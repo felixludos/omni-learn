@@ -1,0 +1,43 @@
+
+
+data: [/home/fleeb/workspace/ml_datasets/audio/musicnet/musicnet.h5]
+
+save-root: trained_nets/
+name:       test
+
+batch-size:  64
+#train-per:  0.7
+#val-per:    0.1
+split-path: /home/fleeb/workspace/ml_datasets/audio/musicnet/split.pth.tar
+
+dataset: musicnet
+
+model:        naive
+data-type:    wav
+sample-rate:  44100
+step-len:     1
+seq-len:      2000
+hop:          10
+use-batch-norm: True
+
+rec-dim:    128
+rec-num-layers: 1
+rec-type:   lstm
+fc-dims:    [64]
+
+epochs:     20
+seed:       100
+
+loss-type:    nll
+loss-scale:   1
+
+optimization: rmsprop
+lr:           1e-3
+weight-decay: 1e-4
+momentum:     0.9
+decay-epochs: 16
+
+disp-freq:    20
+log-date:     True
+tblog:        True
+no-test:      True

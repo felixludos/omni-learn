@@ -1,0 +1,8 @@
+numpy
+matplotlib
+torch
+tensorflow
+gym
+OpenCV-Python
+tabulate
+configargparse

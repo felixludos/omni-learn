@@ -1,0 +1,61 @@
+<?xml version="1.0" ?>
+<mujoco model="MuJoCo Model">
+    <compiler angle="radian"/>
+    <statistic extent="1" />
+    <option gravity="0 0 -9.81" integrator="RK4" timestep='0.02'/>
+    <size njmax="795" nconmax="250" nstack="631875" />
+    <visual>
+        <quality shadowsize="2048" />
+        <map znear="0.8" zfar="3.2"/>
+    </visual>
+    <default class="main">
+        <joint limited="true" armature="0.01" damping="0.7" /> <!-- damping was 0.2-->
+        <!-- <position kp="500" /> -->
+        <geom margin="0.001" />
+    </default>
+    <asset>
+        <material name="material1" rgba="0.5 0.7 0.6 1" specular="0.247985" shininess="0.01864" reflectance="0.032382" />
+        <material name="material2" rgba="0.7 0.8 0.5 1" specular="0.977985" shininess="0.51864" reflectance="0.0" />
+        <material name="material3" rgba="0.6 0.4 0.8 1" specular="0.177985" shininess="0.31864" reflectance="0.6" />
+    </asset>
+    <worldbody>
+        <geom name="floor0" size="1 1 1" pos="0 0 0" type="plane" />
+        <light pos="1 0 1.5" dir="-0.371391 0 -0.928477" castshadow="false" cutoff="90" exponent="1" diffuse="1 1 1" specular="0 0 0" />
+        <body name="floor0" pos="1.5 1.4 0">
+            <inertial pos="1.5 1.4 0" mass="0" diaginertia="0 0 0" />
+        </body>
+        <body name="floating_obj" pos="0 0 0.3">
+
+            <!-- full rot -->
+            <inertial pos="0 0 0" mass="1" diaginertia="0.166667 0.166667 0.166667" />
+
+            <joint name="obj_jnt_x" pos="0 0 0" axis="1 0 0" type="slide" limited='true' range="-.5 .5" damping="0.01" />
+            <joint name="obj_jnt_y" pos="0 0 0" axis="0 1 0" type="slide" limited='true' range="-.5 .5" damping="0.01" />
+            <joint name="obj_jnt_z" pos="0 0 0" axis="0 0 1" type="slide" limited='true' range="0 .4" damping="0.01" />
+
+            <joint name="obj_jnt_wx" pos="0 0 0" axis="1 0 0" type="hinge" limited='false' damping="0.01" />
+            <joint name="obj_jnt_wy" pos="0 0 0" axis="0 1 0" type="hinge" limited='false' damping="0.01" />
+            <joint name="obj_jnt_wz" pos="0 0 0" axis="0 0 1" type="hinge" limited='false' damping="0.01" />
+
+            <!--<joint name="obj_jnt" pos="0 0 0" axis="1 0 0" type="free" limited='false' damping="0.01" />-->
+            <geom name="geom0" size="0.16 0.04 0.06" type="box" material="material1"/>
+            <geom name="geom1" size="0.05 0.13" type="cylinder" pos="-0.06 0.03 0.04" material="material2" euler="1.8 0 0"/>
+            <geom name="geom2" size="0.04 0.16" type="capsule" pos="0.08 0.03 0.04" material="material3" euler="0 0.1 0"/>
+            <!--<geom name="geom2" size="0.06 0.10 0.14" type="box" pos="-0.08 0.05 0" euler="0.3 .4 0" material="material3"/>-->
+        </body>
+        <body name="external_camera_body_0" pos="0 0 0">
+            <camera euler="0 1 1.57" fovy="45" name="external_camera_0" pos="1.8 0 1.2"></camera>
+        </body>
+    </worldbody>
+    <actuator>
+
+        <motor gear="16" joint="obj_jnt_x" name="obj:motionX"/>
+        <motor gear="16" joint="obj_jnt_y" name="obj:motionY"/>
+        <motor gear="16" joint="obj_jnt_z" name="obj:motionZ"/>
+        <!-- for single rot-->
+        <motor gear="4" joint="obj_jnt_wx" name="obj:motionWX"/>
+        <motor gear="4" joint="obj_jnt_wy" name="obj:motionWY"/>
+        <motor gear="4" joint="obj_jnt_wz" name="obj:motionWZ"/>
+
+    </actuator>
+</mujoco>

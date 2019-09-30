@@ -1,0 +1,65 @@
+<mujoco>
+    <compiler angle="degree"/>
+    <option gravity="0 0 -9.81" timestep="0.003" iterations="50" solver="Newton" jacobian="sparse" cone="elliptic" tolerance="1e-10"/>
+   
+    <default>
+        <geom solimp=".9 .9 .01"/>
+        <default class="peg">
+            <geom mass="0.5" size="0.007 0.1" axisangle="1 0 0 87" type="cylinder" condim='1' rgba=".80 .20 .20 1"/>
+            
+        </default>
+
+    </default>
+    <asset>
+        <texture type="skybox" builtin="gradient" width="128" height="128" rgb1=".4 .6 .8" rgb2="0 0 0"/>  
+        <texture name="texgeom" type="cube" builtin="flat" mark="cross" width="128" height="128" 
+            rgb1="0.6 0.6 0.6" rgb2="0.6 0.6 0.6" markrgb="1 1 1"/>  
+        <texture name="texplane" type="2d" builtin="checker" rgb1=".4 .4 .4" rgb2=".6 .6 .6" 
+            width="512" height="512"/>  
+        <material name='geom' texture="texgeom" texuniform="true"/>
+        <material name='MatPlane' reflectance='0.3' texture="texplane" texrepeat="1 1" texuniform="true"/>
+    </asset>
+
+    <statistic extent="1"/>
+
+    <worldbody>
+        <geom pos="0 0 -.8" type="plane" size="3 3 .5" rgba=".7 .7 .7 1" material="MatPlane"/>
+
+        <body name='plinko-token' pos='-.44 -.05 0.9'>
+            <!--<joint name="token" type="free"/>-->
+
+            <joint name="tokenx" type="slide" axis="1 0 0" limited="false" range="-.5 .5"/>
+            <!--<joint name="tokeny" type="slide" axis="0 1 0" limited="false" range="0 1"/>-->
+            <joint name="tokenz" type="slide" axis="0 0 1" limited="false" range="0 1"/>
+            <!--<joint name="tokenwx" type="hinge" axis="1 0 0" limited="false" range="0 1"/>-->
+            <joint name="tokenwy" type="hinge" axis="0 1 0" limited="false" range="0 1"/>
+            <!--<joint name="tokenwz" type="hinge" axis="0 0 1" limited="false" range="0 1"/>-->
+
+            <geom name='obj' type='cylinder' size='.048 .01' axisangle='1 0 0 90'/>
+        </body>
+
+        <body name="board" pos="0 0 0">
+
+            <geom axisangle='1 0 0 -3' condim="3" size="0.55 0.01 0.75" rgba=".80 .80 .80 1" type="box"/>
+
+            <body name="glass" pos="0 -.16 0">
+                <geom size="0.6 0.01 0.75" rgba=".20 .20 .80 0.05" type="box" condim='3'/>
+            </body>
+
+            <!-- board -->
+            <body name="base" pos="0 0 -0.7">
+                <geom size="0.585 0.25 0.02" rgba=".80 .20 .20 1" type="box" condim='3'/>
+            </body>
+
+            <body name="left-base" pos="-0.56 0 0">
+                <geom size="0.025 0.3 0.75" rgba=".80 .20 .20 0.5" type="box" condim='3'/>
+            </body>
+
+            <body name="right-base" pos="0.56 0 0">
+                <geom size="0.025 0.3 0.75" rgba=".80 .20 .20 0.5" type="box" condim='3'/>
+            </body>
+
+
+        </body>
+    </worldbody>
+</mujoco>

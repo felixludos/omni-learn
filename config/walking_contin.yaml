@@ -1,0 +1,42 @@
+agent:              walking-contin-comm # has global baseline
+
+alg:                npg
+policy:             gaussian
+model:              mlp
+hidden:             [10]
+
+baseline:           lin
+#b-hidden:           [5]
+#b-lr:               1e-2
+#b-optim-type:       sgd
+#b-nesterov:         True
+#b-epochs:           10
+#b-batch-size:       128
+b-time-order:       3
+b-obs-order:        1
+
+env:                walking
+multi-agent:        True
+
+continuous-comm:    True
+s2c-channels:       1
+c2s-channels:       1
+cut-comm-graph:     True
+
+commander:          True
+cmd-hidden:         [30]
+#unique-subs:        True
+#parallel-update:    True #False
+
+save-root:          results/
+#seed:               100
+
+num-iter:           100
+num-traj:           20
+save-freq:          10
+num-eval:           10
+#viz:                2
+
+step-size:          0.005
+min-log-std:        -3
+

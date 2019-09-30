@@ -1,0 +1,48 @@
+<?xml version="1.0" ?>
+<mujoco model="MuJoCo Model">
+    <compiler angle="radian" eulerseq="xyz"/>
+    <statistic extent="1" />
+    <option gravity="0 0 -9.81" integrator="RK4" timestep='0.02'/>
+    <size njmax="1000" nconmax="500" nstack="631875" />
+    <visual>
+        <quality shadowsize="2048" />
+        <headlight active="0"/>
+        <map znear=".8" zfar="7"/>
+    </visual>
+    <default class="main">
+        <joint limited="true" armature="0.01" damping=".7"  /> <!-- damping was 0.2-->
+        <geom margin="0.0001" conaffinity="1" condim="3" contype="1" solref=".02 1" solimp=".01 .02 .001" />
+    </default>
+    <asset>
+
+        {}
+
+
+        <material name="screen_mat" emission="100" shininess="0" specular="0" reflectance="0" rgba="0 0 0 0"/>
+
+    </asset>
+    <worldbody>
+
+
+
+        <body name="camera" euler="0 1.4 1.57" pos="2 0 .6">
+            <light directional="true" pos="0 0 0" castshadow="false"/>
+            <camera fovy="45" name="external_camera_0" pos="0 0 0" />
+
+            <body name="screen" pos="0 0 -3.5">
+                <geom name="screen" type="box" size="2 2 .01" material="screen_mat" />
+            </body>
+
+        </body>
+
+
+        {}
+
+
+    </worldbody>
+    <actuator>
+
+        {}
+
+    </actuator>
+</mujoco>

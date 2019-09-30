@@ -1,0 +1,27 @@
+alg:                vpg
+
+policy:             gaussian
+model:              mlp
+#hidden:             [5]
+discount:           0
+
+baseline:           mlp
+
+env:                sel
+
+save-root:          results/
+seed:               100
+
+num-iter:           100
+num-traj:           3
+save-freq:          50
+num-eval:           10
+
+nonlinearity:       prelu
+optim-type:         sgd
+lr:                 1e-1
+weight-decay:       1e-4
+b-hidden:           [5]
+
+b-lr:               1e-1
+b-optim-type:       sgd
