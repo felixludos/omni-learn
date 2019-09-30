@@ -136,26 +136,27 @@ class Rec_Encoder(Encoder): # fc before and after recurrence
 class Decoder(fm.Model):
 
 	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,
-				 channels=[], kernels=[], ups=[], upsampling='deconv', norm_type='batch', output_norm_type=None,
+				 channels=[], kernels=[], ups=[], upsampling='deconv', norm_type='instance', output_norm_type=None,
 				 hidden_fc=[]):
 		
 		self.out_shape = out_shape
-		
-		deconv, in_shape = make_deconv_net(self.out_shape, nonlin=nonlin, output_nonlin=output_nonlin,
-		                                   ups=ups, upsampling=upsampling, norm_type=norm_type,
-		                                   out_batch_norm=output_norm_type,
-		                                   channels=channels, kernels=kernels)
 
-		super(Decoder, self).__init__(in_shape if latent_dim is None else latent_dim, out_shape)
+		dshapes, dsets = plan_deconv(self.out_shape, channels=channels, kernels=kernels, factors=ups) # TODO: add strides
 
-		self.deconv_shape = in_shape
+		deconv_layers = build_deconv_layers(dsets, sizes=dshapes[1:], nonlin=nonlin, out_nonlin=output_nonlin,
+											up_type=upsampling, norm_type=norm_type,
+											out_norm_type=output_norm_type)
+
+		super(Decoder, self).__init__(dshapes[0] if latent_dim is None else latent_dim, out_shape)
+
+		self.deconv_shape = dshapes[0]
 		self.latent_dim = latent_dim if latent_dim is not None else int(np.product(self.deconv_shape))
 
 		self.fc = None
 		if latent_dim is not None:
 			self.fc = make_MLP(self.latent_dim, int(np.product(self.deconv_shape)), hidden_dims=hidden_fc, nonlin=nonlin, output_nonlin=nonlin)
 
-		self.deconv = deconv
+		self.deconv = nn.Sequential(*deconv_layers)
 
 	def forward(self, q):
 		if self.fc is not None:

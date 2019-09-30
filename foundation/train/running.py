@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributions as distrib
 import torchvision
+from ..framework import Generative_Model
 from .. import util
 from .. import models
 from .load_model import save_checkpoint
@@ -122,20 +123,16 @@ def run_unsup_epoch(model, loader, args, mode='test', optim=None,
 	itr = iter(loader)
 	start = time.time()
 	for i, sample in enumerate(itr):
-
-		try:
-			x = sample['x'] # dict
-		except:
-			x = sample[0] # tuple
 			
-		x = x.to(args.device)
+		sample = sample.to(args.device)
 
-		args.total_samples[mode] += x.size(0)
+		args.total_samples[mode] += sample.size(0)
 
 		time_stats.update('data', time.time() - start)
 		start = time.time()
 
-		loss = model.get_loss(x, stats=stats)
+		out = model.get_loss(sample, stats=stats)
+		loss = out['loss']
 		stats.update('loss', loss.detach())
 
 		loss *= args.loss_scale
@@ -160,24 +157,26 @@ def run_unsup_epoch(model, loader, args, mode='test', optim=None,
 
 				B, C, H, W = x.size()
 
-				rec = model(x).detach()
-
-				stats.update('viz-loss', viz_criterion(rec, x).detach())
+				if 'original' in out and 'reconstruction' in out:
+					stats.update('viz-loss', viz_criterion(rec, x).detach())
 
 				vals = stats.smooths(logger_prefix)
 
 				logger.update(vals, args.total_samples[mode])
 
 				if i % print_freq * 10 == 0:  # update images
-					N = min(4, B)
 
-					viz_x, viz_rec = x[:N], rec[:N]
+					if 'original' in out and 'reconstruction' in out:
 
-					imgs = torch.stack([viz_x, viz_rec], 0).view(-1, C, H, W)
-					imgs = torchvision.utils.make_grid(imgs, nrow=N).permute(1, 2, 0).unsqueeze(0)
-					
-					info = {logger_prefix.format('rec'): imgs.cpu().numpy()}
-					
+						N = min(4, B)
+
+						viz_x, viz_rec = out['original'][:N], out['reconstruction'][:N]
+
+						imgs = torch.stack([viz_x, viz_rec], 0).view(-1, C, H, W)
+						imgs = torchvision.utils.make_grid(imgs, nrow=N).permute(1, 2, 0).unsqueeze(0)
+
+						info = {logger_prefix.format('rec'): imgs.cpu().numpy()}
+
 					try:
 						gen = model.generate(N=N).detach()
 						imgs = torchvision.utils.make_grid(gen, nrow=N//2).permute(1, 2, 0).unsqueeze(0)
