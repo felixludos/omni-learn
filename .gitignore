@@ -1,1 +1,6 @@
 local_data/
+.ipynb_checkpoints/
+.idea/
+__pycharm__/
+trained_nets/
+foundation.egg-info
