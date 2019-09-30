@@ -9,6 +9,9 @@ from .. import util
 from torch.utils.data import TensorDataset, DataLoader, ConcatDataset
 from ..data.collectors import *
 
+FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+print(FD_PATH)
+
 def simple_split_dataset(dataset, split, shuffle=True):
 	'''
 
@@ -76,9 +79,9 @@ def _load_data(path=None, args=None):
 
 		args.din = 1, 28, 28
 
-		traindata = torchvision.datasets.MNIST('data/mnist/', train=True, download=True,
+		traindata = torchvision.datasets.MNIST(os.path.join(FD_PATH,'local_data/mnist/'), train=True, download=True,
 											   transform=torchvision.transforms.ToTensor())
-		testdata = torchvision.datasets.MNIST('data/mnist/', train=False, download=True,
+		testdata = torchvision.datasets.MNIST(os.path.join(FD_PATH,'local_data/mnist/'), train=False, download=True,
 											  transform=torchvision.transforms.ToTensor())
 
 		if hasattr(args, 'indexed') and args.indexed:
