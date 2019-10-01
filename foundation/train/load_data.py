@@ -8,9 +8,35 @@ import torchvision
 from .. import util
 from torch.utils.data import TensorDataset, DataLoader, ConcatDataset
 from ..data.collectors import *
+from ..data.collate import _collate_movable
+
 
 FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 print(FD_PATH)
+
+def get_loader(*datasets, batch_size=None, num_workers=0, shuffle=True, pin_memory=True,
+		   drop_last=False, worker_init_fn=None):
+
+	if shuffle == 'all':
+		shuffles = [True]*3
+	elif shuffle:
+		shuffles = [True, False, False]
+	else:
+		shuffles = [False]*3
+
+	if batch_size is None:
+		batch_size = 64 # TODO: maybe choose batch size smartly
+
+	loaders = [DataLoader(ds, batch_size=batch_size, shuffle=s, num_workers=num_workers,
+						  # collate_fn=_collate_movable, 
+						  pin_memory=pin_memory, drop_last=drop_last,
+						  worker_init_fn=worker_init_fn) for ds, s in zip(datasets, shuffles)]
+
+
+	if len(loaders) == 1:
+		return loaders[0]
+	return loaders
+
 
 def simple_split_dataset(dataset, split, shuffle=True):
 	'''
@@ -43,18 +69,6 @@ def split_dataset(dataset, split1, split2=None, shuffle=True):
 
 def load_data(path=None, args=None):
 
-	datasets = _load_data(path=path, args=args)
-
-	if not hasattr(args, 'def_device'):
-		args.def_device = None
-
-	# formatting for all datatsets here
-	datasets = [Movable_Dataset(ds, device=args.def_device) for ds in datasets]
-
-
-	return datasets
-
-def _load_data(path=None, args=None):
 	assert path is not None or args is not None, 'must specify the model'
 
 	if path is not None:

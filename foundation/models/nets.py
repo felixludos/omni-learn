@@ -168,7 +168,7 @@ class Decoder(fm.Model):
 		return self.deconv(z)
 
 
-class Autoencoder(fm.Unsupervised_Model):
+class Autoencoder(fm.Trainable_Model):
 	def __init__(self, shape, latent_dim=None, nonlin='prelu', latent_nonlin=None, recon_nonlin=None,
 	             channels=[], kernels=3, factors=1, down='max', up='deconv', norm_type='batch',
 	             hidden_fc=[], latent_norm_type=None, output_norm_type=None, criterion=None):

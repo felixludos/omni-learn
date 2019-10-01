@@ -21,11 +21,11 @@ from foundation import data
 
 
 
-class DirectDecoder(fd.Generative_Model, fd.Unsupervised_Model):
+class DirectDecoder(fd.Generative, fd.Decodable, fd.Vizualizable, fd.Trainable_Model):
 
 
     def __init__(self, latent_dim, out_shape, vocab_size, **dec_kwargs):
-        super().__init__(nn.BCELoss(), latent_dim, out_shape)
+        super().__init__(latent_dim, out_shape)
 
         self.latent_dim = latent_dim
         self.out_shape = out_shape
@@ -35,6 +35,21 @@ class DirectDecoder(fd.Generative_Model, fd.Unsupervised_Model):
 
         self.dec = models.Decoder(out_shape, latent_dim=latent_dim, **dec_kwargs)
 
+        self.criterion = nn.BCELoss()
+
+    def _visualize(self, info, logger):
+
+        if self._viz_counter % 5 == 0:
+
+            B, C, H, W = info['original']
+            N = min(B, 4)
+
+            viz_x, viz_rec = info['original'][:N], info['reconstruction'][:N]
+
+            recs = torch.stack([viz_x, viz_rec],1).view(2*N, C, H, W)
+            logger.add('image', 'rec', recs)
+
+            # show some generation examples
 
 
     def forward(self, idx):
@@ -43,21 +58,27 @@ class DirectDecoder(fd.Generative_Model, fd.Unsupervised_Model):
         out = self.decode(q)
         return out
 
-    def get_loss(self, sample, stats=None): # reconstruction only
+    def _step(self, batch):
 
-        idx, (x, _) = sample
+        idx, (x, _) = batch
 
         pred = self(idx)
 
-        out = {
+        _p = pred.device, x.device
+        print(_p)
+
+        out = util.TensorDict({
             'loss': self.criterion(pred, x),
             'original': x,
             'reconstruction': pred.detach(),
-        }
+        })
 
         return out
 
     def decode(self, q):
+
+        # possibly normalize here
+
         return self.dec(q)
 
     def generate(self, N=1):
@@ -83,14 +104,14 @@ def main():
     args.indexed = True
     args.use_val = False
 
-    args.num_workers = 0
+    args.num_workers = 4
     args.batch_size = 128
 
     args.start_epoch = 0
     args.epochs = 10
 
-    args.name = 'test_on_mnist'
-    args.latent_dim = 2
+    args.name = 'direct_decoder'
+    args.latent_dim = 3
 
     args.save_model = False
 
@@ -121,10 +142,8 @@ def main():
 
     datasets = train.load_data(args=args)
 
-    shuffles = [True, False, False]
-
-    loaders = [DataLoader(d, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=s) for d, s in
-               zip(datasets, shuffles)]
+    loaders = train.get_loader(*datasets, batch_size=args.batch_size, num_workers=args.num_workers,
+                               shuffle=True, drop_last=False, )
 
     trainloader, testloader = loaders[0], loaders[-1]
     valloader = None if len(loaders) == 2 else loaders[1]
@@ -144,31 +163,67 @@ def main():
 
     model = DirectDecoder(latent_dim=args.latent_dim, out_shape=(1, 28, 28), vocab_size=len(datasets[0]),
 
-                          nonlin='prelu', output_nonlin='sigmoid',
-                          channels=[8, 16, 32], kernels=[3, 3, 3], ups=[2, 2, 2], upsampling='bilinear',
+                          nonlin='prelu', output_nonlin=None,
+                          channels=[32, 16, 8], kernels=[3, 3, 3], ups=[2, 2, 2], upsampling='bilinear',
                           output_norm_type=None,
-                          hidden_fc=[32],
+                          hidden_fc=[128],
                           )
 
-    model.to(args.device)
+    # model.to(args.device)
     print(model)
     print('Model has {} parameters'.format(util.count_parameters(model)))
 
-    optim = util.get_optimizer('adam', model.parameters(), lr=1e-3, weight_decay=1e-4, momentum=0.9)
+    model.set_optim(optim_type='adam', lr=1e-3, weight_decay=1e-4, momentum=0.9)
+    # optim = util.get_optimizer('sgd', model.parameters(), )
     scheduler = None  # torch.optim.lr_scheduler.StepLR(optim, step_size=6, gamma=0.2)
 
-    for sample in iter(trainloader):
-        idx, (x,y) = sample
-        idx, (x,y) = idx.to(args.device), (x.to(args.device), y.to(args.device))
-        break
+    lr = model.optim.param_groups[0]['lr']
+    for _ in range(10):
 
-    out = model(idx)
+        old_lr = lr
+        if scheduler is not None:
+            scheduler.step()
+        lr = model.optim.param_groups[0]['lr']
 
-    print(out.shape)
+        if lr != old_lr:
+            print('--- lr update: {:.3E} -> {:.3E} ---'.format(old_lr, lr))
 
-    loss = model.get_loss(x, idx)
+        train_stats = util.StatsMeter('lr', tau=0.1)
+        train_stats.update('lr', lr)
 
-    print(loss)
+        train_stats = train.run_epoch(model, trainloader, args, mode='train',
+                                      epoch=epoch, print_freq=10, logger=logger, silent=True,
+                                      viz_criterion_args=['reconstruction', 'original'],
+                                      stats=train_stats)
+
+        all_train_stats.append(train_stats)
+
+        print('[ {} ] Epoch {} Train={:.3f} ({:.3f})'.format(
+            time.strftime("%H:%M:%S"), epoch + 1,
+            train_stats['loss-viz'].avg.item(), train_stats['loss'].avg.item(),
+        ))
+
+        if args.save_model:
+
+            av_loss = train_stats['loss'].avg.item()
+            is_best = best_loss is None or av_loss < best_loss
+            if is_best:
+                best_loss = av_loss
+
+            path = train.save_checkpoint({
+                'epoch': epoch,
+                'args': args,
+                'model_str': str(model),
+                'model_state': model.state_dict(),
+                'all_train_stats': all_train_stats,
+                'all_test_stats': all_test_stats,
+
+            }, args.save_dir, is_best=is_best, epoch=epoch + 1)
+            print('--- checkpoint saved to {} ---'.format(path))
+
+        epoch += 1
+
+    print('Done')
 
     print('test complete.')
 

@@ -24,6 +24,53 @@ def get_optimizer(optim_type, parameters, lr=1e-3, weight_decay=0, momentum=0, *
 		assert False, "Unknown optimizer type: " + optim_type
 	return optimizer
 
+class Complex_Optimizer(Optimizer):
+	def __init__(self, **optims):
+		super().__init__()
+		self.optims = optims
+
+	def add_param_group(self, *args, **kwargs): # probably shouldnt be used
+		for optim in self.optims.values():
+			optim.add_param_group(*args, **kwargs)
+
+	def load_state_dict(self, state_dict):
+		for name, optim in self.optims.items():
+			optim.load_state_dict(state_dict['name'])
+
+	def state_dict(self):
+		return {name:optim.state_dict() for name, optim in self.optims.items()}
+
+	def zero_grad(self):
+		for optim in self.optims.values():
+			optim.zero_grad()
+
+	def step(self, closure=None): # can and perhaps should be overridden
+		for optim in self.optims.values():
+			optim.step(closure)
+
+	def __getitem__(self, item):
+		return self.optims[item]
+	def __setitem__(self, key, value):
+		self.optims[key] = value
+	def __delitem__(self, key):
+		del self.optims[key]
+
+	def __getattr__(self, item):
+		try:
+			return super().__getattribute__(item)
+		except AttributeError:
+			return self.optims[item]
+	def __setattr__(self, key, value):
+		if isinstance(value, Optimizer):
+			self.__setitem__(key, value)
+		else:
+			super().__setattr__(key, value)
+	def __delattr__(self, item):
+		try:
+			super().__delattr__(item)
+		except AttributeError:
+			self.__delitem__(item)
+
 
 class Conjugate_Gradient(Optimizer):
 	def __init__(self, params, step_size, nsteps, residual_tol=1e-10, ret_stats=False):

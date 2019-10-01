@@ -5,6 +5,8 @@ from .stats import *
 from .data import *
 from .math import *
 from .optim import *
+from .containers import *
+from .logging import *
 #from .setup import *
 try:
 	from .viz import *

@@ -2,38 +2,37 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from .containers import TensorList, TensorDict, Movable
 import h5py as hf
 
-class Movable_Dataset(Dataset):
-
-	def __init__(self, dataset, device=None):
-		self.dataset = dataset
-
-		self.device = device
-
-	def __len__(self):
-		return len(self.dataset)
-
-	def __getitem__(self, idx):
-
-		out = self.dataset[idx]
-
-		if not isinstance(out, Movable):
-			if isinstance(out, torch.Tensor):
-				new = TensorList([out], _size_key=0)
-			elif isinstance(out, (list, tuple)):
-				new = TensorList(out)
-			elif isinstance(out, dict):
-				new = TensorDict()
-				new.update(out)
-		else:
-			raise Exception('Unknown type {}: {}'.format(type(out), out))
-
-		if self.device is not None:
-			new = new.to(self.device)
-
-		return new
+# class Movable_Dataset(Dataset):
+#
+# 	def __init__(self, dataset, device=None):
+# 		self.dataset = dataset
+#
+# 		self.device = device
+#
+# 	def __len__(self):
+# 		return len(self.dataset)
+#
+# 	def __getitem__(self, idx):
+#
+# 		out = self.dataset[idx]
+#
+# 		if not isinstance(out, Movable):
+# 			if isinstance(out, torch.Tensor):
+# 				new = TensorList([out], _size_key=0)
+# 			elif isinstance(out, (list, tuple)):
+# 				new = TensorList(out)
+# 			elif isinstance(out, dict):
+# 				new = TensorDict()
+# 				new.update(out)
+# 		else:
+# 			raise Exception('Unknown type {}: {}'.format(type(out), out))
+#
+# 		if self.device is not None:
+# 			new = new.to(self.device)
+#
+# 		return new
 
 class Indexed_Dataset(Dataset):
 	def __init__(self, d):

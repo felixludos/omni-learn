@@ -10,14 +10,14 @@ from itertools import chain
 
 class Model(nn.Module):  # any vector function
 	def __init__(self, in_dim, out_dim):
-		super(Model, self).__init__()
+		super().__init__()
 		self.din = in_dim
 		self.dout = out_dim
 		self.device = 'cpu'
 
-	def cuda(self):
-		self.device = 'cuda'
-		super(Model, self).cuda()
+	def cuda(self, device=None):
+		self.device = 'cuda' if device is None else device
+		super(Model, self).cuda(device)
 
 	def cpu(self):
 		self.device = 'cpu'
@@ -27,8 +27,19 @@ class Model(nn.Module):  # any vector function
 		self.device = device
 		super(Model, self).to(device)
 
-	def forward(self, x):
-		return x  # Identity model
+	def step(self, batch): # Override pre-processing mixins
+		return self._step(batch)
+
+	def test(self, batch): # Override pre-processing mixins
+		return self._test(batch)
+
+	def _step(self, batch): # Override post-processing mixins
+		self.train()
+		return util.TensorDict()
+
+	def _test(self, batch): # Override post-processing mixins
+		self.eval()
+		return util.TensorDict()
 
 class CompositeModel(Model):
 	def __init__(self, *models):
@@ -40,56 +51,113 @@ class CompositeModel(Model):
 			x = m(x)
 		return x
 
-class Unsupervised_Model(Model):
-	def __init__(self, criterion, in_dim, out_dim=1):
-		super(Unsupervised_Model, self).__init__(in_dim, out_dim)
-		self.criterion = criterion
+# class Unsupervised_Model(Model):
+# 	def __init__(self, criterion, in_dim, out_dim=1):
+# 		raise Exception('Deprecated. See mixins.py')
+# 		super(Unsupervised_Model, self).__init__(in_dim, out_dim)
+# 		self.criterion = criterion
+#
+# 	def get_loss(self, x, **kwargs):
+# 		raise NotImplementedError
+#
+#
+# class Supervised_Model(Model):
+# 	def __init__(self, criterion, in_dim, out_dim, optim=None, scheduler=None):
+# 		raise Exception('Deprecated. See mixins.py')
+# 		super().__init__(in_dim, out_dim)
+# 		self.criterion = criterion
+# 		self.optim = optim
+# 		self.scheduler = scheduler
+# 		self.stats = util.StatsMeter('loss')
+#
+# 	def train_epoch(self, loader):
+# 		assert self.optim is not None
+# 		if self.scheduler is not None:
+# 			self.scheduler.step()
+#
+# 		for sample in loader:
+# 			x,y = sample
+#
+# 			self.optim.zero_grad()
+# 			loss = self.get_loss(x,y)
+# 			loss.backward()
+# 			self.optim.step()
+#
+# 			self.stats.update('loss', loss.detach())
+#
+# 	def get_loss(self, x, y, **kwargs):
+# 		return self.criterion(self(x), y)
 
-	def get_loss(self, x, **kwargs):
-		raise NotImplementedError
+class Optimizable(nn.Module):
 
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.optim = None
 
-class Supervised_Model(Model):
-	def __init__(self, criterion, in_dim, out_dim, optim=None, scheduler=None):
-		super().__init__(in_dim, out_dim)
-		self.criterion = criterion
+	def set_optim(self, optim=None, optim_type=None, **optim_kwargs):
+		if optim is None:
+			optim = util.get_optimizer(optim_type, self.parameters(), **optim_kwargs)
 		self.optim = optim
-		self.scheduler = scheduler
-		self.stats = util.StatsMeter('loss')
 
-	def train_epoch(self, loader):
-		assert self.optim is not None
-		if self.scheduler is not None:
-			self.scheduler.step()
+	def optim_step(self, loss):
+		if self.optim is None:
+			raise Exception('Optimizer not set')
+		self.optim.zero_grad()
+		loss.backward()
+		self.optim.step()
 
-		for sample in loader:
-			x,y = sample
+	def load_state_dict(self, state_dict):
+		if self.optim is not None:
+			self.optim.load_state_dict(state_dict['optim'])
+		super().load_state_dict(state_dict['model'])
 
-			self.optim.zero_grad()
-			loss = self.get_loss(x,y)
-			loss.backward()
-			self.optim.step()
+	def state_dict(self):
+		state_dict = {
+			'model': super().state_dict(),
+		}
+		if self.optim is not None:
+			state_dict['optim'] = self.optim.state_dict()
+		return state_dict
 
-			self.stats.update('loss', loss.detach())
-
-	def get_loss(self, x, y, **kwargs):
-		return self.criterion(self(x), y)
-
-
-class Generative_Model(Model):
-
+class Generative(object):
 	def generate(self, N=1):
 		raise NotImplementedError
 
+class Encodable(object):
+	def encode(self, x):
+		raise NotImplementedError # should output q
 
+class Decodable(object):
+	def decode(self, q):
+		return NotImplementedError # should output x
 
-class EncoderDecoder(Model):
-
-	def encode(self, observed_state):
+class Vizualizable(object):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._viz_counter = 0
+		self.reset_viz_counter()
+	def reset_viz_counter(self):
+		self._viz_counter = 0
+	def visualize(self, info, logger): # records output directly to logger
+		self._viz_counter += 1
+		self._visualize(info, logger)
+	def _visualize(self, info, logger):
 		raise NotImplementedError
 
-	def decode(self, latent_state):
-		raise NotImplementedError
+
+class Recordable(object):
+	def __init__(self, *args, stats=None, **kwargs):
+		super().__init__(*args, **kwargs)
+
+		if stats is None:
+			stats = util.StatsMeter()
+		self.stats = stats
+
+
+
+class Trainable_Model(Recordable, Optimizable, Model):
+	pass
+
 
 
 class Transition_Model(Model):
@@ -141,7 +209,7 @@ class Transition_Model(Model):
 
 		return (Jx - n) / self.eps, (Ju - n) / self.eps  # returns transposed jacobians
 
-	def forward(self, state, ctrl):  # identity model
+	def forward(self, state, ctrl=None):  # identity model
 		return state
 
 
