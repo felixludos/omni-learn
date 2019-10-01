@@ -8,9 +8,9 @@ def to(obj, device):
 		return obj.to(device)
 	except AttributeError:
 		if isinstance(obj, list):
-			return TensorList(obj).to(device)
+			return TensorList([to(o, device) for o in obj])
 		if isinstance(obj, dict):
-			return TensorDict(obj).to(device)
+			return TensorDict({k:to(v,device) for k,v in obj.items()})
 		raise Exception('Unknown object {}: {}'.format(type(obj), obj))
 
 class Movable(object):

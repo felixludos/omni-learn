@@ -133,7 +133,7 @@ class Rec_Encoder(Encoder): # fc before and after recurrence
 		return qs
 	
 
-class Decoder(fm.Model):
+class Decoder(fm.Decodable, fm.Model):
 
 	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,
 				 channels=[], kernels=[], ups=[], upsampling='deconv', norm_type='instance', output_norm_type=None,
@@ -159,6 +159,9 @@ class Decoder(fm.Model):
 		self.deconv = nn.Sequential(*deconv_layers)
 
 	def forward(self, q):
+		return self.decode(q)
+
+	def decode(self, q):
 		if self.fc is not None:
 			z = self.fc(q)
 		else:

@@ -46,8 +46,8 @@ def run_epoch(model, loader, args, mode='test',
 	time_stats = util.StatsMeter('data', 'model', 'viz')
 	stats.shallow_join(time_stats, prefix='time/')
 
-	logger_prefix = '{}/{}'.format(mode, '{}') if not unique_tests or train else '{}{}/{}'.format(
-		mode, epoch + 1 + args.start_epoch, '{}')
+	logger_prefix = '{}/{}'.format('{}',mode) if not unique_tests or train else '{}/{}{}'.format('{}',
+		mode, epoch + 1 + args.start_epoch)
 
 	try:
 		model.reset_viz_counter()
@@ -107,6 +107,9 @@ def run_epoch(model, loader, args, mode='test',
 		print(border)
 		print(msg)
 		print(border)
+
+	if logger is not None:
+		logger.flush()
 
 	return stats
 

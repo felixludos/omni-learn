@@ -20,20 +20,41 @@ from foundation import train
 from foundation import data
 
 
+class MLP_Decoder(fd.Decodable, fd.Model):
 
-class DirectDecoder(fd.Generative, fd.Decodable, fd.Vizualizable, fd.Trainable_Model):
-
-
-    def __init__(self, latent_dim, out_shape, vocab_size, **dec_kwargs):
+    def __init__(self, latent_dim, out_shape, hidden_dims=[], nonlin='prelu', output_nonlin=None):
         super().__init__(latent_dim, out_shape)
 
-        self.latent_dim = latent_dim
         self.out_shape = out_shape
         self.out_dim = np.product(out_shape)
 
-        self.table = nn.Embedding(vocab_size, latent_dim)
+        self.net = models.make_MLP(latent_dim, self.out_dim, hidden_dims=hidden_dims,
+                                   output_nonlin=output_nonlin, nonlin=nonlin)
 
-        self.dec = models.Decoder(out_shape, latent_dim=latent_dim, **dec_kwargs)
+    def forward(self, q):
+        return self.decode(q)
+
+    def decode(self, q):
+        B = q.size(0)
+        out = self.net(q)
+        return out.view(B, *self.out_shape)
+
+class DirectDecoder(fd.Generative, fd.Decodable, fd.Vizualizable, fd.Trainable_Model):
+
+    def __init__(self, decoder, latent_dim, vocab_size,
+                 normalize_latent=False, zero_embedding=False,):
+        super().__init__(decoder.din, decoder.dout)
+
+        self.latent_dim = latent_dim
+
+        self.table = nn.Embedding(vocab_size, latent_dim)
+        if zero_embedding:
+            self.table.weight.data.mul_(0)
+
+        self.dec = decoder
+        # self.dec = models.Decoder(out_shape, latent_dim=latent_dim, **dec_kwargs)
+
+        self.normalize_latent = normalize_latent
 
         self.criterion = nn.BCELoss()
 
@@ -41,49 +62,61 @@ class DirectDecoder(fd.Generative, fd.Decodable, fd.Vizualizable, fd.Trainable_M
 
         if self._viz_counter % 5 == 0:
 
-            B, C, H, W = info['original']
-            N = min(B, 4)
+            logger.add('histogram', 'latent-norm', info.latent.norm(p=2, dim=-1))
+
+            B, C, H, W = info['original'].shape
+            N = min(B, 8)
 
             viz_x, viz_rec = info['original'][:N], info['reconstruction'][:N]
 
-            recs = torch.stack([viz_x, viz_rec],1).view(2*N, C, H, W)
-            logger.add('image', 'rec', recs)
+            recs = torch.cat([viz_x, viz_rec],0)
+            logger.add('images', 'rec', recs)
 
             # show some generation examples
+            if self.normalize_latent:
+                gen = self.generate(16)
+                logger.add('images', 'gen', gen)
 
 
-    def forward(self, idx):
-
-        q = self.table(idx)
-        out = self.decode(q)
-        return out
+    def forward(self, q):
+        return self.decode(q)
 
     def _step(self, batch):
 
         idx, (x, _) = batch
 
-        pred = self(idx)
+        q = self.retrieve(idx)
+        pred = self.decode(q)
 
-        _p = pred.device, x.device
-        print(_p)
+        loss = self.criterion(pred, x)
+
+        self.optim_step(loss)
 
         out = util.TensorDict({
-            'loss': self.criterion(pred, x),
+            'loss': loss.detach(),
             'original': x,
             'reconstruction': pred.detach(),
+            'latent': q.detach(),
         })
 
         return out
 
+    def retrieve(self, idx):
+        return self.table(idx)
+
     def decode(self, q):
-
         # possibly normalize here
+        if self.normalize_latent:
+            q = F.normalize(q, p=2, dim=1)
 
-        return self.dec(q)
+        return self.dec.decode(q)
 
     def generate(self, N=1):
-        raise NotImplementedError
 
+        assert self.normalize_latent, 'Must normalize to sample'
+
+        q = torch.randn(N, self.latent_dim).to(self.table.weight.device)
+        return self.decode(q)
 
 
 
@@ -104,7 +137,7 @@ def main():
     args.indexed = True
     args.use_val = False
 
-    args.num_workers = 4
+    args.num_workers = 0#4
     args.batch_size = 128
 
     args.start_epoch = 0
@@ -163,13 +196,13 @@ def main():
 
     model = DirectDecoder(latent_dim=args.latent_dim, out_shape=(1, 28, 28), vocab_size=len(datasets[0]),
 
-                          nonlin='prelu', output_nonlin=None,
+                          nonlin='prelu', output_nonlin='sigmoid',
                           channels=[32, 16, 8], kernels=[3, 3, 3], ups=[2, 2, 2], upsampling='bilinear',
                           output_norm_type=None,
                           hidden_fc=[128],
                           )
 
-    # model.to(args.device)
+    model.to(args.device)
     print(model)
     print('Model has {} parameters'.format(util.count_parameters(model)))
 

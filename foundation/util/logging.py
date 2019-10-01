@@ -53,6 +53,12 @@ class Logger(object):
 
 		add_fn(tag, *args, global_step=global_step, **kwargs)
 
+	def flush(self):
+		if self.tblog is not None:
+			self.tblog.flush()
+		if self.txtlog is not None:
+			self.txtlog.flush()
+
 
 ### Write to stdout and log file
 class Tee(object):

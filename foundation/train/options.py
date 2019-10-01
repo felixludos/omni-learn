@@ -1,5 +1,59 @@
 import configargparse
 
+def setup_standard_options():
+	parser = configargparse.ArgumentParser(description='Direct Decoder Training')
+
+	parser.add_argument('-c', '--config', required=True, is_config_file=True,
+	                    help='Path to config file for parameters')
+
+	# Saving
+	parser.add_argument('-s', '--saveroot', type=str, default='../trained_nets/', )
+	parser.add_argument('-n', '--name', type=str, default=None)
+	parser.add_argument('--no-tb', dest='tblog', action='store_false')
+	parser.add_argument('--txtlog', action='store_true')
+	parser.add_argument('--logdate', action='store_true')
+	parser.add_argument('--print-freq', type=int, default=-1)
+	parser.add_argument('--save-freq', type=int, default=-1)
+
+	parser.add_argument('--resume', type=str, default=None)
+	parser.add_argument('-l', '--load', type=str, default=None)
+
+	# Training
+	parser.add_argument('--seed', type=int, default=0)
+	parser.add_argument('--epochs', type=int, default=25)
+	parser.add_argument('--start-epoch', type=int, default=0)
+	parser.add_argument('--decay-epochs', type=int, default=-1)
+	parser.add_argument('--decay-factor', type=float, default=0.2)
+	parser.add_argument('--use-val', action='store_true')
+	parser.add_argument('--no-unique-tests', dest='unique_tests', action='store_false')
+	parser.add_argument('-b', '--batch-size', default=128, type=int, )
+	parser.add_argument('--no-test', action='store_true')
+
+	# Optim
+	parser.add_argument('--optim-type', type=str, default='adam')
+	parser.add_argument('--lr', type=float, default=1e-3)
+	parser.add_argument('--weight-decay', type=float, default=0)
+	parser.add_argument('--momentum', type=float, default=0)
+
+	# Device/Multiprocessing
+	parser.add_argument('-j', '--num-workers', type=int, default=4)
+	parser.add_argument('--device', type=str, default='cuda')
+	parser.add_argument('--no-cuda', action='store_true')
+
+	# Dataset
+	parser.add_argument('--dataset', type=str, default='mnist')
+	parser.add_argument('-d', '--data', type=str, nargs='+')
+	parser.add_argument('--indexed', action='store_true')
+
+	parser.add_argument('--nonlin', type=str, default='prelu')
+	parser.add_argument('--fc', type=int, nargs='+', default=[64, 128])
+	parser.add_argument('--channels', type=int, nargs='+', default=[32, 16, 8])
+	parser.add_argument('--kernels', type=int, nargs='+', default=3)
+	parser.add_argument('--factors', type=int, nargs='+', default=2)
+	parser.add_argument('--upsampling', type=str, default='bilinear')
+	parser.add_argument('--norm-type', type=str, default='instance')
+
+	return parser
 
 def setup_unsup_options():
 	parser = configargparse.ArgumentParser(description='Generate data of')

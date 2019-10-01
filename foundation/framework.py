@@ -94,9 +94,11 @@ class Optimizable(nn.Module):
 		super().__init__(*args, **kwargs)
 		self.optim = None
 
-	def set_optim(self, optim=None, optim_type=None, **optim_kwargs):
+	def set_optim(self, optim=None, optim_type=None, parameters=None, **optim_kwargs):
 		if optim is None:
-			optim = util.get_optimizer(optim_type, self.parameters(), **optim_kwargs)
+			if parameters is None:
+				parameters = self.parameters()
+			optim = util.get_optimizer(optim_type, parameters, **optim_kwargs)
 		self.optim = optim
 
 	def optim_step(self, loss):

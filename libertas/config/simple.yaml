@@ -1,0 +1,42 @@
+
+
+device: cuda
+seed: 0
+
+logdate: True
+txtlog: False
+
+saveroot: ../trained_nets/
+
+dataset: mnist
+indexed: True
+
+num-workers: 4
+batch-size: 128
+
+start-epoch: 0
+print-freq: 40
+epochs: 40
+
+optim-type: adam
+lr: 1e-2
+weight-decay: 0
+momentum: 0
+
+#decay-epochs: 12
+#decay-factor: .5
+
+#save-model: False
+
+decoder: conv
+fc: [64, 128]
+channels: [32, 16, 8]
+kernels: 3
+factors: 2
+upsampling: bilinear
+
+latent-dim: 20
+
+#zero-embedding: False
+#normalize-latent: False
+#latent-lr: -1
