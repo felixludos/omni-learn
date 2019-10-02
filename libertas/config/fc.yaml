@@ -15,8 +15,8 @@ num-workers: 4
 batch-size: 128
 
 start-epoch: 0
-print-freq: 40
-epochs: 40
+print-freq: 50
+epochs: 50
 
 optim-type: adam
 lr: 1e-2
@@ -37,6 +37,7 @@ upsampling: bilinear
 
 latent-dim: 20
 
+distr: none
+
 #zero-embedding: True
-normalize-latent: False
 #latent-lr: -1

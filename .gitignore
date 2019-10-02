@@ -3,4 +3,5 @@ local_data/
 .idea/
 __pycharm__/
 trained_nets/
+old_trained_nets/
 foundation.egg-info

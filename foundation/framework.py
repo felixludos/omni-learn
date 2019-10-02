@@ -41,6 +41,9 @@ class Model(nn.Module):  # any vector function
 		self.eval()
 		return util.TensorDict()
 
+	def reset(self): # called at the beginning of each epoch
+		pass
+
 class CompositeModel(Model):
 	def __init__(self, *models):
 		super().__init__(models[0].din, models[-1].dout)
@@ -94,6 +97,21 @@ class Optimizable(nn.Module):
 		super().__init__(*args, **kwargs)
 		self.optim = None
 
+		if isinstance(self, Recordable):
+			self.stats.new('lr')
+
+	def record_lr(self):
+		if self.optim is not None:
+			lr = self.optim.param_groups[0]['lr']
+			try:
+				self.stats.update('lr', lr)
+			except AttributeError:
+				pass
+
+	def reset(self):
+		super().reset()
+		self.record_lr()
+
 	def set_optim(self, optim=None, optim_type=None, parameters=None, **optim_kwargs):
 		if optim is None:
 			if parameters is None:
@@ -121,6 +139,30 @@ class Optimizable(nn.Module):
 			state_dict['optim'] = self.optim.state_dict()
 		return state_dict
 
+class Schedulable(Optimizable):
+	def __init__(self, *args, scheduler=None, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.scheduler = scheduler
+
+	def load_state_dict(self, state_dict):
+		if self.scheduler is not None:
+			self.scheduler.load_state_dict(state_dict['scheduler'])
+		super().load_state_dict(state_dict)
+
+	def state_dict(self):
+		state_dict = super().state_dict()
+		if self.scheduler is not None:
+			state_dict['scheduler'] = self.scheduler.state_dict()
+		return state_dict
+
+	def schedule_step(self):
+		if self.scheduler is not None:
+			self.scheduler.step()
+
+	def reset(self):
+		super().reset()
+		self.schedule_step()
+
 class Generative(object):
 	def generate(self, N=1):
 		raise NotImplementedError
@@ -133,7 +175,22 @@ class Decodable(object):
 	def decode(self, q):
 		return NotImplementedError # should output x
 
-class Vizualizable(object):
+class Recordable(Model):
+	def __init__(self, *args, stats=None, **kwargs):
+		super().__init__(*args, **kwargs)
+
+		if stats is None:
+			stats = util.StatsMeter()
+		self.stats = stats
+
+	def reset_stats(self):
+		self.stats.reset()
+
+	def reset(self):
+		super().reset()
+		self.reset_stats()
+
+class Vizualizable(Recordable):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._viz_counter = 0
@@ -146,15 +203,9 @@ class Vizualizable(object):
 	def _visualize(self, info, logger):
 		raise NotImplementedError
 
-
-class Recordable(object):
-	def __init__(self, *args, stats=None, **kwargs):
-		super().__init__(*args, **kwargs)
-
-		if stats is None:
-			stats = util.StatsMeter()
-		self.stats = stats
-
+	def reset(self):
+		self.reset_viz_counter()
+		super().reset()
 
 
 class Trainable_Model(Recordable, Optimizable, Model):

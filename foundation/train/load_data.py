@@ -12,10 +12,10 @@ from ..data.collate import _collate_movable
 
 
 FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-print(FD_PATH)
+# print(FD_PATH)
 
-def get_loader(*datasets, batch_size=None, num_workers=0, shuffle=True, pin_memory=True,
-		   drop_last=False, worker_init_fn=None):
+def get_loaders(*datasets, batch_size=None, num_workers=0, shuffle=True, pin_memory=True,
+		   drop_last=False, worker_init_fn=None, silent=False):
 
 	if shuffle == 'all':
 		shuffles = [True]*3
@@ -32,6 +32,15 @@ def get_loader(*datasets, batch_size=None, num_workers=0, shuffle=True, pin_memo
 						  pin_memory=pin_memory, drop_last=drop_last,
 						  worker_init_fn=worker_init_fn) for ds, s in zip(datasets, shuffles)]
 
+	if not silent:
+		trainloader, testloader = loaders[0], loaders[-1]
+		valloader = None if len(loaders) == 2 else loaders[1]
+
+		print('traindata len={}, trainloader len={}'.format(len(datasets[0]), len(trainloader)))
+		if valloader is not None:
+			print('valdata len={}, valloader len={}'.format(len(datasets[1]), len(valloader)))
+		print('testdata len={}, testloader len={}'.format(len(datasets[-1]), len(testloader)))
+		print('Batch size: {} samples'.format(batch_size))
 
 	if len(loaders) == 1:
 		return loaders[0]

@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .. import util
-from ..models import unsup
+# from ..models import unsup
 from .. import models
 
 
@@ -21,6 +21,52 @@ def save_checkpoint(info, save_dir, is_best=False, epoch=None):
 
 	return path
 
+def load(path=None, args=None, load_model=None, load_data=None, load_state_dict=True):
+	assert path is not None or args is not None, 'must provide either path to checkpoint or args'
+	assert load_model or load_data, 'nothing to load'
+
+	checkpoint = None
+	if path is not None:
+		ckptpath = path
+		if os.path.isdir(path):
+			ckptpath = os.path.join(path, 'best.pth.tar')
+
+		if not os.path.isfile(ckptpath):
+			ckptpath = os.path.join(path, list(sorted(os.listdir(path), reverse=True))[0], 'best.pth.tar')
+
+		assert os.path.isfile(ckptpath), 'Could not find encoder: ' + path
+
+		checkpoint = torch.load(ckptpath)
+		args = checkpoint['args']
+		print('Loaded {}'.format(ckptpath))
+
+	out = []
+
+	if load_data is not None:
+		if checkpoint is not None and 'datasets' in checkpoint:
+			datasets = checkpoint['datasets']
+		else:
+			datasets = load_data(args=args)
+
+		out.append(datasets)
+
+	if load_model:
+
+		model = load_model(args=args)
+
+		if checkpoint is not None and 'model_state' in checkpoint and load_state_dict:
+			model.load_state_dict(checkpoint['model_state'])
+			print('Loaded model_state from checkpoint')
+
+		out.append(model)
+
+	if checkpoint is not None:
+		return args, out
+
+	return out
+
+
+# Deprecated
 
 def load_unsup_model(path=None, args=None, optim=None, to_device=True):
 	assert path is not None or args is not None, 'must specify the model'

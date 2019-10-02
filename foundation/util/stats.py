@@ -85,9 +85,10 @@ class StatsMeter(object):
 			elif not intersection:
 				self._stats[name] = meter.copy()
 
-	def shallow_join(self, other, prefix=''):
+	def shallow_join(self, other, fmt=None):
 		for name, meter in other._stats.items():
-			name = prefix + name
+			if fmt is not None:
+				name = fmt.format(name)
 			self._stats[name] = meter
 	
 	def keys(self):

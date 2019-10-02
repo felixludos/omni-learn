@@ -281,6 +281,8 @@ def plan_deconv(out_shape, channels, kernels=2, factors=1, strides=1, padding=No
 	assert len(channels) > 0
 	L = len(channels)
 
+	channels = channels.copy()
+
 	try:
 		assert len(kernels) == L
 	except TypeError:

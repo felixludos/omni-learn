@@ -34,9 +34,6 @@ def run_epoch(model, loader, args, mode='test',
 
 	if stats is None:
 		stats = util.StatsMeter('loss', tau=max(min(1 / len(loader), 0.1), 0.01))
-		if isinstance(model, Recordable):
-			model.stats.reset()
-			stats.shallow_join(model.stats, prefix='model/')
 	elif 'loss' not in stats:
 		stats.new('loss')
 
@@ -44,15 +41,16 @@ def run_epoch(model, loader, args, mode='test',
 		stats.new('loss-viz')
 
 	time_stats = util.StatsMeter('data', 'model', 'viz')
-	stats.shallow_join(time_stats, prefix='time/')
+	stats.shallow_join(time_stats, fmt='time-{}')
 
 	logger_prefix = '{}/{}'.format('{}',mode) if not unique_tests or train else '{}/{}{}'.format('{}',
 		mode, epoch + 1 + args.start_epoch)
 
-	try:
-		model.reset_viz_counter()
-	except AttributeError:
-		pass
+	# model.reset()
+
+	# if isinstance(model, Recordable):
+	# 	model.stats.reset()
+	# 	stats.shallow_join(model.stats)
 
 	itr = iter(loader)
 	start = time.time()
@@ -112,6 +110,16 @@ def run_epoch(model, loader, args, mode='test',
 		logger.flush()
 
 	return stats
+
+
+
+
+
+
+
+
+
+
 
 
 
