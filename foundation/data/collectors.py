@@ -180,21 +180,26 @@ class H5_Dataset(Dataset):
 
 			if keys is None:
 				keys = {k for k in h5_file.keys()}
-			self.keys = keys
+			self.keys = set((key if isinstance(key, tuple) else (key,)) for key in keys)
 
-			if self.unbatched is not None:
+			if self.unbatched is not None: # TODO: add select_grouped to unbatched keys
 				for k in self.unbatched:
 					assert k in h5_file, '{} not found'.format(k)
 
 			# check first dim of all data arrays is equal
-			lens = np.array([h5_file[k].shape[0] for k in self.keys])
+			lens = np.array([self.select_grouped(h5_file, *key).shape[0] for key in self.keys])
 			assert (lens == lens[0]).all(), 'not all lengths are the same for these keys'
 			self._len = lens[0]
+
+	def select_grouped(self, obj, *terms):
+		for term in terms:
+			obj = obj[term]
+		return obj
 
 	def __getitem__(self, idx):
 
 		with hf.File(self.path, 'r') as h5_file:
-			sample = {k:h5_file[k][idx] for k in self.keys}
+			sample = {'-'.join(key):self.select_grouped(h5_file, *key)[idx] for key in self.keys}
 			if self.unbatched is not None:
 				sample.update({k:h5_file[k].value for k in self.unbatched})
 		return sample
@@ -262,3 +267,40 @@ class H5_Loader_Dataset(Dataset): # index refers to a full h5 file, instead of t
 
 	def __len__(self):
 		return len(self.paths)
+
+
+
+
+class Npy_Loader_Dataset(Dataset):
+
+	def __init__(self, npy_file_path, keys=None, unbatched_keys=None):
+
+		self.path = npy_file_path
+
+		self.unbatched_keys = unbatched_keys
+
+
+
+		np_file = np.load(npy_file_path)
+
+		if keys is None:
+			keys = {k for k in np_file.keys()}
+		self.keys = keys
+
+		self.data = {k:np_file[k] for k in self.keys}
+		self.unbatched = {k:np_file[k] for k in self.unbatched_keys} if self.unbatched_keys is not None else {}
+
+		# check first dim of all data arrays is equal
+		lens = np.array([v.shape[0] for v in self.data.values()])
+		assert (lens == lens[0]).all(), 'not all lengths are the same for these keys'
+		self._len = lens[0]
+
+	def __getitem__(self, idx):
+
+		sample = {k:self.data[k][idx] for k in self.keys}
+		sample.update(self.unbatched)
+		return sample
+
+	def __len__(self):
+		return self._len
+

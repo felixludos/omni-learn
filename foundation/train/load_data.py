@@ -12,6 +12,7 @@ from ..data.collate import _collate_movable
 
 
 FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+DEFAULT_DATA_PATH = os.path.join(os.path.dirname(FD_PATH),'local_data')
 # print(FD_PATH)
 
 def get_loaders(*datasets, batch_size=None, num_workers=0, shuffle=True, pin_memory=True,
@@ -33,17 +34,19 @@ def get_loaders(*datasets, batch_size=None, num_workers=0, shuffle=True, pin_mem
 						  worker_init_fn=worker_init_fn) for ds, s in zip(datasets, shuffles)]
 
 	if not silent:
-		trainloader, testloader = loaders[0], loaders[-1]
-		valloader = None if len(loaders) == 2 else loaders[1]
+		trainloader = loaders[0]
+		testloader = None if len(loaders) < 2 else loaders[-1]
+		valloader = None if len(loaders) < 3 else loaders[1]
 
 		print('traindata len={}, trainloader len={}'.format(len(datasets[0]), len(trainloader)))
 		if valloader is not None:
 			print('valdata len={}, valloader len={}'.format(len(datasets[1]), len(valloader)))
-		print('testdata len={}, testloader len={}'.format(len(datasets[-1]), len(testloader)))
+		if testloader is not None:
+			print('testdata len={}, testloader len={}'.format(len(datasets[-1]), len(testloader)))
 		print('Batch size: {} samples'.format(batch_size))
 
-	if len(loaders) == 1:
-		return loaders[0]
+	# if len(loaders) == 1:
+	# 	return loaders[0]
 	return loaders
 
 
@@ -76,6 +79,32 @@ def split_dataset(dataset, split1, split2=None, shuffle=True):
 	p2, p3 = simple_split_dataset(p2, split2, shuffle=False)
 	return p1, p2, p3
 
+_pytorch_toy_datasets = {
+	'mnist': torchvision.datasets.MNIST,
+	'kmnist': torchvision.datasets.KMNIST,
+	'fmnist': torchvision.datasets.FashionMNIST,
+	'emnist': torchvision.datasets.EMNIST,
+	'svhn': torchvision.datasets.SVHN
+}
+_pytorch_toy_datasets_classes = {
+	'emnist': 26,
+	'svhn': 10,
+}
+_pytorch_toy_datasets_size = {
+	'svhn': (3,32,32),
+}
+
+_pytorch_toy_dataset_args = {
+	'emnist': {'split':'letters'},
+}
+
+_pytorch_toy_dataset_train_args = {
+	'svhn': {'split':'train'},
+}
+_pytorch_toy_dataset_test_args = {
+	'svhn': {'split':'test'},
+}
+
 def load_data(path=None, args=None):
 
 	assert path is not None or args is not None, 'must specify the model'
@@ -96,16 +125,34 @@ def load_data(path=None, args=None):
 		print('Loaded args from {}'.format(path))
 		args = checkpoint['args']
 
-	if args.dataset == 'mnist':
+	if args.dataset in _pytorch_toy_datasets:
 
 		args.save_datasets = False
 
-		args.din = 1, 28, 28
+		args.din = _pytorch_toy_datasets_size[args.dataset] if args.dataset in _pytorch_toy_datasets_size else (1, 28, 28)
 
-		traindata = torchvision.datasets.MNIST(os.path.join(FD_PATH,'local_data/mnist/'), train=True, download=True,
-											   transform=torchvision.transforms.ToTensor())
-		testdata = torchvision.datasets.MNIST(os.path.join(FD_PATH,'local_data/mnist/'), train=False, download=True,
-											  transform=torchvision.transforms.ToTensor())
+		args.dout = _pytorch_toy_datasets_classes[args.dataset] if args.dataset in _pytorch_toy_datasets_classes else 10
+
+		train_kwargs = _pytorch_toy_dataset_args[args.dataset] if args.dataset in _pytorch_toy_dataset_args else {}
+		test_kwargs = train_kwargs.copy()
+
+		if args.dataset in _pytorch_toy_dataset_train_args:
+			train_kwargs.update(_pytorch_toy_dataset_train_args[args.dataset])
+		else:
+			train_kwargs['train'] = True
+		if args.dataset in _pytorch_toy_dataset_train_args:
+			test_kwargs.update(_pytorch_toy_dataset_test_args[args.dataset])
+		else:
+			test_kwargs['train'] = False
+
+		traindata = _pytorch_toy_datasets[args.dataset](os.path.join(DEFAULT_DATA_PATH, args.dataset), download=True,
+											   transform=torchvision.transforms.ToTensor(), **train_kwargs)
+		testdata = _pytorch_toy_datasets[args.dataset](os.path.join(DEFAULT_DATA_PATH, args.dataset), download=True,
+											  transform=torchvision.transforms.ToTensor(), **test_kwargs)
+
+		if args.dataset == 'emnist': # they didnt use zero based indexing for the classes (!)
+			traindata = Format_Dataset(traindata, format_fn=lambda xy: (xy[0].permute(0,2,1), xy[1]-1))
+			testdata = Format_Dataset(testdata, format_fn=lambda xy: (xy[0].permute(0,2,1), xy[1] - 1))
 
 		if hasattr(args, 'indexed') and args.indexed:
 			traindata = Indexed_Dataset(traindata)
@@ -113,7 +160,7 @@ def load_data(path=None, args=None):
 
 		if args.use_val:
 
-			traindata, valdata = split_dataset(traindata, split=args.val_per, shuffle=False)
+			traindata, valdata = split_dataset(traindata, split1=1-args.val_per, shuffle=False)
 			
 			return traindata, valdata, testdata
 		
@@ -146,11 +193,16 @@ def load_data(path=None, args=None):
 			fmt_fn = format_h5_seq
 
 		else:
-			dataset = ConcatDataset([H5_Dataset(d, keys={'rgbs'}) for d in args.data_files])
+			dataset = ConcatDataset([H5_Dataset(d, keys={'rgbs'}) for d in args.data_files]) if len(args.data_files) > 1 else H5_Dataset(args.data_files[0], keys={'rgbs'})
 
 			assert False
 
-		datasets = split_dataset(dataset, args.test_per)
+		if args.test_per is not None and args.test_per > 0:
+
+			datasets = split_dataset(dataset, args.test_per)
+
+		else:
+			datasets = (dataset,)
 
 		if args.use_val:
 

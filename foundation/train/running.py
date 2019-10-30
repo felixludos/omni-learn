@@ -8,8 +8,199 @@ import torch.distributions as distrib
 import torchvision
 from ..framework import Generative, Recordable
 from .. import util
+from ..framework import Visualizable
+from .load_data import get_loaders
+from .options import setup_standard_options
 from .. import models
 from .load_model import save_checkpoint
+
+def run_full(get_options, get_data, get_model, argv=None):
+	if argv is None:
+		argv = sys.argv[1:]
+
+	parser = get_options() # shuffle, drop_last, viz_criterion_args, track_best
+	parser = setup_standard_options(parser)
+
+	# Model
+
+	args = parser.parse_args(argv)
+
+	if hasattr(args, 'kernels') and args.kernels is not None:
+		if len(args.kernels) != len(args.channels):
+			args.kernels = args.kernels * len(args.channels)
+
+	if hasattr(args, 'factors') and args.kernels is not None:
+		if len(args.factors) != len(args.channels):
+			args.factors = args.factors * len(args.channels)
+
+	###################
+	# Logging
+	###################
+
+	now = time.strftime("%y%m%d-%H%M%S")
+	if args.logdate:
+		args.name = args.name + '_' + now
+	args.save_dir = os.path.join(args.saveroot, args.name)
+	# args.save_dir = os.path.join(args.save_root, args.name)
+	print('Save dir: {}'.format(args.save_dir))
+	if args.tblog or args.txtlog:
+		util.create_dir(args.save_dir)
+		print('Logging in {}'.format(args.save_dir))
+
+	logger = util.Logger(args.save_dir, tensorboard=args.tblog, txt=args.txtlog)
+
+	if args.no_cuda or not torch.cuda.is_available():
+		args.device = 'cpu'
+	print('Using {}'.format(args.device))
+
+	# Set seed
+	torch.manual_seed(args.seed)
+	np.random.seed(args.seed)
+	try:
+		torch.cuda.manual_seed(args.seed)
+	except:
+		pass
+
+	###################
+	# Data
+	###################
+
+	assert not args.use_val, 'cant use validation'
+
+	datasets = get_data(args)
+
+	loaders = get_loaders(*datasets, batch_size=args.batch_size, num_workers=args.num_workers,
+	                                            shuffle=args.shuffle, drop_last=args.drop_last, silent=True)
+
+	trainloader = loaders[0]
+	testloader = None if len(loaders) < 2 else loaders[-1]
+	valloader = None if len(loaders) < 3 else loaders[1]
+
+	print('traindata len={}, trainloader len={}'.format(len(datasets[0]), len(trainloader)))
+	if valloader is not None:
+		print('valdata len={}, valloader len={}'.format(len(datasets[1]), len(valloader)))
+	if testloader is not None:
+		print('testdata len={}, testloader len={}'.format(len(datasets[-1]), len(testloader)))
+	print('Batch size: {} samples'.format(args.batch_size))
+
+	# Reseed after loading datasets
+	torch.manual_seed(args.seed)
+	np.random.seed(args.seed)
+	try:
+		torch.cuda.manual_seed(args.seed)
+	except:
+		pass
+
+	###################
+	# Model
+	###################
+
+	args.total_samples = {'train': 0, 'test': 0}
+	if valloader is not None:
+		args.total_samples['val'] = 0
+	epoch = args.start_epoch
+	best_loss = None
+	best_epoch = None
+	is_best = False
+	all_train_stats = []
+	all_val_stats = []
+
+	if args.stats_decay is None:
+		args.stats_decay = max(min(1 / len(trainloader), 0.1), 0.01)
+	util.set_default_tau(args.stats_decay)
+
+	model = get_model(args)
+
+	model.to(args.device)
+
+	print(model)
+	print(model.optim)
+	print('Model has {} parameters'.format(util.count_parameters(model)))
+
+	# Reseed after model init
+	torch.manual_seed(args.seed)
+	np.random.seed(args.seed)
+	try:
+		torch.cuda.manual_seed(args.seed)
+	except:
+		pass
+
+	###################
+	# Run Train/Val Epochs
+	###################
+
+	if args.no_test:
+		print('Will not run test data after training')
+	else:
+		raise NotImplementedError
+
+
+	for _ in range(args.epochs):
+
+		model.reset()
+
+		train_stats = util.StatsMeter()
+		train_stats.shallow_join(model.stats)
+
+		train_stats = run_epoch(model, trainloader, args, mode='train',
+		                              epoch=epoch, print_freq=args.print_freq, logger=logger, silent=False,
+		                              viz_criterion_args=args.viz_criterion_args,
+		                              stats=train_stats, )
+
+		all_train_stats.append(train_stats.copy())
+
+		if valloader is not None:
+			model.reset()
+
+			val_stats = util.StatsMeter()
+			val_stats.shallow_join(model.stats)
+
+			val_stats = run_epoch(model, valloader, args, mode='val',
+		                              epoch=epoch, print_freq=args.print_freq, logger=logger, silent=False,
+		                              viz_criterion_args=args.viz_criterion_args,
+		                              stats=val_stats, )
+
+			all_val_stats.append(val_stats.copy())
+
+
+
+		if args.save_freq > 0 and epoch % args.save_freq == 0:
+
+
+			ckpt = {
+				'epoch': epoch+1,
+
+				'args': args,
+
+				'model_str': str(model),
+				'model_state': model.state_dict(),
+				'all_train_stats': all_train_stats,
+			}
+			if args.track_best:
+				av_loss = train_stats['loss'].avg.item() if valloader is None else val_stats['loss'].avg.item()
+				is_best = best_loss is None or av_loss < best_loss
+				if is_best:
+					best_loss = av_loss
+					best_epoch = epoch
+
+				ckpt['loss'] = av_loss
+				ckpt['best_loss'] = best_loss
+				ckpt['best_epoch'] = best_epoch
+			if len(all_val_stats):
+				ckpt['all_val_stats'] = all_val_stats
+			path = save_checkpoint(ckpt, args.save_dir, is_best=is_best, epoch=epoch+1)
+			print('--- checkpoint saved to {} ---'.format(path))
+
+		epoch += 1
+		print()
+
+	###################
+	# Run Test Epochs
+	###################
+
+	print('No test epoch implemented')
+
+	return model, datasets, loaders
 
 
 def run_epoch(model, loader, args, mode='test',
@@ -21,7 +212,7 @@ def run_epoch(model, loader, args, mode='test',
 	else:
 		model.eval()
 	if not hasattr(args, 'total_samples'):
-		args.total_samples = {'train': 0, 'test': 0}
+		args.total_samples = {'train': 0, 'val':0, 'test': 0}
 
 	viz_criterion = util.get_loss_type(viz_criterion) if viz_criterion_args is not None else None
 
@@ -40,17 +231,11 @@ def run_epoch(model, loader, args, mode='test',
 	if viz_criterion is not None and 'loss-viz' not in stats:
 		stats.new('loss-viz')
 
-	time_stats = util.StatsMeter('data', 'model', 'viz')
+	time_stats = util.StatsMeter('data', 'model', 'viz', tau=args.stats_decay)
 	stats.shallow_join(time_stats, fmt='time-{}')
 
 	logger_prefix = '{}/{}'.format('{}',mode) if not unique_tests or train else '{}/{}{}'.format('{}',
-		mode, epoch + 1 + args.start_epoch)
-
-	# model.reset()
-
-	# if isinstance(model, Recordable):
-	# 	model.stats.reset()
-	# 	stats.shallow_join(model.stats)
+		mode, epoch + 1)
 
 	itr = iter(loader)
 	start = time.time()
@@ -85,12 +270,13 @@ def run_epoch(model, loader, args, mode='test',
 				for k,v in stats.smooths().items():
 					logger.add('scalar', k, v)
 
-				model.visualize(out, logger)
+				if isinstance(model, Visualizable):
+					model.visualize(out, logger)
 
 			if not silent:
 				print('[ {} ] {} Ep={}/{} Itr={}/{} Loss: {:.3f} ({:.3f})'.format(
 					time.strftime("%H:%M:%S"), mode,
-					epoch + args.start_epoch + 1, args.epochs, i + 1, len(loader),
+					epoch + 1, args.epochs, i + 1, len(loader),
 					stats['loss'].val.item(), stats['loss'].smooth.item()))
 
 		time_stats.update('viz', time.time() - start)
@@ -99,7 +285,7 @@ def run_epoch(model, loader, args, mode='test',
 	if not silent:
 		msg = '[ {} ] {} Ep={}/{} complete Loss: {:.4f} ({:.4f})'.format(
 			time.strftime("%H:%M:%S"), mode,
-			epoch + args.start_epoch + 1, args.epochs,
+			epoch + 1, args.epochs,
 			stats['loss'].val.item(), stats['loss'].smooth.item())
 		border = '-' * 50
 		print(border)
@@ -119,448 +305,4 @@ def run_epoch(model, loader, args, mode='test',
 
 
 
-
-
-
-
-def run_rl_training(gen, agent, args=None,
-                logger=None, stats=None, tau=0.1,
-                save_freq=None, print_freq=1,
-                num_iter=None, continue_gen_stats=False):
-
-	save_dir = None
-	if hasattr(args, 'save_dir'):
-		save_dir = args.save_dir
-
-	if stats is None:
-		stats = util.StatsMeter(tau=tau)
-	stats.new('time-gen', 'time-learn', 'time-viz')
-
-	gen = iter(gen)
-
-	if hasattr(agent, 'stats'):
-		stats.shallow_join(agent.stats)
-	if hasattr(gen, 'stats'):
-		stats.shallow_join(gen.stats)
-	if hasattr(args, 'tau'):
-		stats.set_tau(args.tau)
-
-	agent.eval()
-
-	start = time.time()
-
-	for itr, rollouts in enumerate(gen):
-
-		stats.update('time-gen', time.time()-start)
-		########################
-		# Train Agent
-		start = time.time()
-
-		agent.train()
-		agent.learn(**rollouts)
-
-		stats.update('time-learn', time.time()-start)
-		########################
-		# Visualize/Log stats
-		start = time.time()
-
-		N_steps, N_episodes = (gen.gen.steps_generated(), gen.gen.episodes_generated()) \
-								if continue_gen_stats else (gen.steps_generated(), gen.episodes_generated())
-
-		if logger is not None:
-			info = stats.vals()
-			info['performance'] = stats['rewards'].smooth.item()
-			logger.update(info, step=N_steps)
-
-		if print_freq is not None and itr % print_freq == 0:
-			print("[ {} ] {:}/{:} (ep={}) : last={:5.3f} max={:5.3f} - {:5.3f} ".format((time.strftime("%m-%d-%y %H:%M:%S")),
-                                                                        N_steps, args.budget_steps,
-                                                                        N_episodes,
-		                                                                stats['rewards'].val.item(),
-		                                                                stats['rewards'].max.item(),
-		                                                                stats['rewards'].smooth.item(),
-		                                                                ))
-
-		if save_freq is not None and itr % save_freq == 0 and save_dir is not None:
-			path = save_checkpoint({
-				'agent_state_dict': agent.state_dict(),
-				'stats': stats,
-				'args': args,
-				'steps': N_steps,
-				'episodes': N_episodes,
-			}, args.save_dir, epoch=itr)
-			print('--- checkpoint saved at: {} ---'.format(path))
-
-		stats.update('time-viz', time.time() - start)
-		start = time.time()
-
-		agent.eval()
-		
-		if num_iter is not None and num_iter <= itr:
-			break
-		
-	return stats
-
-def run_unsup_epoch(model, loader, args, mode='test', optim=None,
-					epoch=None, print_freq=-1, logger=None, unique_tests=False, silent=False,
-					stats_callback=None, stats=None, viz_loss=True):
-	train = mode == 'train'
-	if train:
-		model.train()
-	else:
-		model.eval()
-	if not hasattr(args, 'total_samples'):
-		args.total_samples = {'train': 0, 'test':0}
-
-	viz_criterion = nn.MSELoss() if viz_loss else None
-
-	print_freq = max(1, len(loader) // 100) if print_freq < 0 else print_freq
-	if print_freq == 0:
-		print_freq = None
-
-	if stats is None:
-		stats = util.StatsMeter('loss', tau=max(min(1/len(loader), 0.1), 0.01))
-	elif 'loss' not in stats:
-		stats.new('loss')
-
-	if viz_loss and 'viz-loss' not in stats:
-		stats.new('viz-loss')
-
-	time_stats = util.StatsMeter('data', 'fwd', 'bwd', 'viz')
-	stats.shallow_join(time_stats, prefix='time-')
-
-	logger_prefix = '{}-{}'.format(mode, '{}') if not unique_tests or train else '{}{}-{}'.format(
-																mode, epoch + 1 + args.start_epoch, '{}')
-
-	itr = iter(loader)
-	start = time.time()
-	for i, sample in enumerate(itr):
-			
-		sample = sample.to(args.device)
-
-		args.total_samples[mode] += sample.size(0)
-
-		time_stats.update('data', time.time() - start)
-		start = time.time()
-
-		out = model.get_loss(sample, stats=stats)
-		loss = out['loss']
-		stats.update('loss', loss.detach())
-
-		loss *= args.loss_scale
-
-		time_stats.update('fwd', time.time() - start)
-		start = time.time()
-
-		if train:
-			optim.zero_grad()
-			loss.backward()
-			optim.step()
-
-		time_stats.update('bwd', time.time() - start)
-		start = time.time()
-
-		if stats_callback is not None:
-			assert False
-			stats_callback(stats, model, sample)
-
-		if print_freq is not None and i % print_freq == 0:
-			if logger is not None:
-
-				B, C, H, W = x.size()
-
-				if 'original' in out and 'reconstruction' in out:
-					stats.update('viz-loss', viz_criterion(rec, x).detach())
-
-				vals = stats.smooths(logger_prefix)
-
-				logger.update(vals, args.total_samples[mode])
-
-				if i % print_freq * 10 == 0:  # update images
-
-					if 'original' in out and 'reconstruction' in out:
-
-						N = min(4, B)
-
-						viz_x, viz_rec = out['original'][:N], out['reconstruction'][:N]
-
-						imgs = torch.stack([viz_x, viz_rec], 0).view(-1, C, H, W)
-						imgs = torchvision.utils.make_grid(imgs, nrow=N).permute(1, 2, 0).unsqueeze(0)
-
-						info = {logger_prefix.format('rec'): imgs.cpu().numpy()}
-
-					try:
-						gen = model.generate(N=N).detach()
-						imgs = torchvision.utils.make_grid(gen, nrow=N//2).permute(1, 2, 0).unsqueeze(0)
-						
-						info[logger_prefix.format('gen')] = imgs.cpu().numpy()
-						
-					except AttributeError:
-						pass
-					
-					logger.update_images(info, args.total_samples[mode])
-
-			if not silent:
-				print('[ {} ] {} Ep={}/{} Itr={}/{} Loss: {:.3f} ({:.3f})'.format(
-					time.strftime("%H:%M:%S"), mode,
-					epoch + args.start_epoch + 1, args.epochs, i + 1, len(loader),
-					stats['loss'].val, stats['loss'].smooth))
-
-		time_stats.update('viz', time.time() - start)
-		start = time.time()
-
-	if not silent:
-		msg = '[ {} ] {} Ep={}/{} complete Loss: {:.4f} ({:.4f})'.format(
-			time.strftime("%H:%M:%S"), mode,
-			epoch + args.start_epoch + 1, args.epochs,
-			stats['loss'].val, stats['loss'].smooth)
-		border = '-' * 50
-		print(border)
-		print(msg)
-		print(border)
-
-	return stats
-
-
-def run_transition_epoch(model, loader, args, mode='test', optim=None, criterion=None,
-					epoch=None, print_freq=-1, logger=None, unique_tests=False, silent=False,
-					stats_callback=None, stats=None, viz_loss=True):
-	train = mode == 'train'
-	if train:
-		model.train()
-	else:
-		model.eval()
-	if not hasattr(args, 'total_samples'):
-		args.total_samples = {'train': 0, 'test': 0}
-
-	viz_criterion = nn.MSELoss() if viz_loss else None
-	if criterion is None:
-		criterion = nn.MSELoss()
-
-	print_freq = max(1, len(loader) // 100) if print_freq < 0 else print_freq
-	if print_freq == 0:
-		print_freq = None
-
-	if stats is None:
-		stats = util.StatsMeter('loss', tau=max(min(1 / len(loader), 0.1), 0.01))
-	elif 'loss' not in stats:
-		stats.new('loss-total', 'loss-pred', 'loss-model')
-
-	if viz_loss and 'viz-loss' not in stats:
-		stats.new('loss-viz')
-
-	time_stats = util.StatsMeter('data', 'fwd', 'bwd', 'viz')
-	stats.shallow_join(time_stats, prefix='time-')
-
-	logger_prefix = '{}-{}'.format(mode, '{}') if not unique_tests or train else '{}{}-{}'.format(
-		mode, epoch + 1 + args.start_epoch, '{}')
-
-	itr = iter(loader)
-	start = time.time()
-	for i, sample in enumerate(itr):
-
-		states = sample['states'].to(args.device)
-		controls = sample['controls'].to(args.device)
-
-		states = states.permute(1, 0, 2)
-		controls = controls.permute(1, 0, 2)
-
-		q = None
-		if 'context' in sample:
-			context = sample['context'].to(args.device)
-			q = context.permute(1,0,2)
-
-		assert states.size(0) == controls.size(0)+1, '{} and {}'.format(states.shape, controls.shape)
-
-		args.total_samples[mode] += controls.size(0)
-
-		x, nx = states[0], states[1:]
-		U = controls # K, B, C
-
-		time_stats.update('data', time.time() - start)
-		start = time.time()
-
-		px = model.sequence(x, U, q)
-
-		model_loss = model.get_loss(q)
-		stats.udpate('loss-model', model_loss.detach())
-
-		if hasattr(args, 'pred_len'):
-			nx = nx[-args.pred_len:]
-			px = px[-args.pred_len:]
-		pred_loss = criterion(px, nx)
-		stats.update('loss-pred', pred_loss.detach())
-
-		loss = model_loss + pred_loss
-		stats.update('loss-total', loss)
-		loss *= args.loss_scale
-
-		time_stats.update('fwd', time.time() - start)
-		start = time.time()
-
-		if train:
-			optim.zero_grad()
-			loss.backward()
-			optim.step()
-
-		time_stats.update('bwd', time.time() - start)
-		start = time.time()
-
-		if stats_callback is not None:
-			assert False
-			stats_callback(stats, model, sample)
-
-		if print_freq is not None and i % print_freq == 0:
-			if logger is not None:
-
-				stats.update('loss-viz', viz_criterion(px.detach(),nx))
-
-				vals = stats.smooths(logger_prefix)
-
-				logger.update(vals, args.total_samples[mode])
-
-				# if i % print_freq * 10 == 0:  # update images
-				# 	N = min(4, B)
-				#
-				# 	viz_x, viz_rec = x[:N], rec[:N]
-				#
-				# 	imgs = torch.stack([viz_x, viz_rec], 0).view(-1, C, H, W)
-				# 	imgs = torchvision.utils.make_grid(imgs, nrow=N).permute(1, 2, 0).unsqueeze(0)
-				#
-				# 	info = {logger_prefix.format('rec'): imgs.cpu().numpy()}
-				#
-				# 	try:
-				# 		gen = model.generate(N=N).detach()
-				# 		imgs = torchvision.utils.make_grid(gen, nrow=N // 2).permute(1, 2, 0).unsqueeze(0)
-				#
-				# 		info[logger_prefix.format('gen')] = imgs.cpu().numpy()
-				#
-				# 	except AttributeError:
-				# 		pass
-				#
-				# 	logger.update_images(info, args.total_samples[mode])
-
-			if not silent:
-				print('[ {} ] {} Ep={}/{} Itr={}/{} Loss: {:.3f} ({:.3f})'.format(
-					time.strftime("%H:%M:%S"), mode,
-					epoch + args.start_epoch + 1, args.epochs, i + 1, len(loader),
-					stats['loss'].val, stats['loss'].smooth))
-
-		time_stats.update('viz', time.time() - start)
-		start = time.time()
-
-	if not silent:
-		msg = '[ {} ] {} Ep={}/{} complete Loss: {:.4f} ({:.4f})'.format(
-			time.strftime("%H:%M:%S"), mode,
-			epoch + args.start_epoch + 1, args.epochs,
-			stats['loss'].val, stats['loss'].smooth)
-		border = '-' * 50
-		print(border)
-		print(msg)
-		print(border)
-
-	return stats
-
-def run_cls_epoch(model, loader, args, mode='test', optim=None, criterion=None,
-					epoch=None, print_freq=-1, logger=None, unique_tests=False, silent=False,
-					stats_callback=None, stats=None):
-	train = mode == 'train'
-	if train:
-		model.train()
-	else:
-		model.eval()
-	if not hasattr(args, 'total_samples'):
-		args.total_samples = {'train': 0, 'test': 0}
-	elif mode == 'val' and 'val' not in args.total_samples:
-		args.total_samples['val'] = 0
-
-	if not hasattr(args, 'loss_scale'):
-		args.loss_scale = 1
-
-	if criterion is None:
-		criterion = nn.CrossEntropyLoss()
-
-	print_freq = max(1, len(loader) // 100) if print_freq < 0 else print_freq
-	if print_freq == 0:
-		print_freq = None
-
-	if stats is None:
-		stats = util.StatsMeter(tau=max(min(10 / len(loader), 0.1), 0.01))
-	stats.new('loss', 'accuracy', 'confidence')
-
-	time_stats = util.StatsMeter('data', 'fwd', 'bwd', 'viz')
-	stats.shallow_join(time_stats, prefix='time-')
-
-	logger_prefix = '{}-{}'.format(mode, '{}') if not unique_tests or train else '{}{}-{}'.format(
-		mode, epoch + 1 + args.start_epoch, '{}')
-
-	itr = iter(loader)
-	start = time.time()
-	for i, sample in enumerate(itr):
-
-		x, y = sample
-		if hasattr(args, 'device'):
-			x = x.to(args.device)
-			y = y.to(args.device)
-
-		args.total_samples[mode] += x.size(0)
-
-		time_stats.update('data', time.time() - start)
-		start = time.time()
-
-		pred = model(x)
-
-		loss = criterion(pred, y)
-
-		stats.update('loss', loss)
-		loss *= args.loss_scale
-
-		time_stats.update('fwd', time.time() - start)
-		start = time.time()
-
-		if train:
-			optim.zero_grad()
-			loss.backward()
-			optim.step()
-
-		time_stats.update('bwd', time.time() - start)
-		start = time.time()
-
-		if stats_callback is not None:
-			stats_callback(stats, model, sample)
-
-		with torch.no_grad():
-			conf, pick = pred.max(-1)
-
-			confidence = conf.detach()
-			correct = pick.sub(y).eq(0).float().detach()
-
-			stats.update('confidence', confidence.mean())
-			stats.update('accuracy', correct.mean())
-
-		if print_freq is not None and i % print_freq == 0:
-
-			if logger is not None:
-				logger.update(stats.smooths(logger_prefix), args.total_samples[mode])
-
-			if not silent:
-				print('[ {} ] {} Ep={}/{} Itr={}/{} Loss: {:.3f} ({:.3f})'.format(
-					time.strftime("%H:%M:%S"), mode,
-					epoch + args.start_epoch + 1, args.epochs, i + 1, len(loader),
-					stats['loss'].val, stats['loss'].smooth))
-
-		time_stats.update('viz', time.time() - start)
-		start = time.time()
-
-	if not silent:
-		msg = '[ {} ] {} Ep={}/{} complete Loss: {:.4f} ({:.4f})'.format(
-			time.strftime("%H:%M:%S"), mode,
-			epoch + args.start_epoch + 1, args.epochs,
-			stats['loss'].val, stats['loss'].smooth)
-		border = '-' * 50
-		print(border)
-		print(msg)
-		print(border)
-
-	return stats
 

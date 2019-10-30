@@ -1,0 +1,47 @@
+
+
+device: cuda
+seed: 0
+#no-cuda: False
+
+logdate: True
+txtlog: False
+
+saveroot: ../trained_nets/
+save-freq: 10
+track-best: True
+
+dataset: mnist
+indexed: False
+
+num-workers: 4
+batch-size: 128
+use-val: False
+drop-last: False
+no-test: True
+viz-criterion-args: [x, y]
+
+start-epoch: 0
+print-freq: 50
+epochs: 50
+
+optim-type: adam
+lr: 1e-2
+#weight-decay: 1e-3
+#momentum: 0.9
+
+#decay-epochs: 18
+#decay-factor: .5
+
+# Model
+
+#model-type: vae
+nonlin: prelu
+fc: [256, 64]
+channels: [8, 16, 32]
+kernels: 3
+factors: 2
+upsampling: bilinear
+downsampling: max
+
+#latent-dim: 16

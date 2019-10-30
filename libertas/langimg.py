@@ -1,5 +1,7 @@
 
 
+#### this is very similar to the paper called: Generative Latent Optimization (GLO)
+
 import sys, os, time
 #os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import torch
@@ -9,6 +11,7 @@ import torch.distributions as distrib
 import torch.multiprocessing as mp
 from torch.utils.data import Dataset, DataLoader
 import gym
+from sklearn.decomposition import PCA
 import numpy as np
 #%matplotlib tk
 import matplotlib.pyplot as plt
@@ -39,21 +42,20 @@ class MLP_Decoder(fd.Decodable, fd.Model):
 		out = self.net(q)
 		return out.view(B, *self.out_shape)
 
-class DirectDecoder(fd.Generative, fd.Decodable, fd.Schedulable, fd.Vizualizable, fd.Model):
+class DirectDecoder(fd.Generative, fd.Decodable, fd.Schedulable, fd.Visualizable, fd.Model):
 
 	def __init__(self, decoder, latent_dim, vocab_size, beta=1.,
-				 zero_embedding=False,):
+				 scale_embeddings=-1, noise=0,):
 		super().__init__(decoder.din, decoder.dout)
 
 		self.latent_dim = latent_dim
 		self.beta = beta
 
 		self.table = nn.Embedding(vocab_size, latent_dim)
-		if zero_embedding:
-			self.table.weight.data.mul_(0)
+		if scale_embeddings >= 0:
+			self.table.weight.data.mul_(scale_embeddings)
 
 		self.dec = decoder
-		# self.dec = models.Decoder(out_shape, latent_dim=latent_dim, **dec_kwargs)
 
 		self.criterion = nn.BCELoss()
 
@@ -63,7 +65,7 @@ class DirectDecoder(fd.Generative, fd.Decodable, fd.Schedulable, fd.Vizualizable
 
 		if self._viz_counter % 5 == 0:
 
-			logger.add('histogram', 'latent-norm', info.latent.norm(p=2, dim=-1))
+			# logger.add('histogram', 'latent-norm', info.latent.norm(p=2, dim=-1))
 
 			B, C, H, W = info['original'].shape
 			N = min(B, 8)
@@ -77,11 +79,24 @@ class DirectDecoder(fd.Generative, fd.Decodable, fd.Schedulable, fd.Vizualizable
 			try:
 				# gen = self.generate(16)
 				q_gen = self.sample_prior(2*N)
-				logger.add('histogram', 'gen-norm', q_gen.norm(p=2, dim=-1))
+				# logger.add('histogram', 'gen-norm', q_gen.norm(p=2, dim=-1))
 				gen = self.decode(q_gen)
 				logger.add('images', 'gen', gen)
 			except NotImplementedError:
 				pass
+
+			# show latent space
+			if self.latent_dim >= 2:
+				if self.latent_dim > 2:
+					x = PCA(n_components=2, copy=False).fit_transform(self.table.weight.cpu().numpy())
+				else:
+					x = self.table.weight.cpu().numpy()
+
+				fig = plt.figure(figsize=(3,3))
+				plt.gca().set_aspect('equal')
+				plt.scatter(*x.T, marker='.', s=2, edgecolors='none', alpha=0.5)
+				# plt.show()
+				logger.add('figure', 'latent-space', fig, close=True)
 
 
 	def forward(self, q):
@@ -92,7 +107,7 @@ class DirectDecoder(fd.Generative, fd.Decodable, fd.Schedulable, fd.Vizualizable
 
 	def _step(self, batch):
 
-		out = util.TensorDict()
+		out = super()._step(batch)
 
 		idx, (x, _) = batch
 
@@ -109,14 +124,15 @@ class DirectDecoder(fd.Generative, fd.Decodable, fd.Schedulable, fd.Vizualizable
 
 			out['reg'] = reg.detach()
 
-		self.optim_step(total)
+		if self.training:
+			self.optim_step(total)
 
 		out.update({
-			'loss': loss.detach(),
-			'total': total.detach(),
+			'loss': loss,
+			'total': total,
 			'original': x,
-			'reconstruction': pred.detach(),
-			'latent': q.detach(),
+			'reconstruction': pred,
+			'latent': q,
 		})
 
 		return out
@@ -133,7 +149,6 @@ class DirectDecoder(fd.Generative, fd.Decodable, fd.Schedulable, fd.Vizualizable
 	def generate(self, N=1):
 		q = self.sample_prior(N)
 		return self.decode(q)
-
 
 class UniformDDecoder(DirectDecoder):
 
@@ -181,6 +196,48 @@ class GaussianDDecoder(DirectDecoder):
 		# return q.norm(p=2)
 		return q.pow(2).mean()
 
+
+class NoisyGaussianDDecoder(GaussianDDecoder):
+
+	def __init__(self, *args, n_samples=8, noise_std=0.2, **kwargs):
+		super().__init__(*args, **kwargs)
+
+		self.n_samples = n_samples
+
+	def _step(self, batch):
+
+		out = util.TensorDict()
+
+		idx, (x, _) = batch
+
+		q = self.retrieve(idx)
+
+
+
+		pred = self.decode(q)
+
+		loss = self.criterion(pred, x)
+		total = loss
+		if self.beta > 0:
+			reg = self.regularize(q)
+			total += self.beta * reg
+
+			self.stats.update('reg', reg.detach())
+
+			out['reg'] = reg.detach()
+
+		self.optim_step(total)
+
+		out.update({
+			'loss': loss.detach(),
+			'total': total.detach(),
+			'original': x,
+			'reconstruction': pred.detach(),
+			'latent': q.detach(),
+		})
+
+		return out
+
 class SphericalDDecoder(DirectDecoder):
 
 	def decode(self, q):
@@ -199,6 +256,23 @@ class SphericalDDecoder(DirectDecoder):
 		dots = q @ q.T
 		return dots.mean()
 
+def get_ddecoder_options():
+	parser = train.setup_standard_options()
+
+	parser.add_argument('--decoder', type=str, default='conv')
+	parser.add_argument('--distr', type=str, default='none')
+
+	parser.add_argument('--beta', type=float, default=1.)
+
+	parser.add_argument('--latent-dim', type=int, default=3)
+	parser.add_argument('--scale-embeddings', default=-1, type=float)
+	parser.add_argument('--cut-reset', action='store_true')
+
+	parser.add_argument('--emb-optim-type', type=str, default=None)
+	parser.add_argument('--emb-lr', type=float, default=-1)
+	parser.add_argument('--emb-momentum', type=float, default=None)
+
+	return parser
 
 def get_model(args):
 	if not hasattr(args, 'train_size'):
@@ -227,7 +301,7 @@ def get_model(args):
 		'decoder': dec,
 		'latent_dim': args.latent_dim,
 		'vocab_size': args.train_size,
-		'zero_embedding': args.zero_embedding,
+		'scale_embeddings': args.scale_embeddings,
 		'beta': args.beta,
 
 	}
@@ -248,8 +322,22 @@ def get_model(args):
 
 	print('Using a distribution: {}'.format(args.distr))
 
-	model.set_optim(optim_type=args.optim_type, lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum)
-	# optim = util.get_optimizer('sgd', model.parameters(), )
+	if args.emb_lr >= 0:
+
+		if args.emb_optim_type is None:
+			args.emb_optim_type = args.optim_type
+		if args.emb_momentum is None:
+			args.emb_momentum = args.momentum
+
+		optim = util.Complex_Optimizer(dec=util.get_optimizer(args.optim_type, model.dec.parameters(), lr=args.lr,
+		                                                      weight_decay=args.weight_decay, momentum=args.momentum),
+		                               emb=util.get_optimizer(args.emb_optim_type, model.table.parameters(), lr=args.emb_lr,
+		                                                      weight_decay=0, momentum=args.emb_momentum))
+
+		model.set_optim(optim=optim)
+	else:
+		model.set_optim(optim_type=args.optim_type, lr=args.lr,
+		                weight_decay=args.weight_decay, momentum=args.momentum)
 
 	model.to(args.device)
 

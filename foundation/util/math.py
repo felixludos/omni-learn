@@ -150,6 +150,8 @@ def set_seed(seed=None):
 def get_random_seed():
 	return np.frombuffer(np.random.bytes(4), dtype=np.int32)[0]
 
+def random_permutation(D):
+	return torch.eye(D)[torch.randperm(D)]
 
 #####################
 # Linear Systems
@@ -304,6 +306,67 @@ def se3_quat2Rt(se3quats): # qw, qx, qy, qz, x, y, z
 	rots = quat2mat(quats)
 
 	return torch.cat([rots,trans],-1)
+
+#####################
+# Angles/Spheres
+#####################
+
+def cart2angl(pts):
+	N, D = pts.size()
+
+	if D == 2:
+		phis = torch.atan2(pts.narrow(-1, 1, 1), pts.narrow(-1, 0, 1))
+	else:
+		num = pts.narrow(-1, 0, D - 1)
+		last = pts.narrow(-1, D - 1, 1)
+
+		den = torch.triu(pts.unsqueeze(1).expand(N,D,D)).pow(2).sum(-1).sqrt().narrow(-1, 0, D - 1)
+
+		phis = torch.acos(num / den)
+
+		sel = last.squeeze() < 0
+		phis[sel, -1] = 2 * np.pi - phis[sel, -1]
+
+	return phis
+
+def cart2sphr(pts):
+
+	N, D = pts.size()
+
+	assert D >= 2
+
+	r = pts.norm(dim=-1, keepdim=True)
+	phis = cart2angl(pts)
+
+	return torch.cat([r, phis],-1)
+
+def angl2cart(phis):
+	N, S = phis.size()
+
+	cos = torch.cos(phis)
+	sin = torch.sin(phis)
+
+	sel = torch.tril(torch.ones(S, S, device=phis.device))
+
+	sns = sin.unsqueeze(1).pow(sel.unsqueeze(0)).prod(-1)
+
+	first = cos.narrow(-1, 0, 1)
+	last = sns.narrow(-1, -1, 1)
+	middle = cos[:, 1:] * sns[:, :-1]
+
+	return torch.cat([first, middle, last], -1)
+
+def sphr2cart(sphr):
+	N, D = sphr.size()
+
+	r, phis = sphr.narrow(-1,0,1), sphr.narrow(-1,1,D-1)
+
+	pts = angl2cart(phis)
+
+	return r * pts
+
+
+
 
 #####################
 # Rotations

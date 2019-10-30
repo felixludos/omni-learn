@@ -9,7 +9,9 @@ from .. import framework as fm
 from .atom import *
 from .layers import *
 
-class Encoder(fm.Model):
+
+
+class Conv_Encoder(fm.Encodable, fm.Model):
 
 	def __init__(self, in_shape, latent_dim=None, feature_dim=None,
 				 nonlin='prelu', output_nonlin=None,
@@ -28,7 +30,7 @@ class Encoder(fm.Model):
 
 		out_shape = cshapes[-1]
 
-		super(Encoder, self).__init__(in_shape, out_shape if latent_dim is None else latent_dim)
+		super().__init__(in_shape, out_shape if latent_dim is None else latent_dim)
 
 		self.conv = nn.Sequential(*conv_layers)
 
@@ -51,12 +53,14 @@ class Encoder(fm.Model):
 		c = c.view(-1, self.feature_dim)
 		return self.fc(c)
 
+	def encode(self, x):
+		return self(x)
+
 	def forward(self, x):
 		c = self.conv(x)#.view(-1, self.conv_dim)
-
 		return self.transform_conv_features(c)
 
-class Rec_Encoder(Encoder): # fc before and after recurrence
+class Rec_Encoder(Conv_Encoder): # fc before and after recurrence
 	def __init__(self, in_shape, rec_dim,
 	             
 	             nonlin='prelu', before_fc=[], after_fc=[], out_dim=None,
@@ -111,6 +115,7 @@ class Rec_Encoder(Encoder): # fc before and after recurrence
 		self.dout = out_dim
 
 	def reset(self):
+		super().reset()
 		self.rec.reset()
 		
 	def forward(self, xs):
@@ -133,7 +138,7 @@ class Rec_Encoder(Encoder): # fc before and after recurrence
 		return qs
 	
 
-class Decoder(fm.Decodable, fm.Model):
+class Conv_Decoder(fm.Decodable, fm.Model):
 
 	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,
 				 channels=[], kernels=[], ups=[], upsampling='deconv', norm_type='instance', output_norm_type=None,
@@ -147,7 +152,7 @@ class Decoder(fm.Decodable, fm.Model):
 											up_type=upsampling, norm_type=norm_type,
 											out_norm_type=output_norm_type)
 
-		super(Decoder, self).__init__(dshapes[0] if latent_dim is None else latent_dim, out_shape)
+		super().__init__(dshapes[0] if latent_dim is None else latent_dim, out_shape)
 
 		self.deconv_shape = dshapes[0]
 		self.latent_dim = latent_dim if latent_dim is not None else int(np.product(self.deconv_shape))
@@ -171,64 +176,9 @@ class Decoder(fm.Decodable, fm.Model):
 		return self.deconv(z)
 
 
-class Autoencoder(fm.Trainable_Model):
-	def __init__(self, shape, latent_dim=None, nonlin='prelu', latent_nonlin=None, recon_nonlin=None,
-	             channels=[], kernels=3, factors=1, down='max', up='deconv', norm_type='batch',
-	             hidden_fc=[], latent_norm_type=None, output_norm_type=None, criterion=None):
-		
-		if criterion is None:
-			criterion = nn.MSELoss()
-		
-		super(Autoencoder, self).__init__(criterion, shape, latent_dim)
-		
-		try:
-			len(kernels)
-		except TypeError:
-			kernels = [kernels] * len(channels)
-		
-		try:
-			len(factors)
-		except TypeError:
-			factors = [factors] * len(channels)
-		
-		assert len(channels) == len(kernels)
-		assert len(channels) == len(factors)
-		
-		self.shape = shape
-		
-		strides = factors if down == 'stride' else [1] * len(channels)
-		pools = factors if down == 'max' else False
-		
-		self.enc = Encoder(self.shape, latent_dim, nonlin=nonlin, output_nonlin=latent_nonlin,
-		                   channels=channels, kernels=kernels, strides=strides, pooling=pools, norm_type=norm_type,
-		                   hidden_fc=hidden_fc, output_batch_norm=latent_norm_type)
-		
-		self.latent_dim = self.enc.latent_dim
-		
-		self.dec = Decoder(self.shape, latent_dim, nonlin=nonlin, output_nonlin=recon_nonlin,
-		                   channels=channels[::-1], kernels=kernels[::-1], ups=factors[::-1], upsampling=up,
-						   norm_type=norm_type,
-		                   hidden_fc=hidden_fc[::-1], output_batch_norm=output_norm_type)
-	
-	def forward(self, x, ret_q=False):
-		
-		q = self.encode(x)
-		x = self.decode(q)
-		
-		if ret_q:
-			return x, q
-		return x
-	
-	def encode(self, x):
-		return self.enc(x)
-	
-	def decode(self, q):
-		return self.dec(q)
-	
-	def get_loss(self, x, stats=None):
-		rec = self(x)
-		
-		return self.criterion(rec, x)
+
+
+
 
 
 

@@ -28,11 +28,17 @@ class StatsCollector(object):
 	def save(self, path):
 		torch.save(self.export(), path)
 
+_tau = 0.001
+
+def set_default_tau(tau):
+	global _tau
+	_tau = tau
+
 class StatsMeter(object):
-	def __init__(self , *names, tau=0.001, **stats):
+	def __init__(self , *names, tau=None, **stats):
 		self._stats = {}
 		
-		self.tau = tau
+		self.tau = tau if tau is not None else _tau
 		
 		for name in names:
 			self.new(name)
@@ -67,8 +73,20 @@ class StatsMeter(object):
 			#assert name not in self._stats, 'The stat ' + name + ' already exists'
 			if name not in self._stats:
 				self._stats[name] = AverageMeter(tau=self.tau)
+
+	def discard(self, *names):
+		for name in names:
+			if name in self._stats:
+				del self._stats[name]
+	def remove(self, *names):
+		for name in names:
+			del self._stats[name]
+
+	def __delitem__(self, key):
+		del self._stats[key]
 	
 	def update(self, name, value, n=1):
+		# assert isinstance(value, (int,float)) or value.size == 1, 'unknown: {} {}'.format(value.shape, value)
 		self._stats[name].update(value, n=n)
 	
 	def __add__(self, other):
@@ -104,7 +122,7 @@ class StatsMeter(object):
 		return {fmt.format(k):v.avg.item() for k,v in self._stats.items()}
 	
 	def smooths(self, fmt='{}'):
-		return {fmt.format(k): (v.smooth.item() if v.smooth is not None else float('nan')) for k,v in self._stats.items()}
+		return {fmt.format(k): (v.smooth.item() if v.smooth is not None else v.val.item()) for k,v in self._stats.items()}
 
 	def split(self):
 		all_vals = {k:v.export() for k,v in self.__dict__.items()}
@@ -154,6 +172,9 @@ class AverageMeter(object):
 	def copy(self):
 		new = AverageMeter()
 		for k, v in self.__dict__.items():
+			if k == 'tau':
+				new.tau = self.tau
+				continue
 			try:
 				new.__dict__[k] = None if v is None else v.clone()
 			except Exception as e:
@@ -177,8 +198,8 @@ class AverageMeter(object):
 		try:
 			val = val.float().detach().cpu()
 		except:
-			pass
-		self.val = torch.tensor(val).float()
+			val = torch.tensor(val).float()
+		self.val = val
 		self.sum += self.val * n
 		prev_count = self.count
 		self.count += n

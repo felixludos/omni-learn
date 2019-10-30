@@ -43,6 +43,10 @@ class Logger(object):
 		if self.tblog is None:
 			return None
 
+		# if data_type == 'scalar' and not isinstance(args[0], float):
+		# 	print(tag, type(args[0]), args[0])
+		# 	assert False
+
 		add_fn = self.tblog.__getattribute__('add_{}'.format(data_type))
 
 		if global_step is None:

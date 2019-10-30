@@ -1,4 +1,5 @@
 
+from itertools import chain
 import torch
 from torch import optim as O
 from torch import nn
@@ -24,18 +25,23 @@ def get_optimizer(optim_type, parameters, lr=1e-3, weight_decay=0, momentum=0, *
 		assert False, "Unknown optimizer type: " + optim_type
 	return optimizer
 
+
+
 class Complex_Optimizer(Optimizer):
 	def __init__(self, **optims):
-		super().__init__()
-		self.optims = optims
+		self.__dict__['optims'] = None
+		super().__init__([{}], None)
+		self.__dict__['optims'] = optims
+		self.__dict__['param_groups'] = [grp for grp in chain(*[o.param_groups for o in optims.values()])]
 
 	def add_param_group(self, *args, **kwargs): # probably shouldnt be used
+		return
 		for optim in self.optims.values():
 			optim.add_param_group(*args, **kwargs)
 
 	def load_state_dict(self, state_dict):
 		for name, optim in self.optims.items():
-			optim.load_state_dict(state_dict['name'])
+			optim.load_state_dict(state_dict[name])
 
 	def state_dict(self):
 		return {name:optim.state_dict() for name, optim in self.optims.items()}
@@ -70,6 +76,17 @@ class Complex_Optimizer(Optimizer):
 			super().__delattr__(item)
 		except AttributeError:
 			self.__delitem__(item)
+
+	def __str__(self):
+		s = ['Complex-Optimizer(']
+
+		for k,v in self.optims.items():
+			s.append('  ' + k + ': ' + str(v).replace('\n', '\n    '))
+
+		s.append(')')
+
+		return '\n'.join(s)
+
 
 
 class Conjugate_Gradient(Optimizer):

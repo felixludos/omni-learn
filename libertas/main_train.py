@@ -10,10 +10,13 @@ import torch.distributions as distrib
 import torch.multiprocessing as mp
 from torch.utils.data import Dataset, DataLoader
 import gym
+import traceback
+import ipdb
 import numpy as np
 #%matplotlib tk
 import matplotlib.pyplot as plt
 #plt.switch_backend('Qt5Agg') #('Qt5Agg')
+plt.switch_backend('agg')
 import foundation as fd
 from foundation import models
 from foundation import util
@@ -26,21 +29,9 @@ def main(argv=None):
 	if argv is None:
 		argv = sys.argv[1:]
 
-	parser = train.setup_standard_options()
-
-	###################
-	# Additional options
-	###################
+	parser = get_ddecoder_options()
 
 	# Model
-	parser.add_argument('--decoder', type=str, default='conv')
-	parser.add_argument('--distr', type=str, default='none')
-
-	parser.add_argument('--beta', type=float, default=1.)
-
-	parser.add_argument('--latent-dim', type=int, default=3)
-	parser.add_argument('--zero-embedding', action='store_true')
-	parser.add_argument('--cut-reset', action='store_true')
 
 	args = parser.parse_args(argv)
 
@@ -193,6 +184,16 @@ if __name__ == '__main__':
 
 	argv = None
 
-	main(argv)
+	try:
+		main(argv)
+
+	except KeyboardInterrupt:
+		extype, value, tb = sys.exc_info()
+		traceback.print_exc()
+
+	except:
+		extype, value, tb = sys.exc_info()
+		traceback.print_exc()
+		ipdb.post_mortem(tb)
 
 

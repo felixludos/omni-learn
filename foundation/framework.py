@@ -7,7 +7,6 @@ from . import util
 import torch.multiprocessing as mp
 from itertools import chain
 
-
 class Model(nn.Module):  # any vector function
 	def __init__(self, in_dim, out_dim):
 		super().__init__()
@@ -27,19 +26,7 @@ class Model(nn.Module):  # any vector function
 		self.device = device
 		super(Model, self).to(device)
 
-	def step(self, batch): # Override pre-processing mixins
-		return self._step(batch)
 
-	def test(self, batch): # Override pre-processing mixins
-		return self._test(batch)
-
-	def _step(self, batch): # Override post-processing mixins
-		self.train()
-		return util.TensorDict()
-
-	def _test(self, batch): # Override post-processing mixins
-		self.eval()
-		return util.TensorDict()
 
 	def reset(self): # called at the beginning of each epoch
 		pass
@@ -54,42 +41,6 @@ class CompositeModel(Model):
 			x = m(x)
 		return x
 
-# class Unsupervised_Model(Model):
-# 	def __init__(self, criterion, in_dim, out_dim=1):
-# 		raise Exception('Deprecated. See mixins.py')
-# 		super(Unsupervised_Model, self).__init__(in_dim, out_dim)
-# 		self.criterion = criterion
-#
-# 	def get_loss(self, x, **kwargs):
-# 		raise NotImplementedError
-#
-#
-# class Supervised_Model(Model):
-# 	def __init__(self, criterion, in_dim, out_dim, optim=None, scheduler=None):
-# 		raise Exception('Deprecated. See mixins.py')
-# 		super().__init__(in_dim, out_dim)
-# 		self.criterion = criterion
-# 		self.optim = optim
-# 		self.scheduler = scheduler
-# 		self.stats = util.StatsMeter('loss')
-#
-# 	def train_epoch(self, loader):
-# 		assert self.optim is not None
-# 		if self.scheduler is not None:
-# 			self.scheduler.step()
-#
-# 		for sample in loader:
-# 			x,y = sample
-#
-# 			self.optim.zero_grad()
-# 			loss = self.get_loss(x,y)
-# 			loss.backward()
-# 			self.optim.step()
-#
-# 			self.stats.update('loss', loss.detach())
-#
-# 	def get_loss(self, x, y, **kwargs):
-# 		return self.criterion(self(x), y)
 
 class Optimizable(nn.Module):
 
@@ -97,11 +48,10 @@ class Optimizable(nn.Module):
 		super().__init__(*args, **kwargs)
 		self.optim = None
 
-		if isinstance(self, Recordable):
-			self.stats.new('lr')
-
 	def record_lr(self):
 		if self.optim is not None:
+			if 'lr' not in self.stats:
+				self.stats.new('lr')
 			lr = self.optim.param_groups[0]['lr']
 			try:
 				self.stats.update('lr', lr)
@@ -119,7 +69,7 @@ class Optimizable(nn.Module):
 			optim = util.get_optimizer(optim_type, parameters, **optim_kwargs)
 		self.optim = optim
 
-	def optim_step(self, loss):
+	def optim_step(self, loss): # should only be called during training
 		if self.optim is None:
 			raise Exception('Optimizer not set')
 		self.optim.zero_grad()
@@ -131,9 +81,9 @@ class Optimizable(nn.Module):
 			self.optim.load_state_dict(state_dict['optim'])
 		super().load_state_dict(state_dict['model'])
 
-	def state_dict(self):
+	def state_dict(self, *args, **kwargs):
 		state_dict = {
-			'model': super().state_dict(),
+			'model': super().state_dict(*args, **kwargs),
 		}
 		if self.optim is not None:
 			state_dict['optim'] = self.optim.state_dict()
@@ -190,7 +140,7 @@ class Recordable(Model):
 		super().reset()
 		self.reset_stats()
 
-class Vizualizable(Recordable):
+class Visualizable(Recordable):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._viz_counter = 0
@@ -199,7 +149,8 @@ class Vizualizable(Recordable):
 		self._viz_counter = 0
 	def visualize(self, info, logger): # records output directly to logger
 		self._viz_counter += 1
-		self._visualize(info, logger)
+		with torch.no_grad():
+			self._visualize(info, logger)
 	def _visualize(self, info, logger):
 		raise NotImplementedError
 
@@ -207,10 +158,41 @@ class Vizualizable(Recordable):
 		self.reset_viz_counter()
 		super().reset()
 
+class Regularizable(object):
 
-class Trainable_Model(Recordable, Optimizable, Model):
-	pass
+	def regularize(self, q):
+		return torch.tensor(0).type_as(q)
 
+class Trainable_Model(Optimizable, Recordable, Model): # top level - must be implemented to train
+	def step(self, batch):  # Override pre-processing mixins
+		return self._step(batch)
+
+	def test(self, batch):  # Override pre-processing mixins
+		return self._test(batch)
+
+	def _step(self, batch, out=None):  # Override post-processing mixins
+		if out is None:
+			out = util.TensorDict()
+		return out
+
+	def _test(self, batch):  # Override post-processing mixins
+		return self._step(batch)  # by default do the same thing as during training
+
+	# NOTE: never call an optimizer outside of _step (not in mixinable functions)
+	# NOTE: before any call to an optimizer check with self.train_me()
+	def train_me(self):
+		return self.train and self.optim is not None
+
+
+
+
+
+
+
+
+
+
+# Old (but not deprecated)
 
 
 class Transition_Model(Model):

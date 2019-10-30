@@ -1,10 +1,16 @@
 import configargparse
 
-def setup_standard_options():
-	parser = configargparse.ArgumentParser(description='Direct Decoder Training')
+def get_parser(desc='blank', no_config=False):
+	parser = configargparse.ArgumentParser(description=desc)
 
-	parser.add_argument('-c', '--config', required=True, is_config_file=True,
-	                    help='Path to config file for parameters')
+	if not no_config:
+		parser.add_argument('-c', '--config', required=True, is_config_file=True,
+		                    help='Path to config file for parameters')
+	return parser
+
+def setup_standard_options(parser=None, no_config=False):
+	if parser is None:
+		parser = get_parser(no_config=no_config)
 
 	# Saving
 	parser.add_argument('-s', '--saveroot', type=str, default='../trained_nets/', )
@@ -14,6 +20,7 @@ def setup_standard_options():
 	parser.add_argument('--logdate', action='store_true')
 	parser.add_argument('--print-freq', type=int, default=-1)
 	parser.add_argument('--save-freq', type=int, default=-1)
+	parser.add_argument('--track-best', action='store_true')
 
 	parser.add_argument('--resume', type=str, default=None)
 	parser.add_argument('-l', '--load', type=str, default=None)
@@ -25,9 +32,13 @@ def setup_standard_options():
 	parser.add_argument('--decay-epochs', type=int, default=-1)
 	parser.add_argument('--decay-factor', type=float, default=0.2)
 	parser.add_argument('--use-val', action='store_true')
+	parser.add_argument('--test-per', type=float, default=None)
+	parser.add_argument('--val-per', type=float, default=None)
 	parser.add_argument('--no-unique-tests', dest='unique_tests', action='store_false')
 	parser.add_argument('-b', '--batch-size', default=128, type=int, )
 	parser.add_argument('--no-test', action='store_true')
+	parser.add_argument('--viz-criterion-args', nargs='+', type=str, default=None)
+	parser.add_argument('--stats-decay', type=float, default=.01)
 
 	# Optim
 	parser.add_argument('--optim-type', type=str, default='adam')
@@ -41,19 +52,36 @@ def setup_standard_options():
 	parser.add_argument('--no-cuda', action='store_true')
 
 	# Dataset
+	parser.add_argument('--dataroot', type=str, default=None) # a common root
 	parser.add_argument('--dataset', type=str, default='mnist')
 	parser.add_argument('-d', '--data', type=str, nargs='+')
+	parser.add_argument('--no-shuffle', dest='shuffle', action='store_false')
+	parser.add_argument('--drop-last', action='store_true')
 	parser.add_argument('--indexed', action='store_true')
 
+	# Model
+	parser.add_argument('--model-type', type=str, default=None)
+	parser.add_argument('--latent-dim', type=int, default=-1)
 	parser.add_argument('--nonlin', type=str, default='prelu')
-	parser.add_argument('--fc', type=int, nargs='+', default=[64, 128])
-	parser.add_argument('--channels', type=int, nargs='+', default=[32, 16, 8])
-	parser.add_argument('--kernels', type=int, nargs='+', default=3)
-	parser.add_argument('--factors', type=int, nargs='+', default=2)
+	parser.add_argument('--fc', type=int, nargs='+', default=None)
+	parser.add_argument('--channels', type=int, nargs='+', default=None)
+	parser.add_argument('--kernels', type=int, nargs='+', default=None)
+	parser.add_argument('--factors', type=int, nargs='+', default=None)
+	parser.add_argument('--strides', type=int, nargs='+', default=1)
 	parser.add_argument('--upsampling', type=str, default='bilinear')
+	parser.add_argument('--downsampling', type=str, default='max')
 	parser.add_argument('--norm-type', type=str, default='instance')
 
 	return parser
+
+
+
+
+
+##########
+# Old
+
+
 
 def setup_unsup_options():
 	parser = configargparse.ArgumentParser(description='Generate data of')

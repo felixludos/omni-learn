@@ -17,5 +17,6 @@ setup(name='foundation',
             'OpenCV-Python',
             'tabulate',
             'configargparse',
+            'ipdb',
       ],
       zip_safe=False)
