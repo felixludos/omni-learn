@@ -28,7 +28,7 @@ class Model(nn.Module):  # any vector function
 
 
 
-	def reset(self): # called at the beginning of each epoch
+	def pre_epoch(self): # called at the beginning of each epoch
 		pass
 
 class CompositeModel(Model):
@@ -49,6 +49,7 @@ class Optimizable(nn.Module):
 		self.optim = None
 
 	def record_lr(self):
+		return
 		if self.optim is not None:
 			if 'lr' not in self.stats:
 				self.stats.new('lr')
@@ -58,8 +59,8 @@ class Optimizable(nn.Module):
 			except AttributeError:
 				pass
 
-	def reset(self):
-		super().reset()
+	def pre_epoch(self):
+		super().pre_epoch()
 		self.record_lr()
 
 	def set_optim(self, optim=None, optim_type=None, parameters=None, **optim_kwargs):
@@ -109,8 +110,8 @@ class Schedulable(Optimizable):
 		if self.scheduler is not None:
 			self.scheduler.step()
 
-	def reset(self):
-		super().reset()
+	def pre_epoch(self):
+		super().pre_epoch()
 		self.schedule_step()
 
 class Generative(object):
@@ -136,8 +137,8 @@ class Recordable(Model):
 	def reset_stats(self):
 		self.stats.reset()
 
-	def reset(self):
-		super().reset()
+	def pre_epoch(self):
+		super().pre_epoch()
 		self.reset_stats()
 
 class Visualizable(Recordable):
@@ -154,9 +155,9 @@ class Visualizable(Recordable):
 	def _visualize(self, info, logger):
 		raise NotImplementedError
 
-	def reset(self):
+	def pre_epoch(self):
 		self.reset_viz_counter()
-		super().reset()
+		super().pre_epoch()
 
 class Regularizable(object):
 

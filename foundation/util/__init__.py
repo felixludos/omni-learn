@@ -3,10 +3,12 @@ from .farming import *
 from .os import *
 from .stats import *
 from .data import *
+from .logic import *
 from .math import *
 from .optim import *
 from .containers import *
 from .logging import *
+
 #from .setup import *
 try:
 	from .viz import *

@@ -9,7 +9,7 @@ import torchvision
 from ..framework import Generative, Recordable
 from .. import util
 from ..framework import Visualizable
-from .load_data import get_loaders
+from .load_data import old_get_loaders as get_loaders # TODO: update
 from .options import setup_standard_options
 from .. import models
 from .load_model import save_checkpoint
@@ -54,12 +54,8 @@ def run_full(get_options, get_data, get_model, argv=None):
 	print('Using {}'.format(args.device))
 
 	# Set seed
-	torch.manual_seed(args.seed)
-	np.random.seed(args.seed)
-	try:
-		torch.cuda.manual_seed(args.seed)
-	except:
-		pass
+	assert args.seed is not None
+	util.set_seed(args.seed)
 
 	###################
 	# Data
@@ -71,6 +67,7 @@ def run_full(get_options, get_data, get_model, argv=None):
 
 	loaders = get_loaders(*datasets, batch_size=args.batch_size, num_workers=args.num_workers,
 	                                            shuffle=args.shuffle, drop_last=args.drop_last, silent=True)
+
 
 	trainloader = loaders[0]
 	testloader = None if len(loaders) < 2 else loaders[-1]
@@ -84,12 +81,7 @@ def run_full(get_options, get_data, get_model, argv=None):
 	print('Batch size: {} samples'.format(args.batch_size))
 
 	# Reseed after loading datasets
-	torch.manual_seed(args.seed)
-	np.random.seed(args.seed)
-	try:
-		torch.cuda.manual_seed(args.seed)
-	except:
-		pass
+	util.set_seed(args.seed)
 
 	###################
 	# Model
@@ -118,12 +110,7 @@ def run_full(get_options, get_data, get_model, argv=None):
 	print('Model has {} parameters'.format(util.count_parameters(model)))
 
 	# Reseed after model init
-	torch.manual_seed(args.seed)
-	np.random.seed(args.seed)
-	try:
-		torch.cuda.manual_seed(args.seed)
-	except:
-		pass
+	util.set_seed(args.seed)
 
 	###################
 	# Run Train/Val Epochs
@@ -137,7 +124,7 @@ def run_full(get_options, get_data, get_model, argv=None):
 
 	for _ in range(args.epochs):
 
-		model.reset()
+		model.pre_epoch()
 
 		train_stats = util.StatsMeter()
 		train_stats.shallow_join(model.stats)
@@ -150,7 +137,7 @@ def run_full(get_options, get_data, get_model, argv=None):
 		all_train_stats.append(train_stats.copy())
 
 		if valloader is not None:
-			model.reset()
+			model.pre_epoch()
 
 			val_stats = util.StatsMeter()
 			val_stats.shallow_join(model.stats)
@@ -165,8 +152,6 @@ def run_full(get_options, get_data, get_model, argv=None):
 
 
 		if args.save_freq > 0 and epoch % args.save_freq == 0:
-
-
 			ckpt = {
 				'epoch': epoch+1,
 
@@ -238,6 +223,7 @@ def run_epoch(model, loader, args, mode='test',
 		mode, epoch + 1)
 
 	itr = iter(loader)
+
 	start = time.time()
 	for i, batch in enumerate(itr):
 		batch = util.to(batch, args.device)
@@ -249,11 +235,15 @@ def run_epoch(model, loader, args, mode='test',
 		time_stats.update('data', time.time() - start)
 		start = time.time()
 
+		# print('11')
+
 		if train:
 			out = model.step(batch)
 		else:
 			out = model.test(batch)
 		stats.update('loss', out.loss.detach())
+
+		# print('12')
 
 		time_stats.update('model', time.time() - start)
 		start = time.time()

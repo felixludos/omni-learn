@@ -6,13 +6,13 @@ from torch import nn
 from torch.optim import Optimizer
 from .stats import StatsMeter
 
-def get_optimizer(optim_type, parameters, lr=1e-3, weight_decay=0, momentum=0, **optim_args):
+def get_optimizer(optim_type, parameters, lr=1e-3, weight_decay=0, momentum=0, beta1=.9, beta2=.999, **optim_args):
 	if optim_type == 'sgd':
 		optimizer = O.SGD(parameters,lr=lr, weight_decay=weight_decay, momentum=momentum, **optim_args)
 	elif optim_type == 'rmsprop':
 		optimizer = O.RMSprop(parameters, lr=lr, weight_decay=weight_decay, momentum=momentum, **optim_args)
 	elif optim_type == 'adam':
-		optimizer = O.Adam(parameters, lr=lr, weight_decay=weight_decay)
+		optimizer = O.Adam(parameters, lr=lr, weight_decay=weight_decay, betas=(beta1, beta2), **optim_args)
 	elif optim_type == 'cg':
 		optimizer = Conjugate_Gradient(parameters, **optim_args)
 	elif optim_type == 'rprop':
@@ -32,12 +32,21 @@ class Complex_Optimizer(Optimizer):
 		self.__dict__['optims'] = None
 		super().__init__([{}], None)
 		self.__dict__['optims'] = optims
-		self.__dict__['param_groups'] = [grp for grp in chain(*[o.param_groups for o in optims.values()])]
+		self._update_groups()
+		# self.__dict__['param_groups'] = [grp for grp in chain(*[o.param_groups for o in optims.values()])]
+
+	def _update_groups(self):
+		self.param_groups = self._param_group_gen()
+
+	def _param_group_gen(self):
+		for optim in self.optims.values():
+			for grp in optim.param_groups:
+				yield grp
+		self._update_groups()
 
 	def add_param_group(self, *args, **kwargs): # probably shouldnt be used
 		return
-		for optim in self.optims.values():
-			optim.add_param_group(*args, **kwargs)
+		# raise Exception('invalid for complex optimizers')
 
 	def load_state_dict(self, state_dict):
 		for name, optim in self.optims.items():

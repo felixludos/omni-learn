@@ -1,5 +1,6 @@
 
 import sys, os, time
+import inspect
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,6 +8,30 @@ import torch.nn.functional as F
 from .. import util
 # from ..models import unsup
 from .. import models
+
+
+_model_registry = {}
+def register_model(name, cls):
+	_model_registry[name] = cls
+
+
+def fill_args(cls, A):
+
+	args = inspect.getargspec()
+
+
+def default_create_model(A):
+	'''
+	req: A.model, A.device, A.model.type
+
+
+	:param A:
+	:return:
+	'''
+
+	info = A.model
+
+	assert A.model.type in _model_registry, 'Unknown model type (have you registered it?): {}'.format(A.model.type)
 
 
 def save_checkpoint(info, save_dir, is_best=False, epoch=None):
@@ -21,7 +46,8 @@ def save_checkpoint(info, save_dir, is_best=False, epoch=None):
 
 	return path
 
-def load(path=None, args=None, load_model=None, load_data=None, load_state_dict=True):
+def load(path=None, args=None, load_model=None, load_data=None, load_state_dict=True,
+         load_last=False, **overrides):
 	assert path is not None or args is not None, 'must provide either path to checkpoint or args'
 	assert load_model or load_data, 'nothing to load'
 
@@ -29,16 +55,27 @@ def load(path=None, args=None, load_model=None, load_data=None, load_state_dict=
 	if path is not None:
 		ckptpath = path
 		if os.path.isdir(path):
-			ckptpath = os.path.join(path, 'best.pth.tar')
+			pick = 'best.pth.tar'
+			if load_last:
+				ckpts = [n for n in os.listdir(path) if 'checkpoint' in n and '.pth.tar' in n]
+				vals = [int(n.split('_')[-1].split('.')[0]) for n in ckpts]
+				pick = 'checkpoint_{}.pth.tar'.format(max(vals))
+			print('Found {} checkpoints. Using {}'.format(len(ckpts), pick))
 
-		if not os.path.isfile(ckptpath):
-			ckptpath = os.path.join(path, list(sorted(os.listdir(path), reverse=True))[0], 'best.pth.tar')
+			ckptpath = os.path.join(path, pick)
 
-		assert os.path.isfile(ckptpath), 'Could not find encoder: ' + path
+		# if not os.path.isfile(ckptpath):
+		# 	ckptpath = os.path.join(path, list(sorted(os.listdir(path), reverse=True))[0], 'best.pth.tar')
+
+		assert os.path.isfile(ckptpath), 'Could not find checkpoint: ' + path
 
 		checkpoint = torch.load(ckptpath)
 		args = checkpoint['args']
 		print('Loaded {}'.format(ckptpath))
+
+		for k,v in overrides.items():
+			args.__dict__[k] = v
+
 
 	out = []
 
@@ -109,7 +146,7 @@ def load_unsup_model(path=None, args=None, optim=None, to_device=True):
 								 hidden_fc=args.fc, criterion=criterion, beta=args.beta)
 
 	else:
-		raise Exception('Unknown model config: {}'.format(args.model_type))
+		raise Exception('Unknown model config_tml: {}'.format(args.model_type))
 
 	if checkpoint is not None:
 

@@ -1,0 +1,100 @@
+
+
+device: cuda
+seed: 0
+#no-cuda: False
+
+logdate: True
+txtlog: False
+
+saveroot: /is/ei/fleeb/workspace/foundation/trained_nets/
+save-freq: 1
+track-best: True
+
+dataroot: /is/ei/fleeb/workspace/local_data/
+dataset: dsprites
+
+num-workers: 0
+batch-size: 128
+use-val: False
+drop-last: False
+no-test: True
+viz-criterion-args: [original, reconstruction]
+
+start-epoch: 0
+print-freq: 50
+epochs: 40
+
+#optim-type: adam
+#lr: 1e-3
+#weight-decay: 1e-4
+#momentum: 0.9
+
+#decay-epochs: 18
+#decay-factor: .5
+
+# Model
+
+
+nonlin: prelu
+fc: [128, 128, 256]
+disc-fc: [128, 64, 16]
+enc-fc: [256, 128, 128]
+channels: [128, 64, 32, 16, 8]
+kernels: 3
+factors: 2
+upsampling: bilinear
+downsampling: max
+
+#disc-lr: 1e-4
+#enc-lr: 3e-4
+
+latent-dim: 16
+
+#disc-steps: 4
+
+disc-gp: 10
+beta: 100
+
+criterion: bce
+#criterion: mse
+#feature-match: True
+
+
+
+
+# gans -> rsmprop
+# wae -> adam (enc)
+
+
+
+#name: test-pycharm-wgan-rmsprop-disclr3x
+##optim-type: rmsprop
+##disc-optim-type: rmsprop
+#gan-wt: 1
+disc-steps: 4
+#disc-lr-factor: 3
+#lr: 1e-3
+#beta1: .5
+
+
+# test wae with rmsprop
+#model-type: wpp
+#name: test-pycharm-wae-rmsprop
+#gan-wt: 0
+#lr: 2e-4
+#optim-type: rmsprop
+##momentum: .2
+#enc-optim-type: adam
+
+name: test-pycharm-wfae-dropin
+model-type: fwae-dropin
+gan-wt: 1e-2
+lr: 4e-4
+optim-type: rmsprop
+#momentum: .2
+enc-optim-type: adam
+prob: 1
+fake-hyb: True
+no-fake-rec: True
+prior-wt: .5

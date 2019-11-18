@@ -7,7 +7,7 @@ def to(obj, device):
 	try:
 		return obj.to(device)
 	except AttributeError:
-		if isinstance(obj, list):
+		if isinstance(obj, (list, tuple)):
 			return TensorList([to(o, device) for o in obj])
 		if isinstance(obj, dict):
 			return TensorDict({k:to(v,device) for k,v in obj.items()})

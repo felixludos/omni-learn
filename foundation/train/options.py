@@ -4,8 +4,8 @@ def get_parser(desc='blank', no_config=False):
 	parser = configargparse.ArgumentParser(description=desc)
 
 	if not no_config:
-		parser.add_argument('-c', '--config', required=True, is_config_file=True,
-		                    help='Path to config file for parameters')
+		parser.add_argument('-c', '--config_tml', required=True, is_config_file=True,
+		                    help='Path to config_tml file for parameters')
 	return parser
 
 def setup_standard_options(parser=None, no_config=False):
@@ -45,6 +45,8 @@ def setup_standard_options(parser=None, no_config=False):
 	parser.add_argument('--lr', type=float, default=1e-3)
 	parser.add_argument('--weight-decay', type=float, default=0)
 	parser.add_argument('--momentum', type=float, default=0)
+	parser.add_argument('--beta1', type=float, default=.9)
+	parser.add_argument('--beta2', type=float, default=.999)
 
 	# Device/Multiprocessing
 	parser.add_argument('-j', '--num-workers', type=int, default=4)
@@ -86,8 +88,8 @@ def setup_standard_options(parser=None, no_config=False):
 def setup_unsup_options():
 	parser = configargparse.ArgumentParser(description='Generate data of')
 
-	parser.add_argument('-c', '--config', required=True, is_config_file=True,
-						help='Path to config file for parameters')
+	parser.add_argument('-c', '--config_tml', required=True, is_config_file=True,
+						help='Path to config_tml file for parameters')
 
 
 	# Saving
@@ -159,8 +161,8 @@ def setup_rl_options():
 	parser = configargparse.ArgumentParser(description='Policy Gradient Training')
 
 	# Dataset options
-	parser.add_argument('-c', '--config', required=False, is_config_file=True,
-	                    help='Path to config file for parameters')
+	parser.add_argument('-c', '--config_tml', required=False, is_config_file=True,
+	                    help='Path to config_tml file for parameters')
 
 	parser.add_argument('--name', type=str, default=None, help='Name of job (required if not resuming)')
 
@@ -266,8 +268,8 @@ def setup_gen_data_options():
 def setup_control_options():
 	parser = configargparse.ArgumentParser(description='RL Training/Evaluation')
 
-	parser.add_argument('-c', '--config', required=True, is_config_file=True,
-	                    help='Path to config file for parameters')
+	parser.add_argument('-c', '--config_tml', required=True, is_config_file=True,
+	                    help='Path to config_tml file for parameters')
 
 	parser.add_argument('--print-freq', type=int, default=None)
 	parser.add_argument('--filter', action='store_true', )
@@ -325,8 +327,8 @@ def setup_ray_options():
 	parser = configargparse.ArgumentParser(description='Policy Gradient Training')
 
 	# Dataset options
-	parser.add_argument('-c', '--config', required=False, is_config_file=True,
-	                    help='Path to config file for parameters')
+	parser.add_argument('-c', '--config_tml', required=False, is_config_file=True,
+	                    help='Path to config_tml file for parameters')
 
 	parser.add_argument('--name', type=str, default=None, help='Name of job (required if not resuming)')
 
@@ -401,8 +403,8 @@ def setup_q_options():  # TODO: make consistent with pg
 	# Parse arguments
 	parser = configargparse.ArgumentParser(description='Swarm Ions Training')
 
-	parser.add_argument('-c', '--config', required=True, is_config_file=True,
-	                    help='Path to config file for parameters')
+	parser.add_argument('-c', '--config_tml', required=True, is_config_file=True,
+	                    help='Path to config_tml file for parameters')
 
 	parser.add_argument('--name', required=True, type=str,
 	                    help='Environment for agent to learn')

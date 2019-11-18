@@ -37,9 +37,42 @@ def cum_prod(xs, cut_prev=False):
 
 	return torch.stack(out)
 
+def pairwise_distance(ps, qs=None, p=2): # last dim is summed
+
+	if qs is None:
+		return F.pdist(ps, p=p)
+
+	ps, qs = ps.unsqueeze(-2), qs.unsqueeze(-3)
+	return (ps - qs).pow(p).sum(-1).pow(1/p)
+
+def lorentzian(ps, qs=None, C=None):
+
+	dists = pairwise_distance(ps, qs).pow(2)
+
+	if C is None:
+		C = ps.size(-1) # dimensionality
+
+	return C / (C + dists)
+
+def MMD(p, q, C=None):
+
+	if C is None:
+		C = q.size(-1)
+
+	ps = lorentzian(p, C=C)
+	qs = lorentzian(q, C=C)
+	pq = lorentzian(p, q, C=C)
+
+	return ps.mean() + qs.mean() - 2*pq.mean()
+
 #####################
 # Neural Networks
 #####################
+
+class RMSELoss(nn.MSELoss):
+	def forward(self, *args, **kwargs):
+		loss = super().forward(*args, **kwargs)
+		return loss.sqrt()
 
 def get_loss_type(name, **kwargs):
 
@@ -48,6 +81,8 @@ def get_loss_type(name, **kwargs):
 
 	if name == 'mse':
 		return nn.MSELoss(**kwargs)
+	elif name == 'rmse':
+		return RMSELoss(**kwargs)
 	elif name == 'l1':
 		return nn.L1Loss(**kwargs)
 	elif name == 'huber':
@@ -110,48 +145,114 @@ def get_normalization(norm, num, **kwargs):
 # Randomness and Noise
 #####################
 
-class OUNoise(nn.Module):
-	"""docstring for OUNoise"""
-	def __init__(self, batch_size, dim, mu=0, theta=1, sigma=1, batch_first=True):
-		super(OUNoise, self).__init__()
-		self.dim = dim
-		self.batch_size = batch_size
-		self.mu = mu
-		self.theta = theta
-		self.sigma = sigma
-		self.stack_dim = 1 if batch_first else 0
-		self.reset()
-
-	def reset(self):
-		state = torch.ones(self.batch_size, self.dim) * self.mu
-		self.register_buffer('state', state)
-
-	def forward(self, seq=1, reset=False):
-		if reset:
-			self.reset()
-
-		states = [self.state]
-		for k in range(seq):
-			dx = self.theta * (self.mu - states[-1]) + self.sigma * torch.randn(self.batch_size, self.dim).type_as(self.state)
-			states.append(states[-1] + dx)
-
-		self.state = states[-1]
-		states = torch.stack(states, self.stack_dim) # batch x seq x dim or seq x batch x dim
-		return states.squeeze(1).squeeze(0)
-
 def set_seed(seed=None):
 	if seed is None:
 		seed = get_random_seed()
 	torch.manual_seed(seed)
 	np.random.seed(seed)
 	random.seed(seed)
+	if torch.cuda.is_available():
+		torch.cuda.manual_seed(seed)
 	return seed
 
 def get_random_seed():
 	return np.frombuffer(np.random.bytes(4), dtype=np.int32)[0]
 
-def random_permutation(D):
+class OUNoise(nn.Module):
+	"""docstring for OUNoise"""
+	def __init__(self, dim=1, batch_size=None,
+	             mu=0., theta=1., sigma=1.,
+	             batch_first=True):
+		super(OUNoise, self).__init__()
+
+		if not isinstance(mu, torch.Tensor):
+			mu = torch.tensor(mu)
+		if not isinstance(theta, torch.Tensor):
+			theta = torch.tensor(theta)
+		if not isinstance(sigma, torch.Tensor):
+			sigma = torch.tensor(sigma)
+
+		mu = mu.float()
+		sigma = sigma.float()
+		theta = theta.float()
+
+		if mu.ndimension() > 0:
+			dim = mu.size(-1)
+			if mu.ndimension() > 1:
+				batch_size = mu.size(0)
+		elif sigma.ndimension() > 0:
+			dim = sigma.size(-1)
+			if sigma.ndimension() > 1:
+				batch_size = sigma.size(0)
+		elif theta.ndimension() > 0:
+			dim = theta.size(-1)
+			if theta.ndimension() > 1:
+				batch_size = theta.size(0)
+
+		if mu.ndimension() == 0:
+			mu = mu.unsqueeze(-1).expand(dim)
+		if sigma.ndimension() == 0:
+			sigma = sigma.unsqueeze(-1).expand(dim)
+		if theta.ndimension() == 0:
+			theta = theta.unsqueeze(-1).expand(dim)
+
+		assert mu.size(-1) == dim and sigma.size(-1) == dim and theta.size(-1) == dim, 'wrong dims'
+
+		self.register_buffer('mu', mu)
+		self.register_buffer('sigma', sigma)
+		self.register_buffer('theta', theta)
+		self.register_buffer('state', torch.tensor(0.)) # register placeholder
+
+		self.dim = dim
+		self.batch_size = None
+		self.batch_first = batch_first
+		self.reset(batch_size)
+
+	def reset(self, B=None):
+		if B is not None:
+			self.batch_size = B
+		self.stack_dim = 1 if self.batch_first and self.batch_size is not None else 0
+
+		self.state = self.mu.clone()
+
+		if self.batch_size is not None:
+			if self.state.ndimension() < 2:
+				self.state = self.state.unsqueeze(0).expand((self.batch_size, self.dim))
+			assert self.state.size(0) == self.batch_size, '{} vs {}'.format(self.state.size(0), self.batch_size)
+
+		return self.state
+
+	def forward(self, seq=None, reset=False):
+		if reset:
+			self.reset()
+		nseq = 1 if seq is None else seq
+
+		states = [self.state]
+		for k in range(nseq):
+			dx = self.theta * (self.mu - states[-1]) + self.sigma * torch.randn_like(self.state)
+			states.append(states[-1] + dx)
+
+		self.state = states[-1]
+		states = torch.stack(states[1:], self.stack_dim) # batch x seq x dim or seq x batch x dim
+
+		if seq is None:
+			states = states.squeeze(self.stack_dim)
+		if self.batch_size is None and states.ndimension() > 1:
+			states.squeeze(1-self.stack_dim)
+
+		return states
+
+def random_permutation_mat(D):
 	return torch.eye(D)[torch.randperm(D)]
+
+def shuffle_dim(M, dim=-1): # reshuffle with replacement
+	assert M.ndimension() == 2 and dim == -1, 'not implemented yet' # TODO: generalize to many-dimmed M and any dim
+	B,D = M.size()
+	
+	row = torch.randperm(B*D).fmod(B).view(B, D)
+	col = torch.arange(D).unsqueeze(0).expand(B,-1)
+	
+	return M[row, col]
 
 #####################
 # Linear Systems

@@ -10,7 +10,7 @@ import torch
 
 class Dim_Description(object):
 	def __init__(self, name, **props):
-		self.__dict__[name] = name
+		self.__dict__['name'] = name
 		self.__dict__['properties'] = props
 
 	def sample(self, N=None):
@@ -70,6 +70,19 @@ class Ranged_Dim(Typed_Dim):
 	def sample(self, N=None):
 		shape = (1,) if N is None else (N,1)
 		return torch.rand(*shape) * (self.max - self.min) + self.min
+
+class SinCos_Dim(Ranged_Dim):
+	def __init__(self, name, type, **props):
+		props['max'] = 1.
+		props['min'] = -1.
+		props['name'] = '{}({})'.format(type, name)
+		if 'type' not in props:
+			props['type'] = type
+		super().__init__(**props)
+
+	def sample(self, N=None):
+		shape = (1,) if N is None else (N,1)
+		return torch.randn(*shape)
 
 class Periodic_Dim(Ranged_Dim):
 	def __init__(self, period, **props):

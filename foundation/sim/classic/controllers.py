@@ -28,8 +28,8 @@ class Composer(Controller):
 	def __getitem__(self, item):
 		return self.controllers[item]
 
-	def forward(self, t, q):
-		U = self.controllers[0](t, q)
+	def forward(self, t, q): # TODO: fix to using sum()
+		U = self.controllers[0](t, q).clone()
 		for ctrl in self.controllers[1:]:
 			U += ctrl(t, q)
 		return U
@@ -49,12 +49,12 @@ class Constant(Controller):
 		self.val = val.to(self.val.device)
 
 	def forward(self, t, q):
-		return self.val
+		return self.val.clone()
 
 
 
 class SimpleLimiter(Controller):
-	def __init__(self, force, index, range=1., offset=None, tolerance=0.01):
+	def __init__(self, force, index, range=1., offset=None, tolerance=None):
 
 		try:
 			len(index)
@@ -78,7 +78,7 @@ class SimpleLimiter(Controller):
 
 		if self.offset is not None:
 			x -= self.offset
-		x /= (self.range + self.tol)
+		x /= self.range
 
 		u = self.force(x)
 		return u
@@ -122,6 +122,9 @@ class Force(nn.Module):
 	def __init__(self, dim):
 		super().__init__()
 		self.dim = dim
+		
+	def energy(self, q):
+		raise NotImplementedError
 
 class NonMechanical_Force(Force):
 	def forward(self, x, v):
@@ -172,5 +175,6 @@ class CutPowerForce(Mechanical_Force): # TODO: sort of a hack
 			x = self.pre(x)
 
 		f = self.coeff * x**self.power
-		f[x.abs()<1] = 0.
+		f[x.abs()<=1] = 0.
+		
 		return f

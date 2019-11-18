@@ -15,9 +15,9 @@ from torchdiffeq import odeint
 from ...framework import Model
 
 from .dynamics import Controlled_Dynamics, Cartpole_Dynamics
-from .controllers import Constant, Composer, PowerForce, CutPowerForce
+from .controllers import Constant, Composer, PowerForce, CutPowerForce, SimpleLimiter
 from .descriptions import Typed_Dim, Angle_Dim, Discrete_Dim, Ranged_Dim, Velocity_Dim
-
+from .representations import SinCosRepresentation
 
 # TODO: add reward functions on top of simulators
 # TODO: sim.print_desc() - nicely format state_desc and action_desc
@@ -38,9 +38,13 @@ class Simulator(Model):
 		self.state_desc = state_desc
 		self.action_desc = action_desc
 
+	def nicify(self):
+		raise NotImplementedError
+
 	def sample_state(self, N=None):
 		if self.state_desc is not None:
-			return torch.cat([desc.sample(N) for desc in self.state_desc], -1).to(self.device)
+			state = torch.cat([desc.sample(N) for desc in self.state_desc], -1).to(self.device)
+			return self._observe(state)
 		raise NotImplementedError
 
 	def sample_action(self, N=None):
@@ -91,51 +95,65 @@ class Simulator(Model):
 
 class Cartpole(Simulator):
 
-	def __init__(self, ctrl_scale=1., timestep=0.01, batch_size=None, sincos=False,
-	             # limit=1, limit_pow=25., limit_coeff=-26., # by default in a power 36 potential for limit
+	def __init__(self, ctrl_scale=5., timestep=0.01, batch_size=None,
+	             limit=1., limit_pow=4., limit_coeff=-40., # by default in a power 36 potential for limit
 	             init_dx_scale=1., init_dtheta_scale=1.,
 	             # dynamics=None, state_desc=None, action_desc=None,
 	             integration_method='rk4',
 	             **dynamics_args):
 
 		controller = Constant()
+		actuator = controller
+		
+		if limit is not None:
+			frc = CutPowerForce(power=limit_pow, coeff=limit_coeff)
+			limiter = SimpleLimiter(frc, index=0, range=limit)
+			actuator = Composer(controller, limiter)
+		else:
+			print('WARNING: x is not limited in cartpole')
 
-		dynamics = Cartpole_Dynamics(cart_force=controller, limit=1., **dynamics_args)
+
+		dynamics = Cartpole_Dynamics(cart_force=actuator, **dynamics_args)
 
 		state_desc = [Ranged_Dim(name='x', min=-1, max=1), Angle_Dim(name='theta'),
 		              Velocity_Dim(name='dx', scale=init_dx_scale), Velocity_Dim(name='dtheta', scale=init_dtheta_scale)]
-		if sincos:
-			cossin_state_desc = [Ranged_Dim(name='x', min=-1, max=1), Ranged_Dim(name='sin(theta)', min=-1, max=1), Ranged_Dim(name='cos(theta)', min=-1, max=1),
-			              Velocity_Dim(name='dx', scale=init_dx_scale), Velocity_Dim(name='dtheta', scale=init_dtheta_scale)]
 
 		action_desc = [Ranged_Dim(name='u', min=-1, max=1)]
 
 		super().__init__(dynamics=dynamics, timestep=timestep, batch_size=batch_size, integration_method=integration_method,
-		                 state_desc=cossin_state_desc if sincos else state_desc, action_desc=action_desc)
+		                 state_desc=state_desc, action_desc=action_desc)
+
+		self.controller = controller
 
 		self._true_state_desc = state_desc
 		self.ctrl_scale = ctrl_scale
-		self.sincos = sincos
 
-	def sample_state(self, N=None):
-		return torch.cat([desc.sample(N) for desc in self._true_state_desc], -1).to(self.device)
+	def nicify(self):
+		return SinCosRepresentation(self, 1)
 
-	def _reset(self, state):
-		self.dynamics.controller.val *= 0.
+	def sample_state(self, N=None):  # TODO: fix for sincos
+
+		states = torch.cat([desc.sample(N) for desc in self._true_state_desc], -1).to(self.device)
+
+		return states
+
+	def _reset(self, state): # TODO: fix for sincos
+		self.controller.val *= 0.
+
 		return state
 
 	def _apply_control(self, ctrl):
-		self.dynamics.controller.update(self.ctrl_scale * ctrl.view(-1, 1))
+		self.controller.update(self.ctrl_scale * ctrl.view(-1, 1).clamp(-1,1))
 
 	def _observe(self, state):
 
-		if self.sincos:
-			x, theta, dx, dtheta = state.narrow(-1,0,1), state.narrow(-1,1,1), state.narrow(-1,2,1), state.narrow(-1,3,1)
-			return torch.cat([x, torch.sin(theta), torch.cos(theta), dx, dtheta],-1)
+		# if self.sincos:
+		# 	x, theta, dx, dtheta = state.narrow(-1,0,1), state.narrow(-1,1,1), state.narrow(-1,2,1), state.narrow(-1,3,1)
+		# 	return torch.cat([x, torch.sin(theta), torch.cos(theta), dx, dtheta],-1)
 
 		state[...,1] %= 2*np.pi
 
-		return state
+		return super()._observe(state)
 
 	def _render(self, state, size):
 		W, H = size
@@ -161,7 +179,8 @@ class Cartpole(Simulator):
 
 		# pole
 		theta = state[1]
-		px, py = state[1:3] if self.sincos else (np.sin(theta), np.cos(theta))
+		# px, py = state[1:3] if self.sincos else (np.sin(theta), np.cos(theta))
+		px, py = np.sin(theta), np.cos(theta)
 
 		dr.line([cart, level, cart + L * px, level - L * py], width=5, fill=(80, 100, 220))
 

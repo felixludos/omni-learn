@@ -4,7 +4,7 @@ from lab_setup import Barium, Ytterbium
 
 def make_parser():
     p = configargparse.ArgParser(description='Simulate trapped Ba or Yb Ions in a linear Paul Trap')
-    p.add('-c', '--config', required=True, is_config_file=True, help='config file path')
+    p.add('-c', '--config_tml', required=True, is_config_file=True, help='config_tml file path')
 
     p.add('--name', type=str, required=True, help='Name of simulation')
     p.add('--save-root', type=str, required=True, help='Root for saving results')

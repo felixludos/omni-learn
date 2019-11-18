@@ -4,6 +4,14 @@ import torch
 from torch.utils.data import Dataset
 import h5py as hf
 
+from .. import util
+
+class DatasetWrapper(util.Simple_Child, Dataset):
+	def __init__(self, dataset):
+		super().__init__(_parent='dataset')
+		self.dataset = dataset
+
+
 # class Movable_Dataset(Dataset):
 #
 # 	def __init__(self, dataset, device=None):
@@ -20,7 +28,7 @@ import h5py as hf
 #
 # 		if not isinstance(out, Movable):
 # 			if isinstance(out, torch.Tensor):
-# 				new = TensorList([out], _size_key=0)
+# 				new = out
 # 			elif isinstance(out, (list, tuple)):
 # 				new = TensorList(out)
 # 			elif isinstance(out, dict):
@@ -33,6 +41,49 @@ import h5py as hf
 # 			new = new.to(self.device)
 #
 # 		return new
+
+class Batchable_Dataset(Dataset): # you can select using a full batch
+	def allow_batched(self):
+		return True
+
+class Info_Dataset(Dataset):
+
+	def __init__(self, din, dout, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.din = din
+		self.dout = dout
+
+	def get_info(self):
+		return self.din, self.dout
+
+class Device_Dataset(Dataset): # Full dataset is in memory, so it can be moved to GPU
+	def __init__(self, *args, device='cpu', **kwargs):
+		super().__init__(*args, **kwargs)
+		self.device = device
+		self._buffers = set()
+
+	def register_buffer(self, name, buffer):
+		self._buffers.add(name)
+		self.__setattr__(name, buffer)
+
+	def get_device(self):
+		return self.device
+
+	def to(self, device):
+		self.device = device
+		for name in self._buffers:
+			try:
+				self.__setattr__(name, getattr(self,name).to(device))
+			except AttributeError:
+				pass
+
+class Testable_Dataset(Dataset): # Has a pre-defined loadable testset
+	def __init__(self, *args, train=True, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.train = train
+
+	def get_mode(self):
+		return 'train' if self.train else 'test'
 
 class Indexed_Dataset(Dataset):
 	def __init__(self, d):
@@ -78,23 +129,28 @@ class List_Dataset(Dataset):
 	def __len__(self):
 		return len(self.data)
 
-class Subset_Dataset(Dataset):
+class Subset_Dataset(DatasetWrapper):
 
-	def __init__(self, data_source, indices):
-		self.data_source = data_source
+	def __init__(self, dataset, indices):
+		super().__init__(dataset)
 		self.indices = indices
 
+		try:
+			device = self.dataset.get_device()
+			self.indices = self.indices.to(device)
+		except AttributeError:
+			pass
+
 	def __getitem__(self, idx):
-		return self.data_source[self.indices[idx]]
+		return self.dataset[self.indices[idx]]
 
 	def __len__(self):
 		return len(self.indices)
 
-class Format_Dataset(Dataset):
+class Format_Dataset(DatasetWrapper):
 
-	def __init__(self, tensor_dataset, format_fn, format_args=None, include_original=False):
-
-		self.dataset = tensor_dataset
+	def __init__(self, dataset, format_fn, format_args=None, include_original=False):
+		super().__init__(dataset)
 
 		self.format_fn = format_fn
 		self.format_args = {} if format_args is None else format_args
@@ -114,13 +170,18 @@ class Format_Dataset(Dataset):
 
 		return formatted
 
-class Shuffle_Dataset(Dataset):
+class Shuffle_Dataset(DatasetWrapper):
 
 	def __init__(self, dataset):
+		super().__init__(dataset)
 
-		self.dataset = dataset
-		self.indices = np.arange(len(dataset))
-		np.random.shuffle(self.indices)
+		self.indices = torch.randperm(len(self.dataset))
+
+		try:
+			device = self.dataset.get_device()
+			self.indices = self.indices.to(device)
+		except AttributeError:
+			pass
 
 	def __len__(self):
 		return len(self.dataset)
