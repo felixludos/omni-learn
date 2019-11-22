@@ -1,0 +1,65 @@
+# parents = [...]
+
+device: 'cuda'
+num_workers: 0
+seed: 0
+
+output:
+
+    tblog: true
+    txtlog: false
+    logdate: true
+
+#   save_freq: -1
+
+viz:
+    stats_decay: 0.01
+#   print_freq = -1
+#	criterion_args = ['pred', 'y']
+
+training:
+    start: 0
+    epochs: 20
+
+    track_best: true
+#	no_test = true
+
+#evaluation:
+
+dataset:
+    batch_size: 128
+
+    shuffle: true
+    drop_last: false
+
+model:
+
+#	_type: mlp
+#	latent_dim: 16
+#   fc: [64, 64]
+
+    nonlin: 'prelu'
+
+    upsampling: 'bilinear'
+    downsampling: 'max'
+
+    norm_type: 'instance'
+
+
+optim:
+    type: 'adam'
+    lr: 1.e-3
+    weight_decay: 0
+    momentum: 0
+    beta1: 0.9
+    beta2: 0.999
+
+#	lr_decay:
+#		type: 'factor'
+#		epochs: 10
+#		factor: 0.1
+
+
+
+
+

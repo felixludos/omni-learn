@@ -1,0 +1,28 @@
+# Trapped Ion Motion Simulation Config File
+
+# Traj settings
+name:           testing_4_ions
+save-root:      saves/
+load-path:      ~
+save-xyz:       True
+save-spectra:   True
+save-temp:      True
+#total-frames:   5000000
+frames:         10000
+print-step:     500
+seed:           ~
+
+# Sim settings
+init-setting:   eq
+timestep:       auto
+# All SI units (w_E is in Hz - not rad/sec)
+trap-V_0:       1000
+trap-V_caps:    10
+trap-w_E:       18.2e6
+trap-X:         0.930e-3
+trap-Y:         0.793e-3
+trap-Z:         2.84e-3
+trap-cooling-lasers:   all-dirs
+ions:           [Ba, Ba, Ba, Ba]
+
+

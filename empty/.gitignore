@@ -1,0 +1,8 @@
+local_data/
+.ipynb_checkpoints/
+.idea/
+__pycache__/
+__pycache__
+trained_nets/
+old_trained_nets/
+foundation.egg-info/
