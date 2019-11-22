@@ -65,22 +65,25 @@ class Optimizable(nn.Module):
 
 	def set_optim(self, optim_info=None):
 
-		sub_optims = {}
-		for name, child in self.named_children():
-			if isinstance(child, Optimizable) and child.optim is not None:
-				sub_optims[name] = child.optim
+		if optim_info is None: # aggregate optimizers of children
+			sub_optims = {}
+			for name, child in self.named_children():
+				if isinstance(child, Optimizable) and child.optim is not None:
+					sub_optims[name] = child.optim
 
-		if len(sub_optims) == 0:
-			assert optim_info is not None, 'no sub optims found, and no optim info provided'
+			assert len(sub_optims) > 0, 'no children have optimizers'
 
+			if len(sub_optims) == 1:
+				optim = next(iter(sub_optims.values()))
+			else:
+				optim = util.Complex_Optimizer(**sub_optims)
+
+		else:
 			optim = util.default_create_optim(self.parameters(), optim_info)
 
-		elif len(sub_optims) == 1:
-			optim = next(iter(sub_optims.values()))
-		else:
-			optim = util.Complex_Optimizer(**sub_optims)
-
 		self.optim = optim
+
+
 
 	def optim_step(self, loss): # should only be called during training
 		if self.optim is None:

@@ -35,7 +35,7 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 
 			self.meta = _rec_decode(data['metadata'][()])
 
-			images = torch.from_numpy(data['imgs']).float()
+			images = torch.from_numpy(data['imgs']).float().unsqueeze(1)
 
 			if label_type is not None:
 				if label_type == 'values':

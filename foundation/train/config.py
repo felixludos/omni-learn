@@ -254,11 +254,17 @@ class Config(util.NS): # TODO: allow adding aliases
 			val = self[item]
 
 		if isinstance(val, dict) and '_type' in val:  # WARNING: using pull will automatically create registered sub components
+			print('Creating sub-component: {} (type={})'.format(item, val['_type']))
 			val = create_component(val)
-		if isinstance(val, str) and val[:2] == '<>':  # alias
+
+		elif isinstance(val, str) and val[:2] == '<>':  # alias
 			alias = val[2:]
 			val = self.pull(alias, *defaults)
 			print('{} is an alias for {}'.format(item, alias))
+
+		else:
+			print('{}: {}'.format(item, val))
+
 
 		if defaulted:
 			print('{} default: {}'.format(item, val))

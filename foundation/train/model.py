@@ -4,6 +4,7 @@ import os
 import inspect
 import torch
 # from ..models import unsup
+from .. import framework as fm
 from .. import models
 
 
@@ -46,6 +47,9 @@ def _create_mlp(info): # mostly for selecting/formatting args (and creating sub 
 register_model('mlp', create_fn=_create_mlp)
 
 
+class Trainable_Conv(fm.Optimizable, models.Conv_Encoder):
+	pass
+
 def _create_conv(info):
 
 	kwargs = {
@@ -67,7 +71,7 @@ def _create_conv(info):
 		'norm_type': info.pull('norm_type', 'batch'),
 		'output_norm_type': info.pull('output_norm_type', None),
 
-		'hidden_fc': info.pull('hidden_fc', []),
+		'hidden_fc': info.pull('hidden_fc', '<>fc', []),
 	}
 
 	num = len(kwargs['channels'])
@@ -79,26 +83,36 @@ def _create_conv(info):
 	# TODO: deal with rectangular inputs
 	try:
 		len(kernels)
-	except AttributeError:
+	except TypeError:
 		kernels = [kernels]*num
 	kwargs['kernels'] = kernels
 
 	try:
 		len(strides)
-	except AttributeError:
+	except TypeError:
 		strides = [strides]*num
 	kwargs['strides'] = strides
 
 	try:
 		len(factors)
-	except AttributeError:
+	except TypeError:
 		factors = [factors] * num
 	kwargs['factors'] = factors
 
+	conv = Trainable_Conv(**kwargs)
 
-	return models.Conv_Encoder(**kwargs)
+	optim_info = info.pull('optim', None)
+	if optim_info is not None:
+		conv.set_optim(optim_info)
+
+	return conv
+
+
 register_model('conv', create_fn=_create_conv)
 
+
+class Trainable_Deconv(fm.Optimizable, models.Conv_Decoder):
+	pass
 
 def _create_deconv(info):
 
@@ -120,7 +134,7 @@ def _create_deconv(info):
 		'norm_type': info.pull('norm_type', 'instance'),
 		'output_norm_type': info.pull('output_norm_type', None),
 
-		'hidden_fc': info.pull('hidden_fc', []),
+		'hidden_fc': info.pull('hidden_fc', '<>fc', []),
 	}
 
 	num = len(kwargs['channels'])
@@ -131,18 +145,25 @@ def _create_deconv(info):
 	# TODO: deal with rectangular inputs
 	try:
 		len(kernels)
-	except AttributeError:
+	except TypeError:
 		kernels = [kernels]*num
 	kwargs['kernels'] = kernels
 
 	try:
 		len(factors)
-	except AttributeError:
+	except TypeError:
 		factors = [factors] * num
 	kwargs['ups'] = factors
 
 
-	return models.Conv_Decoder(**kwargs)
+	deconv = Trainable_Deconv(**kwargs)
+
+	optim_info = info.pull('optim', None)
+	if optim_info is not None:
+		deconv.set_optim(optim_info)
+
+	return deconv
+
 register_model('deconv', create_fn=_create_deconv)
 
 
