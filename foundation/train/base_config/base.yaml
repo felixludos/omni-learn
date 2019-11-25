@@ -12,8 +12,7 @@ output:
 
 #   save_freq: -1
 
-viz:
-    stats_decay: 0.01
+#    stats_decay: 0.01
 #   print_freq = -1
 #	criterion_args = ['pred', 'y']
 

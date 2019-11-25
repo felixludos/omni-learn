@@ -1,11 +1,11 @@
 
 import sys, os, time
 import traceback, ipdb
+from tqdm import tqdm
 import yaml
 import torch
-from ..framework import Recordable
 from .. import util
-from ..framework import Visualizable
+from ..framework import Visualizable, Recordable
 # from .load_data import old_get_loaders as get_loaders # TODO: update
 
 from .setup import setup_records, setup_logging
@@ -127,10 +127,14 @@ def run_full(A, get_data, get_model, get_name=None):
 		print('testdata not loaded yet')
 	print('Batch size: {} samples'.format(A.dataset.batch_size))
 
-	if 'stats_decay' not in A.training:
-		A.training.stats_decay = max(0.01, min(100/len(trainloader), 0.1))
-	if 'print_freq' not in A.training:
-		A.training.print_freq = min(max(20, len(trainloader) // 40), 200)
+	if 'stats_decay' not in A.output:
+		A.output.stats_decay = max(0.01, min(100/len(trainloader), 0.1))
+	util.set_default_tau(A.output.stats_decay)
+	if isinstance(model, Recordable):
+		model.stats.set_tau(A.output.stats_decay)
+	if 'print_freq' not in A.output:
+		A.output.print_freq = min(max(20, len(trainloader) // 40), 200)
+
 
 	###################
 	# Model
@@ -152,13 +156,13 @@ def run_full(A, get_data, get_model, get_name=None):
 		util.set_seed(epoch_seed)
 
 		train_stats = run_epoch(model, trainloader, A, mode='train', records=records,
-		                              logger=logger, silent=False,)
+		                              logger=logger, silent=False, inline='inline' in A and A.inline)
 
 		records['stats']['train'].append(train_stats.export())
 
 		if valloader is not None:
 			val_stats = run_epoch(model, valloader, A, mode='val', records=records,
-		                              logger=logger, silent=False,)
+		                              logger=logger, silent=False, inline='inline' in A and A.inline)
 
 			records['stats']['val'].append(val_stats.export())
 
@@ -222,7 +226,7 @@ def run_full(A, get_data, get_model, get_name=None):
 		print('testdata len={}, testloader len={}'.format(len(testset), len(testloader)))
 
 		test_stats = run_epoch(model, testloader, A, records=records, mode='test',
-		                      logger=logger, silent=False,)
+		                      logger=logger, silent=False, inline='inline' in A and A.inline)
 
 		records['stats']['test'] = test_stats.export()
 
@@ -237,7 +241,7 @@ def run_full(A, get_data, get_model, get_name=None):
 
 def run_epoch(model, loader, A, records, mode='test',
                 logger=None, unique_tests=False, silent=False,
-                stats=None):
+                stats=None, inline=False):
 	train = mode == 'train'
 	if train:
 		model.train()
@@ -245,7 +249,7 @@ def run_epoch(model, loader, A, records, mode='test',
 		model.eval()
 		
 	total_epochs = A.training.epochs #+ A.training.start
-	print_freq = A.training.print_freq
+	print_freq = A.output.print_freq
 	
 	viz_criterion = None
 	if 'viz_criterion' in A.training and 'viz_criterion_args' in A.training:
@@ -263,16 +267,19 @@ def run_epoch(model, loader, A, records, mode='test',
 	if viz_criterion is not None and 'loss-viz' not in stats:
 		stats.new('loss-viz')
 
-	time_stats = util.StatsMeter('data', 'model', 'viz', tau=A.training.stats_decay)
+	time_stats = util.StatsMeter('data', 'model', 'viz')
 	stats.shallow_join(time_stats, fmt='time-{}')
 
 	logger_prefix = '{}/{}'.format('{}',mode) if not unique_tests or train else '{}/{}{}'.format('{}',
 		mode, records['epoch'])
 
-	itr = iter(loader)
+
+	itr = enumerate(iter(loader))
+	if inline:
+		itr = tqdm(itr, total=len(loader), leave=True)
 
 	start = time.time()
-	for i, batch in enumerate(itr):
+	for i, batch in itr:
 		batch = util.to(batch, A.device)
 
 		B = batch.size(0)
@@ -308,9 +315,12 @@ def run_epoch(model, loader, A, records, mode='test',
 				if isinstance(model, Visualizable):
 					model.visualize(out, logger)
 
-			if not silent:
-				loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(), stats['loss'].smooth.item()) \
-					if stats['loss'].count > 0 else ''
+		if not silent:
+			loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(), stats['loss'].smooth.item()) \
+				if stats['loss'].count > 0 else ''
+			if inline:
+				itr.set_description('{} {}/{}{}'.format(mode, records['epoch'], total_epochs, loss_info))
+			elif print_freq is None or i % print_freq == 0:
 				print('[ {} ] {} Ep={}/{} Itr={}/{}{}'.format(
 					time.strftime("%H:%M:%S"), mode,
 					records['epoch'], total_epochs, i + 1, len(loader), loss_info))
