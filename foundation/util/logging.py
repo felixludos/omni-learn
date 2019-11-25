@@ -22,10 +22,11 @@ class Logger(object):
 				logfile = open(os.path.join(log_dir, 'logfile.txt'), 'a+')
 			self._old_stdout = sys.stdout
 			self.txtlog = Tee(self._old_stdout, logfile)
+			sys.stdout = self.txtlog
 
 			now = time.strftime("%b-%d-%Y-%H%M%S")
 			title = '**** Beginning Log {} ****\n'.format(now)
-			title_stars = '* ' *(len(title ) -1) + '\n'
+			title_stars = '*' *(len(title ) -1) + '\n'
 
 			self.txtlog.write(title_stars + title + title_stars, logonly=True)
 

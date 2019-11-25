@@ -79,13 +79,20 @@ def run_full(A, get_data, get_model, get_name=None):
 		config_path = A.export(os.path.join(A.output.save_dir, 'config.tml'))
 		print('Config saved to {}'.format(config_path))
 
-	if 'save_dir' in A.output and os.environ['FOUNDATION_RUN_MODE'] == 'cluster' and 'JOBDIR' in os.environ:
+	if 'save_dir' in A.output and os.environ['FOUNDATION_RUN_MODE'] == 'cluster' and 'JOBDIR' in os.environ: # cluster checkpointing for restarts
 
 		jobdir = os.environ['JOBDIR']
 
-		with open(os.path.join(jobdir, 'checkpoints.txt'), 'w') as f:
-			f.write(os.path.basename(A.output.save_dir))
-		print('[Saved checkpoint dir for restarts]')
+		if 'checkpoints.txt' not in os.listdir(jobdir):
+
+			# register job
+			if 'JOB_ID' in os.environ:
+				with open(os.environ['JOB_REGISTRY_PATH'], 'a+') as f:
+					f.write('{:>10} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1], A.output.save_dir))
+
+			with open(os.path.join(jobdir, 'checkpoints.txt'), 'w') as f:
+				f.write(os.path.basename(A.output.save_dir))
+			print('[Saved checkpoint dir for restarts]')
 
 	###################
 	# DataLoader
@@ -308,6 +315,8 @@ def run_epoch(model, loader, A, records, mode='test',
 					time.strftime("%H:%M:%S"), mode,
 					records['epoch'], total_epochs, i + 1, len(loader), loss_info))
 
+				sys.stdout.flush()
+
 		time_stats.update('viz', time.time() - start)
 		start = time.time()
 
@@ -324,6 +333,7 @@ def run_epoch(model, loader, A, records, mode='test',
 
 	if logger is not None:
 		logger.flush()
+	sys.stdout.flush()
 
 	return stats
 
