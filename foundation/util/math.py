@@ -715,6 +715,53 @@ class Joint_Distribution(distrib.Distribution):
 		return 'Joint_Distribution({})'.format(', '.join(map(str, self.base)))
 
 
+class Normal_Mixture(distrib.Distribution):
+	def __init__(self, locs, scales, wts=None, batch_first=False):
+
+		super().__init__(locs.size()[1:], locs.size()[1:])
+
+		self.locs = locs
+		self.scales = scales
+		self.denom = scales.pow(2).mul(2)
+
+		self.dim = int(batch_first)
+
+		if wts is None:
+			# wts = torch.ones(self.locs.size(0), device=locs.device)
+			pass
+		else:
+			raise NotImplementedError
+			assert wts.size(0) == self.locs.size(self.dim)
+		self.wts = wts
+
+	@property
+	def mean(self):
+		if self.wts is None:
+			return self.locs.mean(self.dim)
+
+	@property
+	def stddev(self):
+		if self.wts is None:
+			return self.scales
+
+	def log_prob(self, value):
+		value = value.unsqueeze(self.dim)
+		log_probs = (self.locs - value).pow(2).div(-self.denom) - self.denom.mul(np.pi).log().div(2)
+		return log_probs.logsumexp(log_probs, dim=self.dim)
+
+	def rsample(self, sample_shape=None):
+
+		if self.wts is None:
+
+
+
+			pass
+		else:
+			raise NotImplementedError
+
+		pass
+
+
 _known_distribs = [distrib.MultivariateNormal, distrib.Categorical, Joint_Distribution]
 
 def group_kl(p, q):

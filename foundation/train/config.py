@@ -10,6 +10,12 @@ _config_registry = {}
 def register_config(name, path):
 	assert os.path.isfile(path), 'Cant find config file: {}'.format(path)
 	_config_registry[name] = path
+def register_config_dir(path):
+	assert os.path.isdir(path)
+	for fname in os.listdir(path):
+		if os.path.isfile(os.path.join(path, fname)):
+			name = fname.split('.')[0]
+			register_config(name, os.path.join(path, fname))
 def recover_path(name):
 	if name in _config_registry:
 		return _config_registry[name]
