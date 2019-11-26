@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from itertools import zip_longest
 import torch.nn.functional as F
+from torch.distributions import Normal
 from .. import framework as fm
 
 from .atom import *
@@ -57,6 +58,32 @@ class Conv_Encoder(fm.Encodable, fm.Model):
 	def forward(self, x):
 		c = self.conv(x)#.view(-1, self.conv_dim)
 		return self.transform_conv_features(c)
+
+class Normal_Conv_Encoder(Conv_Encoder):
+
+	def __init__(self, *args, latent_dim=None, min_log_std=None, **kwargs):
+
+		assert latent_dim is not None, 'must provide a size of the latent space'
+
+		distrib_dim = latent_dim
+
+		super().__init__(*args, latent_dim=2*latent_dim, **kwargs)
+
+
+		self.distrib_dim = distrib_dim
+		self.min_log_std = min_log_std
+
+	def transform_conv_features(self, c):
+
+		q = super().transform_conv_features(c)
+
+		mu, logsigma = q.narrow(-1, 0, self.distrib_dim), q.narrow(-1, self.distrib_dim, self.distrib_dim)
+
+		if self.min_log_std is not None:
+			logsigma = logsigma.clamp(min=self.min_log_std)
+
+		return Normal(loc=mu, scale=logsigma.exp())
+
 
 class Rec_Encoder(Conv_Encoder): # fc before and after recurrence
 	def __init__(self, in_shape, rec_dim,

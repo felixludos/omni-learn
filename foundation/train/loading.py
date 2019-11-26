@@ -89,6 +89,10 @@ def load(path=None, A=None, get_model=None, get_data=None, mode='train',
 			A.update(new_A)
 		print('Loaded {}'.format(ckptpath))
 
+		if 'FOUNDATION_DATA_DIR' in os.environ:
+			A.dataroot = os.environ['FOUNDATION_DATA_DIR']
+			print('Set dataroot to: {}'.format(A.dataroot))
+
 	out = []
 
 	if return_args:

@@ -20,6 +20,11 @@ def create_component(info):
 	return model
 
 def default_create_model(A):
+
+	assert '_type' in A.model
+
+	print('Model-type: {}'.format(A.model._type))
+
 	model = create_component(A.model)
 	return model
 
@@ -50,8 +55,7 @@ register_model('mlp', create_fn=_create_mlp)
 class Trainable_Conv(fm.Optimizable, models.Conv_Encoder):
 	pass
 
-def _create_conv(info):
-
+def _get_conv_args(info):
 	kwargs = {
 
 		# req
@@ -84,13 +88,13 @@ def _create_conv(info):
 	try:
 		len(kernels)
 	except TypeError:
-		kernels = [kernels]*num
+		kernels = [kernels] * num
 	kwargs['kernels'] = kernels
 
 	try:
 		len(strides)
 	except TypeError:
-		strides = [strides]*num
+		strides = [strides] * num
 	kwargs['strides'] = strides
 
 	try:
@@ -99,6 +103,12 @@ def _create_conv(info):
 		factors = [factors] * num
 	kwargs['factors'] = factors
 
+	return kwargs
+
+def _create_conv(info):
+
+	kwargs = _get_conv_args(info)
+
 	conv = Trainable_Conv(**kwargs)
 
 	optim_info = info.pull('optim', None)
@@ -106,9 +116,29 @@ def _create_conv(info):
 		conv.set_optim(optim_info)
 
 	return conv
-
-
 register_model('conv', create_fn=_create_conv)
+
+class Trainable_Normal_Enc(fm.Optimizable, models.Normal_Conv_Encoder):
+	pass
+
+def _create_normal_conv(info):
+
+	kwargs = _get_conv_args(info)
+
+	assert kwargs['latent_dim'] is not None, 'must provide a latent_dim'
+
+	kwargs.update({
+		'min_log_std': info.pull('min_log_std', None),
+	})
+
+	conv = Trainable_Normal_Enc(**kwargs)
+
+	optim_info = info.pull('optim', None)
+	if optim_info is not None:
+		conv.set_optim(optim_info)
+
+	return conv
+register_model('normal-conv', create_fn=_create_normal_conv)
 
 
 class Trainable_Deconv(fm.Optimizable, models.Conv_Decoder):

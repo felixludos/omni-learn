@@ -24,7 +24,9 @@ def run_full(A, get_data, get_model, get_name=None):
 	if 'seed' not in A:
 		A.seed = util.gen_random_seed()
 	print('Using pegasus seed: {}'.format(A.seed))
-	
+
+	sys.stdout.flush()
+
 	###################
 	# Data/Model
 	###################
@@ -83,16 +85,23 @@ def run_full(A, get_data, get_model, get_name=None):
 
 		jobdir = os.environ['JOBDIR']
 
-		if 'checkpoints.txt' not in os.listdir(jobdir):
+		cname = 'checkpoints{}.txt'.format(os.environ['PROCESS_ID'])
+
+		if cname not in os.listdir(jobdir):
 
 			# register job
 			if 'JOB_ID' in os.environ:
 				with open(os.environ['JOB_REGISTRY_PATH'], 'a+') as f:
-					f.write('{:>10} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1], A.output.save_dir))
+					f.write('{:>10} - {} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1],
+					                                    os.path.basename(A.output.save_dir),
+					                                    os.path.basename(jobdir)))
 
-			with open(os.path.join(jobdir, 'checkpoints.txt'), 'w') as f:
+			with open(os.path.join(jobdir, cname), 'w') as f:
 				f.write(os.path.basename(A.output.save_dir))
 			print('[Saved checkpoint dir for restarts]')
+
+	if 'RESTART_AFTER' in os.environ:
+		print('Will restart after {} epochs.'.format(os.environ['RESTART_AFTER']))
 
 	###################
 	# DataLoader
@@ -134,6 +143,10 @@ def run_full(A, get_data, get_model, get_name=None):
 		model.stats.set_tau(A.output.stats_decay)
 	if 'print_freq' not in A.output:
 		A.output.print_freq = min(max(20, len(trainloader) // 40), 200)
+		print('Print freq set to: {}'.format(A.output.print_freq))
+	if 'unique_tests' not in A.output:
+		A.output.unique_tests = False
+		print('Validation of each epoch is not logged separately')
 
 
 	###################
@@ -143,6 +156,8 @@ def run_full(A, get_data, get_model, get_name=None):
 	print(model)
 	print(model.optim)
 	print('Model has {} parameters'.format(util.count_parameters(model)))
+
+	sys.stdout.flush()
 
 	###################
 	# Run Train/Val Epochs
@@ -161,7 +176,7 @@ def run_full(A, get_data, get_model, get_name=None):
 		records['stats']['train'].append(train_stats.export())
 
 		if valloader is not None:
-			val_stats = run_epoch(model, valloader, A, mode='val', records=records,
+			val_stats = run_epoch(model, valloader, A, mode='val', records=records, unique_tests=A.output.unique_tests,
 		                              logger=logger, silent=False, inline='inline' in A and A.inline)
 
 			records['stats']['val'].append(val_stats.export())
@@ -198,8 +213,10 @@ def run_full(A, get_data, get_model, get_name=None):
 
 		print()
 
-		# print('*** Exiting with status 3')
-		# sys.exit(3)
+		if 'RESTART_AFTER' in os.environ and (i+1) % int(os.environ['RESTART_AFTER']) == 0:
+
+			print('*** Exiting for restart after {} epochs'.format(os.environ['RESTART_AFTER']))
+			sys.exit(3)
 
 	###################
 	# Run Test Epochs
@@ -270,8 +287,8 @@ def run_epoch(model, loader, A, records, mode='test',
 	time_stats = util.StatsMeter('data', 'model', 'viz')
 	stats.shallow_join(time_stats, fmt='time-{}')
 
-	logger_prefix = '{}/{}'.format('{}',mode) if not unique_tests or train else '{}/{}{}'.format('{}',
-		mode, records['epoch'])
+	logger_prefix = '{}/{}'.format('{}',mode) if not unique_tests or train else 'zz{}-{}/{}'.format(records['epoch'], '{}',
+		mode)
 
 
 	itr = enumerate(iter(loader))
@@ -336,7 +353,10 @@ def run_epoch(model, loader, A, records, mode='test',
 		msg = '[ {} ] {} Ep={}/{} complete{}'.format(
 			time.strftime("%H:%M:%S"), mode,
 			records['epoch'], total_epochs, loss_info)
-		border = '-' * 50
+		border = '-' * len(msg)
+
+		if inline:
+			print()
 		print(border)
 		print(msg)
 		print(border)

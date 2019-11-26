@@ -160,6 +160,8 @@ def parse_cmd_args(argv=None, parent_defaults=True):
 
 	if parent is not None:
 		parent.update(root, parent_defaults=parent_defaults)
+	else:
+		return root
 
 	return parent
 

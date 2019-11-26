@@ -2,6 +2,8 @@ parents: ['model']
 
 name: 'test-pycharm'
 
+inline: True
+
 #dataset.kwargs.download = true
 
 #resume = 'test-pycharm_191121-154737'

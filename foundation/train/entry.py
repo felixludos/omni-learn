@@ -29,7 +29,7 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 	if mode == 'cluster' and 'JOBDIR' in os.environ:
 		ctxt = redirect_stderr(sys.stdout)
-		ctxt2 = redirect_stdout(open(os.path.join(os.environ['JOBDIR'], 'out.log'), 'a+'))
+		ctxt2 = redirect_stdout(open(os.path.join(os.environ['JOBDIR'], 'out{}.log'.format(os.environ['PROCESS_ID'])), 'a+'))
 
 	with ctxt, ctxt2:
 
@@ -53,9 +53,11 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 		if mode == 'cluster' and 'JOBDIR' in os.environ: # TODO: setup links for restarts
 
-			if 'checkpoints.txt' in os.listdir(os.environ['JOBDIR']):
+			cname = 'checkpoints{}.txt'.format(os.environ['PROCESS_ID'])
+
+			if cname in os.listdir(os.environ['JOBDIR']):
 				print('This job has already made progress')
-				with open(os.path.join(os.environ['JOBDIR'], 'checkpoints.txt'), 'r') as f:
+				with open(os.path.join(os.environ['JOBDIR'], cname), 'r') as f:
 					config.resume = f.readline()
 
 				print('Resuming: {}'.format(config.resume))
