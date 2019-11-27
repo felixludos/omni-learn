@@ -8,7 +8,7 @@ from .. import util
 
 class DatasetWrapper(util.Simple_Child, Dataset):
 	def __init__(self, dataset):
-		super().__init__(_parent='dataset')
+		super().__init__(_parent=dataset)
 		self.dataset = dataset
 
 

@@ -54,6 +54,9 @@ def run_full(A, get_data, get_model, get_name=None):
 	if 'name' not in A:
 		A.name = get_name(A) if get_name is not None else None
 
+	if 'save_dir' in A.output:
+		del A.output.save_dir
+
 	logger = setup_logging(A.output)
 
 	if ckpt is None: # novel
@@ -66,7 +69,6 @@ def run_full(A, get_data, get_model, get_name=None):
 			del A.load
 			print('WARNING: you are loading a previous model!')
 		else: # resume, complete
-			A.training.start = records['epoch']
 			if extend is not None: # resume
 				A.training.epochs += extend
 				print('Extending training by {} epochs'.format(extend))
@@ -77,28 +79,29 @@ def run_full(A, get_data, get_model, get_name=None):
 	if 'track_best' not in A.training:
 		A.training.track_best = False
 
-	if 'save_dir' in A.output and ('config.tml' not in os.listdir(A.output.save_dir) or extend is not None): # new save_dir - novel, load
-		config_path = A.export(os.path.join(A.output.save_dir, 'config.tml'))
-		print('Config saved to {}'.format(config_path))
+	if 'save_dir' in A.output:
+		if ('config.tml' not in os.listdir(A.output.save_dir) or extend is not None): # new save_dir - novel, load
+			config_path = A.export(os.path.join(A.output.save_dir, 'config.tml'))
+			print('Config saved to {}'.format(config_path))
 
-	if 'save_dir' in A.output and os.environ['FOUNDATION_RUN_MODE'] == 'cluster' and 'JOBDIR' in os.environ: # cluster checkpointing for restarts
+		if os.environ['FOUNDATION_RUN_MODE'] == 'cluster' and 'JOBDIR' in os.environ: # cluster checkpointing for restarts
 
-		jobdir = os.environ['JOBDIR']
+			jobdir = os.environ['JOBDIR']
 
-		cname = 'checkpoints{}.txt'.format(os.environ['PROCESS_ID'])
+			cname = 'checkpoints{}.txt'.format(os.environ['PROCESS_ID'])
 
-		if cname not in os.listdir(jobdir):
+			if cname not in os.listdir(jobdir):
 
-			# register job
-			if 'JOB_ID' in os.environ:
-				with open(os.environ['JOB_REGISTRY_PATH'], 'a+') as f:
-					f.write('{:>10} - {} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1],
-					                                    os.path.basename(A.output.save_dir),
-					                                    os.path.basename(jobdir)))
+				# register job
+				if 'JOB_ID' in os.environ:
+					with open(os.environ['JOB_REGISTRY_PATH'], 'a+') as f:
+						f.write('{:>10} - {} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1],
+						                                    os.path.basename(A.output.save_dir),
+						                                    os.path.basename(jobdir)))
 
-			with open(os.path.join(jobdir, cname), 'w') as f:
-				f.write(os.path.basename(A.output.save_dir))
-			print('[Saved checkpoint dir for restarts]')
+				with open(os.path.join(jobdir, cname), 'w') as f:
+					f.write(os.path.basename(A.output.save_dir))
+				print('[Saved checkpoint dir for restarts]')
 
 	if 'RESTART_AFTER' in os.environ:
 		print('Will restart after {} epochs.'.format(os.environ['RESTART_AFTER']))
@@ -116,8 +119,6 @@ def run_full(A, get_data, get_model, get_name=None):
 
 	loaders = get_loaders(*datasets, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
 	                                            shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
-
-	# TODO: generalize for other validation methods
 
 	if len(datasets) > 1:
 		trainloader, *valloaders = loaders
@@ -163,7 +164,7 @@ def run_full(A, get_data, get_model, get_name=None):
 	# Run Train/Val Epochs
 	###################
 
-	for i in range(A.training.epochs - A.training.start):
+	for i in range(A.training.epochs - records['epoch']):
 		is_best = False
 
 		records['epoch'] += 1
@@ -247,13 +248,14 @@ def run_full(A, get_data, get_model, get_name=None):
 
 		records['stats']['test'] = test_stats.export()
 
-		results_path = os.path.join(A.output.save_dir, 'results.yaml')
-		with open(results_path, 'w') as f:
-			yaml.dump(records, f)
-		print('Final results saved to {}'.format(results_path))
+		if 'save_dir' in A.output:
+			results_path = os.path.join(A.output.save_dir, 'results.yaml')
+			with open(results_path, 'w') as f:
+				yaml.dump(records, f)
+			print('Final results saved to {}'.format(results_path))
 
 
-	return model, datasets, loaders
+	return model, datasets, loaders, records
 
 
 def run_epoch(model, loader, A, records, mode='test',
@@ -264,7 +266,8 @@ def run_epoch(model, loader, A, records, mode='test',
 		model.train()
 	else:
 		model.eval()
-		
+
+	epoch = records['epoch']
 	total_epochs = A.training.epochs #+ A.training.start
 	print_freq = A.output.print_freq
 	
@@ -287,16 +290,24 @@ def run_epoch(model, loader, A, records, mode='test',
 	time_stats = util.StatsMeter('data', 'model', 'viz')
 	stats.shallow_join(time_stats, fmt='time-{}')
 
-	logger_prefix = '{}/{}'.format('{}',mode) if not unique_tests or train else 'zz{}-{}/{}'.format(records['epoch'], '{}',
+	logger_prefix = '{}/{}'.format('{}', mode) if not unique_tests or train else 'zz{}-{}/{}'.format(epoch, '{}',
 		mode)
 
+	total = len(loader)
+	total //= 10 # REMOVE
+
+	print('\n\nWARNING: not running full epochs\n\n')
 
 	itr = enumerate(iter(loader))
 	if inline:
-		itr = tqdm(itr, total=len(loader), leave=True)
+		itr = tqdm(itr, total=total, leave=True)
 
 	start = time.time()
 	for i, batch in itr:
+
+		if i == total: # REMOVE
+			break
+
 		batch = util.to(batch, A.device)
 
 		B = batch.size(0)
@@ -336,11 +347,11 @@ def run_epoch(model, loader, A, records, mode='test',
 			loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(), stats['loss'].smooth.item()) \
 				if stats['loss'].count > 0 else ''
 			if inline:
-				itr.set_description('{} {}/{}{}'.format(mode, records['epoch'], total_epochs, loss_info))
+				itr.set_description('{} {}/{}{}'.format(mode, epoch, total_epochs, loss_info))
 			elif print_freq is None or i % print_freq == 0:
 				print('[ {} ] {} Ep={}/{} Itr={}/{}{}'.format(
 					time.strftime("%H:%M:%S"), mode,
-					records['epoch'], total_epochs, i + 1, len(loader), loss_info))
+					epoch, total_epochs, i + 1, len(loader), loss_info))
 
 				sys.stdout.flush()
 
@@ -352,7 +363,7 @@ def run_epoch(model, loader, A, records, mode='test',
 			if stats['loss'].count > 0 else ''
 		msg = '[ {} ] {} Ep={}/{} complete{}'.format(
 			time.strftime("%H:%M:%S"), mode,
-			records['epoch'], total_epochs, loss_info)
+			epoch, total_epochs, loss_info)
 		border = '-' * len(msg)
 
 		if inline:

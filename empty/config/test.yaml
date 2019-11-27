@@ -8,7 +8,6 @@ output:
 dataset:
     name: 'mnist'
 
-#	kwargs.dataroot = '../../local_data'
     kwargs:
         download: false
 

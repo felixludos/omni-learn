@@ -6,6 +6,10 @@ from .. import util
 
 def setup_logging(info):
 
+	if 'invisible' in info and info.invisible:
+		print('No record of this run will be made')
+		return None
+
 	assert 'name' in info, 'This run is missing a name'
 
 	if 'save_dir' not in info:
@@ -13,13 +17,7 @@ def setup_logging(info):
 		if 'logdate' in info and info.logdate:
 			info.name = '{}_{}'.format(info.name, now)
 
-		if 'saveroot' not in info:
-			if 'FOUNDATION_SAVE_DIR' in os.environ:
-				info.saveroot = os.environ['FOUNDATION_SAVE_DIR']
-			# else:
-			# 	raise Exception('No saveroot provided')
-
-		info.save_dir = os.path.join(info.saveroot, info.name) if 'saveroot' in info else None
+		info.save_dir = os.path.join(os.environ['FOUNDATION_SAVE_DIR'], info.name)
 	if 'save_dir' in info:
 		print('Save dir: {}'.format(info.save_dir))
 	else:

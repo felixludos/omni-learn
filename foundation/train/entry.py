@@ -38,13 +38,13 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 		config.run_mode = mode
 
-		if 'saveroot' not in config and 'FOUNDATION_SAVE_DIR' in os.environ:
-			config.saveroot = os.environ['FOUNDATION_SAVE_DIR']
-			print('Set saveroot to: {}'.format(config.saveroot))
+		assert 'FOUNDATION_SAVE_DIR' in os.environ, 'no save dir provided'
+		config.saveroot = os.environ['FOUNDATION_SAVE_DIR']
+		print('Set saveroot to: {}'.format(config.saveroot))
 
-		if 'dataroot' not in config and 'FOUNDATION_DATA_DIR' in os.environ:
-			config.dataroot = os.environ['FOUNDATION_DATA_DIR']
-			print('Set dataroot to: {}'.format(config.dataroot))
+		assert 'FOUNDATION_DATA_DIR' in os.environ, 'no data dir provided'
+		config.dataroot = os.environ['FOUNDATION_DATA_DIR']
+		print('Set dataroot to: {}'.format(config.dataroot))
 
 		if get_model is None:
 			get_model = default_create_model

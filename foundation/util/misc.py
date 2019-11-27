@@ -40,15 +40,18 @@ class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attr
 
 class Simple_Child(object): # a simple wrapper that delegates __getattr__s to some parent attribute
 
-	def __init__(self, *args, _parent='target', **kwargs):
+	def __init__(self, *args, _parent=None, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._parent = _parent
 
-	def __getattr__(self, item):
+	def __getattribute__(self, item):
+		parent = super().__getattribute__('_parent')
+		if parent is None:
+			return super().__getattribute__(item)
 		try:
 			return super().__getattribute__(item)
 		except AttributeError:
-			return self.__getattr__(self._parent).__getattribute__(item)
+			return parent.__getattribute__(item)
 
 
 def to_np(tensor):
