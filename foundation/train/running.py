@@ -95,7 +95,7 @@ def run_full(A, get_data, get_model, get_name=None):
 				# register job
 				if 'JOB_ID' in os.environ:
 					with open(os.environ['JOB_REGISTRY_PATH'], 'a+') as f:
-						f.write('{:>10} - {} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1],
+						f.write('{:<12} - {} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1],
 						                                    os.path.basename(A.output.save_dir),
 						                                    os.path.basename(jobdir)))
 
@@ -298,6 +298,11 @@ def run_epoch(model, loader, A, records, mode='test',
 	# total //= 10 # REMOVE
 	# print('\n\nWARNING: not running full epochs\n\n')
 
+	max_iter = A.training.max_iter if 'max_iter' in A.training else None
+	if max_iter is not None:
+		print('\n\nWARNING: not running full epochs\n\n')
+		total = max_iter
+
 	itr = enumerate(iter(loader))
 	if inline:
 		itr = tqdm(itr, total=total, leave=True)
@@ -305,8 +310,10 @@ def run_epoch(model, loader, A, records, mode='test',
 	start = time.time()
 	for i, batch in itr:
 
-		# if i == total: # REMOVE
-		# 	break
+		if max_iter is not None and i == max_iter:
+			print('WARNING: ending epoch prematurely! - hit max_iter')
+			del itr
+			break
 
 		batch = util.to(batch, A.device)
 

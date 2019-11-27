@@ -112,7 +112,9 @@ class NoConfigFound(Exception):
 def parse_cmd_args(argv=None, parent_defaults=True):
 
 	if argv is None:
-		argv = sys.argv[1:]
+		argv = sys.argv
+
+	argv = argv[1:]
 
 	if len(argv) == 0 or (argv[0] not in _config_registry and not os.path.isfile(argv[0])):
 

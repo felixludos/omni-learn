@@ -12,7 +12,6 @@ from .data import default_load_data
 
 from .running import run_full
 
-
 def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 	ctxt, ctxt2 = nullcontext(), nullcontext()
