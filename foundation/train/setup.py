@@ -14,8 +14,9 @@ def setup_logging(info):
 
 	if 'save_dir' not in info:
 		now = time.strftime("%y%m%d-%H%M%S")
-		if 'logdate' in info and info.logdate:
+		if 'logdate' in info and info.logdate and '_logged_date' not in info:
 			info.name = '{}_{}'.format(info.name, now)
+			info._logged_date = True
 
 		info.save_dir = os.path.join(os.environ['FOUNDATION_SAVE_DIR'], info.name)
 	if 'save_dir' in info:

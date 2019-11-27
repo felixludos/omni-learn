@@ -294,9 +294,9 @@ def run_epoch(model, loader, A, records, mode='test',
 		mode)
 
 	total = len(loader)
-	total //= 10 # REMOVE
 
-	print('\n\nWARNING: not running full epochs\n\n')
+	# total //= 10 # REMOVE
+	# print('\n\nWARNING: not running full epochs\n\n')
 
 	itr = enumerate(iter(loader))
 	if inline:
@@ -305,8 +305,8 @@ def run_epoch(model, loader, A, records, mode='test',
 	start = time.time()
 	for i, batch in itr:
 
-		if i == total: # REMOVE
-			break
+		# if i == total: # REMOVE
+		# 	break
 
 		batch = util.to(batch, A.device)
 
