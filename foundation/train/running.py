@@ -43,7 +43,7 @@ def run_full(A, get_data, get_model, get_name=None):
 		A.loaded = A.load
 	
 	A, (*datasets, testset), model, ckpt = load(path=path, A=A, mode='train',
-	                                            load_last=A is None, # load will load the best, rather than last
+	                                            load_last=True, # load will load the best, rather than last
 	                                              get_model=get_model, get_data=get_data,
 	                                              return_args=True, return_ckpt=True)
 
