@@ -52,24 +52,29 @@ def yamlify(data):
 
 	raise YamlifyError(data)
 
-def load_single_config(path, process=True, parents=None):
-
+def load_config_from_path(path, process=True):
 	path = recover_path(path)
-	with open(path,'r') as f:
+	with open(path, 'r') as f:
 		data = yaml.load(f)
 
 	if process:
-		data = configurize(data)
+		return configurize(data)
+	return data
 
-		if parents is not None and 'parents' in data:
-			todo = []
-			for parent in data.parents: # prep new parents
-				ppath = _config_registry[parent] if parent in _config_registry else parent
-				if ppath not in parents:
-					todo.append(ppath)
-					parents[ppath] = None
-			for ppath in todo: # load parents
-				parents[ppath] = load_single_config(ppath, parents=parents)
+def load_single_config(data, process=True, parents=None): # data can either be an existing config or a path to a config
+
+	if isinstance(data, str):
+		data = load_config_from_path(data, process=process)
+
+	if parents is not None and 'parents' in data:
+		todo = []
+		for parent in data.parents: # prep new parents
+			ppath = _config_registry[parent] if parent in _config_registry else parent
+			if ppath not in parents:
+				todo.append(ppath)
+				parents[ppath] = None
+		for ppath in todo: # load parents
+			parents[ppath] = load_single_config(ppath, parents=parents)
 
 	return data
 
@@ -116,62 +121,51 @@ def parse_cmd_args(argv=None, parent_defaults=True):
 
 	argv = argv[1:]
 
-	if len(argv) == 0 or (argv[0] not in _config_registry and not os.path.isfile(argv[0])):
+	root = Config() # from argv
 
-		if 'FOUNDATION_CONFIG' not in os.environ:
-			print('WARNING: No parent config found (using command line args only)')
-			parent = None
-			# raise NoConfigFound() # TODO possibly allow no specifying a config
-
+	parents = []
+	for term in argv:
+		if len(term) >= 2 and term[:2] == '--':
+			break
 		else:
-			parent = os.environ['FOUNDATION_CONFIG']
-			assert os.path.isfile(parent), 'Invalid setting of $FOUNDATION_CONFIG: {}'.format(parent)
+			assert term in _config_registry or os.path.isfile(term), 'invalid config name/path: {}'.format(term)
+			parents.append(term)
+	root.parents = parents
 
-	else:
-		parent = argv[0]
+	argv = argv[len(parents):]
 
-	if parent is not None:
-		argv = argv[1:]
-		parent = get_config(parent, parent_defaults=parent_defaults)
+	if len(argv):
 
-	if len(argv) == 0:
-		return parent
+		terms = iter(argv)
 
-	terms = iter(argv)
-
-	root = Config()
-
-	term = next(terms)
-	if term[:2] != '--':
-		raise ParsingError(term)
-	done = False
-	while not done:
-		keys = term[2:].split('.')
-		values = []
-		try:
-			val = next(terms)
-			while val[:2] != '--':
-				try:
-					values.append(configurize(json.loads(val)))
-				except json.JSONDecodeError:
-					values.append(val)
+		term = next(terms)
+		if term[:2] != '--':
+			raise ParsingError(term)
+		done = False
+		while not done:
+			keys = term[2:].split('.')
+			values = []
+			try:
 				val = next(terms)
-			term = val
-		except StopIteration:
-			done = True
+				while val[:2] != '--':
+					try:
+						values.append(configurize(json.loads(val)))
+					except json.JSONDecodeError:
+						values.append(val)
+					val = next(terms)
+				term = val
+			except StopIteration:
+				done = True
 
-		if len(values) == 0:
-			values = [True]
-		if len(values) == 1:
-			values = values[0]
-		root[keys] = values
+			if len(values) == 0:
+				values = [True]
+			if len(values) == 1:
+				values = values[0]
+			root[keys] = values
 
-	if parent is not None:
-		parent.update(root, parent_defaults=parent_defaults)
-	else:
-		return root
+	root = get_config(root, parent_defaults=parent_defaults)
 
-	return parent
+	return root
 
 def _add_default_parent(C):
 	for k, child in C.items():
