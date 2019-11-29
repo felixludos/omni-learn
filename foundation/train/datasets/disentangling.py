@@ -60,7 +60,7 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 
 register_dataset('dsprites', dSprites)
 
-class Shapes3D(Info_Dataset, Batchable_Dataset):
+class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset):
 
 	def __init__(self, dataroot=None, images=None, labels=None, din=(3, 64, 64), dout=None, load_memory=True):
 		assert images is not None or dataroot is not None, 'nothing to use/load'
