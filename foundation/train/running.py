@@ -70,9 +70,9 @@ def run_full(A, get_data, get_model, get_name=None):
 			print('WARNING: you are loading a previous model!')
 		else: # resume, complete
 			if extend is not None: # resume
-				A.training.epochs += extend
-				print('Extending training by {} epochs'.format(extend))
-			print('Running {} more epochs'.format(A.training.epochs))
+				A.training.epochs = extend
+				print('Extending training to {} epochs'.format(extend))
+			print('Running {} more epochs'.format(A.training.epochs - records['epoch']))
 
 	if 'save_freq' not in A.output or 'save_dir' not in A.output:
 		A.output.save_freq = -1
