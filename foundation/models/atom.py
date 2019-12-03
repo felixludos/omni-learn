@@ -53,6 +53,7 @@ def make_MLP(input_dim, output_dim, hidden_dims=[], nonlin='prelu', output_nonli
 	net.din, net.dout = din, dout
 	return net
 
+# WARNING: Deprecated
 def make_conv_net(in_shape, channels=[], output_nonlin=None, nonlin='prelu', batch_norm=[], output_batch_norm=True,
                   kernels=[], pooling=[],
                   padding=[], strides=[], ret_output_shape=True):  # TODO: update to use plan and build
@@ -114,7 +115,7 @@ def make_conv_net(in_shape, channels=[], output_nonlin=None, nonlin='prelu', bat
 
 	return net
 
-
+# WARNING: Deprecated
 def make_deconv_net(out_shape, channels=[], upsampling='deconv', output_nonlin=None, output_batch_norm=True,
                     nonlin='prelu', batch_norm=[], kernels=[],  # TODO: update to use plan and build
                     padding=[], ups=[], ret_input_shape=True):

@@ -171,6 +171,7 @@ def _create_deconv(info):
 
 	kernels = info.pull('kernels', 3)
 	factors = info.pull('factors', 2)
+	strides = info.pull('strides', 1)
 
 	# TODO: deal with rectangular inputs
 	try:
@@ -184,6 +185,12 @@ def _create_deconv(info):
 	except TypeError:
 		factors = [factors] * num
 	kwargs['ups'] = factors
+
+	try:
+		len(strides)
+	except TypeError:
+		strides = [strides]*num
+	kwargs['strides'] = strides
 
 
 	deconv = Trainable_Deconv(**kwargs)

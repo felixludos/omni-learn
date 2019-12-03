@@ -166,12 +166,13 @@ class Rec_Encoder(Conv_Encoder): # fc before and after recurrence
 class Conv_Decoder(fm.Decodable, fm.Model):
 
 	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,
-				 channels=[], kernels=[], ups=[], upsampling='deconv', norm_type='instance', output_norm_type=None,
+				 channels=[], kernels=[], ups=[], strides=[], upsampling='deconv', norm_type='instance', output_norm_type=None,
 				 hidden_fc=[]):
 		
 		self.out_shape = out_shape
 
-		dshapes, dsets = plan_deconv(self.out_shape, channels=channels, kernels=kernels, factors=ups) # TODO: add strides
+		dshapes, dsets = plan_deconv(self.out_shape, channels=channels, kernels=kernels, factors=ups,
+		                             strides=strides if upsampling == 'deconv' else 1)
 
 		deconv_layers = build_deconv_layers(dsets, sizes=dshapes[1:], nonlin=nonlin, out_nonlin=output_nonlin,
 											up_type=upsampling, norm_type=norm_type,

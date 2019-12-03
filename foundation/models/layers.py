@@ -291,13 +291,13 @@ class ConvLayer(nn.Module):
 
 
 class DeconvLayer(nn.Module):
-	def __init__(self, in_channels, out_channels, up_type='deconv', upsize=None,
+	def __init__(self, in_channels, out_channels, up_type='deconv', upsize=None, stride=1,
 				 norm_type=None, nonlin='elu', output_padding=None, **conv_kwargs):
 		super().__init__()
 
 		self.up_type = up_type
 		if self.up_type == 'deconv':
-			self.deconv = nn.ConvTranspose2d(in_channels, out_channels,
+			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, stride=stride,
 											 output_padding=output_padding, **conv_kwargs)
 		else:
 			self.deconv = nn.Sequential(nn.Upsample(size=upsize, mode=up_type),

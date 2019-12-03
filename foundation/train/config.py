@@ -200,9 +200,9 @@ class Config(util.NS): # TODO: allow adding aliases
 			return super().update(other)
 
 		for k, v in other.items():
-			if k in self and v is '_x_': # reserved for deleting settings in parents
+			if self.contains_nodefault(k) and v is '_x_': # reserved for deleting settings in parents
 				del self[k]
-			elif k in self and isinstance(v, Config) and isinstance(self[k], Config):
+			elif self.contains_nodefault(k) and isinstance(v, Config) and isinstance(self[k], Config):
 				self[k].update(v)
 			else:
 				self[k] = v
@@ -211,8 +211,8 @@ class Config(util.NS): # TODO: allow adding aliases
 
 		if parent_defaults:
 			_add_default_parent(self)
-			
-		x = 1+1
+
+		# x = 1+1
 
 	def _single_get(self, item):
 		if not self.contains_nodefault(item) and item[0] != '_' and self._parent_obj_for_defaults is not None:
