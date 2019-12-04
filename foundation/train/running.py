@@ -45,7 +45,7 @@ def run_full(A, get_data, get_model, get_name=None):
 	A, (*datasets, testset), model, ckpt = load(path=path, A=A, mode='train',
 	                                            load_last=True, # load will load the best, rather than last
 	                                              get_model=get_model, get_data=get_data,
-	                                              return_args=True, return_ckpt=True)
+	                                              return_args=True, return_ckpt=True, strict='load' not in A)
 
 	###################
 	# Logging
@@ -156,6 +156,8 @@ def run_full(A, get_data, get_model, get_name=None):
 
 	print(model)
 	print(model.optim)
+	if hasattr(model, 'scheduler'):
+		print(model.scheduler)
 	print('Model has {} parameters'.format(util.count_parameters(model)))
 
 	sys.stdout.flush()
@@ -171,16 +173,24 @@ def run_full(A, get_data, get_model, get_name=None):
 
 		util.set_seed(epoch_seed)
 
+		model.pre_epoch()
+
 		train_stats = run_epoch(model, trainloader, A, mode='train', records=records,
 		                              logger=logger, silent=False, inline='inline' in A and A.inline)
 
 		records['stats']['train'].append(train_stats.export())
 
 		if valloader is not None:
+			model.pre_epoch()
+
 			val_stats = run_epoch(model, valloader, A, mode='val', records=records, unique_tests=A.output.unique_tests,
 		                              logger=logger, silent=False, inline='inline' in A and A.inline)
 
 			records['stats']['val'].append(val_stats.export())
+
+			model.post_epoch(val_stats)
+		else:
+			model.post_epoch(train_stats)
 
 		epoch_seed = util.gen_deterministic_seed(A.seed)
 
@@ -275,8 +285,6 @@ def run_epoch(model, loader, A, records, mode='test',
 	if 'viz_criterion' in A.training and 'viz_criterion_args' in A.training:
 		viz_criterion = util.get_loss_type(A.training.viz_criterion)
 		viz_criterion_args = A.training.viz_criterion_args
-	
-	model.pre_epoch()
 
 	if stats is None:
 		stats = util.StatsMeter('loss')
@@ -294,9 +302,6 @@ def run_epoch(model, loader, A, records, mode='test',
 		mode)
 
 	total = len(loader)
-
-	# total //= 10 # REMOVE
-	# print('\n\nWARNING: not running full epochs\n\n')
 
 	max_iter = A.training.max_iter if 'max_iter' in A.training else None
 	if max_iter is not None:

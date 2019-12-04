@@ -111,9 +111,8 @@ def _create_conv(info):
 
 	conv = Trainable_Conv(**kwargs)
 
-	optim_info = info.pull('optim', None)
-	if optim_info is not None:
-		conv.set_optim(optim_info)
+	if 'optim_type' in info:
+		conv.set_optim(info)
 
 	return conv
 register_model('conv', create_fn=_create_conv)
@@ -133,9 +132,8 @@ def _create_normal_conv(info):
 
 	conv = Trainable_Normal_Enc(**kwargs)
 
-	optim_info = info.pull('optim', None)
-	if optim_info is not None:
-		conv.set_optim(optim_info)
+	if 'optim_type' in info:
+		conv.set_optim(info)
 
 	return conv
 register_model('normal-conv', create_fn=_create_normal_conv)
@@ -195,9 +193,8 @@ def _create_deconv(info):
 
 	deconv = Trainable_Deconv(**kwargs)
 
-	optim_info = info.pull('optim', None)
-	if optim_info is not None:
-		deconv.set_optim(optim_info)
+	if 'optim_type' in info:
+		deconv.set_optim(info)
 
 	return deconv
 

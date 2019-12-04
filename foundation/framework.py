@@ -31,6 +31,9 @@ class Model(nn.Module):  # any vector function
 	def pre_epoch(self): # called at the beginning of each epoch
 		pass
 
+	def post_epoch(self, stats=None): # called at the end of each epoch
+		pass
+
 class CompositeModel(Model):
 	def __init__(self, *models):
 		super().__init__(models[0].din, models[-1].dout)
@@ -41,94 +44,6 @@ class CompositeModel(Model):
 			x = m(x)
 		return x
 
-
-class Optimizable(nn.Module):
-
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.optim = None
-
-	def record_lr(self): # TODO: fix lr logging
-		return
-		if self.optim is not None:
-			if 'lr' not in self.stats:
-				self.stats.new('lr')
-			lr = self.optim.param_groups[0]['lr']
-			try:
-				self.stats.update('lr', lr)
-			except AttributeError:
-				pass
-
-	def pre_epoch(self):
-		super().pre_epoch()
-		self.record_lr()
-
-	def set_optim(self, optim_info=None):
-
-		if optim_info is None: # aggregate optimizers of children
-			sub_optims = {}
-			for name, child in self.named_children():
-				if isinstance(child, Optimizable) and child.optim is not None:
-					sub_optims[name] = child.optim
-
-			assert len(sub_optims) > 0, 'no children have optimizers'
-
-			if len(sub_optims) == 1:
-				optim = next(iter(sub_optims.values()))
-			else:
-				optim = util.Complex_Optimizer(**sub_optims)
-
-		else:
-			optim = util.default_create_optim(self.parameters(), optim_info)
-
-		self.optim = optim
-
-
-
-	def optim_step(self, loss): # should only be called during training
-		if self.optim is None:
-			raise Exception('Optimizer not set')
-		self.optim.zero_grad()
-		loss.backward()
-		self.optim.step()
-
-	def load_state_dict(self, state_dict):
-		if self.optim is not None:
-			self.optim.load_state_dict(state_dict['optim'])
-		super().load_state_dict(state_dict['model'])
-
-	def state_dict(self, *args, **kwargs):
-		state_dict = {
-			'model': super().state_dict(*args, **kwargs),
-		}
-		if self.optim is not None:
-			state_dict['optim'] = self.optim.state_dict()
-		return state_dict
-
-
-class Schedulable(Optimizable):
-	def __init__(self, *args, scheduler=None, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.scheduler = scheduler
-
-	def load_state_dict(self, state_dict):
-		if self.scheduler is not None:
-			self.scheduler.load_state_dict(state_dict['scheduler'])
-		super().load_state_dict(state_dict)
-
-	def state_dict(self):
-		state_dict = super().state_dict()
-		if self.scheduler is not None:
-			state_dict['scheduler'] = self.scheduler.state_dict()
-		return state_dict
-
-	def schedule_step(self):
-		if self.scheduler is not None:
-			self.scheduler.step()
-
-	def pre_epoch(self):
-		super().pre_epoch()
-		self.schedule_step()
 
 class Generative(object):
 	def generate(self, N=1):
@@ -175,8 +90,107 @@ class Visualizable(Recordable):
 		self.reset_viz_counter()
 		super().pre_epoch()
 
-class Regularizable(object):
+class Optimizable(Recordable):
 
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.optim = None
+
+	def record_lr(self): # TODO: fix lr logging
+		if self.optim is not None:
+			if isinstance(self.optim, util.Complex_Optimizer):
+				for name, optim in self.optim.items():
+					name = 'z-lr-{}'.format(name)
+					if name not in self.stats:
+						self.stats.new(name)
+					lr = optim.param_groups[0]['lr']
+					self.stats.update(name, lr)
+			else:
+				if 'z-lr' not in self.stats:
+					self.stats.new('z-lr')
+				lr = self.optim.param_groups[0]['lr']
+				self.stats.update('z-lr', lr)
+
+	def pre_epoch(self):
+		super().pre_epoch()
+		self.record_lr()
+
+	def set_optim(self, optim_info=None):
+
+		if optim_info is None: # aggregate optimizers of children
+			sub_optims = {}
+			for name, child in self.named_children():
+				if isinstance(child, Optimizable) and child.optim is not None:
+					sub_optims[name] = child.optim
+
+			assert len(sub_optims) > 0, 'no children have optimizers'
+
+			if len(sub_optims) == 1:
+				optim = next(iter(sub_optims.values()))
+			else:
+				optim = util.Complex_Optimizer(**sub_optims)
+
+		else:
+			optim = util.default_create_optim(self.parameters(), optim_info)
+
+		self.optim = optim
+
+
+	def optim_step(self, loss): # should only be called during training
+		if self.optim is None:
+			raise Exception('Optimizer not set')
+		self.optim.zero_grad()
+		loss.backward()
+		self.optim.step()
+
+	def load_state_dict(self, state_dict):
+		if self.optim is not None:
+			self.optim.load_state_dict(state_dict['optim'])
+		super().load_state_dict(state_dict['model'])
+
+	def state_dict(self, *args, **kwargs):
+		state_dict = {
+			'model': super().state_dict(*args, **kwargs),
+		}
+		if self.optim is not None:
+			state_dict['optim'] = self.optim.state_dict()
+		return state_dict
+
+
+class Schedulable(Optimizable):
+	def __init__(self, *args, scheduler=None, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.scheduler = scheduler
+
+	def set_scheduler(self, info):
+		assert self.optim is not None, 'no optim to schedule'
+		self.scheduler, self.scheduler_req_loss = util.default_create_scheduler(self.optim, info)
+
+	def load_state_dict(self, state_dict):
+		if self.scheduler is not None:
+			self.scheduler.load_state_dict(state_dict['scheduler'])
+		super().load_state_dict(state_dict)
+
+	def state_dict(self):
+		state_dict = super().state_dict()
+		if self.scheduler is not None:
+			state_dict['scheduler'] = self.scheduler.state_dict()
+		return state_dict
+
+	def schedule_step(self, val=None):
+		if self.scheduler is not None:
+			print('LR Scheduler stepping')
+			if val is None:
+				self.scheduler.step()
+			else:
+				self.scheduler.step(val)
+
+	def post_epoch(self, stats):
+		assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
+		self.schedule_step(stats['loss'].avg.item() if self.scheduler_req_loss else None)
+		super().post_epoch()
+
+class Regularizable(object):
 	def regularize(self, q):
 		return torch.tensor(0).type_as(q)
 
@@ -198,7 +212,7 @@ class Trainable_Model(Optimizable, Recordable, Model): # top level - must be imp
 	# NOTE: never call an optimizer outside of _step (not in mixinable functions)
 	# NOTE: before any call to an optimizer check with self.train_me()
 	def train_me(self):
-		return self.train and self.optim is not None
+		return self.training and self.optim is not None
 
 
 

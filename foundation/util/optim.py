@@ -29,7 +29,7 @@ def default_create_optim(parameters, info): # info is a train.Config
 
 	kwargs = {
 
-		'optim_type': info.pull('type'),
+		'optim_type': info.pull('optim_type'),
 
 		'parameters': parameters,
 
@@ -43,13 +43,39 @@ def default_create_optim(parameters, info): # info is a train.Config
 
 	return get_optimizer(**kwargs)
 
+def default_create_scheduler(optimizer, info):
+
+	if 'scheduler_type' not in info:
+		return None, False
+
+	name = info.pull('scheduler_type')
+
+	factor = info.pull('scheduler_decay', 0.1)
+	min_lr = info.pull('min_lr', 0.)
+
+	req_loss = False
+	if name == 'step':
+		step_size = info.pull('scheduler_step')
+		out = O.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=factor)
+	elif name == 'plateau':
+		patience = info.pull('scheduler_patience', 10)
+		cooldown = info.pull('scheduler_cooldown', 0)
+
+		out = O.lr_scheduler.ReduceLROnPlateau(optimizer, factor=factor, patience=patience,
+		                                       min_lr=min_lr, cooldown=cooldown)
+		req_loss = True
+
+	return out, req_loss
+
 
 class Complex_Optimizer(Optimizer):
 	def __init__(self, **optims):
 		self.__dict__['optims'] = None
 		super().__init__([{}], None)
 		self.__dict__['optims'] = optims
-		self._update_groups()
+		self.param_groups = sum([[p for p in o.param_groups] for o in self.optims.values()], [])
+		# self._update_groups()
+		# self._update_named_groups()
 		# self.__dict__['param_groups'] = [grp for grp in chain(*[o.param_groups for o in optims.values()])]
 
 	def _update_groups(self):
@@ -60,6 +86,15 @@ class Complex_Optimizer(Optimizer):
 			for grp in optim.param_groups:
 				yield grp
 		self._update_groups()
+
+	def _update_named_groups(self):
+		self.named_param_groups = self._named_param_group_gen()
+
+	def _named_param_group_gen(self):
+		for key, optim in self.optims.items():
+			for grp in optim.param_groups:
+				yield (key, grp)
+		self._update_named_groups()
 
 	def add_param_group(self, *args, **kwargs): # probably shouldnt be used
 		return
@@ -80,9 +115,15 @@ class Complex_Optimizer(Optimizer):
 		for optim in self.optims.values():
 			optim.step(closure)
 
+	def __iter__(self):
+		return iter(self.optims)
+	def items(self):
+		return self.optims.items()
+
 	def __getitem__(self, item):
 		return self.optims[item]
 	def __setitem__(self, key, value):
+		raise NotImplementedError
 		self.optims[key] = value
 	def __delitem__(self, key):
 		del self.optims[key]
@@ -93,7 +134,9 @@ class Complex_Optimizer(Optimizer):
 		except AttributeError:
 			return self.optims[item]
 	def __setattr__(self, key, value):
+		# raise NotImplementedError
 		if isinstance(value, Optimizer):
+			raise NotImplementedError
 			self.__setitem__(key, value)
 		else:
 			super().__setattr__(key, value)
@@ -107,7 +150,7 @@ class Complex_Optimizer(Optimizer):
 		s = ['Complex-Optimizer(']
 
 		for k,v in self.optims.items():
-			s.append('  ' + k + ': ' + str(v).replace('\n', '\n    '))
+			s.append('  {}: {}'.format(k,str(v).replace('\n', '\n    ')))
 
 		s.append(')')
 

@@ -61,7 +61,7 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 
 
 def load(path=None, A=None, get_model=None, get_data=None, mode='train',
-         load_state_dict=True, load_last=False, return_args=True, return_ckpt=False):
+         load_state_dict=True, load_last=False, return_args=True, return_ckpt=False, strict=True):
 	assert path is not None or A is not None, 'must provide either path to checkpoint or args'
 	assert get_model is not None or get_data is not None, 'nothing to load'
 
@@ -116,7 +116,7 @@ def load(path=None, A=None, get_model=None, get_data=None, mode='train',
 		model.to(A.device)
 
 		if checkpoint is not None and 'model_state' in checkpoint and load_state_dict:
-			model.load_state_dict(checkpoint['model_state'])
+			model.load_state_dict(checkpoint['model_state'], strict=strict)
 			print('Loaded model_state from checkpoint')
 
 		out.append(model)

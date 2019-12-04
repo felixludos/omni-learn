@@ -200,7 +200,7 @@ class Config(util.NS): # TODO: allow adding aliases
 			return super().update(other)
 
 		for k, v in other.items():
-			if self.contains_nodefault(k) and v is '_x_': # reserved for deleting settings in parents
+			if self.contains_nodefault(k) and v == '_x_': # reserved for deleting settings in parents
 				del self[k]
 			elif self.contains_nodefault(k) and isinstance(v, Config) and isinstance(self[k], Config):
 				self[k].update(v)
