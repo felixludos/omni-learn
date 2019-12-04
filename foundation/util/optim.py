@@ -51,7 +51,7 @@ def default_create_scheduler(optimizer, info):
 	name = info.pull('scheduler_type')
 
 	factor = info.pull('scheduler_decay', 0.1)
-	min_lr = info.pull('min_lr', 0.)
+	min_lr = info.pull('scheduler_min_lr', 0.)
 
 	req_loss = False
 	if name == 'step':
