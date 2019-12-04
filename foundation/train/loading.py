@@ -116,7 +116,7 @@ def load(path=None, A=None, get_model=None, get_data=None, mode='train',
 		model.to(A.device)
 
 		if checkpoint is not None and 'model_state' in checkpoint and load_state_dict:
-			model.load_state_dict(checkpoint['model_state'], strict=strict)
+			model.load_state_dict(checkpoint['model_state'])
 			print('Loaded model_state from checkpoint')
 
 		out.append(model)
