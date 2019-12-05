@@ -56,16 +56,41 @@ def default_create_scheduler(optimizer, info):
 	req_loss = False
 	if name == 'step':
 		step_size = info.pull('scheduler_step')
-		out = O.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=factor)
+		out = StepLR(optimizer, step_size=step_size, gamma=factor)
 	elif name == 'plateau':
 		patience = info.pull('scheduler_patience', 10)
 		cooldown = info.pull('scheduler_cooldown', 0)
 
-		out = O.lr_scheduler.ReduceLROnPlateau(optimizer, factor=factor, patience=patience,
+		out = ReduceOnPlateau(optimizer, factor=factor, patience=patience, verbose=True,
 		                                       min_lr=min_lr, cooldown=cooldown)
 		req_loss = True
 
 	return out, req_loss
+
+
+class StepLR(O.lr_scheduler.StepLR):
+	def __str__(self):
+		return self.__repr__()
+
+	def __repr__(self):
+		return 'StepLR(step={}, gamma={})'.format(self.step_size, self.gamma)
+
+
+class MultiStepLR(O.lr_scheduler.MultiStepLR):
+	def __str__(self):
+		return self.__repr__()
+
+	def __repr__(self):
+		return 'MultiStepLR(milestones={}, gamma={})'.format(self.milestones, self.gamma)
+
+class ReduceOnPlateau(O.lr_scheduler.ReduceLROnPlateau):
+
+	def __str__(self):
+		return self.__repr__()
+
+	def __repr__(self):
+		return 'ReduceOnPlateau(factor={}, patience={}, cooldown={})'.format(self.factor, self.patience, self.cooldown)
+
 
 
 class Complex_Optimizer(Optimizer):
@@ -73,10 +98,13 @@ class Complex_Optimizer(Optimizer):
 		self.__dict__['optims'] = None
 		super().__init__([{}], None)
 		self.__dict__['optims'] = optims
-		self.param_groups = sum([[p for p in o.param_groups] for o in self.optims.values()], [])
+		self.group_params()
 		# self._update_groups()
 		# self._update_named_groups()
 		# self.__dict__['param_groups'] = [grp for grp in chain(*[o.param_groups for o in optims.values()])]
+
+	def group_params(self):
+		self.param_groups = sum([[p for p in o.param_groups] for o in self.optims.values()], [])
 
 	def _update_groups(self):
 		self.param_groups = self._param_group_gen()
@@ -103,6 +131,7 @@ class Complex_Optimizer(Optimizer):
 	def load_state_dict(self, state_dict):
 		for name, optim in self.optims.items():
 			optim.load_state_dict(state_dict[name])
+		self.group_params() # important to get loaded param groups
 
 	def state_dict(self):
 		return {name:optim.state_dict() for name, optim in self.optims.items()}

@@ -96,7 +96,7 @@ class Optimizable(Recordable):
 		super().__init__(*args, **kwargs)
 		self.optim = None
 
-	def record_lr(self): # TODO: fix lr logging
+	def record_lr(self):
 		if self.optim is not None:
 			if isinstance(self.optim, util.Complex_Optimizer):
 				for name, optim in self.optim.items():
@@ -194,7 +194,7 @@ class Regularizable(object):
 	def regularize(self, q):
 		return torch.tensor(0).type_as(q)
 
-class Trainable_Model(Optimizable, Recordable, Model): # top level - must be implemented to train
+class Trainable_Model(Optimizable, Model): # top level - must be implemented to train
 	def step(self, batch):  # Override pre-processing mixins
 		return self._step(batch)
 
