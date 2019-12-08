@@ -1,6 +1,8 @@
 
 import numpy as np
 import cv2
+from io import BytesIO
+from PIL import Image
 import torch
 from torch.utils.data import DataLoader, Dataset
 # from torch.utils.data.dataloader import re, numpy_type_map, _use_shared_memory, string_classes, int_classes#,
@@ -141,6 +143,16 @@ def str_to_float32_img(s):
 def str_to_byte_img(s):
 	return cv2.imdecode(np.frombuffer(s, np.uint8), -1)
 
+
+def jpeg_to_str(path):
+	with open(path, 'rb') as f:
+		return f.read()
+
+def str_to_jpeg(s, ret_PIL=False):
+	img = Image.open(BytesIO(s))
+	if ret_PIL:
+		return img
+	return np.array(img)
 
 
 # Wrapper to create a DataLoader with NS_collate
