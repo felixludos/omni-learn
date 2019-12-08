@@ -95,8 +95,8 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset):
 		return len(self.images)
 
 	def __getitem__(self, item):
-		if isinstance(item, (np.ndarray, torch.Tensor)):
-			item = item.tolist()
+		# if isinstance(item, (np.ndarray, torch.Tensor)):
+		# 	item = item.tolist()
 		# images = torch.from_numpy(self.images[item]).permute(2,0,1).float().div(255)
 		images = self.images[item].float().div(255)
 		if self.labeled:
@@ -109,6 +109,11 @@ register_dataset('3dshapes', Shapes3D)
 
 
 class CelebA(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset):
+
+
+
+
+
 	pass
 
 # register_dataset('celeba', CelebA)
