@@ -171,13 +171,15 @@ class Schedulable(Optimizable):
 				if isinstance(child, Schedulable) and child.scheduler is not None:
 					sub_sch[name] = child.scheduler
 
-			assert len(sub_sch) > 0, 'no children have optimizers'
+			if len(sub_sch) == 0:
+				sch = None
+			else:
 
-			# if len(sub_sch) == 1:
-			# 	sch = next(iter(sub_sch.values()))
-			# else:
-			# 	sch = util.Complex_Scheduler(**sub_sch)
-			sch = util.Complex_Scheduler(**sub_sch)
+				# if len(sub_sch) == 1:
+				# 	sch = next(iter(sub_sch.values()))
+				# else:
+				# 	sch = util.Complex_Scheduler(**sub_sch)
+				sch = util.Complex_Scheduler(**sub_sch)
 		else:
 			sch = util.default_create_scheduler(self.optim, info)
 
