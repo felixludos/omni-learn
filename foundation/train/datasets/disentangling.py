@@ -4,6 +4,7 @@ import h5py as hf
 import numpy as np
 import torch
 
+from ... import util
 from ..data import register_dataset
 from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset
 
@@ -108,12 +109,53 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset):
 register_dataset('3dshapes', Shapes3D)
 
 
-class CelebA(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset):
+class CelebA(Testable_Dataset, Info_Dataset):
 
 
+	def __init__(self, dataroot, label_type=None, train=True):
+
+		_labels = {
+			'attr': 'attrs',
+			'identity': 'identities',
+			'landmark': 'landmarks',
+		}
+
+		din = (3, 218, 178)
+		if label_type is None:
+			dout = din
+		elif label_type == 'attr':
+			dout = 40
+		elif label_type == 'landmark':
+			dout = 10
+		elif label_type == 'identity':
+			dout = 1
+		else:
+			raise Exception('unknown {}'.format(label_type))
+
+		super().__init__(din=din, dout=dout, train=train, )
+
+		name = 'celeba_train.h5' if train else 'celeba_test.h5'
+
+		with hf.File(os.path.join(dataroot, 'celeba', name), 'r') as f:
+			self.images = f['images'][()]
+			self.labels = f[_labels[label_type]][()] if label_type is not None else None
+
+			self.attr_names = f.attrs['attr_names']
+			self.landmark_names = f.attrs['landmark_names']
 
 
+	def __len__(self):
+		return len(self.images)
 
-	pass
+	def __getitem__(self, item):
 
-# register_dataset('celeba', CelebA)
+		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2,0,1).float().div(255)
+
+		if self.labels is None:
+			return img,
+
+		lbl = torch.from_numpy(self.labels[item])
+
+		return img, lbl
+
+register_dataset('celeba', CelebA)
