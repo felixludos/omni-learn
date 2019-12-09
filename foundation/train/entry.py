@@ -1,7 +1,7 @@
 
 
 import sys, os, time
-import ipdb
+# import ipdb
 import traceback
 
 from contextlib import nullcontext, redirect_stdout, redirect_stderr
@@ -71,6 +71,7 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 		except Exception as e:
 			if mode == 'cmd':
+				import ipdb
 				extype, value, tb = sys.exc_info()
 				traceback.print_exc()
 				ipdb.post_mortem(tb)
