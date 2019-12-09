@@ -125,10 +125,11 @@ class Optimizable(Recordable):
 
 			assert len(sub_optims) > 0, 'no children have optimizers'
 
-			if len(sub_optims) == 1:
-				optim = next(iter(sub_optims.values()))
-			else:
-				optim = util.Complex_Optimizer(**sub_optims)
+			# if len(sub_optims) == 1:
+			# 	optim = next(iter(sub_optims.values()))
+			# else:
+			# 	optim = util.Complex_Optimizer(**sub_optims)
+			optim = util.Complex_Optimizer(**sub_optims)
 
 		else:
 			optim = util.default_create_optim(self.parameters(), optim_info)
@@ -162,17 +163,33 @@ class Schedulable(Optimizable):
 		super().__init__(*args, **kwargs)
 		self.scheduler = scheduler
 
-	def set_scheduler(self, info):
+	def set_scheduler(self, info=None):
 		assert self.optim is not None, 'no optim to schedule'
-		self.scheduler, self.scheduler_req_loss = util.default_create_scheduler(self.optim, info)
+		if info is None:
+			sub_sch = {}
+			for name, child in self.named_children():
+				if isinstance(child, Schedulable) and child.scheduler is not None:
+					sub_sch[name] = child.scheduler
+
+			assert len(sub_sch) > 0, 'no children have optimizers'
+
+			# if len(sub_sch) == 1:
+			# 	sch = next(iter(sub_sch.values()))
+			# else:
+			# 	sch = util.Complex_Scheduler(**sub_sch)
+			sch = util.Complex_Scheduler(**sub_sch)
+		else:
+			sch = util.default_create_scheduler(self.optim, info)
+
+		self.scheduler = sch
 
 	def load_state_dict(self, state_dict):
 		if self.scheduler is not None:
 			self.scheduler.load_state_dict(state_dict['scheduler'])
 		super().load_state_dict(state_dict)
 
-	def state_dict(self):
-		state_dict = super().state_dict()
+	def state_dict(self, *args, **kwargs):
+		state_dict = super().state_dict(*args, **kwargs)
 		if self.scheduler is not None:
 			state_dict['scheduler'] = self.scheduler.state_dict()
 		return state_dict
@@ -180,14 +197,14 @@ class Schedulable(Optimizable):
 	def schedule_step(self, val=None):
 		if self.scheduler is not None:
 			print('LR Scheduler stepping')
-			if val is None:
-				self.scheduler.step()
-			else:
+			if self.scheduler.req_loss:
 				self.scheduler.step(val)
+			else:
+				self.scheduler.step()
 
 	def post_epoch(self, stats):
 		assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
-		self.schedule_step(stats['loss'].avg.item() if self.scheduler_req_loss else None)
+		self.schedule_step(stats['loss'].avg.item())
 		super().post_epoch()
 
 class Regularizable(object):

@@ -65,7 +65,9 @@ def default_create_scheduler(optimizer, info):
 		                                       min_lr=min_lr, cooldown=cooldown)
 		req_loss = True
 
-	return out, req_loss
+	out.req_loss = req_loss
+
+	return out
 
 
 class StepLR(O.lr_scheduler.StepLR):
@@ -185,6 +187,36 @@ class Complex_Optimizer(Optimizer):
 
 		return '\n'.join(s)
 
+
+class Complex_Scheduler(object):
+	def __init__(self, **subs):
+		self.sub = subs
+		self.req_loss = bool(sum([sch.req_loss for sch in self.sub.values()]))
+
+	def load_state_dict(self, state_dict):
+		for name, sch in self.sub.items():
+			sch.load_state_dict(state_dict[name])
+
+	def state_dict(self):
+		return {name:sch.state_dict() for name, sch in self.sub.items()}
+
+
+	def step(self, val=None): # can and perhaps should be overridden
+		for sch in self.sub.values():
+			if sch.req_loss:
+				sch.step(val)
+			else:
+				sch.step()
+
+	def __str__(self):
+		s = ['Complex-Scheduler(']
+
+		for k,v in self.sub.items():
+			s.append('  {}: {}'.format(k,str(v).replace('\n', '\n    ')))
+
+		s.append(')')
+
+		return '\n'.join(s)
 
 
 class Conjugate_Gradient(Optimizer):

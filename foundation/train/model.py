@@ -52,7 +52,7 @@ def _create_mlp(info): # mostly for selecting/formatting args (and creating sub 
 register_model('mlp', create_fn=_create_mlp)
 
 
-class Trainable_Conv(fm.Optimizable, models.Conv_Encoder):
+class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
 	pass
 
 def _get_conv_args(info):
@@ -114,10 +114,13 @@ def _create_conv(info):
 	if 'optim_type' in info:
 		conv.set_optim(info)
 
+	if 'scheduler_type' in info:
+		conv.set_scheduler(info)
+
 	return conv
 register_model('conv', create_fn=_create_conv)
 
-class Trainable_Normal_Enc(fm.Optimizable, models.Normal_Conv_Encoder):
+class Trainable_Normal_Enc(fm.Schedulable, models.Normal_Conv_Encoder):
 	pass
 
 def _create_normal_conv(info):
@@ -135,11 +138,14 @@ def _create_normal_conv(info):
 	if 'optim_type' in info:
 		conv.set_optim(info)
 
+	if 'scheduler_type' in info:
+		conv.set_scheduler(info)
+
 	return conv
 register_model('normal-conv', create_fn=_create_normal_conv)
 
 
-class Trainable_Deconv(fm.Optimizable, models.Conv_Decoder):
+class Trainable_Deconv(fm.Schedulable, models.Conv_Decoder):
 	pass
 
 def _create_deconv(info):
@@ -195,6 +201,9 @@ def _create_deconv(info):
 
 	if 'optim_type' in info:
 		deconv.set_optim(info)
+
+	if 'scheduler_type' in info:
+		deconv.set_scheduler(info)
 
 	return deconv
 
