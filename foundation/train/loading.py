@@ -49,14 +49,14 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 			if len(vals): # dir exists but no checkpoints
 				pick = 'checkpoint_{}.pth.tar'.format(max(vals))
 				print('Found {} checkpoints. Using {}'.format(len(ckpts), pick))
-			elif 'config.tml' in os.listdir(path):
+			elif 'config.yml' in os.listdir(path):
 				print('Found 0 checkpoints. However, a config file was found')
 				return path
 		path = os.path.join(path, pick)
 
 		return path
 
-	raise FileNotFoundError('Invalid path: {}'.format(path))
+	raise FileNotFoundError(path)
 
 
 
@@ -79,7 +79,8 @@ def load(path=None, A=None, get_model=None, get_data=None, mode='train',
 			config_dir = os.path.dirname(ckptpath)
 		else:
 			config_dir = ckptpath
-		load_A = get_config(os.path.join(config_dir, 'config.tml'))
+		config_name = 'config.yml' if 'config.yml' in os.listdir(config_dir) else 'config.tml'
+		load_A = get_config(os.path.join(config_dir, config_name))
 		if A is None:
 			A = load_A
 		else:

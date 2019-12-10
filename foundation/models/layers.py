@@ -328,6 +328,122 @@ class DeconvLayer(nn.Module):
 		return x
 
 
+class DoubleConvLayer(nn.Module):
+	def __init__(self, in_channels, out_channels, factor=1, down_type='max',
+	             norm_type=None, nonlin='elu', output_nonlin='default',
+
+	             internal_channels=None, squeeze=False, residual=False,
+	             ):
+		super().__init__()
+
+		assert factor in {1,2}, 'factor {} not supported'.format(factor)
+		assert nonlin is not None, 'not deep'
+		assert factor == 1 or not residual, 'residual requires same size after conv2'
+
+		if internal_channels is None:
+			internal_channels = out_channels
+
+		self.conv = nn.Conv2d(in_channels, internal_channels, kernel_size=2, padding=1, stride=1)
+		self.nonlin = util.get_nonlinearity(nonlin)
+
+		self.squeeze = None
+		if squeeze:
+			self.squeeze = nn.Conv2d(internal_channels, out_channels, kernel_size=1, padding=0, stride=1)
+			self.nonlin_squeeze = util.get_nonlinearity(nonlin)
+			internal_channels = out_channels
+
+		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
+
+		self.residual = residual
+
+		self.nonlin2 = util.get_nonlinearity(nonlin) if down_type == 'conv' else None
+		self.down = util.get_pooling(down_type, factor, chn=out_channels)
+
+		self.norm = util.get_normalization(norm_type, out_channels)
+		if 'default' == output_nonlin:
+			output_nonlin = nonlin
+		self.out_nonlin = util.get_nonlinearity(output_nonlin)
+
+	def forward(self, x):
+
+		c = self.nonlin(self.conv(x))
+
+		if self.squeeze is not None:
+			c = self.nonlin_squeeze(self.squeeze(c))
+
+		c = self.conv2(c)
+
+		x = c+x if self.residual else c
+
+		if self.down is not None:
+			if self.nonlin2 is not None:
+				x = self.nonlin2(x)
+			x = self.down(x)
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.out_nonlin is not None:
+			x = self.out_nonlin(x)
+		return x
+
+
+class DoubleDeconvLayer(nn.Module):
+	def __init__(self, in_channels, out_channels, factor=None, up_type='deconv',
+				 norm_type=None, nonlin='elu', output_nonlin='default',
+
+	             internal_channels=None, squeeze=False, residual=True,
+	             ):
+		super().__init__()
+
+		assert factor in {1, 2}, 'factor {} not supported'.format(factor)
+		assert nonlin is not None, 'not deep'
+		assert factor == 1 or not residual, 'residual requires same size after conv2'
+
+		if internal_channels is None:
+			internal_channels = out_channels
+
+		self.conv = nn.Conv2d(in_channels, internal_channels, kernel_size=2, padding=1, stride=1)
+		self.nonlin = util.get_nonlinearity(nonlin)
+
+		self.squeeze = None
+		if squeeze:
+			self.squeeze = nn.Conv2d(internal_channels, out_channels, kernel_size=1, padding=0, stride=1)
+			self.nonlin_squeeze = util.get_nonlinearity(nonlin)
+			internal_channels = out_channels
+
+		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
+
+		self.residual = residual
+
+		self.nonlin2 = util.get_nonlinearity(nonlin) if up_type == 'conv' else None
+		self.down = util.get_pooling(down_type, factor, chn=out_channels)
+
+		self.norm = util.get_normalization(norm_type, out_channels)
+		if 'default' == output_nonlin:
+			output_nonlin = nonlin
+		self.out_nonlin = util.get_nonlinearity(output_nonlin)
+
+	def forward(self, x, y=None):
+
+		c = self.nonlin(self.conv(x))
+
+		if self.squeeze is not None:
+			c = self.nonlin_squeeze(self.squeeze(c))
+
+		c = self.conv2(c)
+
+		x = c + x if self.residual else c
+
+		if self.down is not None:
+			if self.nonlin2 is not None:
+				x = self.nonlin2(x)
+			x = self.down(x)
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.out_nonlin is not None:
+			x = self.out_nonlin(x)
+		return x
+
+
 
 class ConvLSTM(fm.Model):
 	def __init__(self, input_dim, hidden_dim, kernel_size,

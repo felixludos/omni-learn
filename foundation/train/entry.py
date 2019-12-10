@@ -54,6 +54,15 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 			cname = 'checkpoints{}.txt'.format(os.environ['PROCESS_ID'])
 
+			if 'auto_name' in config:
+
+				ID = os.environ['JOB_ID'].split('#')[-1]
+				ps = os.environ['PROCESS_ID']
+				num = os.environ['JOB_NUM']
+
+				config.name = 'run{}-{}_{}'.format(str(num).zfill(4), ps, ID)
+
+
 			if cname in os.listdir(os.environ['JOBDIR']):
 				print('This job has already made progress')
 				with open(os.path.join(os.environ['JOBDIR'], cname), 'r') as f:

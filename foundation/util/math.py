@@ -139,7 +139,19 @@ def get_normalization(norm, num, **kwargs):
 	if norm == 'instance':
 		return nn.InstanceNorm2d(num, **kwargs)
 
+def get_pooling(down_type, factor, chn=None):
+	if factor == 1:
+		return None
 
+	if down_type == 'conv':
+		assert chn is not None
+		return nn.Conv2d(chn, chn, kernel_size=factor, padding=0, stride=factor)
+	elif down_type == 'max':
+		return nn.MaxPool2d(factor, factor)
+	elif down_type == 'avg':
+		return nn.AvgPool2d(factor, factor)
+
+	raise Exception('unknown pool type: {}'.format(down_type))
 
 #####################
 # Randomness and Noise

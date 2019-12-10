@@ -3,6 +3,7 @@ import os
 import h5py as hf
 import numpy as np
 import torch
+from torch.nn import functional as F
 
 from ... import util
 from ..data import register_dataset
@@ -82,10 +83,10 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset):
 				labels = data['labels']
 				labels = torch.from_numpy(labels[()]).float()
 
-		self.images = images
+		self.register_buffer('images', images)
 		self.labeled = labels is not None
 		if self.labeled:
-			self.labels = labels
+			self.register_buffer('labels', labels)
 
 		self.factor_order = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape',
                      'orientation']
@@ -112,7 +113,7 @@ register_dataset('3dshapes', Shapes3D)
 class CelebA(Testable_Dataset, Info_Dataset):
 
 
-	def __init__(self, dataroot, label_type=None, train=True):
+	def __init__(self, dataroot, label_type=None, train=True, resize=True):
 
 		_labels = {
 			'attr': 'attrs',
@@ -121,6 +122,12 @@ class CelebA(Testable_Dataset, Info_Dataset):
 		}
 
 		din = (3, 218, 178)
+		if resize:
+			resize = (256, 256)
+			din = (3, 256, 256)
+		else:
+			resize = None
+			
 		if label_type is None:
 			dout = din
 		elif label_type == 'attr':
@@ -132,7 +139,7 @@ class CelebA(Testable_Dataset, Info_Dataset):
 		else:
 			raise Exception('unknown {}'.format(label_type))
 
-		super().__init__(din=din, dout=dout, train=train, )
+		super().__init__(din=din, dout=dout, train=train,)
 
 		name = 'celeba_train.h5' if train else 'celeba_test.h5'
 
@@ -143,6 +150,7 @@ class CelebA(Testable_Dataset, Info_Dataset):
 			self.attr_names = f.attrs['attr_names']
 			self.landmark_names = f.attrs['landmark_names']
 
+		self.resize = resize
 
 	def __len__(self):
 		return len(self.images)
@@ -150,6 +158,9 @@ class CelebA(Testable_Dataset, Info_Dataset):
 	def __getitem__(self, item):
 
 		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2,0,1).float().div(255)
+
+		if self.resize is not None:
+			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
 
 		if self.labels is None:
 			return img,

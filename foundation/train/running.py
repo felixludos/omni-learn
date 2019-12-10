@@ -80,8 +80,8 @@ def run_full(A, get_data, get_model, get_name=None):
 		A.training.track_best = False
 
 	if 'save_dir' in A.output:
-		if ('config.tml' not in os.listdir(A.output.save_dir) or extend is not None): # new save_dir - novel, load
-			config_path = A.export(os.path.join(A.output.save_dir, 'config.tml'))
+		if ('config.yml' not in os.listdir(A.output.save_dir) or extend is not None): # new save_dir - novel, load
+			config_path = A.export(os.path.join(A.output.save_dir, 'config.yml'))
 			print('Config saved to {}'.format(config_path))
 
 		if os.environ['FOUNDATION_RUN_MODE'] == 'cluster' and 'JOBDIR' in os.environ: # cluster checkpointing for restarts

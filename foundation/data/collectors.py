@@ -56,6 +56,10 @@ class Info_Dataset(Dataset):
 	def get_info(self):
 		return self.din, self.dout
 
+# class Resizeable_Dataset(Dataset):
+# 	def __init__(self, *args, size=None, **kwargs):
+# 		super().__init__(*args, **kwargs)
+
 class Device_Dataset(Dataset): # Full dataset is in memory, so it can be moved to GPU
 	def __init__(self, *args, device='cpu', **kwargs):
 		super().__init__(*args, **kwargs)
@@ -73,7 +77,9 @@ class Device_Dataset(Dataset): # Full dataset is in memory, so it can be moved t
 		self.device = device
 		for name in self._buffers:
 			try:
-				self.__setattr__(name, getattr(self,name).to(device))
+				val = getattr(self,name)
+				if val is not None:
+					self.__setattr__(name, val.to(device))
 			except AttributeError:
 				pass
 
