@@ -117,21 +117,24 @@ class Optimizable(Recordable):
 
 	def set_optim(self, optim_info=None):
 
+		optim = None
 		if optim_info is None: # aggregate optimizers of children
 			sub_optims = {}
 			for name, child in self.named_children():
 				if isinstance(child, Optimizable) and child.optim is not None:
 					sub_optims[name] = child.optim
 
-			assert len(sub_optims) > 0, 'no children have optimizers'
+			# assert len(sub_optims) > 0, 'no children have optimizers'
+
 
 			# if len(sub_optims) == 1:
 			# 	optim = next(iter(sub_optims.values()))
 			# else:
 			# 	optim = util.Complex_Optimizer(**sub_optims)
-			optim = util.Complex_Optimizer(**sub_optims)
+			if len(sub_optims):
+				optim = util.Complex_Optimizer(**sub_optims)
 
-		else:
+		elif 'optim_type' in optim_info:
 			optim = util.default_create_optim(self.parameters(), optim_info)
 
 		self.optim = optim

@@ -364,6 +364,9 @@ class DoubleConvLayer(nn.Module):
 			output_nonlin = nonlin
 		self.out_nonlin = util.get_nonlinearity(output_nonlin)
 
+	def extra_repr(self):
+		return 'residual={}'.format(self.residual)
+
 	def forward(self, x):
 
 		c = self.nonlin(self.conv(x))
@@ -419,6 +422,9 @@ class DoubleDeconvLayer(nn.Module):
 		if 'default' == output_nonlin:
 			output_nonlin = nonlin
 		self.out_nonlin = util.get_nonlinearity(output_nonlin)
+
+	def extra_repr(self):
+		return 'residual={}'.format(self.residual)
 
 	def forward(self, x, y=None):
 		

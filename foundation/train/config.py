@@ -183,6 +183,7 @@ def _clean_up_reserved(C):
 	for k in bad:
 		del C[k]
 
+_print_indent = 0
 
 class Config(util.NS): # TODO: allow adding aliases
 	def __init__(self, *args, _parent_obj_for_defaults=None, **kwargs):
@@ -212,7 +213,6 @@ class Config(util.NS): # TODO: allow adding aliases
 		if parent_defaults:
 			_add_default_parent(self)
 
-		# x = 1+1
 
 	def _single_get(self, item):
 		if not self.contains_nodefault(item) and item[0] != '_' and self._parent_obj_for_defaults is not None:
@@ -257,21 +257,28 @@ class Config(util.NS): # TODO: allow adding aliases
 		else:
 			val = self[item]
 
+		global _print_indent
+
 		if isinstance(val, dict) and '_type' in val:  # WARNING: using pull will automatically create registered sub components
 			print('Creating sub-component: {} (type={})'.format(item, val['_type']))
+			_print_indent += 1
 			val = create_component(val)
+			_print_indent -= 1
 
 		elif isinstance(val, str) and val[:2] == '<>':  # alias
 			alias = val[2:]
 			val = self.pull(alias, *defaults)
-			print('{} is an alias for {}'.format(item, alias))
+			print('{}{} is an alias for {}'.format('  '*_print_indent, item, alias))
 
 		else:
-			print('{}: {}'.format(item, val))
+			print('{}{}: {}'.format('  '*_print_indent, item, val))
 
 
 		if defaulted:
-			print('{} default: {}'.format(item, val))
+			print('{}{} default: {}'.format('  '*_print_indent, item, val))
+
+		if type(val) == list:
+			val = tuple(val)
 
 		return val
 
