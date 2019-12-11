@@ -172,18 +172,43 @@ def _add_default_parent(C):
 		if isinstance(child, Config):
 			child._parent_obj_for_defaults = C
 			_add_default_parent(child)
+		elif isinstance(child, (tuple, list, set)):
+			for c in child:
+				if isinstance(c, Config):
+					c._parent_obj_for_defaults = C
+					_add_default_parent(c)
 
 def _clean_up_reserved(C):
 	bad = []
 	for k,v in C.items():
-		if v is '_x_':
+		if '_x_' == v:
 			bad.append(k)
 		elif isinstance(v, Config):
 			_clean_up_reserved(v)
 	for k in bad:
 		del C[k]
 
+_print_waiting = False
 _print_indent = 0
+def _print_with_indent(s):
+	return s if _print_waiting else ''.join(['  '*_print_indent, s])
+
+'''
+Features:
+
+Keys:
+'_{}' = protected - not visible to children
+({1}, {2}, ...) = [{1}][{2}]...
+'{1}.{2}' = ['{1}']['{2}']
+if {} not found: first check parent (if exists) otherwise create self[{}] = Config(parent=self)
+
+Values:
+'<>{}' = alias to key '{}'
+'_x_' = (only when merging) remove this key locally, if exists
+'__x__' = dont default this key and behaves as though it doesnt exist (except on iteration)
+
+'''
+
 
 class Config(util.NS): # TODO: allow adding aliases
 	def __init__(self, *args, _parent_obj_for_defaults=None, **kwargs):
@@ -201,7 +226,7 @@ class Config(util.NS): # TODO: allow adding aliases
 			return super().update(other)
 
 		for k, v in other.items():
-			if self.contains_nodefault(k) and v == '_x_': # reserved for deleting settings in parents
+			if self.contains_nodefault(k) and '_x_' == v: # reserved for deleting settings in parents
 				del self[k]
 			elif self.contains_nodefault(k) and isinstance(v, Config) and isinstance(self[k], Config):
 				self[k].update(v)
@@ -215,9 +240,13 @@ class Config(util.NS): # TODO: allow adding aliases
 
 
 	def _single_get(self, item):
-		if not self.contains_nodefault(item) and item[0] != '_' and self._parent_obj_for_defaults is not None:
+
+		if not self.contains_nodefault(item) \
+				and self._parent_obj_for_defaults is not None \
+				and item[0] != '_':
 			return self._parent_obj_for_defaults[item]
-		return super().__getitem__(item)
+
+		return self.get_nodefault(item)
 
 	def __getitem__(self, item):
 
@@ -234,50 +263,70 @@ class Config(util.NS): # TODO: allow adding aliases
 
 		if isinstance(key, (list, tuple)):
 			if len(key) == 1:
-				return super().__setitem__(key[0], value)
-			return super().__getitem__(key[0]).__setitem__(key[1:], value)
+				return self.__setitem__(key[0], value)
+			return self.__getitem__(key[0]).__setitem__(key[1:], value)
 
 		return super().__setitem__(key, value)
 
 
 	def get_nodefault(self, item):
-		return super().__getitem__(item)
+		val = super().__getitem__(item)
+		if val == '__x__':
+			raise KeyError(item)
+		return val
 
 	def contains_nodefault(self, item):
-		return super().__contains__(item)
+		if super().__contains__(item):
+			return super().__getitem__(item) != '__x__'
+		return False
 
-	def pull(self, item, *defaults): # pull for each arg should only be called once!
+	def _process_val(self, item, val, *defaults, defaulted=False, byparent=False):
+		global _print_indent, _print_waiting
 
-		defaulted = item not in self
-		if defaulted:
-			if len(defaults) == 0:
-				raise MissingConfigError(item)
-			val = defaults[0]
-			defaults = defaults[1:]
-		else:
-			val = self[item]
-
-		global _print_indent
-
-		if isinstance(val, dict) and '_type' in val:  # WARNING: using pull will automatically create registered sub components
-			print('Creating sub-component: {} (type={})'.format(item, val['_type']))
+		if isinstance(val, dict) and '_type' in val:
+			# WARNING: using pull will automatically create registered sub components
+			assert not byparent, 'Pulling a sub-component from a parent is not supported (yet): {}'.format(item)
+			print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
 			_print_indent += 1
-			val = create_component(val)
+			if val['_type'] == 'list':
+				terms = []
+				for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
+					terms.append(self._process_val('({})'.format(i), v))
+				val = tuple(terms)
+			else:
+				val = create_component(val)
 			_print_indent -= 1
 
 		elif isinstance(val, str) and val[:2] == '<>':  # alias
 			alias = val[2:]
+			assert not byparent, 'Using an alias from a parent is not supported: {} {}'.format(item, alias)
+
+			print(_print_with_indent('{} --> '.format(item)), end='')
+			_print_waiting = True
 			val = self.pull(alias, *defaults)
-			print('{}{} is an alias for {}'.format('  '*_print_indent, item, alias))
+			_print_waiting = False
 
 		else:
-			print('{}{}: {}'.format('  '*_print_indent, item, val))
+			print(_print_with_indent('{}: {}{}'.format(item, val, ' (by default)' if defaulted else (' (by parent)' if byparent else ''))))
+
+		return val
 
 
+	def pull(self, item, *defaults): # pull for each arg should only be called once!
+
+		defaulted = item not in self
+		byparent = False
 		if defaulted:
-			print('{}{} default: {}'.format('  '*_print_indent, item, val))
+			if len(defaults) == 0:
+				raise MissingConfigError(item)
+			val, *defaults = defaults
+		else:
+			byparent = not self.contains_nodefault(item)
+			val = self[item]
 
-		if type(val) == list:
+		val = self._process_val(item, val, *defaults, defaulted=defaulted, byparent=byparent)
+
+		if isinstance(val, list):
 			val = tuple(val)
 
 		return val
@@ -296,6 +345,7 @@ class Config(util.NS): # TODO: allow adding aliases
 		return data
 
 	def __contains__(self, item):
-		if self._parent_obj_for_defaults is not None and item[0] != '_' and not super().__contains__(item):
-			return item in self._parent_obj_for_defaults
-		return super().__contains__(item)
+		return self.contains_nodefault(item) \
+			or (not super().__contains__(item)
+				and self._parent_obj_for_defaults is not None
+				and item[0] != '_')

@@ -18,7 +18,13 @@ primitives = (str, int, float, bool)
 
 class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attrs), use __contains__ instead
 	'''
-	Namespace - like a dictionary but where keys can be accessed as attributes
+	Namespace - like a dictionary but where keys can be accessed as attributes, and if not found will create new NS
+	allowing:
+
+	a = NS()
+	a.b.c.d = 'hello'
+	print(repr(a)) # --> NS('b':NS('c':NS('d':'hello')))
+
 	'''
 
 	def __getitem__(self, key):
@@ -34,7 +40,16 @@ class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attr
 				self.__setitem__(key, self.__class__())
 				return super().__getitem__(key)
 
-	pass
+	def todict(self):
+		d = {}
+		for k,v in self.items():
+			if isinstance(v, NS):
+				v = v.todict()
+			d[k] = v
+		return d
+
+	def __repr__(self):
+		return 'NS({})'.format(', '.join(['{}:{}'.format(repr(k), repr(v)) for k,v in self.items()]))
 
 
 

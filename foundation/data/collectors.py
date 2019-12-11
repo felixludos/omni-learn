@@ -56,6 +56,12 @@ class Info_Dataset(Dataset):
 	def get_info(self):
 		return self.din, self.dout
 
+	def pre_epoch(self, mode, epoch): # TODO: integrate in train.running
+		pass
+
+	def post_epoch(self, mode, epoch, stats=None):
+		pass
+
 # class Resizeable_Dataset(Dataset):
 # 	def __init__(self, *args, size=None, **kwargs):
 # 		super().__init__(*args, **kwargs)

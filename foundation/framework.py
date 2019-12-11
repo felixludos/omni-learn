@@ -26,15 +26,13 @@ class Model(nn.Module):  # any vector function
 		self.device = device
 		super(Model, self).to(device)
 
-
-
-	def pre_epoch(self): # called at the beginning of each epoch
+	def pre_epoch(self, mode, epoch): # called at the beginning of each epoch
 		pass
 
-	def post_epoch(self, stats=None): # called at the end of each epoch
+	def post_epoch(self, mode, epoch, stats=None): # called at the end of each epoch
 		pass
 
-class CompositeModel(Model):
+class CompositeModel(Model): # TODO integrate with component based models
 	def __init__(self, *models):
 		super().__init__(models[0].din, models[-1].dout)
 		self.models = nn.ModuleList(models)
@@ -68,8 +66,8 @@ class Recordable(Model):
 	def reset_stats(self):
 		self.stats.reset()
 
-	def pre_epoch(self):
-		super().pre_epoch()
+	def pre_epoch(self, mode, epoch):
+		super().pre_epoch(mode, epoch)
 		self.reset_stats()
 
 class Visualizable(Recordable):
@@ -86,9 +84,9 @@ class Visualizable(Recordable):
 	def _visualize(self, info, logger):
 		raise NotImplementedError
 
-	def pre_epoch(self):
+	def pre_epoch(self, mode, epoch):
 		self.reset_viz_counter()
-		super().pre_epoch()
+		super().pre_epoch(mode, epoch)
 
 class Optimizable(Recordable):
 
@@ -111,14 +109,16 @@ class Optimizable(Recordable):
 				lr = self.optim.param_groups[0]['lr']
 				self.stats.update('z-lr', lr)
 
-	def pre_epoch(self):
-		super().pre_epoch()
+	def pre_epoch(self, mode, epoch):
+		super().pre_epoch(mode, epoch)
 		self.record_lr()
 
 	def set_optim(self, optim_info=None):
 
 		optim = None
-		if optim_info is None and 'optim_type' in optim_info: # aggregate optimizers of children
+		if optim_info is not None and 'optim_type' in optim_info:
+			optim = util.default_create_optim(self.parameters(), optim_info)
+		else: # aggregate optimizers of children
 			sub_optims = {}
 			for name, child in self.named_children():
 				if isinstance(child, Optimizable) and child.optim is not None:
@@ -133,9 +133,6 @@ class Optimizable(Recordable):
 			# 	optim = util.Complex_Optimizer(**sub_optims)
 			if len(sub_optims):
 				optim = util.Complex_Optimizer(**sub_optims)
-
-		elif 'optim_type' in optim_info:
-			optim = util.default_create_optim(self.parameters(), optim_info)
 
 		self.optim = optim
 
@@ -167,7 +164,8 @@ class Schedulable(Optimizable):
 		self.scheduler = scheduler
 
 	def set_scheduler(self, info=None):
-		assert self.optim is not None, 'no optim to schedule'
+		if self.optim is None:
+			return
 		sch = None
 		if info is not None and 'scheduler_type' in info:
 			sch = util.default_create_scheduler(self.optim, info)
@@ -198,17 +196,21 @@ class Schedulable(Optimizable):
 		return state_dict
 
 	def schedule_step(self, val=None):
-		if self.scheduler is not None:
-			print('LR Scheduler stepping')
-			if self.scheduler.req_loss:
-				self.scheduler.step(val)
-			else:
-				self.scheduler.step()
+		print('LR Scheduler stepping')
+		if self.scheduler.req_loss:
+			self.scheduler.step(val)
+		else:
+			self.scheduler.step()
 
-	def post_epoch(self, stats):
-		assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
-		self.schedule_step(stats['loss'].avg.item())
-		super().post_epoch()
+	def post_epoch(self, mode, epoch, stats=None):
+		if self.scheduler is not None:
+			if self.scheduler.req_loss:
+				if mode == 'val':
+					assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
+					self.schedule_step(stats['loss'].avg.item())
+			elif mode == 'train':
+				self.scheduler_step()
+		super().post_epoch(mode, epoch, stats)
 
 class Regularizable(object):
 	def regularize(self, q):

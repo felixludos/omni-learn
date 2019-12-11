@@ -9,7 +9,9 @@ from .. import models
 
 
 _model_registry = {}
+_reserved_names = {'list'}
 def register_model(name, create_fn):
+	assert name not in _reserved_names, '{} is reserved'.format(name)
 	_model_registry[name] = create_fn
 
 def create_component(info):
@@ -35,6 +37,11 @@ class MissingConfigError(Exception):
 
 # register standard components
 
+# def _component_list(info):
+# 	return [create_component(x) for x in info.components]
+#
+# register_model('list', _component_list)
+
 
 def _create_mlp(info): # mostly for selecting/formatting args (and creating sub components!)
 
@@ -49,7 +56,7 @@ def _create_mlp(info): # mostly for selecting/formatting args (and creating sub 
 	model = models.make_MLP(**kwargs)
 
 	return model
-register_model('mlp', create_fn=_create_mlp)
+register_model('mlp', _create_mlp)
 
 
 class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
@@ -118,7 +125,7 @@ def _create_conv(info):
 		conv.set_scheduler(info)
 
 	return conv
-register_model('conv', create_fn=_create_conv)
+register_model('conv', _create_conv)
 
 class Trainable_Normal_Enc(fm.Schedulable, models.Normal_Conv_Encoder):
 	pass
@@ -142,7 +149,7 @@ def _create_normal_conv(info):
 		conv.set_scheduler(info)
 
 	return conv
-register_model('normal-conv', create_fn=_create_normal_conv)
+register_model('normal-conv', _create_normal_conv)
 
 
 class Trainable_Deconv(fm.Schedulable, models.Conv_Decoder):
@@ -207,7 +214,7 @@ def _create_deconv(info):
 
 	return deconv
 
-register_model('deconv', create_fn=_create_deconv)
+register_model('deconv', _create_deconv)
 
 
 

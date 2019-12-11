@@ -10,7 +10,7 @@ from .. import framework as fm
 from .atom import *
 from .layers import *
 
-class Double_Encoder(fm.Encodable, fm.Trainable_Model):
+class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
 		
 		in_shape = A.pull('in_shape', '<>din')
@@ -36,7 +36,7 @@ class Double_Encoder(fm.Encodable, fm.Trainable_Model):
 		if len(internal_channels) != len(channels):
 			internal_channels = internal_channels * len(channels)
 
-		squeeze = A.pull('squeeze', [None] * len(channels))
+		squeeze = A.pull('squeeze', [False] * len(channels))
 		try:
 			len(squeeze)
 		except AttributeError:
@@ -46,7 +46,7 @@ class Double_Encoder(fm.Encodable, fm.Trainable_Model):
 
 		residual = A.pull('residual', False)
 		
-		nonlin = A.pull('nonlin')
+		nonlin = A.pull('nonlin', 'elu')
 		output_nonlin = A.pull('output_nonlin', None)
 		output_norm_type = A.pull('output_norm_type', None)
 
@@ -120,17 +120,134 @@ class Double_Encoder(fm.Encodable, fm.Trainable_Model):
 		return self(x)
 	
 	def forward(self, x):
-		pass
+
+		q = x
+		for l in self.layers:
+			q = l(q)
+
+		if self.tail is not None:
+			q = self.tail(q)
+
+		return q
 
 class Double_Decoder(fm.Decodable, fm.Trainable_Model):
 	def __init__(self, A):
-		super().__init__()
-	
+
+		out_shape = A.pull('out_shape', '<>dout')
+		# latent_dim = A.pull('latent_dim', '<>dout')
+
+		channels = A.pull('channels')
+		assert isinstance(out_shape, tuple), 'input must be an image'
+
+		factors = A.pull('factors', 2)
+		try:
+			len(factors)
+		except AttributeError:
+			factors = [factors]
+		if len(factors) != len(channels):
+			factors = factors * len(channels)
+		total_factor = np.product(factors)
+
+		internal_channels = A.pull('internal_channels', [None] * len(channels))
+		try:
+			len(internal_channels)
+		except AttributeError:
+			internal_channels = [internal_channels]
+		if len(internal_channels) != len(channels):
+			internal_channels = internal_channels * len(channels)
+
+		squeeze = A.pull('squeeze', [False] * len(channels))
+		try:
+			len(squeeze)
+		except AttributeError:
+			squeeze = [squeeze]
+		if len(squeeze) != len(channels):
+			squeeze = squeeze * len(channels)
+
+		residual = A.pull('residual', False)
+
+		nonlin = A.pull('nonlin', 'elu')
+		output_nonlin = A.pull('output_nonlin', None)
+		output_norm_type = A.pull('output_norm_type', None)
+
+		up_type = A.pull('up_type', 'bilinear')
+		norm_type = A.pull('norm_type', None)
+
+		dout = out_shape
+		out_chn, *out_size = out_shape
+		in_chn = channels[0]
+		if len(out_size):
+			out_H, out_W = out_size
+			in_H, in_W = out_H // total_factor, out_W // total_factor
+			assert in_H > 0 and in_W > 0, 'out image not large enough: {} {}'.format(in_H, in_W)
+			din = in_chn, in_H, in_W
+		else:
+			din = in_chn,
+
+		latent_dim = A.pull('latent_dim', '<>din')
+		if 'head' in A:
+			set_nonlin = True
+			A.head.din = latent_dim
+			A.head.dout = din
+			head = A.pull('head')
+		elif latent_dim != dout:
+			set_nonlin = True
+			assert len(dout) == 3, 'Must specify image size to transform to {}'.format(latent_dim)
+			head = make_MLP(input_dim=latent_dim, output_dim=din, output_nonlin=nonlin)
+		else:
+			set_nonlin = False
+			head = None
+
+		din = latent_dim
+
+		super().__init__(din, dout)
+
+		chns = channels + (out_chn,)
+		last_chn = chns[-2:]
+		chns = chns[:-1]
+
+		layers = []
+
+		i_factors, i_internal_channels, i_squeeze = iter(factors), iter(internal_channels), iter(squeeze)
+		for ichn, ochn in zip(chns, chns[1:]):
+			layers.append(
+				layerslib.DoubleDeconvLayer(in_channels=ichn, out_channels=ochn, factor=next(i_factors),
+				                          up_type=up_type, norm_type=norm_type,
+				                          nonlin=nonlin, output_nonlin=nonlin,
+				                          internal_channels=next(i_internal_channels), squeeze=next(i_squeeze),
+				                          residual=residual,
+				                          )
+			)
+		layers.append(
+			layerslib.DoubleDeconvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(i_factors),
+			                          up_type=up_type, norm_type=norm_type if set_nonlin else output_norm_type,
+			                          nonlin=nonlin, output_nonlin=nonlin if set_nonlin else output_nonlin,
+			                          internal_channels=next(i_internal_channels), squeeze=next(i_squeeze),
+			                          residual=residual,
+			                          )
+		)
+
+		self.head = head
+
+		self.layers = nn.ModuleList(layers)
+
+		self.set_optim(A)
+		self.set_scheduler(A)
+
 	def decode(self, q):
 		return self(q)
-	
+
 	def forward(self, q):
-		pass
+
+		x = q
+
+		if self.head is not None:
+			x = self.head(x)
+
+		for l in self.layers:
+			x = l(x)
+
+		return x
 
 class Conv_Encoder(fm.Encodable, fm.Model):
 

@@ -5,7 +5,7 @@ from tqdm import tqdm
 import yaml
 import torch
 from .. import util
-from ..framework import Visualizable, Recordable
+from ..framework import Visualizable, Recordable, Schedulable
 # from .load_data import old_get_loaders as get_loaders # TODO: update
 
 from .setup import setup_records, setup_logging
@@ -131,6 +131,9 @@ def run_full(A, get_data, get_model, get_name=None):
 	print('traindata len={}, trainloader len={}'.format(len(datasets[0]), len(trainloader)))
 	if valloader is not None:
 		print('valdata len={}, valloader len={}'.format(len(datasets[1]), len(valloader)))
+	elif isinstance(model, Schedulable):
+		assert model.scheduler is None or not model.scheduler.req_loss, \
+			'no validation set, but lr scheduler requires loss'
 	if testset is not None:
 		print('testdata len={}'.format(len(testset[-1])))
 	else:
@@ -173,24 +176,24 @@ def run_full(A, get_data, get_model, get_name=None):
 
 		util.set_seed(epoch_seed)
 
-		model.pre_epoch()
+		model.pre_epoch(mode='train', epoch=records['epoch'])
 
 		train_stats = run_epoch(model, trainloader, A, mode='train', records=records,
 		                              logger=logger, silent=False, inline='inline' in A and A.inline)
 
+		model.post_epoch(mode='train', epoch=records['epoch'], stats=train_stats)
+
 		records['stats']['train'].append(train_stats.export())
 
 		if valloader is not None:
-			model.pre_epoch()
+			model.pre_epoch(mode='val', epoch=records['epoch'])
 
 			val_stats = run_epoch(model, valloader, A, mode='val', records=records, unique_tests=A.output.unique_tests,
 		                              logger=logger, silent=False, inline='inline' in A and A.inline)
 
 			records['stats']['val'].append(val_stats.export())
 
-			model.post_epoch(val_stats)
-		else:
-			model.post_epoch(train_stats)
+			model.post_epoch(mode='val', epoch=records['epoch'], stats=val_stats)
 
 		epoch_seed = util.gen_deterministic_seed(A.seed)
 
