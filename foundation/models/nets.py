@@ -10,6 +10,49 @@ from .. import framework as fm
 from .atom import *
 from .layers import *
 
+class Double_Encoder(fm.Encodable, fm.Trainable_Model):
+	def __init__(self, A):
+		
+		in_shape = A.pull('in_shape', '<>din')
+		# latent_dim = A.pull('latent_dim', '<>dout')
+		
+		channels = A.pull('channels')
+		
+		factors = A.pull('factors', 2)
+		try:
+			len(factors)
+		except AttributeError:
+			factors = [factors]
+		if len(factors) != len(channels):
+			factors = factors*len(channels)
+		total_factor = np.product(factors)
+		
+		nonlin = A.pull('nonlin')
+		output_nonlin = A.pull('output_nonlin', None)
+		
+		down_type = A.pull('down_type', 'max')
+		norm_type = A.pull('norm_type', None)
+		
+		
+		
+		super().__init__()
+	
+	def encode(self, x):
+		return self(x)
+	
+	def forward(self, x):
+		pass
+
+class Double_Decoder(fm.Decodable, fm.Trainable_Model):
+	def __init__(self, A):
+		super().__init__()
+	
+	def decode(self, q):
+		return self(q)
+	
+	def forward(self, q):
+		pass
+
 class Conv_Encoder(fm.Encodable, fm.Model):
 
 	def __init__(self, in_shape, latent_dim=None, feature_dim=None,

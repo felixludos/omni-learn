@@ -12,7 +12,8 @@ from .. import util
 from . import layers as layerslib
 
 
-def make_MLP(input_dim, output_dim, hidden_dims=[], nonlin='prelu', output_nonlin=None):
+def make_MLP(input_dim, output_dim, hidden_dims=[],
+             nonlin='prelu', output_nonlin=None):
 	'''
 	:param input_dim: int
 	:param output_dim: int

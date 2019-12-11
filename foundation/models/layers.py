@@ -356,7 +356,7 @@ class DoubleConvLayer(nn.Module):
 
 		self.residual = residual
 
-		self.nonlin2 = util.get_nonlinearity(nonlin) if down_type == 'conv' else None
+		self.nonlin_down = util.get_nonlinearity(nonlin) if down_type == 'conv' else None
 		self.down = util.get_pooling(down_type, factor, chn=out_channels)
 
 		self.norm = util.get_normalization(norm_type, out_channels)
@@ -367,17 +367,15 @@ class DoubleConvLayer(nn.Module):
 	def forward(self, x):
 
 		c = self.nonlin(self.conv(x))
-
 		if self.squeeze is not None:
 			c = self.nonlin_squeeze(self.squeeze(c))
-
 		c = self.conv2(c)
 
 		x = c+x if self.residual else c
 
 		if self.down is not None:
-			if self.nonlin2 is not None:
-				x = self.nonlin2(x)
+			if self.nonlin_down is not None:
+				x = self.nonlin_down(x)
 			x = self.down(x)
 		if self.norm is not None:
 			x = self.norm(x)
@@ -400,6 +398,9 @@ class DoubleDeconvLayer(nn.Module):
 
 		if internal_channels is None:
 			internal_channels = out_channels
+			
+		self.up = util.get_upsample(up_type, factor, chn=in_channels)
+		self.nonlin_up = util.get_nonlinearity(nonlin) if up_type == 'conv' else None
 
 		self.conv = nn.Conv2d(in_channels, internal_channels, kernel_size=2, padding=1, stride=1)
 		self.nonlin = util.get_nonlinearity(nonlin)
@@ -414,29 +415,27 @@ class DoubleDeconvLayer(nn.Module):
 
 		self.residual = residual
 
-		self.nonlin2 = util.get_nonlinearity(nonlin) if up_type == 'conv' else None
-		self.down = util.get_pooling(down_type, factor, chn=out_channels)
-
 		self.norm = util.get_normalization(norm_type, out_channels)
 		if 'default' == output_nonlin:
 			output_nonlin = nonlin
 		self.out_nonlin = util.get_nonlinearity(output_nonlin)
 
 	def forward(self, x, y=None):
+		
+		if self.up is not None:
+			x = self.up(x)
+			if self.nonlin_up is not None:
+				x = self.nonlin_up(x)
 
 		c = self.nonlin(self.conv(x))
-
 		if self.squeeze is not None:
 			c = self.nonlin_squeeze(self.squeeze(c))
-
 		c = self.conv2(c)
 
-		x = c + x if self.residual else c
+		x = c+x if self.residual else c
+		if y is not None:
+			x += y
 
-		if self.down is not None:
-			if self.nonlin2 is not None:
-				x = self.nonlin2(x)
-			x = self.down(x)
 		if self.norm is not None:
 			x = self.norm(x)
 		if self.out_nonlin is not None:

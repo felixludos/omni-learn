@@ -153,6 +153,19 @@ def get_pooling(down_type, factor, chn=None):
 
 	raise Exception('unknown pool type: {}'.format(down_type))
 
+
+
+def get_upsample(up_type, factor, chn=None):
+	if factor == 1:
+		return None
+
+	if up_type == 'conv':
+		assert chn is not None
+		return nn.ConvTranspose2d(chn, chn, kernel_size=factor, stride=factor)
+	else:
+		return nn.Upsample(scale_factor=2, mode=up_type)
+
+
 #####################
 # Randomness and Noise
 #####################
