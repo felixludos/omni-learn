@@ -118,7 +118,7 @@ class Optimizable(Recordable):
 	def set_optim(self, optim_info=None):
 
 		optim = None
-		if optim_info is None: # aggregate optimizers of children
+		if optim_info is None and 'optim_type' in optim_info: # aggregate optimizers of children
 			sub_optims = {}
 			for name, child in self.named_children():
 				if isinstance(child, Optimizable) and child.optim is not None:
@@ -168,23 +168,21 @@ class Schedulable(Optimizable):
 
 	def set_scheduler(self, info=None):
 		assert self.optim is not None, 'no optim to schedule'
-		if info is None:
+		sch = None
+		if info is not None and 'scheduler_type' in info:
+			sch = util.default_create_scheduler(self.optim, info)
+		else:
 			sub_sch = {}
 			for name, child in self.named_children():
 				if isinstance(child, Schedulable) and child.scheduler is not None:
 					sub_sch[name] = child.scheduler
 
-			if len(sub_sch) == 0:
-				sch = None
-			else:
-
+			if len(sub_sch):
 				# if len(sub_sch) == 1:
 				# 	sch = next(iter(sub_sch.values()))
 				# else:
 				# 	sch = util.Complex_Scheduler(**sub_sch)
 				sch = util.Complex_Scheduler(**sub_sch)
-		else:
-			sch = util.default_create_scheduler(self.optim, info)
 
 		self.scheduler = sch
 

@@ -113,10 +113,8 @@ class Double_Encoder(fm.Encodable, fm.Trainable_Model):
 
 		self.tail = tail
 
-		if 'optim_type' in A:
-			self.set_optim(A)
-		if 'scheduler_type' in A:
-			self.set_sch
+		self.set_optim(A)
+		self.set_scheduler(A)
 	
 	def encode(self, x):
 		return self(x)
