@@ -147,6 +147,10 @@ class Lp_Normalization(nn.Module):
 		return F.normalize(x, p=self.p, dim=self.dim, eps=self.eps)
 
 def get_normalization(norm, num, **kwargs):
+
+	if not isinstance(norm, str):
+		return norm
+
 	if norm == 'batch':
 		return nn.BatchNorm2d(num, **kwargs)
 	if norm == 'instance':
@@ -159,6 +163,9 @@ def get_normalization(norm, num, **kwargs):
 	raise Exception('unknown norm type: {}'.format(norm))
 
 def get_pooling(down_type, factor, chn=None):
+	if not isinstance(down_type, str):
+		return down_type
+
 	if factor == 1:
 		return None
 
@@ -173,6 +180,9 @@ def get_pooling(down_type, factor, chn=None):
 	raise Exception('unknown pool type: {}'.format(down_type))
 
 def get_upsample(up_type, factor, chn=None):
+	if not isinstance(up_type, str):
+		return up_type
+
 	if factor == 1:
 		return None
 

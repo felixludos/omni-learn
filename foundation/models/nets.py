@@ -130,7 +130,7 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 
 		return q
 
-class Double_Decoder(fm.Decodable, fm.Trainable_Model):
+class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
 
 		out_shape = A.pull('out_shape', '<>dout')
@@ -142,7 +142,7 @@ class Double_Decoder(fm.Decodable, fm.Trainable_Model):
 		factors = A.pull('factors', 2)
 		try:
 			len(factors)
-		except AttributeError:
+		except TypeError:
 			factors = [factors]
 		if len(factors) != len(channels):
 			factors = factors * len(channels)
@@ -151,7 +151,7 @@ class Double_Decoder(fm.Decodable, fm.Trainable_Model):
 		internal_channels = A.pull('internal_channels', [None] * len(channels))
 		try:
 			len(internal_channels)
-		except AttributeError:
+		except TypeError:
 			internal_channels = [internal_channels]
 		if len(internal_channels) != len(channels):
 			internal_channels = internal_channels * len(channels)
@@ -159,7 +159,7 @@ class Double_Decoder(fm.Decodable, fm.Trainable_Model):
 		squeeze = A.pull('squeeze', [False] * len(channels))
 		try:
 			len(squeeze)
-		except AttributeError:
+		except TypeError:
 			squeeze = [squeeze]
 		if len(squeeze) != len(channels):
 			squeeze = squeeze * len(channels)
@@ -186,16 +186,14 @@ class Double_Decoder(fm.Decodable, fm.Trainable_Model):
 
 		latent_dim = A.pull('latent_dim', '<>din')
 		if 'head' in A:
-			set_nonlin = True
 			A.head.din = latent_dim
 			A.head.dout = din
+			A.head.output_nonlin = nonlin
 			head = A.pull('head')
 		elif latent_dim != dout:
-			set_nonlin = True
 			assert len(dout) == 3, 'Must specify image size to transform to {}'.format(latent_dim)
 			head = make_MLP(input_dim=latent_dim, output_dim=din, output_nonlin=nonlin)
 		else:
-			set_nonlin = False
 			head = None
 
 		din = latent_dim
@@ -220,8 +218,8 @@ class Double_Decoder(fm.Decodable, fm.Trainable_Model):
 			)
 		layers.append(
 			layerslib.DoubleDeconvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(i_factors),
-			                          up_type=up_type, norm_type=norm_type if set_nonlin else output_norm_type,
-			                          nonlin=nonlin, output_nonlin=nonlin if set_nonlin else output_nonlin,
+			                          up_type=up_type, norm_type=output_norm_type,
+			                          nonlin=nonlin, output_nonlin=output_nonlin,
 			                          internal_channels=next(i_internal_channels), squeeze=next(i_squeeze),
 			                          residual=residual,
 			                          )

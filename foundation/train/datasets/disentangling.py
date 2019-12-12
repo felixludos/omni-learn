@@ -38,7 +38,7 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 
 			self.meta = _rec_decode(data['metadata'][()])
 
-			images = torch.from_numpy(data['imgs']).float().unsqueeze(1)
+			images = torch.from_numpy(data['imgs']).unsqueeze(1)
 
 			if label_type is not None:
 				if label_type == 'values':
@@ -55,9 +55,10 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 		return len(self.images)
 
 	def __getitem__(self, item):
+		imgs = self.images[item].float()
 		if self.labeled:
-			return self.images[item], self.labels[item]
-		return self.images[item],
+			return imgs, self.labels[item]
+		return imgs,
 
 
 register_dataset('dsprites', dSprites)
@@ -127,7 +128,7 @@ class CelebA(Testable_Dataset, Info_Dataset):
 			din = (3, 256, 256)
 		else:
 			resize = None
-			
+
 		if label_type is None:
 			dout = din
 		elif label_type == 'attr':
