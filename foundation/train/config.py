@@ -331,6 +331,9 @@ class Config(util.NS): # TODO: allow adding aliases
 
 		return val
 
+	def __str__(self):
+		return super().__repr__()
+
 	def export(self, path=None):
 
 		data = yamlify(self)
@@ -348,4 +351,5 @@ class Config(util.NS): # TODO: allow adding aliases
 		return self.contains_nodefault(item) \
 			or (not super().__contains__(item)
 				and self._parent_obj_for_defaults is not None
-				and item[0] != '_')
+				and item[0] != '_'
+			    and item in self._parent_obj_for_defaults)

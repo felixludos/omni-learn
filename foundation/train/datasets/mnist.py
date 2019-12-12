@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import torch
+from torch.nn import functional as F
 import torchvision
 
 from ... import util
@@ -13,10 +14,13 @@ from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Da
 class MNIST(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, util.Simple_Child):
 
 	def __init__(self, dataset=None, dataroot=None, download=True, label=True, label_attr='targets',
-	             train=True, din=(1,28,28), dout=10,
+	             train=True, din=(1,28,28), dout=10, resize=True,
 	             **kwargs):
 
 		assert dataset is not None or dataroot is not None, 'no dataset to use/load'
+
+		if resize:
+			din = (1, 32, 32)
 
 		super().__init__(din=din, dout=dout if label else din, train=train, _parent='dataset')
 
@@ -26,6 +30,7 @@ class MNIST(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, u
 
 		self.dataset = dataset
 		self.labeled = label
+		self.resize = resize
 
 		images = self.dataset.data
 		if isinstance(images, np.ndarray):
@@ -46,52 +51,59 @@ class MNIST(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, u
 		return len(self.dataset)
 
 	def __getitem__(self, item):
+		img = self.images[item]
+		if self.resize:
+			if img.ndimension() == 3:
+				img = img.unsqueeze(0)
+			img = F.interpolate(img, (32, 32), mode='bilinear').squeeze(0)
 		if self.labeled:
-			return self.images[item], self.labels[item]
-		return self.images[item]
+			return img, self.labels[item]
+		return img
 
 register_dataset('mnist', MNIST)
 
 
 class KMNIST(MNIST):
 
-	def __init__(self, dataroot, train=True, download=True, label=True, **kwargs):
+	def __init__(self, dataroot, train=True, download=True, label=True, resize=True, **kwargs):
 		dataset = torchvision.datasets.KMNIST(os.path.join(dataroot, 'kmnist'),
 		                                      train=train, download=download, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label)
+		super().__init__(dataset=dataset, train=train, label=label, resize=resize)
 
 register_dataset('kmnist', KMNIST)
 
 
 class FashionMNIST(MNIST):
 
-	def __init__(self, dataroot, train=True, download=True, label=True, **kwargs):
+	def __init__(self, dataroot, train=True, download=True, label=True, resize=True, **kwargs):
 		dataset = torchvision.datasets.FashionMNIST(os.path.join(dataroot, 'fmnist'),
 		                                            train=train, download=download, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label)
+		super().__init__(dataset=dataset, train=train, label=label, resize=resize)
 
 register_dataset('fmnist', FashionMNIST)
 
 
 class EMNIST(MNIST):
 
-	def __init__(self, dataroot, train=True, download=True, label=True, split='letters', **kwargs):
+	def __init__(self, dataroot, train=True, download=True, label=True, split='letters', resize=True, **kwargs):
 		dataset = torchvision.datasets.EMNIST(os.path.join(dataroot, 'emnist'), split=split,
 		                                      train=train, download=download, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label, dout=26)
+		dataset.targets -= 1 # targets use 1-based indexing :(
+
+		super().__init__(dataset=dataset, train=train, label=label, dout=26, resize=resize)
 
 register_dataset('emnist', EMNIST)
 
 
 class SVHN(MNIST):
-	def __init__(self, dataroot, train=True, download=True, label=True, split='letters', **kwargs):
+	def __init__(self, dataroot, train=True, download=True, label=True, **kwargs):
 		dataset = torchvision.datasets.SVHN(os.path.join(dataroot, 'svhn'), split='train' if train else 'test',
 		                                      download=download, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label, din=(3,32,32), label_attr='labels')
+		super().__init__(dataset=dataset, train=train, label=label, din=(3,32,32), label_attr='labels', resize=False)
 
 register_dataset('svhn', SVHN)
 
@@ -103,7 +115,7 @@ class CIFAR(MNIST):
 		dataset = cls(os.path.join(dataroot, 'cifar'), train=train,
 		                                    download=download, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label, din=(3, 32, 32), dout=classes)
+		super().__init__(dataset=dataset, train=train, label=label, din=(3, 32, 32), dout=classes, resize=False)
 
 		self.images = self.images.permute(0,3,1,2).contiguous()
 

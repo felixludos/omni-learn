@@ -1,0 +1,31 @@
+parents: ['base']
+
+name: 'test-cmd'
+
+output:
+    save_freq: 1
+
+dataset:
+    name: 'mnist'
+
+#	kwargs.dataroot = '../../local_data'
+    kwargs:
+        download: false
+
+    batch_size: 512
+
+    val_split: 0.166666
+
+training:
+    epochs: 3
+
+model:
+    _type: 'model'
+
+    nonlin: 'elu'
+
+    net:
+        _type: 'mlp'
+        hidden_fc: [300]
+
+

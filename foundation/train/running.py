@@ -45,7 +45,7 @@ def run_full(A, get_data, get_model, get_name=None):
 	A, (*datasets, testset), model, ckpt = load(path=path, A=A, mode='train',
 	                                            load_last=True, # load will load the best, rather than last
 	                                              get_model=get_model, get_data=get_data,
-	                                              return_args=True, return_ckpt=True, strict='load' not in A)
+	                                              return_args=True, return_ckpt=True, )#strict='load' not in A)
 
 	###################
 	# Logging
@@ -241,12 +241,13 @@ def run_full(A, get_data, get_model, get_name=None):
 		records['test_epoch'] = records['epoch']
 
 		if A.training.track_best and 'save_dir' in A.output:
-			model, ckpt = load(path=A.output.save_dir, mode='test', get_model=get_model,
-			                return_args=False, return_ckpt=True)
-			print('Loaded best model, trained for {} epochs'.format(ckpt['records']['epoch']))
-
-			records['test_epoch'] = ckpt['records']['epoch']
-
+			try:
+				model, ckpt = load(path=A.output.save_dir, mode='test', get_model=get_model, get_data=None,
+				                return_args=False, return_ckpt=True, force_load_model=True)
+				print('Loaded best model, trained for {} epochs'.format(ckpt['records']['epoch']))
+				records['test_epoch'] = ckpt['records']['epoch']
+			except FileNotFoundError:
+				print('Using current model for testing')
 
 		if testset is None:
 			testset = get_data(A, mode='test')

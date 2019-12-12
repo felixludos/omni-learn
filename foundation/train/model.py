@@ -42,13 +42,16 @@ class MissingConfigError(Exception):
 #
 # register_model('list', _component_list)
 
+register_model('double-enc', models.Double_Encoder)
+register_model('double-dec', models.Double_Decoder)
+
 
 def _create_mlp(info): # mostly for selecting/formatting args (and creating sub components!)
 
 	kwargs = {
 		'input_dim': info.pull('input_dim', '<>din'),
 		'output_dim': info.pull('output_dim', '<>dout'),
-		'hidden_dims': info.pull('hidden_fc', []),
+		'hidden_dims': info.pull('hidden_dims', '<>hidden_fc', []),
 		'nonlin': info.pull('nonlin', 'prelu'),
 		'output_nonlin': info.pull('output_nonlin', None),
 	}

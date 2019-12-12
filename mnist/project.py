@@ -21,15 +21,13 @@ from foundation import data
 
 MY_PATH = os.path.dirname(os.path.abspath(__file__))
 
-train.register_config('model', os.path.join(MY_PATH, 'config', 'test.yaml'))
-train.register_config('pycharm', os.path.join(MY_PATH, 'config', 'pycharm.yaml'))
+train.register_config_dir(os.path.join(MY_PATH, 'config'))
 
-class Model(fd.Visualizable, fd.Trainable_Model):
+class Model(fd.Visualizable, fd.Schedulable, fd.Trainable_Model):
 	def __init__(self, info):
 
 		net = info.pull('net')
 		criterion = info.pull('criterion', 'cross-entropy')
-		optim_info = info.pull('optim', None)
 
 		super().__init__(net.din, net.dout)
 
@@ -38,8 +36,8 @@ class Model(fd.Visualizable, fd.Trainable_Model):
 
 		self.stats.new('accuracy', 'confidence')
 
-		if optim_info is not None:
-			self.set_optim(optim_info)
+		self.set_optim()
+		self.set_scheduler()
 
 
 	def forward(self, x):

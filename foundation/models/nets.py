@@ -22,16 +22,16 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 		factors = A.pull('factors', 2)
 		try:
 			len(factors)
-		except AttributeError:
+		except TypeError:
 			factors = [factors]
 		if len(factors) != len(channels):
 			factors = factors*len(channels)
-		total_factor = np.product(factors)
+		total_factor = int(np.product(factors))
 
 		internal_channels = A.pull('internal_channels', [None] * len(channels))
 		try:
 			len(internal_channels)
-		except AttributeError:
+		except TypeError:
 			internal_channels = [internal_channels]
 		if len(internal_channels) != len(channels):
 			internal_channels = internal_channels * len(channels)
@@ -39,7 +39,7 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 		squeeze = A.pull('squeeze', [False] * len(channels))
 		try:
 			len(squeeze)
-		except AttributeError:
+		except TypeError:
 			squeeze = [squeeze]
 		if len(squeeze) != len(channels):
 			squeeze = squeeze * len(channels)
@@ -146,7 +146,7 @@ class Double_Decoder(fm.Decodable, fm.Trainable_Model):
 			factors = [factors]
 		if len(factors) != len(channels):
 			factors = factors * len(channels)
-		total_factor = np.product(factors)
+		total_factor = int(np.product(factors))
 
 		internal_channels = A.pull('internal_channels', [None] * len(channels))
 		try:

@@ -133,11 +133,30 @@ def get_nonlinearity(nonlinearity, dim=1, inplace=True):
 	else:
 		assert False, "Unknown nonlin type: " + nonlinearity
 
+class Lp_Normalization(nn.Module):
+	def __init__(self, p=2, dim=1, eps=1e-8):
+		super().__init__()
+		self.p = p
+		self.dim = dim
+		self.eps = eps
+
+	def extra_repr(self):
+		return 'p={}'.format(self.p)
+
+	def forward(self, x):
+		return F.normalize(x, p=self.p, dim=self.dim, eps=self.eps)
+
 def get_normalization(norm, num, **kwargs):
 	if norm == 'batch':
 		return nn.BatchNorm2d(num, **kwargs)
 	if norm == 'instance':
 		return nn.InstanceNorm2d(num, **kwargs)
+	if norm == 'l1':
+		return Lp_Normalization(1)
+	if norm == 'l2':
+		return Lp_Normalization(2)
+
+	raise Exception('unknown norm type: {}'.format(norm))
 
 def get_pooling(down_type, factor, chn=None):
 	if factor == 1:
@@ -152,8 +171,6 @@ def get_pooling(down_type, factor, chn=None):
 		return nn.AvgPool2d(factor, factor)
 
 	raise Exception('unknown pool type: {}'.format(down_type))
-
-
 
 def get_upsample(up_type, factor, chn=None):
 	if factor == 1:

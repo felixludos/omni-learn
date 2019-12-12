@@ -7,8 +7,8 @@ import torch
 from .. import util
 
 from .config import get_config
-# from .data import default_load_data
-# from .model import default_create_model
+from .data import default_load_data
+from .model import default_create_model
 
 
 
@@ -60,15 +60,16 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 
 
 
-def load(path=None, A=None, get_model=None, get_data=None, mode='train',
-         load_state_dict=True, load_last=False, return_args=True, return_ckpt=False, strict=True):
+def load(path=None, A=None, get_model='default', get_data='default', mode='train',
+         load_state_dict=True, load_last=False, force_load_model=False,
+         return_args=False, return_ckpt=False):
 	assert path is not None or A is not None, 'must provide either path to checkpoint or args'
-	assert get_model is not None or get_data is not None, 'nothing to load'
+	assert get_model is not None or get_data is not None or return_ckpt, 'nothing to load'
 
-	# if get_model is 'default':
-	# 	get_model = default_create_model
-	# if get_data is 'default':
-	# 	get_data = default_load_data
+	if get_model is 'default':
+		get_model = default_create_model
+	if get_data is 'default':
+		get_data = default_load_data
 
 	checkpoint = None
 	if path is not None:
@@ -77,6 +78,8 @@ def load(path=None, A=None, get_model=None, get_data=None, mode='train',
 		if os.path.isfile(ckptpath):
 			checkpoint = torch.load(ckptpath)
 			config_dir = os.path.dirname(ckptpath)
+		elif force_load_model:
+			raise FileNotFoundError
 		else:
 			config_dir = ckptpath
 		config_name = 'config.yml' if 'config.yml' in os.listdir(config_dir) else 'config.tml'

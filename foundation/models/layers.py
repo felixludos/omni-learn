@@ -338,7 +338,7 @@ class DoubleConvLayer(nn.Module):
 
 		assert factor in {1,2}, 'factor {} not supported'.format(factor)
 		assert nonlin is not None, 'not deep'
-		assert factor == 1 or not residual, 'residual requires same size after conv2'
+		# assert factor == 1 or not residual, 'residual requires same size after conv2'
 
 		if internal_channels is None:
 			internal_channels = out_channels
@@ -397,7 +397,7 @@ class DoubleDeconvLayer(nn.Module):
 
 		assert factor in {1, 2}, 'factor {} not supported'.format(factor)
 		assert nonlin is not None, 'not deep'
-		assert factor == 1 or not residual, 'residual requires same size after conv2'
+		# assert factor == 1 or not residual, 'residual requires same size after conv2'
 
 		if internal_channels is None:
 			internal_channels = out_channels

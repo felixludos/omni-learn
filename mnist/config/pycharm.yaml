@@ -1,4 +1,4 @@
-parents: ['model']
+parents: ['test']
 
 name: 'test-pycharm'
 

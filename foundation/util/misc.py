@@ -49,7 +49,7 @@ class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attr
 		return d
 
 	def __repr__(self):
-		return 'NS({})'.format(', '.join(['{}:{}'.format(repr(k), repr(v)) for k,v in self.items()]))
+		return '{}{}{}'.format('<{', ', '.join(['{}:{}'.format(repr(k), repr(v)) for k,v in self.items()]), '}>')
 
 
 

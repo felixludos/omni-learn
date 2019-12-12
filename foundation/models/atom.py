@@ -37,7 +37,7 @@ def make_MLP(input_dim, output_dim, hidden_dims=[],
 		output_dim = int(np.product(output_dim))
 
 	nonlins = [nonlin] * len(hidden_dims) + [output_nonlin]
-	hidden_dims = [input_dim] + hidden_dims + [output_dim]
+	hidden_dims = input_dim, *hidden_dims, output_dim
 
 	layers = []
 	if flatten:

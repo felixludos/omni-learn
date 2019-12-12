@@ -195,7 +195,7 @@ class Schedulable(Optimizable):
 			state_dict['scheduler'] = self.scheduler.state_dict()
 		return state_dict
 
-	def schedule_step(self, val=None):
+	def scheduler_step(self, val=None):
 		print('LR Scheduler stepping')
 		if self.scheduler.req_loss:
 			self.scheduler.step(val)
@@ -207,7 +207,7 @@ class Schedulable(Optimizable):
 			if self.scheduler.req_loss:
 				if mode == 'val':
 					assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
-					self.schedule_step(stats['loss'].avg.item())
+					self.scheduler_step(stats['loss'].avg.item())
 			elif mode == 'train':
 				self.scheduler_step()
 		super().post_epoch(mode, epoch, stats)

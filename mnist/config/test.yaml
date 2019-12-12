@@ -3,29 +3,55 @@ parents: ['base']
 name: 'test-cmd'
 
 output:
-    save_freq: 1
+    save_freq: -1
 
 dataset:
-    name: 'mnist'
+    name: 'kmnist'
 
-#	kwargs.dataroot = '../../local_data'
     kwargs:
         download: false
+        label: True
 
-    batch_size: 512
+    batch_size: 128
 
     val_split: 0.166666
 
 training:
-    epochs: 3
+    epochs: 5
 
 model:
     _type: 'model'
 
     nonlin: 'elu'
 
+    norm_type: 'l2'
+
+#    norm_type: '_x_'
+
     net:
-        _type: 'mlp'
-        hidden_fc: [300]
+        _type: 'double-enc'
+
+        channels: [32, 32, 32, 32]
+
+#        internal_channels: 128
+#        residual: True
+#        squeeze: True
+
+
+#        down_type: 'avg'
+
+
+        tail:
+            _type: 'mlp'
+            hidden_dims: [64, 32]
+
+    optim_type: 'adam'
+    lr: 1.e-3
+    weight_decay: 1.e-4
+#    momentum: 0.9
+
+#    scheduler_type: step
+#    scheduler_step: 2
+#    scheduler_decay: 0.4
 
 
