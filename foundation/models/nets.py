@@ -247,6 +247,52 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 
 		return x
 
+def Normal_Distribized(cls):
+	assert issubclass(cls, fm.Model)
+	class Normal_Distrib_Model(cls):
+
+		def __init__(self, A):
+
+			dout = A.pull('latent_dim', '<>dout')
+
+			if isinstance(dout, tuple):
+				cut, *rest = dout
+				full_dout = cut*2, *rest
+			else:
+				cut = dout
+				full_dout = dout*2
+
+			A.latent_dim = full_dout
+
+			min_log_std = A.pull('min_log_std', None)
+
+			super().__init__(A)
+
+			self.cut = cut
+
+			self.latent_dim = dout
+			self.dout = dout
+			self.full_dout = full_dout
+
+			self.min_log_std = min_log_std
+
+		def forward(self, x):
+
+			q = super().forward(x)
+
+			mu, logsigma = q.narrow(1, 0, self.cut), q.narrow(1, self.cut, self.cut)
+
+			if self.min_log_std is not None:
+				logsigma = logsigma.clamp(min=self.min_log_std)
+
+			return Normal(loc=mu, scale=logsigma.exp())
+
+	return Normal_Distrib_Model
+
+# Normal_Distrib_Double_Encoder = Normal_Distribized(Double_Encoder)
+# Normal_Distrib_Double_Decoder = Normal_Distribized(Double_Decoder)
+
+
 class Conv_Encoder(fm.Encodable, fm.Model):
 
 	def __init__(self, in_shape, latent_dim=None, feature_dim=None,

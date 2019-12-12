@@ -374,6 +374,9 @@ def run_epoch(model, loader, A, records, mode='test',
 		time_stats.update('viz', time.time() - start)
 		start = time.time()
 
+		del out
+		torch.cuda.empty_cache()
+
 	if not silent:
 		loss_info = ' Loss: {:.4f} ({:.4f})'.format(stats['loss'].val.item(), stats['loss'].smooth.item()) \
 			if stats['loss'].count > 0 else ''

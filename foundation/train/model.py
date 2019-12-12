@@ -14,10 +14,20 @@ def register_model(name, create_fn):
 	assert name not in _reserved_names, '{} is reserved'.format(name)
 	_model_registry[name] = create_fn
 
+_mod_registry = {}
+def register_modifier(name, mod_fn):
+	assert name not in _reserved_names, '{} is reserved'.format(name)
+	_mod_registry[name] = mod_fn
+
 def create_component(info):
 	assert info._type in _model_registry, 'Unknown model type (have you registered it?): {}'.format(info._type)
 
 	create_fn = _model_registry[info._type]
+
+	if '_mod' in info: # TODO: allow list of mods
+		mod_fn = _mod_registry[info._mod]
+		create_fn = mod_fn(create_fn)
+
 	model = create_fn(info)
 	return model
 
@@ -44,6 +54,8 @@ class MissingConfigError(Exception):
 
 register_model('double-enc', models.Double_Encoder)
 register_model('double-dec', models.Double_Decoder)
+
+register_modifier('normal', models.Normal_Distribized)
 
 
 def _create_mlp(info): # mostly for selecting/formatting args (and creating sub components!)

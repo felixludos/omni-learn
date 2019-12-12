@@ -63,26 +63,28 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 
 register_dataset('dsprites', dSprites)
 
-class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset):
+class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset):
 
-	def __init__(self, dataroot=None, images=None, labels=None, din=(3, 64, 64), dout=None, load_memory=True):
+	def __init__(self, dataroot=None, images=None, labels=None, din=(3, 64, 64), dout=None, load_memory=True,
+	             train=True):
 		assert images is not None or dataroot is not None, 'nothing to use/load'
 
 		if not load_memory:
 			raise NotImplementedError
 
-		super().__init__(din=din, dout=din if labels is None else dout)
+		super().__init__(din=din, dout=din if labels is None else dout, train=train)
 
 		if images is None:
 
-			data = hf.File(os.path.join(dataroot, '3dshapes', '3dshapes.h5'), 'r')
+			with hf.File(os.path.join(dataroot, '3dshapes', '3dshapes_{}.h5'.format(
+					'train' if self.train else 'test')), 'r') as data:
 
-			images = data['images']
-			images = torch.from_numpy(images[()]).permute(0,3,1,2)#.float().div(255)
+				images = data['images']
+				images = torch.from_numpy(images[()]).permute(0,3,1,2)#.float().div(255)
 
-			if labels is not None:
-				labels = data['labels']
-				labels = torch.from_numpy(labels[()]).float()
+				if labels is not None:
+					labels = data['labels']
+					labels = torch.from_numpy(labels[()]).float()
 
 		self.register_buffer('images', images)
 		self.labeled = labels is not None
