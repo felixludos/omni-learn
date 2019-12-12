@@ -79,7 +79,10 @@ def load_single_config(data, process=True, parents=None): # data can either be a
 	return data
 
 
-def get_config(path, parent_defaults=True): # Top level function
+def get_config(path=None, parent_defaults=True): # Top level function
+
+	if path is None:
+		return Config()
 
 	parents = {}
 

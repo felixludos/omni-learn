@@ -3,6 +3,9 @@
 import os
 import inspect
 import torch
+from torch import nn
+
+from .. import util
 # from ..models import unsup
 from .. import framework as fm
 from .. import models
@@ -72,6 +75,97 @@ def _create_mlp(info): # mostly for selecting/formatting args (and creating sub 
 
 	return model
 register_model('mlp', _create_mlp)
+
+
+class Stage_Model(fm.Schedulable, fm.Trainable_Model):
+	def __init__(self, A):
+		stages = A.pull('stages')
+
+		din = A.pull('din')
+		dout = A.pull('dout')
+
+		criterion_info = A.pull('criterion', None)
+
+		super().__init__(din, dout)
+
+		self.stages = nn.ModuleList(self._process_stages(stages))
+
+		self.criterion = None
+		if criterion_info is not None:
+			self.criterion = util.get_loss_type(criterion_info) \
+				if isinstance(criterion_info, str) else util.get_loss_type(**criterion_info)  # TODO: automate
+
+		self.set_optim(A)
+		self.set_scheduler(A)
+
+
+	def _create_stage(self, stage):
+		return create_component(stage)
+	def _process_stages(self, stages):
+
+		N = len(stages)
+
+		assert N > 0, 'no stages provided'
+
+		din = self.din
+
+		sub = []
+		for i, stage in enumerate(stages):
+
+			stage.din = din
+			stage = self._create_stage(stage)
+
+			sub.append(stage)
+			din = stage.dout
+
+		assert din == self.dout, 'dins and douts not set correctly: {} vs {}'.format(din, self.dout)
+
+		return sub
+
+	def forward(self, x):
+		q = x
+		for stage in self.stages:
+			q = stage(q)
+		return q
+
+
+	def _step(self, batch, out=None):
+		if out is None:
+			out = util.TensorDict()
+
+		# compute loss
+
+		x = batch[0]
+		if len(batch) == 2:
+			y = batch[1]
+		else:
+			assert len(batch) == 1, 'Cant figure out how the batch is setup (you will have to implement your own _step)'
+			y = x
+
+		out.x, out.y = x, y
+
+		pred = self(x)
+		out.pred = pred
+
+		loss = self.criterion(pred, y)
+		out.loss = loss
+
+		if isinstance(self, fm.Regularizable):
+			reg = self.regularize(out)
+			loss += reg
+
+		out.loss = loss
+
+		if self.train_me():
+			self.optim.zero_grad()
+			loss.backward()
+			self.optim.step()
+
+		return out
+
+register_model('stage', Stage_Model)
+
+
 
 
 class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):

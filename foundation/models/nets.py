@@ -10,6 +10,7 @@ from .. import framework as fm
 from .atom import *
 from .layers import *
 
+
 class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
 		
