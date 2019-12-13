@@ -79,15 +79,17 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 				num = os.environ['JOB_NUM']
 
 				terms = []
-				if 'model_type' in config.info:
-					terms.append(config.info.model_type)
-				elif '_type' in config.model:
-					terms.append(config.model._type)
 
 				if 'dataset_type' in config.info:
 					terms.append(config.info.dataset_type)
 				elif 'name' in config.dataset:
 					terms.append(config.dataset.name)
+
+				if 'model_type' in config.info:
+					terms.append(config.info.model_type)
+				elif '_type' in config.model:
+					terms.append(config.model._type)
+
 
 				autoname = '-'.join(terms) if len(terms) else 'run'
 
