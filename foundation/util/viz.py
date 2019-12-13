@@ -31,7 +31,7 @@ def fig_to_rgba(fig):
 	return buf
 
 ###################
-# Flow visualization (only 2d) - using yiq
+# Flow visualization - using yiq
 
 _yiq_to_rgb = torch.FloatTensor([[1, 0.956, 0.621],
 						[1, -0.272, -0.647],
