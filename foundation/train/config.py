@@ -89,20 +89,26 @@ def get_config(path=None, parent_defaults=True): # Top level function
 	root = load_single_config(path, parents=parents)
 
 	if len(parents): # topo sort parents
-
 		def _get_parents(n):
 			if 'parents' in n:
 				return [parents[recover_path(p)] for p in n.parents]
 			return []
-			if n not in parents:
-				n = recover_path(n)
-			return parents[n].parents if 'parents' in parents[n] else []
 
 		order = util.toposort(root, _get_parents)
+
+		# for analysis, record the history of all loaded parents
+		pnames = []
+		for p in order:
+			if 'parents' in p:
+				for prt in p.parents:
+					if len(pnames) == 0 or prt != pnames[-1]:
+						pnames.append(prt)
 
 		root = order.pop()
 		while len(order):
 			root.update(order.pop(), parent_defaults=parent_defaults)
+
+		root.info.history = pnames
 
 	return root
 

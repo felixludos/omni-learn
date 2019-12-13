@@ -263,16 +263,20 @@ def Normal_Distribized(cls):
 				cut = dout
 				full_dout = dout*2
 
-			A.latent_dim = full_dout
+			A.dout = full_dout
+			A.latent_dim = full_dout # temporarily change
 
 			min_log_std = A.pull('min_log_std', None)
 
 			super().__init__(A)
 
-			self.cut = cut
-
+			# reset config to correct terms
+			A.latent_dim = dout
+			A.dout = dout
 			self.latent_dim = dout
 			self.dout = dout
+
+			self.cut = cut
 			self.full_dout = full_dout
 
 			self.min_log_std = min_log_std

@@ -20,9 +20,14 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 		mode = 'cmd'
 		os.environ['FOUNDATION_RUN_MODE'] = mode
 		print('WARNING: $FOUNDATION_RUN_MODE is not set, using default: {}'.format(mode))
+	mode = os.environ['FOUNDATION_RUN_MODE']
 
-	else:
-		mode = os.environ['FOUNDATION_RUN_MODE']
+	if 'FOUNDATION_TESTING' not in os.environ:
+		testing = '1'
+		os.environ['FOUNDATION_TESTING'] = testing
+		print('WARNING: $FOUNDATION_TESTING is not set, using default {}'.format(testing))
+	testing = os.environ['FOUNDATION_TESTING'] == '1'
+
 
 	assert mode in {'cmd', 'jupyter', 'cluster', 'pycharm'}, 'Unknown run mode: {}'.format(mode)
 
@@ -33,7 +38,20 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 	with ctxt, ctxt2:
 
 		if config is None:
+
+			if testing and mode == 'cmd':
+				print('-- Inserting \'cmd\' to front of config (because of testing mode) --')
+				argv.insert(1,'cmd')
+
 			config = parse_cmd_args(argv)
+
+		if os.environ['FOUNDATION_TESTING'] == '1':
+			print('\nThis is a test run!\n')
+
+		if 'name' not in config and mode in {'cmd', 'pycharm'} and 'test_override' not in config:
+			config.name = 'test-{}'.format(mode)
+			print('Name defaulting to: {}'.format(config.name))
+
 
 		config.run_mode = mode
 
@@ -60,7 +78,20 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 				ps = os.environ['PROCESS_ID']
 				num = os.environ['JOB_NUM']
 
-				prefix = config.name if 'name' in config else 'run'
+				terms = []
+				if 'model_type' in config.info:
+					terms.append(config.info.model_type)
+				elif '_type' in config.model:
+					terms.append(config.model._type)
+
+				if 'dataset_type' in config.info:
+					terms.append(config.info.dataset_type)
+				elif 'name' in config.dataset:
+					terms.append(config.dataset.name)
+
+				autoname = '-'.join(terms) if len(terms) else 'run'
+
+				prefix = config.name if 'name' in config else autoname
 
 				config.name = '{}_{}-{}'.format(prefix, str(num).zfill(4), ID.replace('.', '-'))
 
