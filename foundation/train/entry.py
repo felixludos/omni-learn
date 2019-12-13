@@ -62,7 +62,7 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 				prefix = config.name if 'name' in config else 'run'
 
-				config.name = '{}{}_{}'.format(prefix, str(num).zfill(4), ID)
+				config.name = '{}_{}-{}'.format(prefix, str(num).zfill(4), ID.replace('.', '-'))
 
 
 			if cname in os.listdir(os.environ['JOBDIR']):
