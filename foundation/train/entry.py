@@ -60,7 +60,9 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 				ps = os.environ['PROCESS_ID']
 				num = os.environ['JOB_NUM']
 
-				config.name = 'run{}-{}_{}'.format(str(num).zfill(4), ps, ID)
+				prefix = config.name if 'name' in config else 'run'
+
+				config.name = '{}{}_{}'.format(prefix, str(num).zfill(4), ID)
 
 
 			if cname in os.listdir(os.environ['JOBDIR']):
