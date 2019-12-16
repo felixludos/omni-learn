@@ -36,7 +36,7 @@ class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attr
 			try:
 				return super().__getattribute__(key)
 			except AttributeError:
-				print('**WARNING: defaulting {}'.format(key))
+				# print('**WARNING: defaulting {}'.format(key))
 				self.__setitem__(key, self.__class__())
 				return super().__getitem__(key)
 

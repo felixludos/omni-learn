@@ -48,9 +48,9 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 			vals = [int(n.split('_')[-1].split('.')[0]) for n in ckpts]
 			if len(vals): # dir exists but no checkpoints
 				pick = 'checkpoint_{}.pth.tar'.format(max(vals))
-				print('Found {} checkpoints. Using {}'.format(len(ckpts), pick))
+				# print('Found {} checkpoints. Using {}'.format(len(ckpts), pick))
 			elif 'config.yml' in os.listdir(path):
-				print('Found 0 checkpoints. However, a config file was found')
+				# print('Found 0 checkpoints. However, a config file was found')
 				return path
 		path = os.path.join(path, pick)
 

@@ -109,6 +109,8 @@ def get_config(path=None, parent_defaults=True): # Top level function
 			root.update(order.pop(), parent_defaults=parent_defaults)
 
 		root.info.history = pnames
+		if 'parents' in root:
+			del root.parents
 
 	return root
 
@@ -263,7 +265,10 @@ class Config(util.NS): # TODO: allow adding aliases
 			item = item.split('.')
 
 		if isinstance(item, (list, tuple)):
-			return self._single_get(item[0])[item[1:]]
+			if len(item) == 1:
+				item = item[0]
+			else:
+				return self._single_get(item[0])[item[1:]]
 		return self._single_get(item)
 
 	def __setitem__(self, key, value):

@@ -7,3 +7,4 @@ from .model import *
 from .data import *
 from .setup import *
 from .entry import *
+from .analysis import *
