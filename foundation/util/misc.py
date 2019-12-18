@@ -49,8 +49,14 @@ class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attr
 		return d
 
 	def __repr__(self):
-		return '{}{}{}'.format('<{', ', '.join(['{}:{}'.format(repr(k), repr(v)) for k,v in self.items()]), '}>')
+		return '{}{}{}'.format('{{', ', '.join(['{}:{}'.format(repr(k), repr(v)) for k,v in self.items()]), '}}')
 
+
+def deep_get(tree, keys):
+	if isinstance(keys, (tuple, list)):
+		if len(keys) == 1:
+			return tree[keys[0]]
+	return deep_get(tree[keys[0]], keys[1:])
 
 
 class Simple_Child(object): # a simple wrapper that delegates __getattr__s to some parent attribute

@@ -59,6 +59,9 @@ def run_full(A, get_data, get_model, get_name=None):
 
 	logger = setup_logging(A.output)
 
+	if 'date' not in A.info and '_logged_date' in A.output:
+		A.info.date = A.output._logged_date
+
 	if ckpt is None: # novel
 		records = setup_records(A.training)
 		epoch_seed = util.gen_deterministic_seed(A.seed)

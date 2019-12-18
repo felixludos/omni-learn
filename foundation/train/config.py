@@ -125,12 +125,13 @@ class NoConfigFound(Exception):
 	def __init__(self):
 		super().__init__('Either provide a config name/path as the first argument, or set your $FOUNDATION_CONFIG environment variable to a config name/path')
 
-def parse_cmd_args(argv=None, parent_defaults=True):
+def parse_config(argv=None, parent_defaults=True):
+	# WARNING: 'argv' should not be equivalent to sys.argv here (no script name in element 0)
 
 	if argv is None:
-		argv = sys.argv
+		argv = sys.argv[1:]
 
-	argv = argv[1:]
+	# argv = argv[1:]
 
 	root = Config() # from argv
 
@@ -282,6 +283,21 @@ class Config(util.NS): # TODO: allow adding aliases
 
 		return super().__setitem__(key, value)
 
+	def __contains__(self, item):
+		if '.' in item:
+			item = item.split('.')
+
+		if isinstance(item, (tuple, list)):
+			if len(item) == 1:
+				item = item[0]
+			else:
+				return item[0] in self and item[1:] in self[item[0]]
+
+		return self.contains_nodefault(item) \
+			or (not super().__contains__(item)
+				and self._parent_obj_for_defaults is not None
+				and item[0] != '_'
+			    and item in self._parent_obj_for_defaults)
 
 	def get_nodefault(self, item):
 		val = super().__getitem__(item)
@@ -290,6 +306,11 @@ class Config(util.NS): # TODO: allow adding aliases
 		return val
 
 	def contains_nodefault(self, item):
+		# if isinstance(item, (tuple, list)):
+		# 	if len(item) == 1:
+		# 		item = item[0]
+		# 	else:
+		# 		return item[0] in self and item[1:] in self
 		if super().__contains__(item):
 			return super().__getitem__(item) != '__x__'
 		return False
@@ -361,9 +382,3 @@ class Config(util.NS): # TODO: allow adding aliases
 
 		return data
 
-	def __contains__(self, item):
-		return self.contains_nodefault(item) \
-			or (not super().__contains__(item)
-				and self._parent_obj_for_defaults is not None
-				and item[0] != '_'
-			    and item in self._parent_obj_for_defaults)

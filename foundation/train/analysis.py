@@ -1,11 +1,18 @@
 
-import sys, os
+import sys, os, shutil
 import numpy as np
 import torch
 
+from torch import multiprocessing as mp
+
 from .. import util
-from .config import get_config, Config
+from .config import get_config, Config, parse_config
 from .loading import find_checkpoint
+
+# import tensorflow as tf
+# from tensorboard import main as tb
+from tensorboard import program
+
 
 
 class Run(util.tdict):
@@ -13,7 +20,7 @@ class Run(util.tdict):
 
 class Run_Manager(object):
 
-	def __init__(self, path=None, recursive=False):
+	def __init__(self, path=None, recursive=False, tbout=None):
 
 		if path is None:
 			assert 'FOUNDATION_SAVE_DIR' in os.environ, 'no path provided, and no default save dir set'
@@ -22,13 +29,23 @@ class Run_Manager(object):
 		self.master_path = path
 		self.recursive = recursive
 
-		self._protected_keys = {'name', 'save_dir'}
+		self._protected_keys = {'name',
+		                        'save_dir'}
+		self._extended_protected_keys = {
+			'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
+		}
+
+		self.tbout = tbout
+		if self.tbout is not None:
+			util.create_dir(self.tbout)
+			print('{} is available to view runs on tensorboard'.format(self.tbout))
+		self.tb_worker = None
 
 		self.refresh()
 
-	def _collect_runs(self, path=None, load_last=True):
+	def _collect_runs(self, path=None, load_last=True, clear_info=False):
 		rootdir = self.master_path if path is None else os.path.join(self.master_path, path)
-		for name in os.listdir(rootdir):
+		for name in sorted(os.listdir(rootdir)):
 
 			run_name = name if path is None else os.path.join(path, name)
 			run_path = os.path.join(rootdir, name) if path is None else os.path.join(self.master_path, name)
@@ -40,18 +57,27 @@ class Run_Manager(object):
 						run = Run(name=run_name, path=run_path)
 						run.ckpt_path = ckpt_path
 						run.config = get_config(os.path.join(run_path, 'config.yml'))
+
+						if clear_info:
+							del run.config.info
+
+						if 'model_type' not in run.config.info:
+							run.config.info.model_type = run.config.model._type
+						if 'dataset_type' not in run.config.info:
+							run.config.info.dataset_type = run.config.dataset.name
+
 					except FileNotFoundError:
 						pass
 					else:
 						self.full_info.append(run)
 				elif self.recursive:
-					self._collect_runs(run_name, load_last=load_last)
+					self._collect_runs(run_name, load_last=load_last, clear_info=clear_info)
 
-	def refresh(self, load_last=True): # collects info from all runs
+	def refresh(self, load_last=True, clear_info=False): # collects info from all runs
 
 		self.full_info = []
 
-		self._collect_runs(load_last=load_last)
+		self._collect_runs(load_last=load_last, clear_info=clear_info)
 
 		self.run2idx = {r.name: i for i,r in enumerate(self.full_info)}
 
@@ -84,45 +110,159 @@ class Run_Manager(object):
 		self.active = self.full_info.copy()
 		return self
 
-	# def _equate(self, A, B, diffs=None):
-	# 	if isinstance(A, Config):
-	# 		return self._compare_configs(A, B, diffs=diffs)
-	# 	return A == B
+	def select(self, model=None, dataset=None):
 
-	def _compare_configs(self, base, other, diffs):
+		if model is not None:
+			self.filter(lambda r: r.config.info.model_type == model)
+		if dataset is not None:
+			self.filter(lambda r: r.config.info.dataset_type == dataset)
+		return self
+
+	def options(self, models=True, datasets=True):
+
+		out = []
+
+		if models:
+			mopts = set()
+			for run in self.active:
+				mopts.add(run.config.info.model_type)
+			out.append(mopts)
+
+		if datasets:
+			dopts = set()
+			for run in self.active:
+				dopts.add(run.config.info.dataset_type)
+			out.append(dopts)
+
+		if len(out) == 1:
+			return out[0]
+		return out
+
+	def _torun(self, x):
+		if not isinstance(x, Run):
+			x = self.getrun(x) if isinstance(x, str) else self[x]
+		return x
+
+	def _compare_configs(self, base, other, diffs, protected_keys=None):
+		if protected_keys is None:
+			protected_keys = self._protected_keys
 
 		for k,v in base.items():
 
-			if k in self._protected_keys:
+			if k in protected_keys:
 				pass
 			elif k not in other:
 				diffs[k] = '__removed__'
 			elif isinstance(v, Config):
-				self._compare_configs(v, other[k], diffs=diffs[k])
+				self._compare_configs(v, other[k], diffs=diffs[k], protected_keys=protected_keys)
 				if len(diffs[k]) == 0:
 					del diffs[k]
 			elif v != other[k]:
 				diffs[k] = other[k]
 
 		for k,v in other.items():
-			if k not in self._protected_keys and k not in base:
+			if k not in protected_keys and k not in base:
 				diffs[k] = v
 
-	def compare(self, base, other, bi=False):
-		if not isinstance(base, Run):
-			base = self.getrun(base) if isinstance(base, str) else self[base]
-		if not isinstance(other, Run):
-			other = self.getrun(other) if isinstance(other, str) else self[other]
+	def compare(self, base, other=None, bi=False):
+		# vs_default = False
+		base = self._torun(base).config
+		protected_keys = self._protected_keys
+		if other is None:
+			if 'history' not in base.info:
+				raise Exception('Unable to load default - no history found')
 
-		diffs = util.NS()
-		self._compare_configs(base.config, other.config, diffs=diffs)
+			other = base
+			base = parse_config(base.info.history)
+			# vs_default = True
+			protected_keys = protected_keys.copy()
+			protected_keys.update(self._extended_protected_keys)
+
+		else:
+			other = self._torun(other).config
+
+		diffs = Config()#util.NS()
+		self._compare_configs(base, other, diffs=diffs, protected_keys=protected_keys)
 
 		if bi:
-			adiffs = util.NS()
-			self._compare_configs(other.config, base.config, diffs=adiffs)
+			adiffs = Config()#util.NS()
+			self._compare_configs(other, base, diffs=adiffs, protected_keys=protected_keys)
 			return diffs, adiffs
 
 		return diffs
+
+
+	def show_unique(self):
+
+		for i, run in enumerate(self.active):
+
+			print('{}) {}'.format(i, run.name))
+
+			diffs = self.compare(run)
+
+			for ks in util.flatten_tree(diffs):
+				print('{}{} - {}'.format('\t', '.'.join(map(str, ks)), diffs[ks]))#, util.deep_get(diffs, ks)))
+
+			run.diffs = diffs
+
+	def start_tb(self, port=None):
+		assert self.tbout is not None, 'no tbout'
+
+		argv = [None, '--logdir', self.tbout]
+		if port is not None:
+			argv.extend(['--port', str(port)])
+
+		tb = program.TensorBoard()
+		tb.configure(argv=argv)
+		self.tb_url = tb.launch()
+		print('Tensorboard started: {}'.format(self.tb_url))
+
+	def clear_links(self):
+		assert self.tbout is not None, 'no tbout'
+		for name in os.listdir(self.tbout):
+			os.unlink(os.path.join(self.tbout, name))
+
+	def _val_format(self, val):
+		if isinstance(val, (tuple, list)):
+			return ','.join(map(str,val))
+		if isinstance(val, float):
+			return '{:.2g}'.format(val).replace('.', 'p')
+		return str(val)
+
+	def link(self, name_fmt='{name}'):
+
+		assert self.tbout is not None, 'no tbout'
+
+		# assert include_dataset or include_date or include_diffs \
+		#        or include_idx or include_job or include_model, 'no name for links'
+
+		for i, run in enumerate(self.active):
+
+			unique = None
+			if 'unique' in name_fmt:
+				if 'diffs' not in run:
+					run.diffs = self.compare(run)
+
+				unique = '_'.join('{}:{}'.format('.'.join(ks[1:]), self._val_format(run.diffs[ks]))
+				                 for ks in util.flatten_tree(run.diffs))
+
+			if 'date' in run.config.info:
+				date = run.config.info.date
+			elif isinstance(run.config.output._logged_date, str):
+				date = run.config.output._logged_date
+			else:
+				date = run.name.split('_')[-1]
+
+			name = name_fmt.format(idx=i,
+			                       unique=unique,
+			                       name=run.name,
+			                       model=run.config.info.model_type,
+			                       dataset=run.config.info.dataset_type,
+			                       date=date)
+
+			os.system('ln -s {} {}'.format(run.path, os.path.join(self.tbout, name)))
+
+
 
 
 

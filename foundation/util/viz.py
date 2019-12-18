@@ -30,6 +30,25 @@ def fig_to_rgba(fig):
 	buf = np.roll(buf, 3, axis=2)
 	return buf
 
+def flatten_tree(tree, is_tree=None, prefix=None): # returns tuples of deep keys
+	if prefix is None:
+		prefix = []
+
+	flat = []
+
+	for k, v in tree.items():
+		prefix.append(k)
+		if (is_tree is not None and is_tree(v)) or isinstance(v, dict):
+			new = flatten_tree(v, is_tree=is_tree, prefix=prefix)
+			if len(new):
+				flat.extend(new)
+				continue
+		flat.append(tuple(prefix))
+		prefix.pop()
+
+	return flat
+
+
 ###################
 # Flow visualization - using yiq
 

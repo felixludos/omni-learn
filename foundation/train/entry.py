@@ -6,13 +6,14 @@ import traceback
 
 from contextlib import nullcontext, redirect_stdout, redirect_stderr
 
-from .config import parse_cmd_args
+from .config import parse_config
 from .model import default_create_model
 from .data import default_load_data
 
 from .running import run_full
 
 def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
+	# WARNING: 'argv' should be equivalent to sys.argv here (with script name in element 0)
 
 	ctxt, ctxt2 = nullcontext(), nullcontext()
 
@@ -43,7 +44,7 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 				print('-- Inserting \'cmd\' to front of config (because of testing mode) --')
 				argv.insert(1,'cmd')
 
-			config = parse_cmd_args(argv)
+			config = parse_config(argv[1:])
 
 		if os.environ['FOUNDATION_TESTING'] == '1':
 			print('\nThis is a test run!\n')
@@ -74,7 +75,7 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 			if 'auto_name' in config:
 
-				ID = os.environ['JOB_ID'].split('#')[-1]
+				ID = os.environ['JOB_ID'].split('#')[-1].split('.')[0]
 				ps = os.environ['PROCESS_ID']
 				num = os.environ['JOB_NUM']
 
@@ -95,7 +96,10 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 				prefix = config.name if 'name' in config else autoname
 
-				config.name = '{}_{}-{}'.format(prefix, str(num).zfill(4), ID.replace('.', '-'))
+				config.name = '{}_{}-{}-{}'.format(prefix, str(num).zfill(4), ID, str(ps).zfill(2))
+				config.info.job.ID = ID
+				config.info.job.num = num
+				config.info.job.ps = ps
 
 
 			if cname in os.listdir(os.environ['JOBDIR']):
