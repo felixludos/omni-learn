@@ -418,6 +418,8 @@ class DoubleDeconvLayer(nn.Module):
 
 		self.residual = residual
 
+		assert not self.residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(in_channels, internal_channels)
+
 		self.norm = util.get_normalization(norm_type, out_channels)
 		if 'default' == output_nonlin:
 			output_nonlin = nonlin

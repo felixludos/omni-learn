@@ -111,6 +111,8 @@ def get_config(path=None, parent_defaults=True): # Top level function
 		root.info.history = pnames
 		if 'parents' in root:
 			del root.parents
+	else: # TODO: clean up
+		root.update(Config()) # update to connect parents and children in tree and remove reversed - see Config.update
 
 	return root
 

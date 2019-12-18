@@ -42,6 +42,7 @@ def flatten_tree(tree, is_tree=None, prefix=None): # returns tuples of deep keys
 			new = flatten_tree(v, is_tree=is_tree, prefix=prefix)
 			if len(new):
 				flat.extend(new)
+				prefix.pop()
 				continue
 		flat.append(tuple(prefix))
 		prefix.pop()

@@ -29,7 +29,7 @@ class Run_Manager(object):
 		self.master_path = path
 		self.recursive = recursive
 
-		self._protected_keys = {'name',
+		self._protected_keys = {'name', 'info',
 		                        'save_dir'}
 		self._extended_protected_keys = {
 			'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
@@ -166,6 +166,7 @@ class Run_Manager(object):
 
 	def compare(self, base, other=None, bi=False):
 		# vs_default = False
+		base_run = self._torun(base)
 		base = self._torun(base).config
 		protected_keys = self._protected_keys
 		if other is None:
@@ -174,6 +175,7 @@ class Run_Manager(object):
 
 			other = base
 			base = parse_config(base.info.history)
+			base_run.base = base
 			# vs_default = True
 			protected_keys = protected_keys.copy()
 			protected_keys.update(self._extended_protected_keys)
@@ -199,9 +201,11 @@ class Run_Manager(object):
 			print('{}) {}'.format(i, run.name))
 
 			diffs = self.compare(run)
+			base = run.base
 
 			for ks in util.flatten_tree(diffs):
-				print('{}{} - {}'.format('\t', '.'.join(map(str, ks)), diffs[ks]))#, util.deep_get(diffs, ks)))
+				print('{}{} - {} ({})'.format('\t', '.'.join(map(str, ks)), diffs[ks], (base[ks] if ks in base else '_')))#, util.deep_get(diffs, ks)))
+			print()
 
 			run.diffs = diffs
 
@@ -222,12 +226,20 @@ class Run_Manager(object):
 		for name in os.listdir(self.tbout):
 			os.unlink(os.path.join(self.tbout, name))
 
+		for run in self.active:
+			for fname in os.listdir(run.path):
+				full = os.path.join(run.path, fname)
+				if os.path.islink(full):
+					os.unlink(full)
+
 	def _val_format(self, val):
 		if isinstance(val, (tuple, list)):
-			return ','.join(map(str,val))
+			return '{}=' + ','.join(map(str,val))
 		if isinstance(val, float):
-			return '{:.2g}'.format(val).replace('.', 'p')
-		return str(val)
+			return '{}=' + '{:.2g}'.format(val).replace('.', 'p')
+		if val == '__removed__':
+			return 'no-{}'
+		return '{}=' + str(val)
 
 	def link(self, name_fmt='{name}'):
 
@@ -243,8 +255,13 @@ class Run_Manager(object):
 				if 'diffs' not in run:
 					run.diffs = self.compare(run)
 
-				unique = '_'.join('{}:{}'.format('.'.join(ks[1:]), self._val_format(run.diffs[ks]))
-				                 for ks in util.flatten_tree(run.diffs))
+				if len(run.diffs):
+
+					unique = '__'.join(self._val_format(run.diffs[ks]).format('.'.join(ks[1:]))
+					                 for ks in util.flatten_tree(run.diffs))
+
+				else:
+					unique = 'default'
 
 			if 'date' in run.config.info:
 				date = run.config.info.date
@@ -260,7 +277,15 @@ class Run_Manager(object):
 			                       dataset=run.config.info.dataset_type,
 			                       date=date)
 
-			os.system('ln -s {} {}'.format(run.path, os.path.join(self.tbout, name)))
+			link_path = os.path.join(self.tbout, name)
+
+			if os.path.islink(link_path): # avoid duplicate links
+				os.unlink(link_path)
+			if 'link' in run and os.path.islink(run.link): # avoid duplicate models
+				os.unlink(run.link)
+
+			os.system('ln -s {} {}'.format(run.path, link_path))
+			run.link = link_path
 
 
 
