@@ -29,7 +29,7 @@ class Run_Manager(object):
 		self.master_path = path
 		self.recursive = recursive
 
-		self._protected_keys = {'name', 'info',
+		self._protected_keys = {'name', 'info', 'job',
 		                        'save_dir'}
 		self._extended_protected_keys = {
 			'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
@@ -39,7 +39,7 @@ class Run_Manager(object):
 		if self.tbout is not None:
 			util.create_dir(self.tbout)
 			print('{} is available to view runs on tensorboard'.format(self.tbout))
-		self.tb_worker = None
+		self.tb = None
 
 		self.refresh()
 
@@ -164,11 +164,13 @@ class Run_Manager(object):
 			if k not in protected_keys and k not in base:
 				diffs[k] = v
 
-	def compare(self, base, other=None, bi=False):
+	def compare(self, base, other=None, bi=False, ignore_keys=None):
 		# vs_default = False
 		base_run = self._torun(base)
 		base = self._torun(base).config
-		protected_keys = self._protected_keys
+		protected_keys = self._protected_keys.copy()
+		if ignore_keys is not None:
+			protected_keys.update(ignore_keys)
 		if other is None:
 			if 'history' not in base.info:
 				raise Exception('Unable to load default - no history found')
@@ -177,7 +179,6 @@ class Run_Manager(object):
 			base = parse_config(base.info.history)
 			base_run.base = base
 			# vs_default = True
-			protected_keys = protected_keys.copy()
 			protected_keys.update(self._extended_protected_keys)
 
 		else:
@@ -194,13 +195,13 @@ class Run_Manager(object):
 		return diffs
 
 
-	def show_unique(self):
+	def show_unique(self, ignore_keys=None):
 
 		for i, run in enumerate(self.active):
 
 			print('{}) {}'.format(i, run.name))
 
-			diffs = self.compare(run)
+			diffs = self.compare(run, ignore_keys=ignore_keys)
 			base = run.base
 
 			for ks in util.flatten_tree(diffs):
@@ -212,13 +213,16 @@ class Run_Manager(object):
 	def start_tb(self, port=None):
 		assert self.tbout is not None, 'no tbout'
 
-		argv = [None, '--logdir', self.tbout]
-		if port is not None:
-			argv.extend(['--port', str(port)])
+		if self.tb is None:
 
-		tb = program.TensorBoard()
-		tb.configure(argv=argv)
-		self.tb_url = tb.launch()
+			argv = [None, '--logdir', self.tbout]
+			if port is not None:
+				argv.extend(['--port', str(port)])
+
+			tb = program.TensorBoard()
+			tb.configure(argv=argv)
+			self.tb_url = tb.launch()
+			self.tb = tb
 		print('Tensorboard started: {}'.format(self.tb_url))
 
 	def clear_links(self):
