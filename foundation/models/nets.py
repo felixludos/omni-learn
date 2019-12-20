@@ -45,14 +45,7 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 		if len(squeeze) != len(channels):
 			squeeze = squeeze * len(channels)
 
-		residual = A.pull('residual', False)
-		
-		nonlin = A.pull('nonlin', 'elu')
 		output_nonlin = A.pull('output_nonlin', None)
-		output_norm_type = A.pull('output_norm_type', None)
-
-		down_type = A.pull('down_type', 'max')
-		norm_type = A.pull('norm_type', None)
 
 		din = in_shape
 		in_chn, *in_size = in_shape
@@ -83,40 +76,51 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 
 		dout = latent_dim
 
+		chns = (in_chn,) + channels
+		layers = self._create_layers(chns, iter(factors), iter(internal_channels), iter(squeeze), A, set_nonlin)
+
 		super().__init__(din, dout)
 
-		chns = (in_chn,) + channels
-		last_chn = chns[-2:]
-		chns = chns[:-1]
-
-		layers = []
-
-		i_factors, i_internal_channels, i_squeeze = iter(factors), iter(internal_channels), iter(squeeze)
-		for ichn, ochn in zip(chns, chns[1:]):
-			layers.append(
-				layerslib.DoubleConvLayer(in_channels=ichn, out_channels=ochn, factor=next(i_factors),
-				                          down_type=down_type, norm_type=norm_type,
-				                          nonlin=nonlin, output_nonlin=nonlin,
-				                          internal_channels=next(i_internal_channels), squeeze=next(i_squeeze),
-				                          residual=residual,
-				                          )
-			)
-		layers.append(
-			layerslib.DoubleConvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(i_factors),
-			                          down_type=down_type, norm_type=norm_type if set_nonlin else output_norm_type,
-			                          nonlin=nonlin, output_nonlin=nonlin if set_nonlin else output_nonlin,
-			                          internal_channels=next(i_internal_channels), squeeze=next(i_squeeze),
-			                          residual=residual,
-			                          )
-		)
-
-		self.layers = nn.ModuleList(layers)
+		self.layers = layers
 
 		self.tail = tail
 
 		self.set_optim(A)
 		self.set_scheduler(A)
-	
+
+	def _create_layers(self, chns, factors, internal_channels, squeeze, A, set_nonlin):
+
+		nonlin = A.pull('nonlin', 'elu')
+		output_nonlin = A.pull('output_nonlin', None)
+		output_norm_type = A.pull('output_norm_type', None)
+
+		down_type = A.pull('down_type', 'max')
+		norm_type = A.pull('norm_type', None)
+		residual = A.pull('residual', False)
+
+		last_chn = chns[-2:]
+		chns = chns[:-1]
+
+		layers = []
+		for ichn, ochn in zip(chns, chns[1:]):
+			layers.append(
+				layerslib.DoubleConvLayer(in_channels=ichn, out_channels=ochn, factor=next(factors),
+				                          down_type=down_type, norm_type=norm_type,
+				                          nonlin=nonlin, output_nonlin=nonlin,
+				                          internal_channels=next(internal_channels), squeeze=next(squeeze),
+				                          residual=residual,
+				                          )
+			)
+		layers.append(
+			layerslib.DoubleConvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(factors),
+			                          down_type=down_type, norm_type=norm_type if set_nonlin else output_norm_type,
+			                          nonlin=nonlin, output_nonlin=nonlin if set_nonlin else output_nonlin,
+			                          internal_channels=next(internal_channels), squeeze=next(squeeze),
+			                          residual=residual,
+			                          )
+		)
+		return nn.ModuleList(layers)
+
 	def encode(self, x):
 		return self(x)
 	
@@ -165,14 +169,7 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 		if len(squeeze) != len(channels):
 			squeeze = squeeze * len(channels)
 
-		residual = A.pull('residual', False)
-
 		nonlin = A.pull('nonlin', 'elu')
-		output_nonlin = A.pull('output_nonlin', None)
-		output_norm_type = A.pull('output_norm_type', None)
-
-		up_type = A.pull('up_type', 'bilinear')
-		norm_type = A.pull('norm_type', None)
 
 		dout = out_shape
 		out_chn, *out_size = out_shape
@@ -199,39 +196,52 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 
 		din = latent_dim
 
+		chns = channels + (out_chn,)
+		layers = self._create_layers(chns, iter(factors), iter(internal_channels), iter(squeeze), A)
+
 		super().__init__(din, dout)
 
-		chns = channels + (out_chn,)
+		self.head = head
+		self.layers = layers
+
+		self.set_optim(A)
+		self.set_scheduler(A)
+
+	def _create_layers(self, chns, factors, internal_channels, squeeze, A):
+
+		nonlin = A.pull('nonlin', 'elu')
+		output_nonlin = A.pull('output_nonlin', None)
+		output_norm_type = A.pull('output_norm_type', None)
+
+		up_type = A.pull('up_type', 'bilinear')
+		norm_type = A.pull('norm_type', None)
+		residual = A.pull('residual', False)
+
 		last_chn = chns[-2:]
 		chns = chns[:-1]
 
 		layers = []
 
-		i_factors, i_internal_channels, i_squeeze = iter(factors), iter(internal_channels), iter(squeeze)
+		# i_factors, i_internal_channels, i_squeeze =
 		for ichn, ochn in zip(chns, chns[1:]):
 			layers.append(
-				layerslib.DoubleDeconvLayer(in_channels=ichn, out_channels=ochn, factor=next(i_factors),
-				                          up_type=up_type, norm_type=norm_type,
-				                          nonlin=nonlin, output_nonlin=nonlin,
-				                          internal_channels=next(i_internal_channels), squeeze=next(i_squeeze),
-				                          residual=residual,
-				                          )
+				layerslib.DoubleDeconvLayer(in_channels=ichn, out_channels=ochn, factor=next(factors),
+				                            up_type=up_type, norm_type=norm_type,
+				                            nonlin=nonlin, output_nonlin=nonlin,
+				                            internal_channels=next(internal_channels), squeeze=next(squeeze),
+				                            residual=residual,
+				                            )
 			)
 		layers.append(
-			layerslib.DoubleDeconvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(i_factors),
-			                          up_type=up_type, norm_type=output_norm_type,
-			                          nonlin=nonlin, output_nonlin=output_nonlin,
-			                          internal_channels=next(i_internal_channels), squeeze=next(i_squeeze),
-			                          residual=residual,
-			                          )
+			layerslib.DoubleDeconvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(factors),
+			                            up_type=up_type, norm_type=output_norm_type,
+			                            nonlin=nonlin, output_nonlin=output_nonlin,
+			                            internal_channels=next(internal_channels), squeeze=next(squeeze),
+			                            residual=residual,
+			                            )
 		)
 
-		self.head = head
-
-		self.layers = nn.ModuleList(layers)
-
-		self.set_optim(A)
-		self.set_scheduler(A)
+		return nn.ModuleList(layers)
 
 	def decode(self, q):
 		return self(q)

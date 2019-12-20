@@ -165,7 +165,40 @@ class Stage_Model(fm.Schedulable, fm.Trainable_Model):
 
 register_model('stage', Stage_Model)
 
-
+# class Reverse_Stage_Model(Stage_Model):
+#
+# 	def __init__(self, A):
+#
+# 		din = A.pull('latent_dim', '<>din', None)
+# 		A.din = din
+#
+# 		super().__init__(A)
+#
+# 	def _process_stages(self, stages):
+#
+# 		N = len(stages)
+#
+# 		assert N > 0, 'no stages provided'
+#
+# 		din = self.din
+#
+# 		sub = []
+# 		for i, stage in reversed(list(enumerate(stages))):
+# 			stage.din = din
+# 			stage = self._create_stage(stage)
+#
+# 			sub.append(stage)
+# 			din = stage.dout
+#
+# 		assert din == self.dout, 'dins and douts not set correctly: {} vs {}'.format(din, self.dout)
+#
+# 		return sub
+#
+# 	def forward(self, x):
+# 		q = x
+# 		for stage in self.stages:
+# 			q = stage(q)
+# 		return q
 
 
 class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
