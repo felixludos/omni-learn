@@ -24,7 +24,7 @@ model:
     nonlin: 'elu'
 
     net:
-        _type: 'mlp'
+        _type: 'nn'
         hidden_fc: [300]
 
 

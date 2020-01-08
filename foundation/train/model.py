@@ -74,7 +74,9 @@ def _create_mlp(info): # mostly for selecting/formatting args (and creating sub 
 	model = models.make_MLP(**kwargs)
 
 	return model
-register_model('mlp', _create_mlp)
+register_model('mlp', _create_mlp) # Outdated
+
+register_model('nn', models.MLP)
 
 
 class Stage_Model(fm.Schedulable, fm.Trainable_Model):

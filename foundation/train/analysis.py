@@ -94,16 +94,21 @@ class Run_Manager(object):
 		return self.full_info[self.run2idx[name]]
 
 	def __getitem__(self, item):
+
 		if self.active is None:
 			print('From full')
-			return self.full_info[item]
-		return self.active[item]
+			runs = self.full_info
+		else:
+			runs = self.active
+		return runs[item]
+
+	def filter_idx(self, *indicies):
+		indicies = set(indicies)
+		self.active = [run for i, run in enumerate(self.active) if i in indicies]
 
 	def filter(self, criterion):
-
 		self.active = [run for run in self.active if criterion(run)]
 		# print('{} remaining'.format(len(self.active)))
-
 		return self
 
 	def clear_filters(self):

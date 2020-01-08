@@ -10,6 +10,33 @@ from .. import framework as fm
 from .atom import *
 from .layers import *
 
+class MLP(fm.Model):
+	def __init__(self, A):
+		kwargs = {
+			'input_dim': A.pull('input_dim', '<>din'),
+			'output_dim': A.pull('output_dim', '<>dout'),
+			'hidden_dims': A.pull('hidden_dims', '<>hidden_fc', []),
+			'nonlin': A.pull('nonlin', 'prelu'),
+			'output_nonlin': A.pull('output_nonlin', None),
+		}
+
+		net = make_MLP(**kwargs)
+		super().__init__(kwargs['input_dim'], kwargs['output_dim'])
+
+		self.net = net
+
+	def __iter__(self):
+		return iter(self.net)
+
+	def __len__(self):
+		return len(self.net)
+
+	def __getitem__(self, item):
+		return self.net[item]
+
+	def forward(self, x):
+		return self.net(x)
+
 
 class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
@@ -273,6 +300,7 @@ def Normal_Distribized(cls):
 				cut = dout
 				full_dout = dout*2
 
+			_dout, _latent_dim = A.dout, A.latent_dim
 			A.dout = full_dout
 			A.latent_dim = full_dout # temporarily change
 
@@ -281,8 +309,7 @@ def Normal_Distribized(cls):
 			super().__init__(A)
 
 			# reset config to correct terms
-			A.latent_dim = dout
-			A.dout = dout
+			A.dout, A.latent_dim = _dout, _latent_dim
 			self.latent_dim = dout
 			self.dout = dout
 
