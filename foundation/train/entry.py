@@ -3,6 +3,7 @@
 import sys, os, time
 # import ipdb
 import traceback
+import socket
 
 from contextlib import nullcontext, redirect_stdout, redirect_stderr
 
@@ -101,7 +102,10 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 				config.info.job.num = num
 				config.info.job.ps = ps
 
-
+			print('Hostname: {}{}'.format(socket.gethostname(),
+			                                ', ' + os.environ['CUDA_VISIBLE_DEVICES']
+			                                if 'CUDA_VISIBLE_DEVICES' in os.environ
+			                                else ''))
 			if cname in os.listdir(os.environ['JOBDIR']):
 				print('This job has already made progress')
 				with open(os.path.join(os.environ['JOBDIR'], cname), 'r') as f:
