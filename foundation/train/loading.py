@@ -72,6 +72,8 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 		get_data = default_load_data
 
 	print('Prep loading')
+	print(path)
+	print(A)
 	sys.stdout.flush()
 
 	checkpoint = None
