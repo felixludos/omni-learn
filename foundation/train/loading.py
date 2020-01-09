@@ -71,10 +71,6 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	if get_data is 'default':
 		get_data = default_load_data
 
-	print('Prep loading')
-	print(path)
-	print(A)
-
 
 	checkpoint = None
 	if path is not None:
@@ -85,12 +81,17 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 		sys.stdout.flush()
 
 		if os.path.isfile(ckptpath):
-			checkpoint = torch.load(ckptpath)
+
+			try:
+				checkpoint = torch.load(ckptpath)
+			except Exception as e:
+				print('bad')
+				print(e)
+				sys.stdout.flush()
+				raise e
 			config_dir = os.path.dirname(ckptpath)
 
-			print('ckpt: {}'.format(checkpoint.keys()))
-			print(config_dir)
-			sys.stdout.flush()
+			print('load successful')
 
 		elif force_load_model:
 			raise FileNotFoundError
@@ -111,8 +112,6 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 			A.dataroot = os.environ['FOUNDATION_DATA_DIR']
 			print('Set dataroot to: {}'.format(A.dataroot))
 
-		sys.stdout.flush()
-
 	out = []
 
 	if return_args:
@@ -130,9 +129,6 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 
 	if get_model is not None:
 		util.set_seed(A.seed)
-
-		print('Getting model')
-		sys.stdout.flush()
 
 		model = get_model(A)
 
