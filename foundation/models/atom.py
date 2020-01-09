@@ -243,7 +243,7 @@ def plan_conv(in_shape, channels, kernels=3, factors=1, strides=1, padding=None,
 
 	padding = [((k[0] - 1) // 2, (k[1] - 1) // 2) if p is None else p for k, p in zip(kernels, padding)]
 
-	channels = [in_shape[0]] + channels
+	channels = [in_shape[0]] + list(channels)
 
 	C, H, W = in_shape
 
@@ -303,7 +303,7 @@ def plan_deconv(out_shape, channels, kernels=2, factors=1, strides=1, padding=No
 	assert len(channels) > 0
 	L = len(channels)
 
-	channels = channels.copy()
+	channels = list(channels)
 
 	try:
 		assert len(kernels) == L
