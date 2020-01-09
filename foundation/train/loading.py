@@ -115,9 +115,15 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	if get_model is not None:
 		util.set_seed(A.seed)
 
+		print('Getting model')
+
 		model = get_model(A)
 
+		print('Moving model to {}'.format(A.device))
+
 		model.to(A.device)
+
+		print('Model on {}'.format(A.device))
 
 		if checkpoint is not None and 'model_state' in checkpoint and load_state_dict:
 			model.load_state_dict(checkpoint['model_state'])
