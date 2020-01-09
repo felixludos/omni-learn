@@ -71,6 +71,9 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	if get_data is 'default':
 		get_data = default_load_data
 
+	print('Prep loading')
+	sys.stdout.flush()
+
 	checkpoint = None
 	if path is not None:
 		ckptpath = find_checkpoint(path, load_last=load_last)
