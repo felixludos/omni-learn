@@ -74,11 +74,14 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	print('Prep loading')
 	print(path)
 	print(A)
-	sys.stdout.flush()
+
 
 	checkpoint = None
 	if path is not None:
 		ckptpath = find_checkpoint(path, load_last=load_last)
+
+		print(ckptpath)
+		sys.stdout.flush()
 
 		if os.path.isfile(ckptpath):
 			checkpoint = torch.load(ckptpath)
