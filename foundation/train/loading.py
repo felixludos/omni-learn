@@ -105,6 +105,8 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 			A.dataroot = os.environ['FOUNDATION_DATA_DIR']
 			print('Set dataroot to: {}'.format(A.dataroot))
 
+		sys.stdout.flush()
+
 	out = []
 
 	if return_args:
