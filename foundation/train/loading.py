@@ -82,11 +82,15 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 
 		print(ckptpath)
 		print(os.path.isfile(ckptpath))
-		sys.stdout.flush()
+
 
 		if os.path.isfile(ckptpath):
 			checkpoint = torch.load(ckptpath)
 			config_dir = os.path.dirname(ckptpath)
+
+			print('ckpt: {}'.format(checkpoint.keys()))
+			sys.stdout.flush()
+
 		elif force_load_model:
 			raise FileNotFoundError
 		else:
