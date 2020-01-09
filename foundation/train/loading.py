@@ -81,6 +81,7 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 		ckptpath = find_checkpoint(path, load_last=load_last)
 
 		print(ckptpath)
+		print(os.path.isfile(ckptpath))
 		sys.stdout.flush()
 
 		if os.path.isfile(ckptpath):
