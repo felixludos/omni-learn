@@ -204,7 +204,16 @@ register_model('stage', Stage_Model)
 
 
 class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
-	pass
+	def __init__(self, A):
+		kwargs = _get_conv_args(A)
+		super().__init__(**kwargs)
+
+		if 'optim_type' in A:
+			self.set_optim(A)
+
+		if 'scheduler_type' in A:
+			self.set_scheduler(A)
+register_model('conv', Trainable_Conv)
 
 def _get_conv_args(info):
 	kwargs = {
@@ -269,7 +278,7 @@ def _create_conv(info):
 		conv.set_scheduler(info)
 
 	return conv
-register_model('conv', _create_conv)
+# register_model('conv', _create_conv)
 
 class Trainable_Normal_Enc(fm.Schedulable, models.Normal_Conv_Encoder):
 	pass
@@ -297,7 +306,63 @@ register_model('normal-conv', _create_normal_conv)
 
 
 class Trainable_Deconv(fm.Schedulable, models.Conv_Decoder):
-	pass
+	def __init__(self, A):
+		kwargs = {
+
+			# req
+			'out_shape': A.pull('out_shape', '<>dout'),
+
+			'channels': A.pull('channels'),
+
+			# optional
+			'latent_dim': A.pull('latent_dim', '<>dout', None),
+
+			'nonlin': A.pull('nonlin', 'prelu'),
+			'output_nonlin': A.pull('output_nonlin', None),
+
+			'upsampling': A.pull('upsampling', 'max'),
+
+			'norm_type': A.pull('norm_type', 'instance'),
+			'output_norm_type': A.pull('output_norm_type', None),
+
+			'hidden_fc': A.pull('hidden_fc', '<>fc', []),
+		}
+
+		num = len(kwargs['channels'])
+
+		kernels = A.pull('kernels', 3)
+		factors = A.pull('factors', 2)
+		strides = A.pull('strides', 1)
+
+		# TODO: deal with rectangular inputs
+		try:
+			len(kernels)
+		except TypeError:
+			kernels = [kernels] * num
+		kwargs['kernels'] = kernels
+
+		try:
+			len(factors)
+		except TypeError:
+			factors = [factors] * num
+		kwargs['ups'] = factors
+
+		try:
+			len(strides)
+		except TypeError:
+			strides = [strides] * num
+		kwargs['strides'] = strides
+
+
+		super().__init__(**kwargs)
+
+		if 'optim_type' in A:
+			self.set_optim(A)
+
+		if 'scheduler_type' in A:
+			self.set_scheduler(A)
+
+register_model('deconv', Trainable_Deconv)
 
 def _create_deconv(info):
 
@@ -358,7 +423,7 @@ def _create_deconv(info):
 
 	return deconv
 
-register_model('deconv', _create_deconv)
+# register_model('deconv', _create_deconv)
 
 
 
