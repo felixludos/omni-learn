@@ -149,7 +149,7 @@ def default_load_data(A, mode='train'):
 	if mode in info:
 		info = info[mode] # TODO: merge A.dataset[mode] with defaults in A.dataset
 
-	name = info.name
+	name = info.pull('name')
 	args = info.args if 'args' in info else ()
 	kwargs = dict(info.kwargs) if 'kwargs' in info else {}
 
