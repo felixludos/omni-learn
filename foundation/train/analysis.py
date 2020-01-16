@@ -284,7 +284,8 @@ class Run_Manager(object):
 			                       name=run.name,
 			                       model=run.config.info.model_type,
 			                       dataset=run.config.info.dataset_type,
-			                       date=date)
+			                       date=date,
+			                       job=run.config.name.split('_')[-1])
 
 			link_path = os.path.join(self.tbout, name)
 

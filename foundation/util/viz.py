@@ -4,6 +4,29 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
+def play_back(imgs, figax=None, batch_first=True):
+	if len(imgs.shape) > 4:  # tile first
+		if not batch_first:
+			imgs = imgs.transpose(1,0,2,3,4)
+		N, S, h, w, c = imgs.shape
+		H = int(np.ceil(np.sqrt(N)))
+		W = int(np.ceil(float(N) / H))
+		imgs = imgs.reshape(H, W, S, h, w, c)
+		imgs = imgs.transpose(2, 0, 3, 1, 4, 5)
+		imgs = imgs.reshape(S, H * h, W * w, c)
+
+	if figax is None:
+		figax = plt.subplots()
+	fig, ax = figax
+	plt.sca(ax)
+	for i, img in enumerate(imgs):
+		plt.cla()
+		plt.axis('off')
+		plt.imshow(img)
+		plt.title('{}/{}'.format(i + 1, len(imgs)))
+		plt.tight_layout()
+		plt.pause(0.02)
+	return fig, ax
 
 def plot_stat(all_stats, key, xdata=None, figax=None, **fmt_args): # all_stats should be a list of StatsMeters containing key
 	if figax is None:
@@ -86,3 +109,29 @@ def yiq2rgb(img, clamp=1): # reqs B x C=3 x H x W
 	#print(img.abs().max(-1)[0])
 	img = _yiq_to_rgb.type_as(img) @ img + 0.5
 	return img.view(3,B,H,W).permute(1,0,2,3).clamp(0,1)
+
+
+
+
+
+# def tile_images(img_nhwc):
+#     """
+#     Tile N images into one big PxQ image
+#     (P,Q) are chosen to be as close as possible, and if N
+#     is square, then P=Q.
+#
+#     input: img_nhwc, list or array of images, ndim=4 once turned into array
+#         n = batch index, h = height, w = width, c = channel
+#     returns:
+#         bigim_HWc, ndarray with ndim=3
+#     """
+#     img_nhwc = np.asarray(img_nhwc)
+#     N, h, w, c = img_nhwc.shape
+#     H = int(np.ceil(np.sqrt(N)))
+#     W = int(np.ceil(float(N)/H))
+#     img_nhwc = np.array(list(img_nhwc) + [img_nhwc[0]*0 for _ in range(N, H*W)])
+#     img_HWhwc = img_nhwc.reshape(H, W, h, w, c)
+#     img_HhWwc = img_HWhwc.transpose(0, 2, 1, 3, 4)
+#     img_Hh_Ww_c = img_HhWwc.reshape(H*h, W*w, c)
+#     return img_Hh_Ww_c
+
