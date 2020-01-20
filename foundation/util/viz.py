@@ -2,9 +2,21 @@
 import sys, os
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
+try:
+	import matplotlib.pyplot as plt
+	from matplotlib import animation
+except ImportError:
+	print('WARNING: matplotlib not found')
+try:
+	import imageio
+except ImportError:
+	print('WARNING: imageio not found')
+# try:
+# 	import ffmpeg
+# except ImportError:
+# 	print('WARNING: ffmpeg not found')
 
-def play_back(imgs, figax=None, batch_first=True):
+def play_back(imgs, figax=None, batch_first=True): # imgs is numpy: either (seq, H, W, C) or (batch, seq, H, W, C)
 	if len(imgs.shape) > 4:  # tile first
 		if not batch_first:
 			imgs = imgs.transpose(1,0,2,3,4)
@@ -72,6 +84,67 @@ def flatten_tree(tree, is_tree=None, prefix=None): # returns tuples of deep keys
 
 	return flat
 
+class Video(object):
+	def __init__(self, path=None, frames=None): # frames must be a sequence of numpy byte images
+		self.frames = frames
+		self.path = path
+
+	def play(self, mode='mpl'):
+
+		if mode == 'mpl':
+			play_back(self.frames)
+		else:
+			raise Exception('Unknonwn mode: {}'.format(mode))
+
+	def as_animation(self, ):
+
+		fig = plt.figure()
+		im = plt.imshow(self.frames[0])
+
+		plt.close()
+
+		def init():
+			im.set_data(self.frames[0])
+
+		def animate(i):
+			im.set_data(self.frames[i])
+			return im
+
+		anim = animation.FuncAnimation(fig, animate, init_func=init, frames=self.frames.shape[0],
+		                               interval=50)
+
+		return anim
+
+	def export(self, path, fmt='mp4'):
+
+		assert fmt in {'mp4', 'gif',}
+
+		if fmt in {'mp4', 'gif'}:
+			imageio.mimsave(path, self.frames)
+
+		# elif fmt == 'mp4':
+		# 	imageio.mimwrite('test2.mp4', self.frames, fps=30)
+
+			# vcodec = 'mp4'
+			# framerate = 25
+			#
+			# images = self.frames
+			# n, height, width, channels = images.shape
+			# process = (
+			# 	ffmpeg
+			# 		.input('pipe:', format='rawvideo', pix_fmt='rgb24', s='{}x{}'.format(width, height))
+			# 		.output(path, pix_fmt='yuv420p', vcodec=vcodec, r=framerate)
+			# 		.overwrite_output()
+			# 		.run_async(pipe_stdin=True)
+			# )
+			# for frame in images:
+			# 	process.stdin.write(
+			# 		frame
+			# 			.astype(np.uint8)
+			# 			.tobytes()
+			# 	)
+			# process.stdin.close()
+			# process.wait()
 
 ###################
 # Flow visualization - using yiq

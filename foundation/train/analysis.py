@@ -2,8 +2,10 @@
 import sys, os, shutil
 import numpy as np
 import torch
-
+import yaml
 from torch import multiprocessing as mp
+
+from bisect import bisect_left
 
 from .. import util
 from .config import get_config, Config, parse_config
@@ -14,23 +16,129 @@ from .loading import find_checkpoint
 from tensorboard import program
 
 
-
 class Run(util.tdict):
-	pass
+	def reset(self, state=None):
+		if 'state' in self:
+
+			if 'figs' in self.state:
+				for fig in self.state.figs.values():
+					fig.close()
+
+			del self.state
+			torch.cuda.empty_cache()
+
+		if state is None:
+			state = util.tdict()
+
+		if 'ckpt_path' not in state:
+			state.ckpt_path = self.ckpt_path
+
+		self.state = state
+		return state
+
+	def load(self):
+		if 'state' not in self:
+			self.reset()
+
+		self._manager._load_fn(self.state)
+
+	def run(self):
+		self._manager._run_model_fn(self.state)
+
+	def evaluate(self, pbar=None):
+
+		jobs = self._manager._eval_fns.items()
+		if pbar is not None:
+			jobs = pbar(jobs, total=len(self._manager._eval_fns))
+
+		results = {}
+		for k, fn in jobs:
+			results[k] = fn(self.state)
+			if pbar is not None:
+				jobs.set_description('EVAL: {}'.format(k))
+
+		self.state.evals = results
+		return results
+
+	def visualize(self, pbar=None):
+
+		jobs = self._manager._viz_fns.items()
+		if pbar is not None:
+			jobs = pbar(jobs, total=len(self._manager._viz_fns))
+
+		results = {}
+		for k, fn in jobs:
+			results[k] = fn(self.state)
+			if pbar is not None:
+				jobs.set_description('VIZ: {}'.format(k))
+
+		self.state.figs = results
+		return results
+
+	def save(self,  save_dir=None, fmtdir='{}', override=False,
+	         include_checkpoint=True, include_config=True, include_original=True,
+	         fig_ext='png'):
+
+		if save_dir is None:
+			save_dir = self._manager.save_dir
+
+		num = int(os.path.basename(self.ckpt_path).split('.')[0].split('_')[0])
+		name = '{}_ckpt{}'.format(self.name, num)
+
+		save_path = os.path.join(save_dir, fmtdir.format(name))
+
+		print('Saving results to: {}'.format(save_path))
+
+		if override:
+			util.create_dir(save_path)
+		else:
+			os.mkdir(save_path)
+
+		if include_checkpoint:
+			src = self.ckpt_path
+			dest = os.path.join(save_path, 'model.pth.tar')
+			shutil.copyfile(src, dest)
+			print('\tModel saved')
+		if include_config:
+			src = os.path.join(self.path, 'config.yml')
+			dest = os.path.join(save_path, 'config.yml')
+			shutil.copyfile(src, dest)
+			print('\tConfig saved')
+		if include_original:
+			with open(os.path.join(save_path, 'original_ckpt_path.txt'), 'w') as f:
+				f.write(self.ckpt_path)
+
+		if 'state' in self:
+			if 'figs' in self.state:
+				for name, fig in self.state.figs.items():
+					fig.savefig(os.path.join(save_path, '{}.{}'.format(name, fig_ext)))
+				print('\tVisualization saved')
+
+			if 'evals' in self.state:
+				torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
+				print('\tEvaluation saved')
+
 
 class Run_Manager(object):
+	def __init__(self, root=None, recursive=False, tbout=None, limit=None,
+	             default_complete=100, save_dir=None,
+	             load_fn=None, run_model_fn=None, viz_fns={}, eval_fns={}):
+		self._load_fn = load_fn
+		self._run_model_fn = run_model_fn
+		self._viz_fns = viz_fns
+		self._eval_fns = eval_fns
 
-	def __init__(self, path=None, recursive=False, tbout=None):
+		self.default_complete = default_complete
+		self.save_dir = save_dir
 
-		if path is None:
+		if root is None:
 			assert 'FOUNDATION_SAVE_DIR' in os.environ, 'no path provided, and no default save dir set'
-			path = os.environ['FOUNDATION_SAVE_DIR']
+			root = os.environ['FOUNDATION_SAVE_DIR']
 
-		self.master_path = path
+		self.master_root = root
 		self.recursive = recursive
 
-		self._protected_keys = {'name', 'info', 'job',
-		                        'save_dir'}
+		self._protected_keys = {'name', 'info', 'job', 'save_dir'}
 		self._extended_protected_keys = {
 			'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
 		}
@@ -41,60 +149,100 @@ class Run_Manager(object):
 			print('{} is available to view runs on tensorboard'.format(self.tbout))
 		self.tb = None
 
-		self.refresh()
+		# self.refresh(limit=limit)
+		self._find_runs(limit=limit)
+		print('Found {} runs'.format(len(self.full_info)))
 
-	def _collect_runs(self, path=None, load_last=True, clear_info=False):
-		rootdir = self.master_path if path is None else os.path.join(self.master_path, path)
-		for name in sorted(os.listdir(rootdir)):
+		self._parse_names()
 
-			run_name = name if path is None else os.path.join(path, name)
-			run_path = os.path.join(rootdir, name) if path is None else os.path.join(self.master_path, name)
+		self.active = self.full_info.copy()
+
+	def _parse_names(self):
+		for run in self.full_info:
+			try:
+				nature, job, date = run.name.split('_')
+				# job = job.split('-')[0]
+				run.splits = nature, job, date
+			except ValueError:
+				# print('{} splitting failed'.format(run.name))
+				pass
+
+	def _find_runs(self, path='', limit=None):
+		self.full_info = []
+
+		root = os.path.join(self.master_root, path)
+		for name in sorted(os.listdir(root)):
+			run_name = os.path.join(path, name)
+			run_path = os.path.join(self.master_root, run_name)
+
 			if os.path.isdir(run_path):
 				if 'config.yml' in os.listdir(run_path):
-
 					try:
-						ckpt_path = find_checkpoint(run_path, load_last=load_last)
-						run = Run(name=run_name, path=run_path)
-						run.ckpt_path = ckpt_path
-						run.config = get_config(os.path.join(run_path, 'config.yml'))
-
-						if clear_info:
-							del run.config.info
-
-						if 'model_type' not in run.config.info:
-							run.config.info.model_type = run.config.model._type
-						if 'dataset_type' not in run.config.info:
-							run.config.info.dataset_type = run.config.dataset.name
-
+						run = Run(name=run_name, path=run_path, _manager=self)
+						run.progress = len([cn for cn in os.listdir(run_path) if '.pth.tar' in cn])
 					except FileNotFoundError:
 						pass
 					else:
 						self.full_info.append(run)
-				elif self.recursive:
-					self._collect_runs(run_name, load_last=load_last, clear_info=clear_info)
 
-	def refresh(self, load_last=True, clear_info=False): # collects info from all runs
+			elif self.recursive:
+				self._find_runs(run_name, limit=limit)
 
-		self.full_info = []
+			if limit is not None and len(self.full_info) >= limit:
+				break
 
-		self._collect_runs(load_last=load_last, clear_info=clear_info)
+	def show_incomplete(self, complete=None):
+		self._check_incomplete(complete=complete, show=True)
 
-		self.run2idx = {r.name: i for i,r in enumerate(self.full_info)}
+	def _check_incomplete(self, complete=None, show=False, negate=False): # more like "check_progress" - for complete and incomplete
+		done = []
+		for run in self.active:
+			req = complete
+			if req is None:
+				req = run.config.training.epochs if 'config' in run else self.default_complete
 
-		print('Found {} runs'.format(len(self.full_info)))
+			if run.progress < req:
+				if show:
+					print('{:>3}/{:<3} {}'.format(run.progress, req, run.name))
+				if not negate:
+					done.append(run)
+			elif negate:
+				done.append(run)
 
-		self.active = None
-		self.clear_filters()
+		return done
+
+	def load_configs(self, checkpoint=None, load_last=True, clear_info=False):
+
+		note = ('last' if load_last else 'best') if checkpoint is None else checkpoint
+		print('Selecting checkpoint: {}'.format(note))
+
+		for run in self.active:
+			if 'config' not in run:
+				if checkpoint is None:
+					ckpt_path = find_checkpoint(run.path, load_last=load_last)
+				else:
+					ckpt_path = os.path.join(run.path, 'checkpoint_{}.pth.tar'.format(checkpoint))
+				run.ckpt_path = ckpt_path
+
+				run.config = get_config(os.path.join(run.path, 'config.yml'))
+				if clear_info:
+					del run.config.info
+
+				run.base = get_base_config(run.config)
 
 	def show(self):
 		for i,r in enumerate(self.active):
 			print('{:>3} - {}'.format(i, r.name))
 
-	def getrun(self, name):
-		return self.full_info[self.run2idx[name]]
+	def __call__(self, name):
+		if isinstance(name, int):
+			return self.active[name]
+		for run in self.active:
+			if run.name == name:
+				return run
+		raise Exception('{} not found'.format(name))
 
 	def __getitem__(self, item):
-
 		if self.active is None:
 			print('From full')
 			runs = self.full_info
@@ -106,22 +254,127 @@ class Run_Manager(object):
 		indicies = set(indicies)
 		self.active = [run for i, run in enumerate(self.active) if i in indicies]
 
+	def sort_by(self, criterion='date'):
+		if criterion in 'date':
+			self.active = sorted(self.active, key=lambda r: r.splits[2])
+		elif criterion in 'job':
+			self.active = sorted(self.active, key=lambda r: r.splits[1])
+		elif criterion in 'model':
+			self.active = sorted(self.active, key=lambda r: r.splits[0].split('-')[1])
+		elif criterion in 'data':
+			self.active = sorted(self.active, key=lambda r: r.splits[0].split('-')[0])
+		else:
+			raise Exception('Unknown criterion: {}'.format(criterion))
+
+		return self
+
 	def filter(self, criterion):
 		self.active = [run for run in self.active if criterion(run)]
 		# print('{} remaining'.format(len(self.active)))
+		return self
+
+	def filter_checkpoints(self, num, cname='checkpoint_{}.pth.tar'):
+
+		cname = cname.format(num)
+
+		remaining = []
+		for run in self.active:
+			if cname in os.listdir(run.path):
+				remaining.append(run)
+
+		self.active = remaining
+		return self
+
+
+	def filter_complete(self, complete=None):
+		self.active = self._check_incomplete(complete=complete, show=False, negate=True)
+		return self
+	def filter_incomplete(self, complete=None):
+		self.active = self._check_incomplete(complete=complete, show=False, negate=False)
+		return self
+
+	def filter_since(self, date=None, job=None):
+		if job is not None:
+			self.sort_by('job')
+			jobs = sorted([run.splits[1].split('-')[0] for run in self.active])
+			idx = bisect_left(jobs, str(job).zfill(4))
+			self.active = self.active[idx:]
+
+		if date is not None:
+			self.sort_by('date')
+			dates = sorted([run.splits[2].split('-')[0] for run in self.active])
+			idx = bisect_left(dates, date)
+			self.active = self.active[idx:]
+
+		return self
+
+	def filter_dates(self, *dates):
+		remaining = []
+		dates = set(dates)
+
+		for run in self.active:
+			day, time = run.splits[2].split('-')
+			if day in dates:
+				remaining.append(day)
+
+		self.active = remaining
+		return self
+
+	def filter_jobs(self, *jobs):
+		remaining = []
+		allowed = {str(job).zfill(4) for job in jobs}
+
+		for run in self.active:
+			job, sch, proc = run.splits[1].split('-')
+			if job in allowed:
+				remaining.append(run)
+
+		self.active = remaining
+		return self
+
+	def filter_strs(self, *strs):
+		remaining = []
+		for run in self.active:
+			for s in strs:
+				if ('!' == s[0] and s[1:] not in run.name) or s in run.name:
+					remaining.append(run)
+
+		self.active = remaining
+		return self
+
+	def filter_models(self, *models):
+		remaining = []
+		models = set(models)
+		for run in self.active:
+			data, model = run.splits[0].split('-')
+			if model in models:
+				remaining.append(run)
+
+		self.active = remaining
+		return self
+
+	def filter_datasets(self, *datasets):
+		remaining = []
+		datasets = set(datasets)
+		for run in self.active:
+			data, model = run.splits[0].split('-')
+			if data in datasets:
+				remaining.append(run)
+
+		self.active = remaining
 		return self
 
 	def clear_filters(self):
 		self.active = self.full_info.copy()
 		return self
 
-	def select(self, model=None, dataset=None):
+	# def select(self, model=None, dataset=None):
+	# 	if model is not None:
+	# 		self.filter(lambda r: r.config.info.model_type == model)
+	# 	if dataset is not None:
+	# 		self.filter(lambda r: r.config.info.dataset_type == dataset)
+	# 	return self
 
-		if model is not None:
-			self.filter(lambda r: r.config.info.model_type == model)
-		if dataset is not None:
-			self.filter(lambda r: r.config.info.dataset_type == dataset)
-		return self
 
 	def options(self, models=True, datasets=True):
 
@@ -144,69 +397,39 @@ class Run_Manager(object):
 		return out
 
 	def _torun(self, x):
-		if not isinstance(x, Run):
+		if x is not None and not isinstance(x, Run):
 			x = self.getrun(x) if isinstance(x, str) else self[x]
 		return x
 
-	def _compare_configs(self, base, other, diffs, protected_keys=None):
-		if protected_keys is None:
-			protected_keys = self._protected_keys
-
-		for k,v in base.items():
-
-			if k in protected_keys:
-				pass
-			elif k not in other:
-				diffs[k] = '__removed__'
-			elif isinstance(v, Config):
-				self._compare_configs(v, other[k], diffs=diffs[k], protected_keys=protected_keys)
-				if len(diffs[k]) == 0:
-					del diffs[k]
-			elif v != other[k]:
-				diffs[k] = other[k]
-
-		for k,v in other.items():
-			if k not in protected_keys and k not in base:
-				diffs[k] = v
-
 	def compare(self, base, other=None, bi=False, ignore_keys=None):
-		# vs_default = False
-		base_run = self._torun(base)
-		base = self._torun(base).config
-		protected_keys = self._protected_keys.copy()
+
+		base, other = self._torun(base), self._torun(other)
+
+		if 'config' not in base:
+			self.load_configs()
+
+		protected_keys = self._extended_protected_keys.copy() if other is None else self._protected_keys.copy()
+
+		if other is None:
+			other = base.config
+			base = base.base
+		else:
+			base, other = base.config, other.config
+
 		if ignore_keys is not None:
 			protected_keys.update(ignore_keys)
-		if other is None:
-			if 'history' not in base.info:
-				raise Exception('Unable to load default - no history found')
 
-			other = base
-			base = parse_config(base.info.history)
-			base_run.base = base
-			# vs_default = True
-			protected_keys.update(self._extended_protected_keys)
-
-		else:
-			other = self._torun(other).config
-
-		diffs = Config()#util.NS()
-		self._compare_configs(base, other, diffs=diffs, protected_keys=protected_keys)
-
-		if bi:
-			adiffs = Config()#util.NS()
-			self._compare_configs(other, base, diffs=adiffs, protected_keys=protected_keys)
-			return diffs, adiffs
-
-		return diffs
-
+		return compare_config(base, other=other, bi=bi, ignore_keys=protected_keys)
 
 	def show_unique(self, ignore_keys=None):
 
 		for i, run in enumerate(self.active):
 
-			print('{}) {}'.format(i, run.name))
+			print('{:>3}) {}'.format(i, run.name))
 
-			diffs = self.compare(run, ignore_keys=ignore_keys)
+			if 'diffs' not in run:
+				run.diffs = self.compare(run, ignore_keys=ignore_keys)
+			diffs = run.diffs
 			base = run.base
 
 			for ks in util.flatten_tree(diffs):
@@ -298,9 +521,56 @@ class Run_Manager(object):
 			run.link = link_path
 
 
+def compare_config(base, other=None, bi=False, ignore_keys=None):
+	# vs_default = False
 
+	protected_keys = {'name', 'info', 'job', 'save_dir'}
+	if other is None:
 
+		protected_keys.update({
+		'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
+		})
 
+		if 'history' not in base.info:
+			raise Exception('Unable to load default - no history found')
+
+		other = base
+		base = get_base_config(base)
+
+	if ignore_keys is not None:
+		protected_keys.update(ignore_keys)
+
+	diffs = Config()#util.NS()
+	_compare_configs(base, other, diffs=diffs, protected_keys=protected_keys)
+
+	if bi:
+		adiffs = Config()#util.NS()
+		_compare_configs(other, base, diffs=adiffs, protected_keys=protected_keys)
+		return diffs, adiffs
+
+	return diffs
+
+def get_base_config(base):
+	return parse_config(base.info.history)
+
+def _compare_configs(base, other, diffs, protected_keys=None):
+
+	for k,v in base.items():
+
+		if k in protected_keys:
+			pass
+		elif k not in other:
+			diffs[k] = '__removed__'
+		elif isinstance(v, Config):
+			_compare_configs(v, other[k], diffs=diffs[k], protected_keys=protected_keys)
+			if len(diffs[k]) == 0:
+				del diffs[k]
+		elif v != other[k]:
+			diffs[k] = other[k]
+
+	for k,v in other.items():
+		if k not in protected_keys and k not in base:
+			diffs[k] = v
 
 
 
