@@ -85,9 +85,9 @@ def flatten_tree(tree, is_tree=None, prefix=None): # returns tuples of deep keys
 	return flat
 
 class Video(object):
-	def __init__(self, path=None, frames=None): # frames must be a sequence of numpy byte images
+	def __init__(self, frames): # frames must be a sequence of numpy byte images
 		self.frames = frames
-		self.path = path
+		# self.path = path
 
 	def play(self, mode='mpl'):
 
@@ -96,10 +96,22 @@ class Video(object):
 		else:
 			raise Exception('Unknonwn mode: {}'.format(mode))
 
-	def as_animation(self, ):
+	def as_animation(self, scale=1):
 
-		fig = plt.figure()
+		H, W, C = self.frames[0].shape
+
+		asp = W/H
+
+		fig = plt.figure(figsize=(1, asp), dpi=int(H*scale),)
+
+		ax = plt.axes([0, 0, 1, 1], frameon=False)
+		ax.get_xaxis().set_visible(False)
+		ax.get_yaxis().set_visible(False)
+		plt.autoscale(tight=True)
+
 		im = plt.imshow(self.frames[0])
+		# plt.axis('off')
+		# plt.tight_layout()
 
 		plt.close()
 
@@ -110,8 +122,7 @@ class Video(object):
 			im.set_data(self.frames[i])
 			return im
 
-		anim = animation.FuncAnimation(fig, animate, init_func=init, frames=self.frames.shape[0],
-		                               interval=50)
+		anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(self.frames), interval=50)
 
 		return anim
 

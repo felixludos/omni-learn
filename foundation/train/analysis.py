@@ -15,14 +15,71 @@ from .loading import find_checkpoint
 # from tensorboard import main as tb
 from tensorboard import program
 
+try:
+	import matplotlib.pyplot as plt
+	from matplotlib.figure import Figure
+	from matplotlib.animation import Animation
+except ImportError:
+	print('WARNING: matplotlib not found')
+
+try:
+	from IPython.display import HTML
+except ImportError:
+	print('WARNING: ipython not found')
+
+class Visualization(object): # wriapper
+	def __init__(self, obj):
+		self.obj = obj
+
+	def view(self, scale=1):
+
+		if isinstance(self.obj, util.Video):
+			return HTML(self.obj.as_animation(scale=scale).to_html5_video())
+
+		return self.obj
+
+	def __str__(self):
+		return 'Viz({})'.format(self.obj)
+
+	def __repr__(self):
+		return repr(self.obj)
+
+	def save(self, path, vid_ext='mp4', img_ext='png', **kwargs):
+		if isinstance(self.obj, Animation):
+			if 'fps' not in kwargs:
+				kwargs['fps'] = 30
+			if 'writer' not in kwargs:
+				kwargs['writer'] = 'imagemagick'
+
+			if 'gif' not in path and 'mp4' not in path:
+				path = '{}.{}'.format(path, vid_ext)
+
+			self.obj.save(path, **kwargs)
+
+		elif isinstance(self.obj, Figure):
+			if '.pdf' not in path and '.png' not in path: # only png or pdf
+				path = '{}.{}'.format(path, img_ext)
+			self.obj.savefig(path)
+
+		elif isinstance(self.obj, util.Video):
+
+			if '.gif' not in path and '.mp4' not in path: # only gif or mp4
+				path = '{}.{}'.format(path, vid_ext)
+
+			self.obj.export(path)
+
+		else:
+			raise Exception('Unknown obj: {}'.format(type(self.obj)))
+
+
 
 class Run(util.tdict):
 	def reset(self, state=None):
 		if 'state' in self:
 
-			if 'figs' in self.state:
-				for fig in self.state.figs.values():
-					fig.close()
+			# if 'figs' in self.state:
+			# 	for fig in self.state.figs.values():
+			# 		fig.close()
 
 			del self.state
 			torch.cuda.empty_cache()
@@ -62,13 +119,17 @@ class Run(util.tdict):
 
 	def visualize(self, pbar=None):
 
+		# import matplotlib.pyplot as plt
+
+		# plt.switch_backend('Agg')
+
 		jobs = self._manager._viz_fns.items()
 		if pbar is not None:
 			jobs = pbar(jobs, total=len(self._manager._viz_fns))
 
 		results = {}
 		for k, fn in jobs:
-			results[k] = fn(self.state)
+			results[k] = [Visualization(fig) for fig in fn(self.state)]
 			if pbar is not None:
 				jobs.set_description('VIZ: {}'.format(k))
 
@@ -77,12 +138,12 @@ class Run(util.tdict):
 
 	def save(self,  save_dir=None, fmtdir='{}', override=False,
 	         include_checkpoint=True, include_config=True, include_original=True,
-	         fig_ext='png'):
+	         img_ext='png', vid_ext='mp4'):
 
 		if save_dir is None:
 			save_dir = self._manager.save_dir
 
-		num = int(os.path.basename(self.ckpt_path).split('.')[0].split('_')[0])
+		num = int(os.path.basename(self.ckpt_path).split('.')[0].split('_')[1])
 		name = '{}_ckpt{}'.format(self.name, num)
 
 		save_path = os.path.join(save_dir, fmtdir.format(name))
@@ -92,7 +153,7 @@ class Run(util.tdict):
 		if override:
 			util.create_dir(save_path)
 		else:
-			os.mkdir(save_path)
+			os.makedirs(save_path)
 
 		if include_checkpoint:
 			src = self.ckpt_path
@@ -110,8 +171,15 @@ class Run(util.tdict):
 
 		if 'state' in self:
 			if 'figs' in self.state:
-				for name, fig in self.state.figs.items():
-					fig.savefig(os.path.join(save_path, '{}.{}'.format(name, fig_ext)))
+				for name, figs in self.state.figs.items():
+					if len(figs) == 1:
+						path = os.path.join(save_path, name)
+						figs[0].save(path, img_ext=img_ext, vid_ext=vid_ext)
+					else:
+						for i, fig in enumerate(figs):
+							path = os.path.join(save_path, '{}{}'.format(name, str(i).zfill(3)))
+							fig.save(path, img_ext=img_ext, vid_ext=vid_ext)
+
 				print('\tVisualization saved')
 
 			if 'evals' in self.state:
