@@ -75,9 +75,13 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 		super().__init__(din=din, dout=din if labels is None else dout, train=train)
 
 		if images is None:
-
-			with hf.File(os.path.join(dataroot, '3dshapes', '3dshapes_{}.h5'.format(
-					'train' if self.train else 'test')), 'r') as data:
+			if self.train is None:
+				file_name = '3dshapes.h5'
+			elif self.train:
+				file_name = '3dshapes_train.h5'
+			else:
+				file_name = '3dshapes_test.h5'
+			with hf.File(os.path.join(dataroot, '3dshapes', file_name), 'r') as data:
 
 				images = data['images']
 				images = torch.from_numpy(images[()]).permute(0,3,1,2)#.float().div(255)
