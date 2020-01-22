@@ -286,7 +286,7 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 		return x
 
 def Normal_Distribized(cls):
-	assert issubclass(cls, fm.Model)
+	assert issubclass(cls, fm.Model), '{}'.format(cls)
 	class Normal_Distrib_Model(cls):
 
 		def __init__(self, A):

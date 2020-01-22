@@ -74,15 +74,14 @@ class Visualization(object): # wriapper
 
 
 class Run(util.tdict):
-	def reset(self, state=None):
+
+	def clear(self):
 		if 'state' in self:
-
-			# if 'figs' in self.state:
-			# 	for fig in self.state.figs.values():
-			# 		fig.close()
-
 			del self.state
 			torch.cuda.empty_cache()
+
+	def reset(self, state=None):
+		self.clear()
 
 		if state is None:
 			state = util.tdict()
@@ -93,35 +92,31 @@ class Run(util.tdict):
 		self.state = state
 		return state
 
-	def load(self):
+	def load(self, **kwargs):
 		if 'state' not in self:
 			self.reset()
 
-		self._manager._load_fn(self.state)
+		self._manager._load_fn(self.state, **kwargs)
 
-	def run(self):
-		self._manager._run_model_fn(self.state)
+	def run(self, **kwargs):
+		self._manager._run_model_fn(self.state, **kwargs)
 
 	def evaluate(self, pbar=None):
 
 		jobs = self._manager._eval_fns.items()
-		if pbar is not None:
-			jobs = pbar(jobs, total=len(self._manager._eval_fns))
+		# if pbar is not None:
+		# 	jobs = pbar(jobs, total=len(self._manager._eval_fns))
 
 		results = {}
 		for k, fn in jobs:
-			results[k] = fn(self.state)
-			if pbar is not None:
-				jobs.set_description('EVAL: {}'.format(k))
+			results[k] = fn(self.state, pbar=pbar)
+			# if pbar is not None:
+			# 	jobs.set_description('EVAL: {}'.format(k))
 
 		self.state.evals = results
 		return results
 
 	def visualize(self, pbar=None):
-
-		# import matplotlib.pyplot as plt
-
-		# plt.switch_backend('Agg')
 
 		jobs = self._manager._viz_fns.items()
 		if pbar is not None:
@@ -225,6 +220,10 @@ class Run_Manager(object):
 
 		self.active = self.full_info.copy()
 
+	def clear_run_cache(self):
+		for run in self.full_info:
+			run.clear()
+
 	def _parse_names(self):
 		for run in self.full_info:
 			try:
@@ -279,13 +278,13 @@ class Run_Manager(object):
 
 		return done
 
-	def load_configs(self, checkpoint=None, load_last=True, clear_info=False):
+	def load_configs(self, checkpoint=None, load_last=True, clear_info=False, force=False):
 
 		note = ('last' if load_last else 'best') if checkpoint is None else checkpoint
 		print('Selecting checkpoint: {}'.format(note))
 
 		for run in self.active:
-			if 'config' not in run:
+			if 'config' not in run or force:
 				if checkpoint is None:
 					ckpt_path = find_checkpoint(run.path, load_last=load_last)
 				else:
