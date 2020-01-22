@@ -10,12 +10,20 @@ _config_registry = {}
 def register_config(name, path):
 	assert os.path.isfile(path), 'Cant find config file: {}'.format(path)
 	_config_registry[name] = path
-def register_config_dir(path):
+def register_config_dir(path, recursive=False, prefix=None, joiner=''):
 	assert os.path.isdir(path)
 	for fname in os.listdir(path):
-		if os.path.isfile(os.path.join(path, fname)):
-			name = fname.split('.')[0]
+		parts = fname.split('.')
+		candidate = os.path.join(path, fname)
+		if os.path.isfile(candidate) and len(parts) > 1 and parts[-1] in {'yml', 'yaml'}:
+			name = parts[0]
+			if prefix is not None:
+				name = joiner.join([prefix, name])
 			register_config(name, os.path.join(path, fname))
+		elif recursive and os.path.isdir(candidate):
+			prefix = fname if prefix is None else os.path.join(prefix, fname)
+			register_config_dir(candidate, recursive=recursive, prefix=prefix, joiner=os.sep)
+
 def recover_path(name):
 	if name in _config_registry:
 		return _config_registry[name]

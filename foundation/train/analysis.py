@@ -104,14 +104,14 @@ class Run(util.tdict):
 	def evaluate(self, pbar=None):
 
 		jobs = self._manager._eval_fns.items()
-		# if pbar is not None:
-		# 	jobs = pbar(jobs, total=len(self._manager._eval_fns))
+		if pbar is not None:
+			jobs = pbar(jobs, total=len(self._manager._eval_fns))
 
 		results = {}
 		for k, fn in jobs:
+			if pbar is not None:
+				jobs.set_description('EVAL: {}'.format(k))
 			results[k] = fn(self.state, pbar=pbar)
-			# if pbar is not None:
-			# 	jobs.set_description('EVAL: {}'.format(k))
 
 		self.state.evals = results
 		return results
@@ -131,7 +131,7 @@ class Run(util.tdict):
 		self.state.figs = results
 		return results
 
-	def save(self,  save_dir=None, fmtdir='{}', override=False,
+	def save(self,  save_dir=None, fmtdir='{}', overwrite=False,
 	         include_checkpoint=True, include_config=True, include_original=True,
 	         img_ext='png', vid_ext='mp4'):
 
@@ -145,41 +145,50 @@ class Run(util.tdict):
 
 		print('Saving results to: {}'.format(save_path))
 
-		if override:
-			util.create_dir(save_path)
+		try:
+			if overwrite:
+				util.create_dir(save_path)
+			else:
+				os.makedirs(save_path)
+		except FileExistsError:
+			print('ERROR: File already exists, you can overwrite using the "overwrite" arg')
 		else:
-			os.makedirs(save_path)
+			if include_checkpoint:
+				src = self.ckpt_path
+				dest = os.path.join(save_path, 'model.pth.tar')
+				shutil.copyfile(src, dest)
+				print('\tModel saved')
+			if include_config:
+				src = os.path.join(self.path, 'config.yml')
+				dest = os.path.join(save_path, 'config.yml')
+				shutil.copyfile(src, dest)
+				print('\tConfig saved')
+			if include_original:
+				with open(os.path.join(save_path, 'original_ckpt_path.txt'), 'w') as f:
+					f.write(self.ckpt_path)
 
-		if include_checkpoint:
-			src = self.ckpt_path
-			dest = os.path.join(save_path, 'model.pth.tar')
-			shutil.copyfile(src, dest)
-			print('\tModel saved')
-		if include_config:
-			src = os.path.join(self.path, 'config.yml')
-			dest = os.path.join(save_path, 'config.yml')
-			shutil.copyfile(src, dest)
-			print('\tConfig saved')
-		if include_original:
-			with open(os.path.join(save_path, 'original_ckpt_path.txt'), 'w') as f:
-				f.write(self.ckpt_path)
+			if 'state' in self:
+				if 'figs' in self.state:
+					for name, figs in self.state.figs.items():
+						if len(figs) == 1:
+							path = os.path.join(save_path, name)
+							figs[0].save(path, img_ext=img_ext, vid_ext=vid_ext)
+						else:
+							for i, fig in enumerate(figs):
+								path = os.path.join(save_path, '{}{}'.format(name, str(i).zfill(3)))
+								fig.save(path, img_ext=img_ext, vid_ext=vid_ext)
 
-		if 'state' in self:
-			if 'figs' in self.state:
-				for name, figs in self.state.figs.items():
-					if len(figs) == 1:
-						path = os.path.join(save_path, name)
-						figs[0].save(path, img_ext=img_ext, vid_ext=vid_ext)
-					else:
-						for i, fig in enumerate(figs):
-							path = os.path.join(save_path, '{}{}'.format(name, str(i).zfill(3)))
-							fig.save(path, img_ext=img_ext, vid_ext=vid_ext)
+					print('\tVisualization saved')
 
-				print('\tVisualization saved')
+				if 'evals' in self.state:
+					try:
+						yaml.dump(self.state.evals, open(os.path.join(save_path, 'eval.yaml'), 'w'))
+					except:
+						print('WARNING: Saving eval results in yaml format failed.')
+					torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
+					print('\tEvaluation saved')
 
-			if 'evals' in self.state:
-				torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
-				print('\tEvaluation saved')
+		return save_path
 
 
 class Run_Manager(object):
