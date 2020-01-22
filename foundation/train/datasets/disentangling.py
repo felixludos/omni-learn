@@ -66,7 +66,7 @@ register_dataset('dsprites', dSprites)
 class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset):
 
 	def __init__(self, dataroot=None, images=None, labels=None, din=(3, 64, 64), dout=None, load_memory=True,
-	             train=True):
+	             train=True, noise=None):
 		assert images is not None or dataroot is not None, 'nothing to use/load'
 
 		if not load_memory:
@@ -86,6 +86,10 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 					labels = data['labels']
 					labels = torch.from_numpy(labels[()]).float()
 
+		if noise is not None:
+			print('Adding {} noise'.format(noise))
+		self.noise = noise
+
 		self.register_buffer('images', images)
 		self.labeled = labels is not None
 		if self.labeled:
@@ -104,6 +108,8 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 		# 	item = item.tolist()
 		# images = torch.from_numpy(self.images[item]).permute(2,0,1).float().div(255)
 		images = self.images[item].float().div(255)
+		if self.noise is not None:
+			images = images.add(torch.randn_like(images).mul(self.noise)).clamp(0,1)
 		if self.labeled:
 			labels = self.labels[item]
 			# labels = torch.from_numpy(self.labels[item]).float()
