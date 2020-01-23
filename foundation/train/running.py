@@ -44,6 +44,7 @@ def run_full(A, get_data, get_model, get_name=None):
 	
 	A, (*datasets, testset), model, ckpt = load(path=path, A=A, mode='train',
 	                                            load_last=True, # load will load the best, rather than last
+	                                            load_optim='load' not in A, load_scheduler='load' not in A, # only load network parameters when "loading" pretrained model
 	                                              get_model=get_model, get_data=get_data,
 	                                              return_args=True, return_ckpt=True, )#strict='load' not in A)
 

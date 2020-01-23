@@ -61,6 +61,7 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 
 
 def load(path=None, A=None, get_model='default', get_data='default', mode='train',
+         load_optim=True, load_scheduler=True,
          load_state_dict=True, load_last=False, force_load_model=False,
          return_args=False, return_ckpt=False):
 	assert path is not None or A is not None, 'must provide either path to checkpoint or args'
@@ -141,6 +142,13 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 		sys.stdout.flush()
 
 		if checkpoint is not None and 'model_state' in checkpoint and load_state_dict:
+
+			if 'optim' in checkpoint['model_state'] and not load_optim:
+				del checkpoint['model_state']['optim']
+
+			if 'scheduler' in checkpoint['model_state'] and not load_scheduler:
+				del checkpoint['model_state']['scheduler']
+
 			model.load_state_dict(checkpoint['model_state'])
 			print('Loaded model_state from checkpoint')
 
