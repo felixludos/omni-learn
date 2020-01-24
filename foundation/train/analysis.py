@@ -136,7 +136,7 @@ class Run(util.tdict):
 			if pbar is None:
 				print('--- Visualizing: {}'.format(k))
 			else:
-				jobs.set_description('EVAL: {}'.format(k))
+				jobs.set_description('VIZ: {}'.format(k))
 
 			results[k] = [Visualization(fig) for fig in fn(self.state, pbar=pbar)]
 
@@ -147,13 +147,13 @@ class Run(util.tdict):
 		return results
 
 	def save(self,  save_dir=None, fmtdir='{}', overwrite=False,
-	         include_checkpoint=True, include_config=True, include_original=True,
+	         include_checkpoint=True, include_config=True, include_original=True, include_results=True,
 	         img_ext='png', vid_ext='mp4'):
 
 		if save_dir is None:
 			save_dir = self._manager.save_dir
 
-		num = int(os.path.basename(self.ckpt_path).split('.')[0].split('_')[1])
+		num = self.ckpt_num
 		name = '{}_ckpt{}'.format(self.name, num)
 
 		save_path = os.path.join(save_dir, fmtdir.format(name))
@@ -197,13 +197,14 @@ class Run(util.tdict):
 
 				if 'evals' in self.state:
 					with open(os.path.join(save_path, 'eval.txt'), 'w') as f:
-						f.write(str(self.state.evals))
+						for k,v in self.state.evals.items():
+							f.write('{} : {}'.format(k,str(v)))
 					torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
 					print('\tEvaluation saved')
 
-				if 'results' in self.state:
+				if include_results and 'results' in self.state:
 					torch.save(self.state.results, os.path.join(save_path, 'results.pth.tar'))
-					print('\tResults saved')
+					print('\tResults saved: {}'.format(', '.join(map(str, self.state.results.keys()))))
 
 		return save_path
 
@@ -244,7 +245,7 @@ class Run_Manager(object):
 
 		self._parse_names()
 
-		self.active = self.full_info.copy()
+		self.set_active()
 
 	def clear_run_cache(self):
 		for run in self.full_info:
@@ -272,7 +273,7 @@ class Run_Manager(object):
 				if 'config.yml' in os.listdir(run_path):
 					try:
 						run = Run(name=run_name, path=run_path, _manager=self)
-						run.progress = len([cn for cn in os.listdir(run_path) if '.pth.tar' in cn])
+						# run.progress = len([cn for cn in os.listdir(run_path) if '.pth.tar' in cn])
 					except FileNotFoundError:
 						pass
 					else:
@@ -304,36 +305,107 @@ class Run_Manager(object):
 
 		return done
 
-	def load_configs(self, checkpoint=None, load_last=True, clear_info=False, force=False):
+
+	def prep_info(self, checkpoint=None, load_last=True, clear_info=False, force=False):
+
+		self.select_checkpoint(checkpoint=checkpoint, load_last=load_last, force=force)
+		self.load_configs(force=force, clear_info=clear_info)
+
+	def select_checkpoint(self, checkpoint=None, load_last=True, force=False):
 
 		note = ('last' if load_last else 'best') if checkpoint is None else checkpoint
 		print('Selecting checkpoint: {}'.format(note))
 
+		valid = []
+
 		for run in self.active:
-			if 'config' not in run or force:
+			if 'ckpt_path' not in run or force:
+
 				if checkpoint is None:
 					ckpt_path = find_checkpoint(run.path, load_last=load_last)
 				else:
 					ckpt_path = os.path.join(run.path, 'checkpoint_{}.pth.tar'.format(checkpoint))
+
+				if 'checkpoint_' not in ckpt_path:
+					print('{} has no checkpoint'.format(run.name))
+					continue
+
 				run.ckpt_path = ckpt_path
 
-				run.config = get_config(os.path.join(run.path, 'config.yml'))
+				ckpt_name = os.path.basename(run.ckpt_path)
+				try:
+					run.ckpt_num = int(ckpt_name.split('_')[-1].split('.')[0])
+				except ValueError as e:
+					print(run.ckpt_path, ckpt_name)
+					raise e
+
+			valid.append(run)
+
+		self.set_active(valid)
+
+
+	def load_configs(self, force=False, clear_info=False):
+		valid = []
+
+		for run in self.active:
+			if 'config' not in run or force:
+
+				fname = os.path.join(run.path, 'config.yml')
+
+				if not os.path.isfile(fname):
+					print('{} has no config'.format(run.name))
+					continue
+
+				config = get_config(fname)
 				if clear_info:
 					del run.config.info
 
-				run.base = get_base_config(run.config)
+				base = get_base_config(config)
 
-	def show(self):
-		for i,r in enumerate(self.active):
-			print('{:>3} - {}'.format(i, r.name))
+				if base is None:
+					print('{} has no base'.format(run.name))
+					continue
+
+				run.config = config
+				run.base = base
+
+			valid.append(run)
+
+		print('Loaded configs')
+		self.set_active(valid)
+
+	def set_active(self, active=None):
+		if active is None:
+			active = self.full_info.copy()
+		self.active = active
+		self.name2idx = None
+	def extend(self, items):
+		self.active.extend(items)
+		if len(items):
+			self.name2idx = None
+	def append(self, item):
+		self.active.append(item)
+		self.name2idx = None
+
+
+	def _update_names(self):
+		if self.name2idx is not None:
+			return
+		self.name2idx = {run.name:i for i,run in enumerate(self.active)}
 
 	def __call__(self, name):
 		if isinstance(name, int):
 			return self.active[name]
-		for run in self.active:
-			if run.name == name:
-				return run
+		if isinstance(name, str):
+			self._update_names()
+			idx = self.name2idx[name]
+			return self.active[idx]
+
 		raise Exception('{} not found'.format(name))
+
+	def __contains__(self, item):
+		self._update_names()
+		return item in self.name2idx
 
 	def __getitem__(self, item):
 		if self.active is None:
@@ -345,7 +417,7 @@ class Run_Manager(object):
 
 	def filter_idx(self, *indicies):
 		indicies = set(indicies)
-		self.active = [run for i, run in enumerate(self.active) if i in indicies]
+		self.set_active([run for i, run in enumerate(self.active) if i in indicies])
 
 	def sort_by(self, criterion='date'):
 		if criterion in 'date':
@@ -359,11 +431,14 @@ class Run_Manager(object):
 		else:
 			raise Exception('Unknown criterion: {}'.format(criterion))
 
+		self.name2idx = None
+
 		return self
 
 	def filter(self, criterion):
-		self.active = [run for run in self.active if criterion(run)]
+		active = [run for run in self.active if criterion(run)]
 		# print('{} remaining'.format(len(self.active)))
+		self.set_active(active)
 		return self
 
 	def filter_checkpoints(self, num, cname='checkpoint_{}.pth.tar'):
@@ -375,29 +450,35 @@ class Run_Manager(object):
 			if cname in os.listdir(run.path):
 				remaining.append(run)
 
-		self.active = remaining
+		self.set_active(remaining)
 		return self
 
 
 	def filter_complete(self, complete=None):
-		self.active = self._check_incomplete(complete=complete, show=False, negate=True)
+		remaining = self._check_incomplete(complete=complete, show=False, negate=True)
+		self.set_active(remaining)
 		return self
 	def filter_incomplete(self, complete=None):
-		self.active = self._check_incomplete(complete=complete, show=False, negate=False)
+		remaining = self._check_incomplete(complete=complete, show=False, negate=False)
+		self.set_active(remaining)
 		return self
 
+	def filter_sel(self, sel): # for slices
+		self.set_active(self.active[sel])
+
 	def filter_since(self, date=None, job=None):
+
 		if job is not None:
 			self.sort_by('job')
 			jobs = sorted([run.splits[1].split('-')[0] for run in self.active])
 			idx = bisect_left(jobs, str(job).zfill(4))
-			self.active = self.active[idx:]
+			self.set_active(self.active[idx:])
 
 		if date is not None:
 			self.sort_by('date')
 			dates = sorted([run.splits[2].split('-')[0] for run in self.active])
 			idx = bisect_left(dates, date)
-			self.active = self.active[idx:]
+			self.set_active(self.active[idx:])
 
 		return self
 
@@ -410,7 +491,7 @@ class Run_Manager(object):
 			if day in dates:
 				remaining.append(day)
 
-		self.active = remaining
+		self.set_active(remaining)
 		return self
 
 	def filter_jobs(self, *jobs):
@@ -422,7 +503,7 @@ class Run_Manager(object):
 			if job in allowed:
 				remaining.append(run)
 
-		self.active = remaining
+		self.set_active(remaining)
 		return self
 
 	def filter_strs(self, *strs):
@@ -432,7 +513,7 @@ class Run_Manager(object):
 				if ('!' == s[0] and s[1:] not in run.name) or s in run.name:
 					remaining.append(run)
 
-		self.active = remaining
+		self.set_active(remaining)
 		return self
 
 	def filter_models(self, *models):
@@ -443,7 +524,7 @@ class Run_Manager(object):
 			if model in models:
 				remaining.append(run)
 
-		self.active = remaining
+		self.set_active(remaining)
 		return self
 
 	def filter_datasets(self, *datasets):
@@ -454,11 +535,11 @@ class Run_Manager(object):
 			if data in datasets:
 				remaining.append(run)
 
-		self.active = remaining
+		self.set_active(remaining)
 		return self
 
 	def clear_filters(self):
-		self.active = self.full_info.copy()
+		self.set_active()
 		return self
 
 	# def select(self, model=None, dataset=None):
@@ -469,29 +550,29 @@ class Run_Manager(object):
 	# 	return self
 
 
-	def options(self, models=True, datasets=True):
-
-		out = []
-
-		if models:
-			mopts = set()
-			for run in self.active:
-				mopts.add(run.config.info.model_type)
-			out.append(mopts)
-
-		if datasets:
-			dopts = set()
-			for run in self.active:
-				dopts.add(run.config.info.dataset_type)
-			out.append(dopts)
-
-		if len(out) == 1:
-			return out[0]
-		return out
+	# def options(self, models=True, datasets=True):
+	#
+	# 	out = []
+	#
+	# 	if models:
+	# 		mopts = set()
+	# 		for run in self.active:
+	# 			mopts.add(run.config.info.model_type)
+	# 		out.append(mopts)
+	#
+	# 	if datasets:
+	# 		dopts = set()
+	# 		for run in self.active:
+	# 			dopts.add(run.config.info.dataset_type)
+	# 		out.append(dopts)
+	#
+	# 	if len(out) == 1:
+	# 		return out[0]
+	# 	return out
 
 	def _torun(self, x):
 		if x is not None and not isinstance(x, Run):
-			x = self.getrun(x) if isinstance(x, str) else self[x]
+			x = self(x) if isinstance(x, str) else self[x]
 		return x
 
 	def compare(self, base, other=None, bi=False, ignore_keys=None):
@@ -514,22 +595,52 @@ class Run_Manager(object):
 
 		return compare_config(base, other=other, bi=bi, ignore_keys=protected_keys)
 
-	def show_unique(self, ignore_keys=None):
+	# def show_unique(self, ignore_keys=None):
+	#
+	# 	for i, run in enumerate(self.active):
+	#
+	# 		print('{:>3}) {}'.format(i, run.name))
+	#
+	# 		if 'diffs' not in run:
+	# 			run.diffs = self.compare(run, ignore_keys=ignore_keys)
+	# 		diffs = run.diffs
+	# 		base = run.base
+	#
+	# 		for ks in util.flatten_tree(diffs):
+	# 			print('{}{} - {} ({})'.format('\t', '.'.join(map(str, ks)), diffs[ks], (base[ks] if ks in base else '_')))#, util.deep_get(diffs, ks)))
+	# 		print()
+	#
+	# 		run.diffs = diffs
 
-		for i, run in enumerate(self.active):
+	def _get_unique(self, run, ignore_keys=None):
+		if 'diffs' not in run:
+			run.diffs = self.compare(run, ignore_keys=ignore_keys)
+		diffs = run.diffs
+		base = run.base
 
+		unique = ['{} - {} ({})'.format('.'.join(map(str, ks)), diffs[ks],
+			                              (base[ks] if ks in base else '_'))
+		          for ks in util.flatten_tree(diffs)]
+
+		return unique
+
+	def show(self, *props, ignore_keys=None, indent='\t'):
+
+		props = set(props)
+
+		for i,run in enumerate(self.active):
 			print('{:>3}) {}'.format(i, run.name))
 
-			if 'diffs' not in run:
-				run.diffs = self.compare(run, ignore_keys=ignore_keys)
-			diffs = run.diffs
-			base = run.base
+			if 'all' in props or 'checkpoint' in props or 'ckpt' in props:
+				print('{}Checkpoint: {}'.format(indent, run.ckpt_num))
 
-			for ks in util.flatten_tree(diffs):
-				print('{}{} - {} ({})'.format('\t', '.'.join(map(str, ks)), diffs[ks], (base[ks] if ks in base else '_')))#, util.deep_get(diffs, ks)))
-			print()
+			if 'all' in props or 'unique' in props:
+				unique = self._get_unique(run, ignore_keys=ignore_keys)
+				print('\n'.join(['{}{}'.format(indent, line) for line in unique]))
 
-			run.diffs = diffs
+			if len(props):
+				print()
+
 
 	def start_tb(self, port=None):
 		assert self.tbout is not None, 'no tbout'
@@ -644,7 +755,8 @@ def compare_config(base, other=None, bi=False, ignore_keys=None):
 	return diffs
 
 def get_base_config(base):
-	return parse_config(base.info.history)
+	if 'info' in base and 'history' in base.info:
+		return parse_config(base.info.history)
 
 def _compare_configs(base, other, diffs, protected_keys=None):
 

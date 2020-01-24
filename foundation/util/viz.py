@@ -16,13 +16,50 @@ except ImportError:
 # except ImportError:
 # 	print('WARNING: ffmpeg not found')
 
+from .math import factors
+
+def calc_tiling(N, H=None, W=None, prefer_tall=False):
+
+	if H is not None or W is not None:
+		raise NotImplementedError
+
+	H,W = tuple(factors(N))[-2:] # most middle 2 factors
+
+	if H > W and not prefer_tall:
+		H, W = W, H
+
+	if not prefer_tall:
+		H,W = W,H
+	return H, W
+
+
+def tile_imgs(imgs, dim=0, H=None, W=None): # for numpy images
+
+	raise NotImplementedError
+
+	assert len(imgs.shape) > 3, 'not enough dimensions'
+	if dim != 0:
+		raise NotImplementedError
+
+	N, h, w, c = imgs.shape
+
+	if H is None or W is None:
+
+		if H is None:
+			W = 0
+
+		pass
+
+	assert H*W == imgs.shape[dim], 'Invalid tiling'
+
+
+
 def play_back(imgs, figax=None, batch_first=True): # imgs is numpy: either (seq, H, W, C) or (batch, seq, H, W, C)
 	if len(imgs.shape) > 4:  # tile first
 		if not batch_first:
 			imgs = imgs.transpose(1,0,2,3,4)
 		N, S, h, w, c = imgs.shape
-		H = int(np.ceil(np.sqrt(N)))
-		W = int(np.ceil(float(N) / H))
+		H, W = calc_tiling(N)
 		imgs = imgs.reshape(H, W, S, h, w, c)
 		imgs = imgs.transpose(2, 0, 3, 1, 4, 5)
 		imgs = imgs.reshape(S, H * h, W * w, c)

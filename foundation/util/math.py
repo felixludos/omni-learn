@@ -12,6 +12,10 @@ from torch.distributions.utils import lazy_property
 # Simple math
 #####################
 
+def factors(n): # has duplicates, starts from the extremes and ends with the middle
+	return (x for tup in ([i, n//i]
+	            for i in range(1, int(n**0.5)+1) if n % i == 0) for x in tup)
+
 def atanh(x): # probably shouldnt be used
 	return (1+x).div(1-x).log() / 2
 

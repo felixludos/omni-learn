@@ -124,6 +124,8 @@ def get_dataset(name, *new_args, **new_kwargs):
 
 	cls, args, kwargs = _dataset_registry[name]
 
+	kwargs = kwargs.copy()
+
 	if len(new_args): # get overwritten
 		args = new_args
 	kwargs.update(new_kwargs)
