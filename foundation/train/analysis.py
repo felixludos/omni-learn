@@ -107,16 +107,21 @@ class Run(util.tdict):
 		# if pbar is not None:
 		# 	jobs = pbar(jobs, total=len(self._manager._eval_fns))
 
-		results = {}
-		for k, fn in jobs:
-			print('--- Evaluating: {}'.format(k))
-			start = time.time()
-			# if pbar is not None:
-			# 	jobs.set_description('EVAL: {}'.format(k))
-			results[k] = fn(self.state, pbar=pbar)
-			print('... took: {:3.2f}\n'.format(time.time() - start))
+		if 'evals' not in self.state:
+			self.state.evals = {}
+		results = self.state.evals
 
-		self.state.evals = results
+		for k, fn in jobs:
+			if k not in results:
+				print('--- Evaluating: {}'.format(k))
+				start = time.time()
+				# if pbar is not None:
+				# 	jobs.set_description('EVAL: {}'.format(k))
+				results[k] = fn(self.state, pbar=pbar)
+				print('... took: {:3.2f}\n'.format(time.time() - start))
+			print('{}: {}'.format(k, results[k]))
+
+		# self.state.evals = results
 		return results
 
 	def visualize(self, pbar=None):
