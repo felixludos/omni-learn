@@ -118,8 +118,8 @@ class Run(util.tdict):
 				# if pbar is not None:
 				# 	jobs.set_description('EVAL: {}'.format(k))
 				results[k] = fn(self.state, pbar=pbar)
-				print('... took: {:3.2f}\n'.format(time.time() - start))
-			print('{}: {}'.format(k, results[k]))
+				print('... took: {:3.2f}'.format(time.time() - start))
+			print('{}: {}\n'.format(k, results[k]))
 
 		# self.state.evals = results
 		return results
@@ -132,13 +132,16 @@ class Run(util.tdict):
 
 		results = {}
 		for k, fn in jobs:
-
-			print('--- Visualizing: {}'.format(k))
 			start = time.time()
-			# if pbar is not None:
-			# 	jobs.set_description('EVAL: {}'.format(k))
+			if pbar is None:
+				print('--- Visualizing: {}'.format(k))
+			else:
+				jobs.set_description('EVAL: {}'.format(k))
+
 			results[k] = [Visualization(fig) for fig in fn(self.state, pbar=pbar)]
-			print('... took: {:3.2f}\n'.format(time.time() - start))
+
+			if pbar is None:
+				print('... took: {:3.2f}\n'.format(time.time() - start))
 
 		self.state.figs = results
 		return results
@@ -193,12 +196,14 @@ class Run(util.tdict):
 					print('\tVisualization saved')
 
 				if 'evals' in self.state:
+					with open(os.path.join(save_path, 'eval.txt'), 'w') as f:
+						f.write(str(self.state.evals))
 					torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
 					print('\tEvaluation saved')
 
-				# if 'results' in self.state:
-				# 	torch.save(self.state.evals, os.path.join(save_path, 'results.pth.tar'))
-				# 	print('\tResults saved')
+				if 'results' in self.state:
+					torch.save(self.state.results, os.path.join(save_path, 'results.pth.tar'))
+					print('\tResults saved')
 
 		return save_path
 
