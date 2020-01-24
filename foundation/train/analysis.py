@@ -1,5 +1,5 @@
 
-import sys, os, shutil
+import sys, os, shutil, time
 import numpy as np
 import torch
 import yaml
@@ -104,14 +104,17 @@ class Run(util.tdict):
 	def evaluate(self, pbar=None):
 
 		jobs = self._manager._eval_fns.items()
-		if pbar is not None:
-			jobs = pbar(jobs, total=len(self._manager._eval_fns))
+		# if pbar is not None:
+		# 	jobs = pbar(jobs, total=len(self._manager._eval_fns))
 
 		results = {}
 		for k, fn in jobs:
-			if pbar is not None:
-				jobs.set_description('EVAL: {}'.format(k))
+			print('--- Evaluating: {}'.format(k))
+			start = time.time()
+			# if pbar is not None:
+			# 	jobs.set_description('EVAL: {}'.format(k))
 			results[k] = fn(self.state, pbar=pbar)
+			print('... took: {:3.2f}\n'.format(time.time() - start))
 
 		self.state.evals = results
 		return results
@@ -124,9 +127,13 @@ class Run(util.tdict):
 
 		results = {}
 		for k, fn in jobs:
-			results[k] = [Visualization(fig) for fig in fn(self.state)]
-			if pbar is not None:
-				jobs.set_description('VIZ: {}'.format(k))
+
+			print('--- Visualizing: {}'.format(k))
+			start = time.time()
+			# if pbar is not None:
+			# 	jobs.set_description('EVAL: {}'.format(k))
+			results[k] = [Visualization(fig) for fig in fn(self.state, pbar=pbar)]
+			print('... took: {:3.2f}\n'.format(time.time() - start))
 
 		self.state.figs = results
 		return results
@@ -181,12 +188,12 @@ class Run(util.tdict):
 					print('\tVisualization saved')
 
 				if 'evals' in self.state:
-					try:
-						yaml.dump(self.state.evals, open(os.path.join(save_path, 'eval.yaml'), 'w'))
-					except:
-						print('WARNING: Saving eval results in yaml format failed.')
 					torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
 					print('\tEvaluation saved')
+
+				# if 'results' in self.state:
+				# 	torch.save(self.state.evals, os.path.join(save_path, 'results.pth.tar'))
+				# 	print('\tResults saved')
 
 		return save_path
 

@@ -143,13 +143,15 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 
 		if checkpoint is not None and 'model_state' in checkpoint and load_state_dict:
 
-			if 'optim' in checkpoint['model_state'] and not load_optim:
-				del checkpoint['model_state']['optim']
+			params = checkpoint['model_state'].copy()
 
-			if 'scheduler' in checkpoint['model_state'] and not load_scheduler:
-				del checkpoint['model_state']['scheduler']
+			if 'optim' in params and not load_optim:
+				del params['optim']
 
-			model.load_state_dict(checkpoint['model_state'])
+			if 'scheduler' in params and not load_scheduler:
+				del params['scheduler']
+
+			model.load_state_dict(params)
 			print('Loaded model_state from checkpoint')
 
 		out.append(model)

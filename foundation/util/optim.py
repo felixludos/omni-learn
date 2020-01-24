@@ -151,6 +151,9 @@ class Complex_Optimizer(Optimizer):
 	def items(self):
 		return self.optims.items()
 
+	def __len__(self):
+		return len(self.optims)
+
 	def __getitem__(self, item):
 		return self.optims[item]
 	def __setitem__(self, key, value):
