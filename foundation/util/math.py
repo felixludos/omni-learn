@@ -218,6 +218,25 @@ def gen_deterministic_seed(seed):
 	set_seed(seed)
 	return gen_random_seed()
 
+def subset(seq, k=None, seed=None):
+	'''
+	Create a reproducable subset of k samples (using seed), without changing the global random state
+	(unless seed is not provided).
+
+	seq can be an int: seq <- [0...seq-1]
+	'''
+	if seed is not None:
+		rng = np.random.RandomState()
+		rng.seed(seed)
+	else:
+		rng = np.random
+
+	perm = rng.permutation(seq)
+	if k is not None:
+		return perm[:k]
+	return perm
+
+
 class OUNoise(nn.Module):
 	"""docstring for OUNoise"""
 	def __init__(self, dim=1, batch_size=None,

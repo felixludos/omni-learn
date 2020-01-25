@@ -58,6 +58,10 @@ def deep_get(tree, keys):
 			return tree[keys[0]]
 	return deep_get(tree[keys[0]], keys[1:])
 
+def sort_by(seq, vals, reverse=False):
+	return [x[0] for x in sorted(zip(seq, vals), key=lambda x: x[1], reverse=reverse)]
+
+
 
 class Simple_Child(object): # a simple wrapper that delegates __getattr__s to some parent attribute
 

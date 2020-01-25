@@ -1,5 +1,6 @@
 
 import sys, os, shutil, time
+import traceback
 import numpy as np
 import torch
 import yaml
@@ -14,11 +15,13 @@ from .loading import find_checkpoint
 # import tensorflow as tf
 # from tensorboard import main as tb
 from tensorboard import program
+import pandas as pd
 
 try:
 	import matplotlib.pyplot as plt
 	from matplotlib.figure import Figure
 	from matplotlib.animation import Animation
+	import seaborn as sns
 except ImportError:
 	print('WARNING: matplotlib not found')
 
@@ -143,18 +146,23 @@ class Run(util.tdict):
 			if pbar is None:
 				print('... took: {:3.2f}\n'.format(time.time() - start))
 
+		if pbar is not None:
+			jobs.close()
+
 		self.state.figs = results
 		return results
 
-	def save(self,  save_dir=None, fmtdir='{}', overwrite=False,
+	def save(self,  save_dir=None, fmtdir='{}', overwrite=False, append_ckpt=True,
 	         include_checkpoint=True, include_config=True, include_original=True, include_results=True,
 	         img_ext='png', vid_ext='mp4'):
 
 		if save_dir is None:
 			save_dir = self._manager.save_dir
 
-		num = self.ckpt_num
-		name = '{}_ckpt{}'.format(self.name, num)
+		name = self.name
+		if append_ckpt and 'ckpt' in self.meta and 'ckpt' not in name:
+			num = self.meta.ckpt
+			name = '{}_ckpt{}'.format(name, num)
 
 		save_path = os.path.join(save_dir, fmtdir.format(name))
 
@@ -198,7 +206,7 @@ class Run(util.tdict):
 				if 'evals' in self.state:
 					with open(os.path.join(save_path, 'eval.txt'), 'w') as f:
 						for k,v in self.state.evals.items():
-							f.write('{} : {}'.format(k,str(v)))
+							f.write('{} : {}\n'.format(k,str(v)))
 					torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
 					print('\tEvaluation saved')
 
@@ -243,23 +251,171 @@ class Run_Manager(object):
 		self._find_runs(limit=limit)
 		print('Found {} runs'.format(len(self.full_info)))
 
+		self.set_active()
 		self._parse_names()
 
-		self.set_active()
+		self.selections = {}
 
-	def clear_run_cache(self):
-		for run in self.full_info:
-			run.clear()
+	def __len__(self):
+		return len(self.active)
 
-	def _parse_names(self):
-		for run in self.full_info:
+	def __iter__(self):
+		return iter(self.active)
+
+	def map(self, fn, safe=False, pbar=None, reduce=None):
+		'''
+		fn is a callable taking one run as input
+		'''
+
+		outs = []
+
+		seq = self.active if pbar is None else pbar(self.active)
+
+		for run in seq:
 			try:
-				nature, job, date = run.name.split('_')
-				# job = job.split('-')[0]
-				run.splits = nature, job, date
-			except ValueError:
-				# print('{} splitting failed'.format(run.name))
+				out = fn(run)
+				outs.append(out)
+			except Exception as e:
+				if safe:
+					print('{} failed'.format(run.name))
+					traceback.print_exc()
+				else:
+					raise e
+
+		if pbar is not None:
+			seq.close()
+
+		if reduce is not None:
+			return reduce(outs)
+		return outs
+
+	def through(self, **map_kwargs):
+
+		def _execute(fn, args=[], kwargs={}):
+			return self.map(lambda run: fn(run, *args, **kwargs),
+			                **map_kwargs)
+
+		return util.make_ghost(Run, _execute)
+
+	def clear_run_cache(self, **kwargs):
+		self.map(lambda run: run.clear(), **kwargs)
+
+	def load_into(self, name, key=None, **kwargs):
+
+		if key is None:
+			key = name.split('.')[0]
+
+		def _load(run):
+			path = os.path.join(run.path, name)
+			if not os.path.isfile(path):
+				print('{} not found in: {}'.format(name, run.name))
+			else:
+				run[key] = torch.load(path)
+
+		self.map(_load, **kwargs)
+
+	def stats_dataframe(self): # gets all stats
+
+		data = []
+
+		keys = None
+
+		for run in self.active:
+			if 'stats' in run:
+				if keys is None:
+					keys = list(run.stats.keys())
+
+				row = [run.stats[key] for key in keys]
+
+				data.append(row)
+
+		if keys is None:
+			print('No stats found')
+			return None
+
+		return pd.DataFrame(data, columns=keys)
+
+
+
+	def plot_stats(self, *stats, figax=None, get_X=None, palette='muted', **kwargs):
+
+		df = self.stats_dataframe()[list(stats)]
+
+		if get_X is None:
+			get_X = lambda run: run.idx
+
+		X = [get_X(run) for run in self]
+
+		df['run'] = X
+
+		yname = 'value'
+		hue = 'stat'
+
+		if len(stats) > 1:
+			df = pd.melt(df, id_vars='run', var_name=hue, value_name=yname)
+		else:
+			yname = stats[0]
+			hue = None
+			palette = None
+
+		if figax is None:
+			figax = plt.subplots()
+		_, ax = figax
+
+		sns.barplot(x='run', y=yname, hue=hue, data=df, ax=ax, palette=palette, **kwargs)
+
+		# plt.title(', '.join(stats))
+
+		return figax
+
+	def _parse_names(self, get_model=None, get_dataset=None, get_date=None, get_job=None, get_ckpt=None):
+		for run in self.active:
+
+			run.meta = util.tdict()
+
+			try:
+				terms = run.name.split('_')
+
+				if len(terms) == 3:
+					nature, job, date = terms
+					ckpt = None
+				elif len(terms) == 4 and terms[3][:4]=='ckpt':
+					nature, job, date, ckpt = terms
+
+				terms = nature.split('-')
+				if len(terms) > 2:
+					terms = '-'.join(terms[:-1]), terms[-1]
+				run.meta.dataset, run.meta.model = terms
+
+				run.meta.job = tuple(job.split('-'))
+				assert len(run.meta.job) == 3
+
+				run.meta.date = tuple(date.split('-'))
+				assert len(run.meta.date) == 2
+
+				if ckpt is not None:
+					run.meta.ckpt = int(ckpt[4:])
+
+
+			except (AssertionError, ValueError) as e:
+				raise e
+				print('Auto parsing failed with: {}'.format(run.name))
 				pass
+
+			if get_model is not None:
+				run.meta.model = get_model(run.name)
+
+			if get_dataset is not None:
+				run.meta.dataset = get_dataset(run.name)
+
+			if get_date is not None:
+				run.meta.date = get_date(run.name)
+
+			if get_job is not None:
+				run.meta.job = get_job(run.name)
+
+			if get_ckpt is not None:
+				run.meta.ckpt = get_ckpt(run.name)
 
 	def _find_runs(self, path='', limit=None):
 		self.full_info = []
@@ -285,33 +441,33 @@ class Run_Manager(object):
 			if limit is not None and len(self.full_info) >= limit:
 				break
 
-	def show_incomplete(self, complete=None):
-		self._check_incomplete(complete=complete, show=True)
+	# def show_incomplete(self, complete=None):
+	# 	self._check_incomplete(complete=complete, show=True)
 
-	def _check_incomplete(self, complete=None, show=False, negate=False): # more like "check_progress" - for complete and incomplete
-		done = []
-		for run in self.active:
-			req = complete
-			if req is None:
-				req = run.config.training.epochs if 'config' in run else self.default_complete
+	# def _check_incomplete(self, complete=None, show=False, negate=False): # more like "check_progress" - for complete and incomplete
+	# 	done = []
+	# 	for run in self.active:
+	# 		req = complete
+	# 		if req is None:
+	# 			req = run.config.training.epochs if 'config' in run else self.default_complete
+	#
+	# 		if run.progress < req:
+	# 			if show:
+	# 				print('{:>3}/{:<3} {}'.format(run.progress, req, run.name))
+	# 			if not negate:
+	# 				done.append(run)
+	# 		elif negate:
+	# 			done.append(run)
+	#
+	# 	return done
 
-			if run.progress < req:
-				if show:
-					print('{:>3}/{:<3} {}'.format(run.progress, req, run.name))
-				if not negate:
-					done.append(run)
-			elif negate:
-				done.append(run)
 
-		return done
+	def prep_info(self, checkpoint=None, load_last=True, clear_info=False, force=False, name=None):
 
-
-	def prep_info(self, checkpoint=None, load_last=True, clear_info=False, force=False):
-
-		self.select_checkpoint(checkpoint=checkpoint, load_last=load_last, force=force)
+		self.select_checkpoint(checkpoint=checkpoint, load_last=load_last, force=force, name=name)
 		self.load_configs(force=force, clear_info=clear_info)
 
-	def select_checkpoint(self, checkpoint=None, load_last=True, force=False):
+	def select_checkpoint(self, checkpoint=None, load_last=True, force=False, name=None):
 
 		note = ('last' if load_last else 'best') if checkpoint is None else checkpoint
 		print('Selecting checkpoint: {}'.format(note))
@@ -321,23 +477,33 @@ class Run_Manager(object):
 		for run in self.active:
 			if 'ckpt_path' not in run or force:
 
-				if checkpoint is None:
-					ckpt_path = find_checkpoint(run.path, load_last=load_last)
-				else:
-					ckpt_path = os.path.join(run.path, 'checkpoint_{}.pth.tar'.format(checkpoint))
+				if name is None:
 
-				if 'checkpoint_' not in ckpt_path:
+					if checkpoint is None:
+						ckpt_path = find_checkpoint(run.path, load_last=load_last)
+					else:
+						ckpt_path = os.path.join(run.path, 'checkpoint_{}.pth.tar'.format(checkpoint))
+
+					name_req = 'checkpoint_'
+				else:
+					name_req = name
+					ckpt_path = os.path.join(run.path, name)
+
+				if name_req not in ckpt_path or not os.path.isfile(ckpt_path):
 					print('{} has no checkpoint'.format(run.name))
 					continue
 
 				run.ckpt_path = ckpt_path
 
 				ckpt_name = os.path.basename(run.ckpt_path)
-				try:
-					run.ckpt_num = int(ckpt_name.split('_')[-1].split('.')[0])
-				except ValueError as e:
-					print(run.ckpt_path, ckpt_name)
-					raise e
+
+				if name is None:
+					try:
+						ckpt_num = int(ckpt_name.split('_')[-1].split('.')[0])
+						run.meta.ckpt = ckpt_num
+					except ValueError as e:
+						print(run.ckpt_path, ckpt_name)
+						raise e
 
 			valid.append(run)
 
@@ -359,6 +525,26 @@ class Run_Manager(object):
 				config = get_config(fname)
 				if clear_info:
 					del run.config.info
+				elif 'info' in config:
+					if 'dataset_type' in config.info:
+						new = config.info.dataset_type
+						if 'dataset' in run.meta:
+							assert run.meta.dataset == new, '{} vs {}'.format(run.meta.dataset, new)
+						run.meta.dataset = new
+					if 'model_type' in config.info:
+						new = config.info.model_type
+						if 'model' in run.meta:
+							assert run.meta.model == new, '{} vs {}'.format(run.meta.model, new)
+						run.meta.model = new
+					if 'history' in config.info:
+						run.meta.history = config.info.history
+					if 'date' in config.info:
+						new = tuple(config.info.date.split('-'))
+						if 'date' in run.meta:
+							assert run.meta.date == new, '{} vs {}'.format(run.meta.date, new)
+						run.meta.date = new
+				if 'job' in config:
+					run.meta.job = config.job.num, config.job.ID, config.job.ps
 
 				base = get_base_config(config)
 
@@ -378,7 +564,10 @@ class Run_Manager(object):
 		if active is None:
 			active = self.full_info.copy()
 		self.active = active
+		for i, run in enumerate(self.active):
+			run.idx = i
 		self.name2idx = None
+		self.output = None
 	def extend(self, items):
 		self.active.extend(items)
 		if len(items):
@@ -387,6 +576,23 @@ class Run_Manager(object):
 		self.active.append(item)
 		self.name2idx = None
 
+
+	def store_selection(self, name, runs=None):
+		self.selections[name] = self.active.copy() if runs is None else runs
+
+	def switch_selection(self, name):
+		self.set_active(self.selections[name])
+
+	def view_selections(self):
+		for k,v in self.selections.items():
+			print('{} : holds {} runs'.format(k, len(v)))
+
+	def clear_selections(self):
+		self.selections.clear()
+
+	def invert(self):
+		inv = [r for r in self.full_info if r.name not in self]
+		self.set_active(inv)
 
 	def _update_names(self):
 		if self.name2idx is not None:
@@ -420,18 +626,23 @@ class Run_Manager(object):
 		self.set_active([run for i, run in enumerate(self.active) if i in indicies])
 
 	def sort_by(self, criterion='date'):
-		if criterion in 'date':
-			self.active = sorted(self.active, key=lambda r: r.splits[2])
-		elif criterion in 'job':
-			self.active = sorted(self.active, key=lambda r: r.splits[1])
-		elif criterion in 'model':
-			self.active = sorted(self.active, key=lambda r: r.splits[0].split('-')[1])
-		elif criterion in 'data':
-			self.active = sorted(self.active, key=lambda r: r.splits[0].split('-')[0])
+		if criterion == 'date':
+			active = sorted(self.active, key=lambda r: r.meta.date)
+		elif criterion == 'job':
+			active = sorted(self.active, key=lambda r: r.meta.job)
+		elif criterion == 'model':
+			active = sorted(self.active, key=lambda r: r.meta.model)
+		elif criterion == 'data':
+			active = sorted(self.active, key=lambda r: r.meta.dataset)
+		elif criterion == 'ckpt':
+			active = sorted(self.active, key=lambda r: r.meta.ckpt)
 		else:
-			raise Exception('Unknown criterion: {}'.format(criterion))
 
-		self.name2idx = None
+			active = criterion(self.active)
+
+			# raise Exception('Unknown criterion: {}'.format(criterion))
+
+		self.set_active(active)
 
 		return self
 
@@ -454,29 +665,35 @@ class Run_Manager(object):
 		return self
 
 
-	def filter_complete(self, complete=None):
-		remaining = self._check_incomplete(complete=complete, show=False, negate=True)
-		self.set_active(remaining)
-		return self
-	def filter_incomplete(self, complete=None):
-		remaining = self._check_incomplete(complete=complete, show=False, negate=False)
-		self.set_active(remaining)
-		return self
+	# def filter_complete(self, complete=None):
+	# 	remaining = self._check_incomplete(complete=complete, show=False, negate=True)
+	# 	self.set_active(remaining)
+	# 	return self
+	# def filter_incomplete(self, complete=None):
+	# 	remaining = self._check_incomplete(complete=complete, show=False, negate=False)
+	# 	self.set_active(remaining)
+	# 	return self
 
 	def filter_sel(self, sel): # for slices
 		self.set_active(self.active[sel])
 
-	def filter_since(self, date=None, job=None):
+	def filter_min(self, date=None, job=None, ckpt=None):
 
 		if job is not None:
 			self.sort_by('job')
-			jobs = sorted([run.splits[1].split('-')[0] for run in self.active])
+			jobs = sorted([run.meta.job[0] for run in self.active])
 			idx = bisect_left(jobs, str(job).zfill(4))
 			self.set_active(self.active[idx:])
 
 		if date is not None:
 			self.sort_by('date')
-			dates = sorted([run.splits[2].split('-')[0] for run in self.active])
+			dates = sorted([run.meta.date[0] for run in self.active])
+			idx = bisect_left(dates, date)
+			self.set_active(self.active[idx:])
+
+		if ckpt is not None:
+			self.sort_by('ckpt')
+			dates = sorted([run.meta.date[0] for run in self.active])
 			idx = bisect_left(dates, date)
 			self.set_active(self.active[idx:])
 
@@ -487,7 +704,7 @@ class Run_Manager(object):
 		dates = set(dates)
 
 		for run in self.active:
-			day, time = run.splits[2].split('-')
+			day, time = run.meta.date
 			if day in dates:
 				remaining.append(day)
 
@@ -496,10 +713,11 @@ class Run_Manager(object):
 
 	def filter_jobs(self, *jobs):
 		remaining = []
-		allowed = {str(job).zfill(4) for job in jobs}
+		allowed = {str(job) for job in jobs}
+		allowed.update({job.zfill(4) for job in allowed})
 
 		for run in self.active:
-			job, sch, proc = run.splits[1].split('-')
+			job, sch, proc = run.meta.job
 			if job in allowed:
 				remaining.append(run)
 
@@ -520,7 +738,7 @@ class Run_Manager(object):
 		remaining = []
 		models = set(models)
 		for run in self.active:
-			data, model = run.splits[0].split('-')
+			model = run.meta.model
 			if model in models:
 				remaining.append(run)
 
@@ -531,7 +749,7 @@ class Run_Manager(object):
 		remaining = []
 		datasets = set(datasets)
 		for run in self.active:
-			data, model = run.splits[0].split('-')
+			data = run.meta.dataset
 			if data in datasets:
 				remaining.append(run)
 
@@ -624,21 +842,32 @@ class Run_Manager(object):
 
 		return unique
 
-	def show(self, *props, ignore_keys=None, indent='\t'):
+	def show(self, *props, ignore_keys=None, indent='\t', manuals=[]):
 
 		props = set(props)
 
-		for i,run in enumerate(self.active):
+		for i, run in enumerate(self.active):
 			print('{:>3}) {}'.format(i, run.name))
 
 			if 'all' in props or 'checkpoint' in props or 'ckpt' in props:
-				print('{}Checkpoint: {}'.format(indent, run.ckpt_num))
+				print('{}Checkpoint: {}'.format(indent, run.meta.ckpt))
+
+			if ('all' in props or 'stats' in props) and 'stats' in run:
+				stats = ['{:>10} : {:3.2f}'.format(*item) for item in run.stats.items()]
+				print('\n'.join(['{}{}'.format(indent, line) for line in stats]))
+				#print()
 
 			if 'all' in props or 'unique' in props:
 				unique = self._get_unique(run, ignore_keys=ignore_keys)
 				print('\n'.join(['{}{}'.format(indent, line) for line in unique]))
 
-			if len(props):
+			if len(manuals):
+				info = []
+				for manual in manuals:
+					info.extend(manual(run).split('\n'))
+				print('\n'.join(['{}{}'.format(indent, line) for line in info]))
+
+			if len(props) or len(manuals):
 				print()
 
 

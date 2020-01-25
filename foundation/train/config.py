@@ -21,8 +21,8 @@ def register_config_dir(path, recursive=False, prefix=None, joiner=''):
 				name = joiner.join([prefix, name])
 			register_config(name, os.path.join(path, fname))
 		elif recursive and os.path.isdir(candidate):
-			prefix = fname if prefix is None else os.path.join(prefix, fname)
-			register_config_dir(candidate, recursive=recursive, prefix=prefix, joiner=os.sep)
+			newprefix = fname if prefix is None else os.path.join(prefix, fname)
+			register_config_dir(candidate, recursive=recursive, prefix=newprefix, joiner=os.sep)
 
 def recover_path(name):
 	if name in _config_registry:

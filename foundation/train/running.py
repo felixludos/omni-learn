@@ -173,7 +173,10 @@ def run_full(A, get_data, get_model, get_name=None):
 	# Run Train/Val Epochs
 	###################
 
-	for i in range(A.training.epochs - records['epoch']):
+	_restart_counter = 0
+	N = A.training.epochs - records['epoch']
+
+	for i in range(N):
 		is_best = False
 
 		records['epoch'] += 1
@@ -229,12 +232,16 @@ def run_full(A, get_data, get_model, get_name=None):
 			path = save_checkpoint(ckpt, A.output.save_dir, is_best=is_best, epoch=records['epoch'])
 			print('--- checkpoint saved to {} ---'.format(path))
 
+			_restart_counter += 1
+
 		print()
 
-		if 'RESTART_AFTER' in os.environ and (i+1) % int(os.environ['RESTART_AFTER']) == 0:
+		if 'RESTART_AFTER' in os.environ and ((_restart_counter+1) % int(os.environ['RESTART_AFTER']) == 0) and (N > i+1):
 
-			print('*** Exiting for restart after {} epochs'.format(os.environ['RESTART_AFTER']))
+			print('*** Exiting for restart after {} checkpoints'.format(os.environ['RESTART_AFTER']))
 			sys.exit(3)
+
+	print('Training complete.')
 
 	###################
 	# Run Test Epochs
