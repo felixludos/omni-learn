@@ -197,6 +197,45 @@ def default_load_data(A, mode='train'):
 		assert 0 < info.val_split < 1, 'cant split: {}'.format(info.val_split)
 		trainsets = simple_split_dataset(trainsets[0], 1-info.val_split, shuffle=True)
 
+	if 'repeat' in info and info.repeat > 0:
+
+		trainset, *other = trainsets
+
+		factor = info.repeat
+
+		if factor > 1:
+			trainset = Repeat_Dataset(trainset, factor)
+
+		trainsets = trainset, *other
+
+
+	if 'repeat_until' in info and info.repeat_until > 0:
+
+		trainset, *other = trainsets
+
+		N = len(trainset)
+
+		factor = max(info.repeat_until // N, 1)
+
+		if factor > 1:
+			trainset = Repeat_Dataset(trainset, factor)
+
+		trainsets = trainset, *other
+
+
+	if 'repeat_until_batches' in info and info.repeat_until_batches > 0:
+
+		trainset, *other = trainsets
+
+		N = len(trainset)/info.batch_size
+
+		factor = max(int(info.repeat_until_batches / N), 1)
+
+		if factor > 1:
+			trainset = Repeat_Dataset(trainset, factor)
+
+		trainsets = trainset, *other
+
 	return (*trainsets, testset) # testset is None if it doesnt exist or has to be loaded separately (with mode=='test')
 
 

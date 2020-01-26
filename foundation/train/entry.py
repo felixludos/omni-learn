@@ -50,6 +50,28 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 		if os.environ['FOUNDATION_TESTING'] == '1':
 			print('\nThis is a test run!\n')
 
+		if 'load' in config:
+			print('Loaded model from: {}'.format(config.load))
+
+			if 'name' in config:
+				del config.name
+
+			if 'output' in config:
+				if '_logged_date' in config.output:
+					del config.output._logged_date
+				if 'name' in config.output:
+					del config.output.name
+			if 'save_dir' in config:
+				del config.save_dir
+			# del config.info
+
+			# if 'name' in config:
+			# 	del config.name
+			# if 'output' in config and '_logged_date' in config.output:
+			# 	del config.output._logged_date
+			# if 'info' in config:
+			# 	del config.info
+
 		if 'name' not in config and mode in {'cmd', 'pycharm'} and 'test_override' not in config:
 			config.name = 'test-{}'.format(mode)
 			print('Name defaulting to: {}'.format(config.name))

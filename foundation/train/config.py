@@ -27,6 +27,20 @@ def register_config_dir(path, recursive=False, prefix=None, joiner=''):
 def recover_path(name):
 	if name in _config_registry:
 		return _config_registry[name]
+	elif 'FOUNDATION_SAVE_DIR' in os.environ and name in os.listdir(os.environ['FOUNDATION_SAVE_DIR']):
+
+		run_dir = name if os.path.isdir(name) else os.path.dirname(name) # full path to run dir or ckpt
+		path = os.path.join(run_dir, 'config.yml')
+
+		if not os.path.isfile(path) and 'FOUNDATION_SAVE_DIR' in os.environ:  # path (using default save dir) to run dir or ckpt
+
+			path = os.path.join(os.environ['FOUNDATION_SAVE_DIR'], name)
+			run_dir = path if os.path.isdir(path) else os.path.dirname(path)
+
+			path = os.path.join(run_dir, 'config.yml') # run dir
+
+		name = path
+
 	assert os.path.isfile(name), 'invalid path: {}'.format(name)
 	return name
 
@@ -77,7 +91,8 @@ def load_single_config(data, process=True, parents=None): # data can either be a
 	if parents is not None and 'parents' in data:
 		todo = []
 		for parent in data.parents: # prep new parents
-			ppath = _config_registry[parent] if parent in _config_registry else parent
+			# ppath = _config_registry[parent] if parent in _config_registry else parent
+			ppath = recover_path(parent)
 			if ppath not in parents:
 				todo.append(ppath)
 				parents[ppath] = None
@@ -86,8 +101,42 @@ def load_single_config(data, process=True, parents=None): # data can either be a
 
 	return data
 
+def _check_for_load(config, parent_defaults=True):
 
-# TODO: should be possible to only provide the run name (a dir in FOUNDATION_SAVE_DIR)
+	if 'load' in config:
+		lparents = {}
+		load = load_single_config(config.load, parents=lparents)
+		assert len(lparents) == 0, 'Loaded configs are not allowed to have parents.'
+		load.update(config, parent_defaults=parent_defaults)
+		config = load
+
+	return config
+
+def merge_configs(configs, parent_defaults=True):
+	'''
+	configs should be ordered from oldest to newest (ie. parents first, children last)
+	also configs can contain "load"
+	'''
+
+	if not len(configs):
+		return Config()
+
+	child = configs.pop()
+	merged = merge_configs(configs, parent_defaults=parent_defaults)
+
+	load = child.load if 'load' in child else None
+	merged.update(child)
+
+	if load is not None:
+		lparents = {}
+		load = load_single_config(load, parents=lparents)
+		assert len(lparents) == 0, 'Loaded configs are not allowed to have parents.'
+		load.update(merged, parent_defaults=parent_defaults)
+		merged = load
+
+	return merged
+
+
 def get_config(path=None, parent_defaults=True): # Top level function
 
 	if path is None:
@@ -97,6 +146,7 @@ def get_config(path=None, parent_defaults=True): # Top level function
 
 	root = load_single_config(path, parents=parents)
 
+	pnames = []
 	if len(parents): # topo sort parents
 		def _get_parents(n):
 			if 'parents' in n:
@@ -106,22 +156,40 @@ def get_config(path=None, parent_defaults=True): # Top level function
 		order = util.toposort(root, _get_parents)
 
 		# for analysis, record the history of all loaded parents
-		pnames = []
+
 		for p in order:
 			if 'parents' in p:
 				for prt in p.parents:
 					if len(pnames) == 0 or prt != pnames[-1]:
 						pnames.append(prt)
 
-		root = order.pop()
-		while len(order):
-			root.update(order.pop(), parent_defaults=parent_defaults)
+		# root = merge_configs(order, parent_defaults=parent_defaults)
+		# root = _check_for_load(order.pop(), parent_defaults=parent_defaults)
+		# while len(order):
+		#
+		# 	child = order.pop()
+		# 	will_load = None
+		# 	if 'load' in child:
+		# 		will_load = child.load
+		#
+		#
+		#
+		# 	root.update()
+		#
+		# 	root.update(_check_for_load(order.pop(), parent_defaults=parent_defaults),
+		# 	            parent_defaults=parent_defaults)
 
-		root.info.history = pnames
-		if 'parents' in root:
-			del root.parents
+		order = list(reversed(order))
+
+
 	else: # TODO: clean up
-		root.update(Config()) # update to connect parents and children in tree and remove reversed - see Config.update
+		order = [root]
+
+	root = merge_configs(order, parent_defaults=parent_defaults) # update to connect parents and children in tree and remove reversed - see Config.update
+
+	root.info.history = pnames
+	if 'parents' in root:
+		del root.parents
 
 	return root
 

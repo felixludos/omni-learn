@@ -104,7 +104,7 @@ class Run(util.tdict):
 	def run(self, **kwargs):
 		self._manager._run_model_fn(self.state, **kwargs)
 
-	def evaluate(self, pbar=None):
+	def evaluate(self, force=False, pbar=None):
 
 		jobs = self._manager._eval_fns.items()
 		# if pbar is not None:
@@ -115,7 +115,7 @@ class Run(util.tdict):
 		results = self.state.evals
 
 		for k, fn in jobs:
-			if k not in results:
+			if k not in results or force:
 				print('--- Evaluating: {}'.format(k))
 				start = time.time()
 				# if pbar is not None:

@@ -41,6 +41,7 @@ def setup_records(training):
 
 	records = {
 		'total_samples': {'train':0, 'val':0, 'test':0, },
+		'total_steps': 0,
 		'stats': {'train':[], 'val':[]},
 	}
 

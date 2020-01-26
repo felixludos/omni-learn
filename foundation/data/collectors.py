@@ -159,6 +159,22 @@ class Subset_Dataset(DatasetWrapper):
 	def __len__(self):
 		return len(self.indices)
 
+class Repeat_Dataset(DatasetWrapper):
+
+	def __init__(self, dataset, factor):
+		super().__init__(dataset)
+		self.factor = factor
+		self.num_real = len(dataset)
+		self.total = self.factor * self.num_real
+		print('Repeating dataset {} times'.format(factor))
+
+	def __getitem__(self, idx):
+		return self.dataset[idx % self.num_real]
+
+	def __len__(self):
+		return self.total
+
+
 class Format_Dataset(DatasetWrapper):
 
 	def __init__(self, dataset, format_fn, format_args=None, include_original=False):

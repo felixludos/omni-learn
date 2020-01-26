@@ -72,6 +72,8 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	if get_data is 'default':
 		get_data = default_load_data
 
+	if A is not None and 'load' in A:
+		path = A.load
 
 	checkpoint = None
 	if path is not None:
@@ -90,28 +92,30 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 				print(e)
 				sys.stdout.flush()
 				raise e
-			config_dir = os.path.dirname(ckptpath)
+			run_dir = os.path.dirname(ckptpath)
 
 			print('load successful')
 
 		elif force_load_model:
 			raise FileNotFoundError
 		else:
-			config_dir = ckptpath
-		config_name = 'config.yml' if 'config.yml' in os.listdir(config_dir) else 'config.tml'
-		load_A = get_config(os.path.join(config_dir, config_name))
-		if A is None:
+			run_dir = ckptpath
+		config_name = 'config.yml' #if 'config.yml' in os.listdir(run_dir) else 'config.tml'
+		load_A = get_config(os.path.join(run_dir, config_name))
+		if A is None: # if no config is provided, the loaded config is adopted
 			A = load_A
-		else:
-			new_A = A.copy()
-			A.clear()
-			A.update(load_A)
-			A.update(new_A)
+		# else: # TODO: enable a way to reload loaded config? (not really necessary, already done in get_config)
+		# 	new_A = A.copy()
+		# 	A.clear()
+		# 	A.update(load_A)
+		# 	A.update(new_A)
 		print('Loaded {}'.format(ckptpath))
 
-		if 'FOUNDATION_DATA_DIR' in os.environ:
+		if 'FOUNDATION_DATA_DIR' in os.environ: # TODO: necessary?
 			A.dataroot = os.environ['FOUNDATION_DATA_DIR']
 			print('Set dataroot to: {}'.format(A.dataroot))
+
+	assert A is not None, 'Nothing to get'
 
 	out = []
 
