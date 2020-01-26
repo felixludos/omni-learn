@@ -204,7 +204,7 @@ def run_full(A, get_data, get_model, get_name=None):
 
 		epoch_seed = util.gen_deterministic_seed(A.seed)
 
-		if A.output.save_freq > 0 and (records['epoch']-1) % A.output.save_freq == 0:
+		if A.output.save_freq > 0 and ((records['epoch']-1) % A.output.save_freq == 0 or (i+1) == N):
 			ckpt = {
 				'model_str': str(model),
 				'model_state': model.state_dict(),

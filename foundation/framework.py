@@ -165,7 +165,7 @@ class Optimizable(Recordable):
 		self.optim.step()
 
 	def load_state_dict(self, state_dict):
-		if self.optim is not None:
+		if self.optim is not None and 'optim' in state_dict:
 			self.optim.load_state_dict(state_dict['optim'])
 		super().load_state_dict(state_dict['model'])
 
@@ -205,7 +205,7 @@ class Schedulable(Optimizable):
 		self.scheduler = sch
 
 	def load_state_dict(self, state_dict):
-		if self.scheduler is not None:
+		if self.scheduler is not None and 'scheduler' in state_dict:
 			self.scheduler.load_state_dict(state_dict['scheduler'])
 		super().load_state_dict(state_dict)
 
