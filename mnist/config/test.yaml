@@ -42,7 +42,7 @@ model:
 
 
         tail:
-            _type: 'nn'
+            _type: 'mlp'
             hidden_dims: [64, 32]
 
     optim_type: 'adam'

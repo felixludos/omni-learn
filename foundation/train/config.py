@@ -3,46 +3,8 @@ import sys, os
 import yaml
 import json
 
-from .model import create_component, MissingConfigError
+from .registry import find_config_path, create_component, MissingConfigError, _reserved_names, _appendable_keys
 from .. import util
-
-_config_registry = {}
-def register_config(name, path):
-	assert os.path.isfile(path), 'Cant find config file: {}'.format(path)
-	_config_registry[name] = path
-def register_config_dir(path, recursive=False, prefix=None, joiner=''):
-	assert os.path.isdir(path)
-	for fname in os.listdir(path):
-		parts = fname.split('.')
-		candidate = os.path.join(path, fname)
-		if os.path.isfile(candidate) and len(parts) > 1 and parts[-1] in {'yml', 'yaml'}:
-			name = parts[0]
-			if prefix is not None:
-				name = joiner.join([prefix, name])
-			register_config(name, os.path.join(path, fname))
-		elif recursive and os.path.isdir(candidate):
-			newprefix = fname if prefix is None else os.path.join(prefix, fname)
-			register_config_dir(candidate, recursive=recursive, prefix=newprefix, joiner=os.sep)
-
-def recover_path(name):
-	if name in _config_registry:
-		return _config_registry[name]
-	elif 'FOUNDATION_SAVE_DIR' in os.environ and name in os.listdir(os.environ['FOUNDATION_SAVE_DIR']):
-
-		run_dir = name if os.path.isdir(name) else os.path.dirname(name) # full path to run dir or ckpt
-		path = os.path.join(run_dir, 'config.yml')
-
-		if not os.path.isfile(path) and 'FOUNDATION_SAVE_DIR' in os.environ:  # path (using default save dir) to run dir or ckpt
-
-			path = os.path.join(os.environ['FOUNDATION_SAVE_DIR'], name)
-			run_dir = path if os.path.isdir(path) else os.path.dirname(path)
-
-			path = os.path.join(run_dir, 'config.yml') # run dir
-
-		name = path
-
-	assert os.path.isfile(name), 'invalid path: {}'.format(name)
-	return name
 
 
 nones = {'None', '_none', '_None', 'null', 'nil', }
@@ -75,7 +37,7 @@ def yamlify(data):
 	raise YamlifyError(data)
 
 def load_config_from_path(path, process=True):
-	path = recover_path(path)
+	path = find_config_path(path)
 	with open(path, 'r') as f:
 		data = yaml.load(f)
 
@@ -92,7 +54,7 @@ def load_single_config(data, process=True, parents=None): # data can either be a
 		todo = []
 		for parent in data.parents: # prep new parents
 			# ppath = _config_registry[parent] if parent in _config_registry else parent
-			ppath = recover_path(parent)
+			ppath = find_config_path(parent)
 			if ppath not in parents:
 				todo.append(ppath)
 				parents[ppath] = None
@@ -150,7 +112,7 @@ def get_config(path=None, parent_defaults=True): # Top level function
 	if len(parents): # topo sort parents
 		def _get_parents(n):
 			if 'parents' in n:
-				return [parents[recover_path(p)] for p in n.parents]
+				return [parents[find_config_path(p)] for p in n.parents]
 			return []
 
 		order = util.toposort(root, _get_parents)
@@ -219,7 +181,7 @@ def parse_config(argv=None, parent_defaults=True):
 		if len(term) >= 2 and term[:2] == '--':
 			break
 		else:
-			assert term in _config_registry or os.path.isfile(term), 'invalid config name/path: {}'.format(term)
+			# assert term in _config_registry or os.path.isfile(term), 'invalid config name/path: {}'.format(term)
 			parents.append(term)
 	root.parents = parents
 
@@ -258,6 +220,8 @@ def parse_config(argv=None, parent_defaults=True):
 
 	return root
 
+_reserved_names.update({'_x_'})
+
 def _add_default_parent(C):
 	for k, child in C.items():
 		if isinstance(child, Config):
@@ -272,36 +236,45 @@ def _add_default_parent(C):
 def _clean_up_reserved(C):
 	bad = []
 	for k,v in C.items():
-		if '_x_' == v:
+		if v == '_x_': # maybe include other _reserved_names
 			bad.append(k)
 		elif isinstance(v, Config):
 			_clean_up_reserved(v)
 	for k in bad:
 		del C[k]
 
+# TODO: find a way to avoid this ... probably not easy
 _print_waiting = False
 _print_indent = 0
 def _print_with_indent(s):
 	return s if _print_waiting else ''.join(['  '*_print_indent, s])
 
-'''
-Features:
-
-Keys:
-'_{}' = protected - not visible to children
-({1}, {2}, ...) = [{1}][{2}]...
-'{1}.{2}' = ['{1}']['{2}']
-if {} not found: first check parent (if exists) otherwise create self[{}] = Config(parent=self)
-
-Values:
-'<>{}' = alias to key '{}'
-'_x_' = (only when merging) remove this key locally, if exists
-'__x__' = dont default this key and behaves as though it doesnt exist (except on iteration)
-
-'''
 
 
 class Config(util.NS): # TODO: allow adding aliases
+	'''
+	Features:
+
+	Keys:
+	'_{}' = protected - not visible to children
+	({1}, {2}, ...) = [{1}][{2}]...
+	'{1}.{2}' = ['{1}']['{2}']
+	if {} not found: first check parent (if exists) otherwise create self[{}] = Config(parent=self)
+
+	Values:
+	'<>{}' = alias to key '{}'
+	'_x_' = (only when merging) remove this key locally, if exists
+	'__x__' = dont default this key and behaves as though it doesnt exist (except on iteration)
+	(for values of "appendable" keys)
+	"+{}" = '{}' gets appended to preexisting value if if it exists
+		(otherwise, the "+" is removed and the value is turned into a list with itself as the only element)
+
+	Also, this is Transactionable, so when creating subcomponents, the same instance is returned when pulling the same
+	sub component again.
+
+	NOTE: avoid setting '__obj' keys (unless you really know what you are doing)
+
+	'''
 	def __init__(self, *args, _parent_obj_for_defaults=None, **kwargs):
 		self.__dict__['_parent_obj_for_defaults'] = _parent_obj_for_defaults
 		# self.__dict__['_aliases'] = {}
@@ -312,17 +285,30 @@ class Config(util.NS): # TODO: allow adding aliases
 	# 		self._aliases[attr] = set()
 	# 	self._aliases[attr].add(alias)
 
+
 	def update(self, other, parent_defaults=True):
 		if not isinstance(other, Config):
-			return super().update(other)
+			super().update(other)
+		else:
+			for k, v in other.items():
+				if self.contains_nodefault(k) and '_x_' == v: # reserved for deleting settings in parents
+					del self[k]
+				elif self.contains_nodefault(k) and isinstance(v, Config) and isinstance(self[k], Config):
+					self[k].update(v)
 
-		for k, v in other.items():
-			if self.contains_nodefault(k) and '_x_' == v: # reserved for deleting settings in parents
-				del self[k]
-			elif self.contains_nodefault(k) and isinstance(v, Config) and isinstance(self[k], Config):
-				self[k].update(v)
-			else:
-				self[k] = v
+				elif k in _appendable_keys and v[0] == '+':
+					# values of appendable keys can be appended instead of overwritten,
+					# only when the new value starts with "+"
+					vs = []
+					if self.contains_nodefault(k):
+						prev = self[k]
+						if not isinstance(prev, list):
+							prev = [prev]
+						vs = prev
+					vs.append(v[1:])
+					self[k] = vs
+				else:
+					self[k] = v
 
 		_clean_up_reserved(self)
 
@@ -394,39 +380,82 @@ class Config(util.NS): # TODO: allow adding aliases
 			return super().__getitem__(item) != '__x__'
 		return False
 
-	def _process_val(self, item, val, *defaults, defaulted=False, byparent=False):
+	def _process_val(self, item, val, *defaults, silent=False, defaulted=False, byparent=False):
 		global _print_indent, _print_waiting
 
 		if isinstance(val, dict) and '_type' in val:
 			# WARNING: using pull will automatically create registered sub components
-			assert not byparent, 'Pulling a sub-component from a parent is not supported (yet): {}'.format(item)
-			print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
-			_print_indent += 1
-			if val['_type'] == 'list':
-				terms = []
-				for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
-					terms.append(self._process_val('({})'.format(i), v))
-				val = tuple(terms)
+
+			# no longer an issue
+			# assert not byparent, 'Pulling a sub-component from a parent is not supported (yet): {}'.format(item)
+
+			assert not defaulted
+
+
+			# TODO: should probably be deprecated - just register a "list" component separately
+			# if val['_type'] == 'list':
+			# 	print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
+			# 	terms = []
+			# 	for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
+			# 		terms.append(self._process_val('({})'.format(i), v))
+			# 	val = tuple(terms)
+			# else:
+
+			type_name = val['_type']
+			mod_info = ''
+			if '_mod' in val:
+				mods = val['_mod']
+				if not isinstance(mods, (list, tuple)):
+					mods = mods,
+
+				mod_info = ' (mods=[{}])'.format(', '.join(m for m in mods)) if len(mods) > 1 \
+					else ' (mod={})'.format(mods[0])
+
+			cmpn = None
+			if self.in_transaction() and '__obj' in val:
+				cmpn = val['__obj']
+
+			creation_note = 'Creating ' if cmpn is None else 'Reusing '
+
+			if not silent:
+				print(_print_with_indent('{}{} (type={}){}{}'.format(creation_note, item, type_name, mod_info,
+				                                                     ' (in parent)' if byparent else '')))
+
+			if cmpn is None:
+				_print_indent += 1
+				cmpn = create_component(val)
+				_print_indent -= 1
+
+			if self.in_transaction():
+				self[item]['__obj'] = cmpn
 			else:
-				val = create_component(val)
-			_print_indent -= 1
+				print('WARNING: this Config is NOT currently in a transaction, so all subcomponents will be created '
+				      'again everytime they are pulled')
+
+			val = cmpn
+
 
 		elif isinstance(val, str) and val[:2] == '<>':  # alias
 			alias = val[2:]
 			assert not byparent, 'Using an alias from a parent is not supported: {} {}'.format(item, alias)
 
-			print(_print_with_indent('{} --> '.format(item)), end='')
+			if not silent:
+				print(_print_with_indent('{} --> '.format(item)), end='')
 			_print_waiting = True
-			val = self.pull(alias, *defaults)
+			val = self.pull(alias, *defaults, silent=silent)
 			_print_waiting = False
 
 		else:
-			print(_print_with_indent('{}: {}{}'.format(item, val, ' (by default)' if defaulted else (' (by parent)' if byparent else ''))))
+			if not silent:
+				print(_print_with_indent('{}: {}{}'.format(item, val, ' (by default)' if defaulted
+						else (' (in parent)' if byparent else ''))))
 
 		return val
 
 
-	def pull(self, item, *defaults): # pull for each arg should only be called once!
+	def pull(self, item, *defaults, silent=False, _byparent=False, _defaulted=False):
+		# TODO: change defaults to be a keyword argument providing *1* default, and have item*s* instead,
+		#  which are the keys to be checked in order
 
 		defaulted = item not in self
 		byparent = False
@@ -438,9 +467,13 @@ class Config(util.NS): # TODO: allow adding aliases
 			byparent = not self.contains_nodefault(item)
 			val = self[item]
 
-		val = self._process_val(item, val, *defaults, defaulted=defaulted, byparent=byparent)
+		if byparent: # if the object was found
+			val = self.__dict__['_parent_obj_for_defaults'].pull(item, silent=silent, _byparent=True)
+		else:
+			val = self._process_val(item, val, *defaults, silent=silent, defaulted=defaulted or _defaulted,
+			                        byparent=byparent or _byparent)
 
-		if isinstance(val, list):
+		if type(val) == list: # TODO: a little heavy handed
 			val = tuple(val)
 
 		return val

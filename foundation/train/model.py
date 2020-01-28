@@ -10,42 +10,30 @@ from .. import util
 from .. import framework as fm
 from .. import models
 
+from .registry import create_component, register_component, Component, Modifier, AutoModifier
 
-_model_registry = {}
-_reserved_names = {'list'}
-def register_model(name, create_fn):
-	assert name not in _reserved_names, '{} is reserved'.format(name)
-	_model_registry[name] = create_fn
+#
+# _model_registry = {}
+# _reserved_names = {'list'}
+# def register_model(name, create_fn):
+# 	assert name not in _reserved_names, '{} is reserved'.format(name)
+# 	_model_registry[name] = create_fn
+#
+# _mod_registry = {}
+# def register_modifier(name, mod_fn):
+# 	assert name not in _reserved_names, '{} is reserved'.format(name)
+# 	_mod_registry[name] = mod_fn
 
-_mod_registry = {}
-def register_modifier(name, mod_fn):
-	assert name not in _reserved_names, '{} is reserved'.format(name)
-	_mod_registry[name] = mod_fn
 
-def create_component(info):
-	assert info._type in _model_registry, 'Unknown model type (have you registered it?): {}'.format(info._type)
 
-	create_fn = _model_registry[info._type]
+def default_create_model(info):
 
-	if '_mod' in info: # TODO: allow list of mods
-		mod_fn = _mod_registry[info._mod]
-		create_fn = mod_fn(create_fn)
+	assert '_type' in info
 
-	model = create_fn(info)
+	print('Model-type: {}'.format(info._type))
+
+	model = create_component(info)
 	return model
-
-def default_create_model(A):
-
-	assert '_type' in A.model
-
-	print('Model-type: {}'.format(A.model._type))
-
-	model = create_component(A.model)
-	return model
-
-class MissingConfigError(Exception):
-	def __init__(self, key):
-		super().__init__(key)
 
 
 # register standard components
@@ -55,10 +43,10 @@ class MissingConfigError(Exception):
 #
 # register_model('list', _component_list)
 
-register_model('double-enc', models.Double_Encoder)
-register_model('double-dec', models.Double_Decoder)
+Component('double-enc')(models.Double_Encoder)
+Component('double-dec')(models.Double_Decoder)
 
-register_modifier('normal', models.Normal_Distribized)
+AutoModifier('normal')(models.Normal)
 
 
 def _create_mlp(info): # mostly for selecting/formatting args (and creating sub components!)
@@ -74,11 +62,12 @@ def _create_mlp(info): # mostly for selecting/formatting args (and creating sub 
 	model = models.make_MLP(**kwargs)
 
 	return model
-register_model('mlp', _create_mlp) # Outdated
+# register_model('mlp', _create_mlp) # Outdated
 
-register_model('nn', models.MLP)
+Component('mlp')(models.MLP)
+Component('nn')(models.MLP) # TODO: remove
 
-
+# @Component('stage') # TODO
 class Stage_Model(fm.Schedulable, fm.Trainable_Model):
 	def __init__(self, A):
 		stages = A.pull('stages')
@@ -165,7 +154,6 @@ class Stage_Model(fm.Schedulable, fm.Trainable_Model):
 
 		return out
 
-register_model('stage', Stage_Model)
 
 # class Reverse_Stage_Model(Stage_Model):
 #
@@ -202,7 +190,7 @@ register_model('stage', Stage_Model)
 # 			q = stage(q)
 # 		return q
 
-
+@Component('conv')
 class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
 	def __init__(self, A):
 		kwargs = _get_conv_args(A)
@@ -213,7 +201,6 @@ class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
 
 		if 'scheduler_type' in A:
 			self.set_scheduler(A)
-register_model('conv', Trainable_Conv)
 
 def _get_conv_args(info):
 	kwargs = {
@@ -283,6 +270,7 @@ def _create_conv(info):
 class Trainable_Normal_Enc(fm.Schedulable, models.Normal_Conv_Encoder):
 	pass
 
+@Component('normal-conv')
 def _create_normal_conv(info):
 
 	kwargs = _get_conv_args(info)
@@ -302,9 +290,9 @@ def _create_normal_conv(info):
 		conv.set_scheduler(info)
 
 	return conv
-register_model('normal-conv', _create_normal_conv)
+# register_model('normal-conv', _create_normal_conv)
 
-
+@Component('deconv')
 class Trainable_Deconv(fm.Schedulable, models.Conv_Decoder):
 	def __init__(self, A):
 		kwargs = {
@@ -362,7 +350,7 @@ class Trainable_Deconv(fm.Schedulable, models.Conv_Decoder):
 		if 'scheduler_type' in A:
 			self.set_scheduler(A)
 
-register_model('deconv', Trainable_Deconv)
+# register_model('deconv', Trainable_Deconv)
 
 def _create_deconv(info):
 

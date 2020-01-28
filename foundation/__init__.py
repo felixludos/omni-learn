@@ -6,4 +6,5 @@ from . import data
 # from . import sim
 from . import models
 # from .framework import *
+from .train import Component, Modifier, AutoModifier
 from .framework import *

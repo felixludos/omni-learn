@@ -7,9 +7,8 @@ import torch
 from .. import util
 
 from .config import get_config
-from .data import default_load_data
+from .data import default_load_data, split_dataset, simple_split_dataset
 from .model import default_create_model
-
 
 
 def save_checkpoint(info, save_dir, is_best=False, epoch=None):
@@ -125,17 +124,45 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	if get_data is not None:
 		util.set_seed(A.seed)
 
+		info = A.dataset
+
 		if checkpoint is not None and 'datasets' in checkpoint:
 			datasets = checkpoint['datasets']
 		else:
-			datasets = get_data(A, mode=mode)
+			info.begin()
+
+			dataset = get_data(A.dataset, mode=mode)
+
+			info.abort()
+
+			try:
+				A.din, A.dout = dataset.din, dataset.dout
+			except AttributeError as e:
+				print('WARNING: Dataset does not have a "din" and "dout"')
+				raise e
+
+			trainsets = dataset,
+			testset = None
+			if 'test_split' in info:
+				assert 0 < info.test_split < 1, 'cant split: {}'.format(info.val_split)
+				*trainsets, testset = simple_split_dataset(dataset, 1-info.test_split, shuffle=True)
+			if 'val_split' in info:  # use/create validation set
+				assert 0 < info.val_split < 1, 'cant split: {}'.format(info.val_split)
+				trainsets = simple_split_dataset(trainsets[0], 1 - info.val_split, shuffle=True)
+
+			datasets = (*trainsets, testset)
 
 		out.append(datasets)
+
 
 	if get_model is not None:
 		util.set_seed(A.seed)
 
-		model = get_model(A)
+		info = A.model
+
+		info.begin()
+		model = get_model(info)
+		info.abort()
 
 		print('Moving model to {}'.format(A.device))
 		sys.stdout.flush()

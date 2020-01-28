@@ -12,8 +12,25 @@ from .setup import setup_records, setup_logging
 from .loading import load, save_checkpoint
 from .data import get_loaders
 
+def run_full(A, *args, **kwargs):
 
-def run_full(A, get_data, get_model, get_name=None):
+	if 'legacy' not in A:
+		print('\n\n\n\nWARNING: USING DEPRECATED TRAINING CODE.\n\n\n\n')
+		print('To use newest code: use config files in ./config/n/')
+		print('To use the legacy code (NOT recommended): set "legacy" to True in the config, '
+		      'or include the legacy.yaml config.')
+		raise Exception('legacy flag not set.')
+
+	elif A.legacy:
+		print('\n\n\n\nWARNING: USING LEGACY TRAINING CODE (this will be deprecated soon).\n\n\n\n')
+		print('To use newest code: use config files in ./config/n/')
+		return legacy_run_full(A, *args, **kwargs)
+	else:
+		print('Using *NEWEST* running code')
+		return new_run_full(A, *args, **kwargs)
+
+
+def legacy_run_full(A, get_data, get_model, get_name=None):
 
 	if 'device' not in A or not torch.cuda.is_available():
 		A.device = 'cpu'
@@ -563,6 +580,8 @@ def new_run_full(A, get_data, get_model, get_name=None):
 		A.output.unique_tests = False
 		print('Validation of each epoch is not logged separately')
 
+	pbar = tqdm if 'inline' in A and A.inline else None
+
 
 	# endregion
 
@@ -589,8 +608,8 @@ def new_run_full(A, get_data, get_model, get_name=None):
 	edata.epoch_seed = epoch_seed
 
 	run_continuous(A, records, model, trainloader, valloader,
-	               logger=None, unique_tests=False, silent=False,
-                   stats=None, inline=False, epoch_seed=epoch_seed)
+	               logger=None, silent=False, display_samples=False,
+                   stats=None, epoch_seed=epoch_seed, pbar=pbar)
 
 
 	print('Training complete.')
@@ -640,40 +659,15 @@ def new_run_full(A, get_data, get_model, get_name=None):
 	return model, datasets, loaders, records
 
 
-def save_checkpoint(A, model, records, loss, N):
-	ckpt = {
-		'model_str': str(model),
-		'model_state': model.state_dict(),
+def restart_loader(loader, epoch_seed=None):
 
-		'records': records,
-		'epoch_seed': epoch_seed,
-	}
+	if epoch_seed is None:
+		util.set_seed(epoch_seed)
 
-	loss = train_stats['loss'] if valloader is None else val_stats['loss']
-
-	if A.training.track_best:
-		if loss.count == 0:
-			print('WARNING: loss has not been logged, so the best model cant be tracked')
-		else:
-			av_loss = loss.avg.item()
-			is_best = records['best']['loss'] is None or av_loss < records['best']['loss']
-			if is_best:
-				if records['best']['loss'] is not None:
-					print('Epoch {} improved from {:.4f} (epoch={}) to: {:.4f}'.format(
-						records['epoch'], records['best']['loss'], records['best']['epoch'], av_loss))
-				records['best']['loss'] = av_loss
-				records['best']['epoch'] = records['epoch']
-
-	path = save_checkpoint(ckpt, A.output.save_dir, is_best=is_best, epoch=records['epoch'])
-	print('--- checkpoint saved to {} ---'.format(path))
-
-
-def restart_loader(loader, epoch_seed):
-
-	util.set_seed(epoch_seed)
 	loader = iter(loader)
 
-	epoch_seed = util.gen_deterministic_seed(epoch_seed)
+	if epoch_seed:
+		epoch_seed = util.gen_deterministic_seed(epoch_seed)
 
 	return loader, epoch_seed
 
@@ -685,22 +679,15 @@ def gen_logger_prefix(mode, unique_test=False, epoch=None):
 	return '{}/{}'.format('{}', mode)
 
 
-def logger_step(logger, stats, smooths=True):
-	logger.set_step(records['total_samples']['train'] if display_samples else records['total_steps'])
-	logger.set_tag_format('{}/train')
-
-	with torch.no_grad():
-		display = stats.smooths() if smooths else stats.avgs()
-		for k, v in display.items():
-			logger.add('scalar', k, v)
+# def logger_step(logger, stats, smooths=True):
+# 	pass
 
 
 
 
 def run_continuous(A, records, model, trainloader, valloader=None,
-                   logger=None, unique_tests=False, silent=False,
-                   display_samples=False,
-                   stats=None, inline=False, epoch_seed=None, pbar=None):
+                   logger=None, silent=False, display_samples=False,
+                   stats=None, epoch_seed=None, pbar=None):
 
 	# region Limits/Freqs
 
@@ -722,9 +709,6 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 			A.output.save_freq = len(trainloader)
 
 	print_freq = A.output.print_freq
-	if pbar is not None:
-		print_freq //= 5 # output isnt persistent (gets overwritten with progress bar)
-
 
 	assert valloader is not None or 'val_freq' in A.training
 	val_freq = A.training.val_freq if 'val_freq' in A.training else None
@@ -738,18 +722,31 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 		viz_criterion = util.get_loss_type(A.training.viz_criterion)
 		viz_criterion_args = A.training.viz_criterion_args
 
-	if stats is None:
-		stats = util.StatsMeter('loss')
-		if isinstance(model, Recordable):
-			stats.shallow_join(model.stats)
-	elif 'loss' not in stats:
-		stats.new('loss')
-	if viz_criterion is not None and 'loss-viz' not in stats:
-		stats.new('loss-viz')
-	time_stats = util.StatsMeter('data', 'model', 'viz')
+	def gen_stats(stats=None):
+		if stats is None:
+			stats = util.StatsMeter('loss')
+			if isinstance(model, Recordable):
+				stats.shallow_join(model.stats)
+		elif 'loss' not in stats:
+			stats.new('loss')
+		if viz_criterion is not None and 'loss-viz' not in stats:
+			stats.new('loss-viz')
+		return stats
+
+	stats = gen_stats(stats)
+	time_stats = util.StatsMeter('data', 'model', 'viz', 'eval', 'save')
 	stats.shallow_join(time_stats, fmt='time-{}')
 
 	# endregion
+
+	assert len(trainloader) >= 1, 'not a single batch in loader'
+	records['epoch'] += 1 # incomplete epochs dont count as epochs
+	model.pre_epoch('train', records['epoch'])
+	loader, epoch_seed = restart_loader(trainloader, epoch_seed)
+
+	bar = None if pbar is None else pbar(total=sample_limit, unit='sample', initial=records['train']['total_samples'])
+
+	val_loss = None
 
 	time_limit = None
 	if A.run_mode == 'cluster' and 'time_limit' in A.training:
@@ -759,24 +756,18 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 		start_time = time.time()
 		time_limit = A.training.time_limit * 3600 # convert to sec
 
-	assert len(trainloader) >= 1, 'not a single batch in loader'
-	records['epoch'] += 1 # incomplete epochs dont count as epochs
-	model.pre_epoch('train', records['epoch'])
-	loader, epoch_seed = restart_loader(trainloader, epoch_seed, model)
-
-	if inline:
-		pbar = tqdm(total=sample_limit, unit='sample', initial=records['train']['total_samples'])
-
 	while (sample_limit is None or records['train']['total_samples'] < sample_limit) \
 		and records['total_steps'] < step_limit:
+
+		# region Training Iteration
 
 		try:
 			start = time.time()
 			batch = next(loader)
 		except StopIteration:
 			model.post_epoch('train', records['epoch'])
-			records['stats']['train'].append(train_stats.export())
-			loader, epoch_seed = restart_loader(trainloader, epoch_seed, model)
+			records['stats']['train'].append(stats.export())
+			loader, epoch_seed = restart_loader(trainloader, epoch_seed)
 			records['epoch'] += 1
 			model.pre_epoch('train', records['epoch'])
 			start = time.time()
@@ -805,7 +796,13 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 				if viz_criterion is not None:
 					stats.update('loss-viz', viz_criterion(*[out[n] for n in viz_criterion_args]).detach())
 
-				logger_step(logger, stats, smooths=True)
+				logger.set_step(records['total_samples']['train'] if display_samples else records['total_steps'])
+				logger.set_tag_format('{}/train')
+
+				with torch.no_grad():
+					display = stats.smooths() #if smooths else stats.avgs()
+					for k, v in display.items():
+						logger.add('scalar', k, v)
 
 				if isinstance(model, Visualizable):
 					model.visualize(out, logger)
@@ -813,76 +810,186 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 		if not silent:
 			loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(), stats['loss'].smooth.item()) \
 				if stats['loss'].count > 0 else ''
-			if inline:
-				itr.set_description('{} ep={} (lim={}) {}'.format(mode, epoch, loss_info))
+			if bar is not None:
+				bar.set_description('Train ep={}{}'.format(records['epoch'], loss_info))
 			elif print_freq is None or records['total_steps'] % print_freq == 0:
-				print('[ {} ] {} Ep={}/{} Itr={}/{}{}'.format(
-					time.strftime("%H:%M:%S"), mode,
-					epoch, total_epochs, i + 1, len(loader), loss_info))
+				print('[ {} ] Train Ep={} Itr={}{}'.format(
+					time.strftime("%H:%M:%S"), records['epoch'], records['total_steps'], step_limit, loss_info))
 
 				sys.stdout.flush()
 
 		time_stats.update('viz', time.time() - start)
 
-		if val_freq is not None and records['total_steps'] % val_freq == 0:
-
-			if pbar is not None:
-				pbar.close()
-				pbar = tqdm(total=len(valloader))
-
-
-			if pbar is not None:
-				pbar = tqdm(total=sample_limit, unit='sample', initial=records['train']['total_samples'])
-
-
-
-
-
-
 		del out
 		torch.cuda.empty_cache()
 
-		records['epoch'] += 1
+		# endregion
+
+		# region Validation
+
+		if val_freq is not None and records['total_steps'] % val_freq == 0:
+			start = time.time()
+
+			# if pbar is not None:
+			# 	pbar.close()
+			# 	pbar = tqdm(total=len(valloader))
+			#
+			# if pbar is not None:
+			# 	pbar = tqdm(total=sample_limit, unit='sample', initial=records['train']['total_samples'])
+
+			model.eval()
+			model.pre_epoch('val', records['epoch'])
+			val_stats = gen_stats()
+
+			loader, epoch_seed = restart_loader(valloader, epoch_seed)
+			if bar is not None:
+				bar.close()
+				loader = pbar(enumerate(loader), total=len(valloader))
+			else:
+				loader = enumerate(loader)
+			start = time.time()
+
+			for i, batch in loader:
+				batch = next(loader)
+
+				batch = util.to(batch, A.device)
+
+				B = batch.size(0)
+				records['total_samples'] += B
+
+				time_stats.update('data', time.time() - start)
+				start = time.time()
+
+				out = model.test(batch)
+
+				if bar is not None:
 
 
 
-		model.pre_epoch(mode='train', epoch=records['epoch'], steps=records['total_steps'])
-		# try:
-		# 	datasets[0].pre_epoch(mode='train', epoch=records['epoch'])
-		# except ValueError:
-		# 	pass
+					pass
 
-		train_stats = run_epoch(model, trainloader, A, mode='train', records=records,
-		                              logger=logger, silent=False, inline='inline' in A and A.inline)
+			time_stats.update('eval', time.time() - start)
+			model.post_epoch('val', records['epoch'])
+			model.train()
 
-		model.post_epoch(mode='train', epoch=records['epoch'], steps=records['total_steps'], stats=train_stats)
-
-		records['stats']['train'].append(train_stats.export())
-
-		if valloader is not None:
-			model.pre_epoch(mode='val', epoch=records['epoch'], steps=records['total_steps'])
-
-			val_stats = run_epoch(model, valloader, A, mode='val', records=records, unique_tests=A.output.unique_tests,
-		                              logger=logger, silent=False, inline='inline' in A and A.inline)
+			print('[ {} ] Validation Ep={} Itr={}{}'.format(
+				time.strftime("%H:%M:%S"), 'val',
+				records['epoch'], records['total_steps'], step_limit, loss_info))
 
 			records['stats']['val'].append(val_stats.export())
 
-			model.post_epoch(mode='val', epoch=records['epoch'], steps=records['total_steps'], stats=val_stats)
+			val_loss = val_stats['loss']
 
-		epoch_seed = util.gen_deterministic_seed(epoch_seed)
+			if logger is not None:
 
-		if A.output.save_freq > 0 and ((records['epoch']-1) % A.output.save_freq == 0
-		                               or records['epoch'] == A.training.epochs):
+				logger.set_tag_format('{}/val')
+
+				with torch.no_grad():
+					if viz_criterion is not None:
+						stats.update('loss-viz', viz_criterion(*[out[n] for n in viz_criterion_args]).detach())
+
+					logger.set_step(records['total_samples']['train'] if display_samples else records['total_steps'])
+
+					with torch.no_grad():
+						display = stats.smooths()  # if smooths else stats.avgs()
+						for k, v in display.items():
+							logger.add('scalar', k, v)
+
+					if isinstance(model, Visualizable):
+						model.visualize(out, logger)
+
+				logger.set_tag_format('{}/train')
+
+			del out
+			torch.cuda.empty_cache()
+
+			bar = None if pbar is None else pbar(total=sample_limit, unit='sample',
+			                                     initial=records['train']['total_samples'])
+
+			time_stats.update('eval', time.time() - start)
 
 
-			_restart_counter += 1
+		# endregion
 
-		print()
+		# region Save
 
-		if 'RESTART_AFTER' in os.environ and ((_restart_counter+1) % int(os.environ['RESTART_AFTER']) == 0) and (N > i+1):
+		if save_freq > 0 and records['total_steps'] % save_freq == 0:
+			start = time.time()
 
-			print('*** Exiting for restart after {} checkpoints'.format(os.environ['RESTART_AFTER']))
-			sys.exit(3)
+			ckpt = {
+				'model_str': str(model),
+				'model_state': model.state_dict(),
+
+				'records': records,
+				'epoch_seed': epoch_seed,
+			}
+
+			if A.training.track_best and val_loss is not None:
+				if val_loss.count == 0:
+					print('WARNING: loss has not been logged, so the best model cant be tracked')
+				else:
+					av_loss = val_loss.avg.item()
+					is_best = records['best']['loss'] is None or av_loss <= records['best']['loss']
+					if is_best:
+						if records['best']['loss'] is not None:
+							print('Epoch {} improved from {:.4f} (epoch={}) to: {:.4f}'.format(
+								records['epoch'], records['best']['loss'], records['best']['epoch'], av_loss))
+						records['best']['loss'] = av_loss
+						records['best']['epoch'] = records['epoch']
+
+			path = save_checkpoint(ckpt, A.output.save_dir, is_best=is_best, epoch=records['epoch'])
+			print('--- checkpoint saved to {} ---'.format(path))
+
+			time_stats.update('save', time.time() - start)
+
+			if time_limit is not None and ((time.time() - start_time) > time_limit):
+				print('*** Exiting for restart, time limit ({:2.2f} hr) has been reached'.format(A.training.time_limit))
+				sys.exit(3)
+
+		# endregion
+
+
+
+
+	# records['epoch'] += 1
+
+	# model.pre_epoch(mode='train', epoch=records['epoch'], steps=records['total_steps'])
+	# # try:
+	# # 	datasets[0].pre_epoch(mode='train', epoch=records['epoch'])
+	# # except ValueError:
+	# # 	pass
+	#
+	# train_stats = run_epoch(model, trainloader, A, mode='train', records=records,
+	#                               logger=logger, silent=False, inline='inline' in A and A.inline)
+	#
+	# model.post_epoch(mode='train', epoch=records['epoch'], steps=records['total_steps'], stats=train_stats)
+	#
+	# records['stats']['train'].append(train_stats.export())
+	#
+	# if valloader is not None:
+	# 	model.pre_epoch(mode='val', epoch=records['epoch'], steps=records['total_steps'])
+	#
+	# 	val_stats = run_epoch(model, valloader, A, mode='val', records=records, unique_tests=A.output.unique_tests,
+	#                               logger=logger, silent=False, inline='inline' in A and A.inline)
+	#
+	# 	records['stats']['val'].append(val_stats.export())
+	#
+	# 	model.post_epoch(mode='val', epoch=records['epoch'], steps=records['total_steps'], stats=val_stats)
+	#
+	# epoch_seed = util.gen_deterministic_seed(epoch_seed)
+	#
+	# if A.output.save_freq > 0 and ((records['epoch']-1) % A.output.save_freq == 0
+	#                                or records['epoch'] == A.training.epochs):
+	#
+	#
+	# 	_restart_counter += 1
+	#
+	# print()
+	#
+	# if 'RESTART_AFTER' in os.environ and ((_restart_counter+1) % int(os.environ['RESTART_AFTER']) == 0) and (N > i+1):
+	#
+	# 	print('*** Exiting for restart after {} checkpoints'.format(os.environ['RESTART_AFTER']))
+	# 	sys.exit(3)
 
 
 

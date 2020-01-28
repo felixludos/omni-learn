@@ -48,10 +48,17 @@ class Batchable_Dataset(Dataset): # you can select using a full batch
 
 class Info_Dataset(Dataset):
 
-	def __init__(self, din, dout, *args, **kwargs):
+	'''
+	If possible, din and dout should already be set by the class, in which as they only have to be passed in to
+	__init__ to overwrite them for the specific instance.
+	'''
+
+	def __init__(self, din=None, dout=None, *args, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.din = din
-		self.dout = dout
+		if din is not None:
+			self.din = din
+		if dout is not None:
+			self.dout = dout
 
 	def get_info(self):
 		return self.din, self.dout

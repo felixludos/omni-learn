@@ -6,31 +6,61 @@ import torch
 from torch.nn import functional as F
 import torchvision
 
+from ..registry import create_component, Component
 from ... import util
-from ..data import register_dataset
+from ..data import Dataset
 
 from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset
 
-class MNIST(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, util.Simple_Child):
+from .transforms import Interpolated
 
-	def __init__(self, dataset=None, dataroot=None, download=True, label=True, label_attr='targets',
-	             train=True, din=(1,28,28), dout=10, resize=True,
-	             **kwargs):
+def _get_common_args(A):
+	dataroot = A.pull('dataroot')
 
-		assert dataset is not None or dataroot is not None, 'no dataset to use/load'
+	download = A.pull('download', False)
+	train = A.pull('train', True)
 
-		if resize:
-			din = (1, 32, 32)
+	return dataroot, {'download': download, 'train': train}
 
-		super().__init__(din=din, dout=dout if label else din, train=train, _parent='dataset')
 
-		if dataset is None:
-			dataset = torchvision.datasets.MNIST(os.path.join(dataroot, 'mnist'),
-			                                     train=train, download=download, **kwargs)
+class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, util.Simple_Child):
+
+	# def __init__(self, dataset=None, dataroot=None, download=True, label=True, label_attr='targets',
+	#              train=True, din=(1,28,28), dout=10, resize=True,
+	#              **kwargs):
+
+
+
+	def __init__(self, dataset, train=True, label_attr=None, din=None, dout=None, **unused):
+		'''
+		Requires dataset object to wrap it (since this is a `util.Simple_Child`).
+
+		Images must be in `dataset.data` and labels in `dataset.[label_attr]` (if provided).
+
+		:param dataset: compatible pytorch torchvision dataset object
+		:param train: bool
+		:param label_attr: attr name used to access labels in `dataset`
+		:param din: optional (if it has to be overwritten)
+		:param dout: optional (if it has to be overwritten)
+		'''
+
+		# dataroot = A.pull('dataroot', None)
+		# download = A.pull('download', True)
+		#
+		# label = A.pull('label', True)
+		# label_attr = A.pull('label_attr', 'targets')
+		#
+		# train = A.pull('train', True)
+		# din = A.pull('din', self.din)
+		# dout = A.pull('dout', 10)
+
+		if label_attr is None:
+			dout = self.din if din is None else din
+
+		super().__init__(din=din, dout=dout, train=train, _parent='dataset')
 
 		self.dataset = dataset
-		self.labeled = label
-		self.resize = resize
+		self.labeled = label_attr is not None
 
 		images = self.dataset.data
 		if isinstance(images, np.ndarray):
@@ -39,7 +69,7 @@ class MNIST(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, u
 		if images.ndimension() == 3:
 			images = images.unsqueeze(1)
 		self.labels = None
-		if label:
+		if label_attr is not None:
 			labels = getattr(self.dataset, label_attr)
 			if not isinstance(labels, torch.Tensor):
 				labels = torch.tensor(labels)
@@ -52,73 +82,109 @@ class MNIST(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, u
 
 	def __getitem__(self, item):
 		img = self.images[item]
-		if self.resize:
-			if img.ndimension() == 3:
-				img = img.unsqueeze(0)
-			img = F.interpolate(img, (32, 32), mode='bilinear').squeeze(0)
 		if self.labeled:
 			return img, self.labels[item]
 		return img
 
-register_dataset('mnist', MNIST)
+@Dataset('mnist')
+class MNIST(Torchvision_Toy_Dataset):
+	din = (1, 28, 28)
 
+	def __init__(self, A):
+		dataroot, kwargs = _get_common_args(A)
+		dataset = torchvision.datasets.MNIST(os.path.join(dataroot, 'mnist'), **kwargs)
 
-class KMNIST(MNIST):
+		labeled = A.pull('labeled', False)
 
-	def __init__(self, dataroot, train=True, download=True, label=True, resize=True, **kwargs):
-		dataset = torchvision.datasets.KMNIST(os.path.join(dataroot, 'kmnist'),
-		                                      train=train, download=download, **kwargs)
+		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label, resize=resize)
+@Dataset('kmnist')
+class KMNIST(Torchvision_Toy_Dataset):
+	din = (1, 28, 28)
 
-register_dataset('kmnist', KMNIST)
+	def __init__(self, A):
 
+		dataroot, kwargs = _get_common_args(A)
+		dataset = torchvision.datasets.KMNIST(os.path.join(dataroot, 'kmnist'), **kwargs)
 
-class FashionMNIST(MNIST):
+		labeled = A.pull('labeled', False)
 
-	def __init__(self, dataroot, train=True, download=True, label=True, resize=True, **kwargs):
-		dataset = torchvision.datasets.FashionMNIST(os.path.join(dataroot, 'fmnist'),
-		                                            train=train, download=download, **kwargs)
+		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label, resize=resize)
+@Dataset('data/fmnist')
+class FashionMNIST(Torchvision_Toy_Dataset):
+	din = (1, 28, 28)
 
-register_dataset('fmnist', FashionMNIST)
+	def __init__(self, A):
 
+		dataroot, kwargs = _get_common_args(A)
+		dataset = torchvision.datasets.FashionMNIST(os.path.join(dataroot, 'fmnist'), **kwargs)
 
-class EMNIST(MNIST):
+		labeled = A.pull('labeled', False)
 
-	def __init__(self, dataroot, train=True, download=True, label=True, split='letters', resize=True, **kwargs):
-		dataset = torchvision.datasets.EMNIST(os.path.join(dataroot, 'emnist'), split=split,
-		                                      train=train, download=download, **kwargs)
+		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
 
-		dataset.targets -= 1 # targets use 1-based indexing :(
+@Dataset('emnist')
+class EMNIST(Torchvision_Toy_Dataset):
+	din = (1, 28, 28)
 
-		super().__init__(dataset=dataset, train=train, label=label, dout=26, resize=resize)
+	def __init__(self, A):
 
-register_dataset('emnist', EMNIST)
+		dataroot, kwargs = _get_common_args(A)
 
+		split = A.pull('split', 'letters')
 
-class SVHN(MNIST):
-	def __init__(self, dataroot, train=True, download=True, label=True, **kwargs):
-		dataset = torchvision.datasets.SVHN(os.path.join(dataroot, 'svhn'), split='train' if train else 'test',
-		                                      download=download, **kwargs)
+		dataset = torchvision.datasets.EMNIST(os.path.join(dataroot, 'emnist'), split=split, **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label, din=(3,32,32), label_attr='labels', resize=False)
+		dataset.targets -= 1  # targets use 1-based indexing :(
 
-register_dataset('svhn', SVHN)
+		labeled = A.pull('labeled', False)
 
+		dout = None
+		if labeled:
+			if split != 'letters':
+				raise NotImplementedError
+			dout = 26
 
-class CIFAR(MNIST):
-	def __init__(self, dataroot, train=True, download=True, label=True, classes=10, **kwargs):
-		assert classes in {10, 100}, 'classes must be 10 or 100'
+		super().__init__(dataset, label_attr='targets' if labeled else None, dout=dout, **kwargs)
+
+@Dataset('svhn')
+class SVHN(Torchvision_Toy_Dataset):
+	din = (3, 32, 32)
+
+	def __init__(self, A):
+
+		dataroot, kwargs = _get_common_args(A)
+
+		split = 'train' if kwargs['train'] else 'test'
+		del kwargs['train']
+
+		dataset = torchvision.datasets.SVHN(os.path.join(dataroot, 'svhn'), split=split, **kwargs)
+
+		labeled = A.pull('labeled', False)
+
+		super().__init__(dataset, label_attr='labels' if labeled else None, **kwargs)
+
+@Dataset('cifar')
+class CIFAR(Torchvision_Toy_Dataset):
+	din = (3, 32, 32)
+
+	def __init__(self, A):
+
+		dataroot, kwargs = _get_common_args(A)
+
+		classes = A.pull('classes', 10)
+
+		assert classes in {10, 100}, 'invalid number of classes for cifar: {}'.format(classes)
+
 		cls = torchvision.datasets.CIFAR10 if classes == 10 else torchvision.datasets.CIFAR100
-		dataset = cls(os.path.join(dataroot, 'cifar'), train=train,
-		                                    download=download, **kwargs)
+		dataset = cls(os.path.join(dataroot, 'cifar'), **kwargs)
 
-		super().__init__(dataset=dataset, train=train, label=label, din=(3, 32, 32), dout=classes, resize=False)
+		labeled = A.pull('labeled', False)
 
-		self.images = self.images.permute(0,3,1,2).contiguous()
+		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
 
-register_dataset('cifar', CIFAR)
+		self.images = self.images.permute(0, 3, 1, 2).contiguous()
+
 
 

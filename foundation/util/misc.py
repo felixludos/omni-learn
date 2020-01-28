@@ -70,13 +70,15 @@ class Simple_Child(object): # a simple wrapper that delegates __getattr__s to so
 		self._parent = _parent
 
 	def __getattribute__(self, item):
-		parent = super().__getattribute__('_parent')
-		if parent is None:
-			return super().__getattribute__(item)
+
 		try:
 			return super().__getattribute__(item)
-		except AttributeError:
-			return parent.__getattribute__(item)
+		except AttributeError as e:
+			try: # check the parent first
+				parent = super().__getattribute__('_parent')
+				return parent.__getattribute__(item)
+			except AttributeError:
+				raise e
 
 
 def to_np(tensor):
