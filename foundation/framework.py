@@ -68,7 +68,8 @@ class Recordable(Model):
 
 	def pre_epoch(self, mode, epoch):
 		super().pre_epoch(mode, epoch)
-		self.reset_stats()
+		if mode == 'val':
+			self.reset_stats()
 
 class Visualizable(Recordable):
 	def __init__(self, *args, **kwargs):

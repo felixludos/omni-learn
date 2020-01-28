@@ -510,8 +510,10 @@ class Run_Manager(object):
 		self.set_active(valid)
 
 
-	def load_configs(self, force=False, clear_info=False):
+	def load_configs(self, force=False, clear_info=False, excluded_info=[]):
 		valid = []
+
+		excluded_info = set(excluded_info)
 
 		for run in self.active:
 			if 'config' not in run or force:
@@ -523,26 +525,33 @@ class Run_Manager(object):
 					continue
 
 				config = get_config(fname)
+
 				if clear_info:
 					del run.config.info
 				elif 'info' in config:
-					if 'dataset_type' in config.info:
-						new = config.info.dataset_type
-						if 'dataset' in run.meta:
-							assert run.meta.dataset == new, '{} vs {}'.format(run.meta.dataset, new)
-						run.meta.dataset = new
-					if 'model_type' in config.info:
-						new = config.info.model_type
-						if 'model' in run.meta:
-							assert run.meta.model == new, '{} vs {}'.format(run.meta.model, new)
-						run.meta.model = new
-					if 'history' in config.info:
-						run.meta.history = config.info.history
-					if 'date' in config.info:
-						new = tuple(config.info.date.split('-'))
-						if 'date' in run.meta:
-							assert run.meta.date == new, '{} vs {}'.format(run.meta.date, new)
-						run.meta.date = new
+
+					for k,v in config.info.items():
+						if k in excluded_info:
+							pass
+						elif 'dataset_type' == k:
+							new = v
+							if 'dataset' in run.meta:
+								assert run.meta.dataset == new, '{} vs {}'.format(run.meta.dataset, new)
+							run.meta.dataset = new
+						elif 'model_type' == k:
+							new = v
+							if 'model' in run.meta:
+								assert run.meta.model == new, '{} vs {}'.format(run.meta.model, new)
+							run.meta.model = new
+						elif 'history' == k:
+							run.meta.history = config.info.history
+						elif 'date' == k:
+							new = tuple(v.split('-'))
+							if 'date' in run.meta:
+								assert run.meta.date == new, '{} vs {}'.format(run.meta.date, new)
+							run.meta.date = new
+						else:
+							run.meta[k] = v
 				if 'job' in config:
 					run.meta.job = config.job.num, config.job.ID, config.job.ps
 

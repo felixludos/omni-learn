@@ -24,6 +24,9 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 		print('WARNING: $FOUNDATION_RUN_MODE is not set, using default: {}'.format(mode))
 	mode = os.environ['FOUNDATION_RUN_MODE']
 
+	# mode = 'cluster'
+	# print('\n\n\n\n\n\nTESTING: running on cluster')
+
 	if 'FOUNDATION_TESTING' not in os.environ:
 		testing = '1'
 		os.environ['FOUNDATION_TESTING'] = testing
@@ -45,10 +48,16 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 				print('-- Inserting \'cmd\' to front of config (because of testing mode) --')
 				argv.insert(1,'cmd')
 
-			config = parse_config(argv[1:])
+			config = parse_config(argv[1:], include_load_history=True)
+
+			assert '_load_history' in config, 'should not happen'
+			if '_load_history' in config:
+				config.info.history = config._load_history
+				del config._load_history
 
 		if os.environ['FOUNDATION_TESTING'] == '1':
 			print('\nThis is a test run!\n')
+
 
 		if 'load' in config:
 			print('Loaded model from: {}'.format(config.load))

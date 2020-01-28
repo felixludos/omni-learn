@@ -60,9 +60,10 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 
 
 def load(path=None, A=None, get_model='default', get_data='default', mode='train',
+         update_config=False,
          load_optim=True, load_scheduler=True,
          load_state_dict=True, load_last=False, force_load_model=False,
-         return_args=False, return_ckpt=False):
+         return_args=False, return_ckpt=False, seed=0):
 	assert path is not None or A is not None, 'must provide either path to checkpoint or args'
 	assert get_model is not None or get_data is not None or return_ckpt, 'nothing to load'
 
@@ -103,11 +104,11 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 		load_A = get_config(os.path.join(run_dir, config_name))
 		if A is None: # if no config is provided, the loaded config is adopted
 			A = load_A
-		# else: # TODO: enable a way to reload loaded config? (not really necessary, already done in get_config)
-		# 	new_A = A.copy()
-		# 	A.clear()
-		# 	A.update(load_A)
-		# 	A.update(new_A)
+		elif update_config:
+			new_A = A.copy()
+			A.clear()
+			A.update(load_A)
+			A.update(new_A)
 		print('Loaded {}'.format(ckptpath))
 
 		if 'FOUNDATION_DATA_DIR' in os.environ: # TODO: necessary?
@@ -116,24 +117,30 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 
 	assert A is not None, 'Nothing to get'
 
+	if 'seed' in A:
+		seed = A.seed
+	else:
+		print('WARNING: no seed found, using: seed={}'.format(seed))
+
 	out = []
 
 	if return_args:
 		out.append(A)
 
 	if get_data is not None:
-		util.set_seed(A.seed)
+		util.set_seed(seed)
 
 		info = A.dataset
 
 		if checkpoint is not None and 'datasets' in checkpoint:
 			datasets = checkpoint['datasets']
 		else:
-			info.begin()
+			A.begin()
 
 			dataset = get_data(A.dataset, mode=mode)
 
-			info.abort()
+			if get_model is None:
+				A.abort() # TODO: don't abort when creating the model right afterwards (wait until after model)
 
 			try:
 				A.din, A.dout = dataset.din, dataset.dout
@@ -156,13 +163,14 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 
 
 	if get_model is not None:
-		util.set_seed(A.seed)
+		util.set_seed(seed)
 
 		info = A.model
 
-		info.begin()
+		if get_data is None:
+			A.begin()
 		model = get_model(info)
-		info.abort()
+		A.abort() # undo all changes to the config throughout model creation
 
 		print('Moving model to {}'.format(A.device))
 		sys.stdout.flush()

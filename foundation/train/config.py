@@ -99,7 +99,7 @@ def merge_configs(configs, parent_defaults=True):
 	return merged
 
 
-def get_config(path=None, parent_defaults=True): # Top level function
+def get_config(path=None, parent_defaults=True, include_load_history=False): # Top level function
 
 	if path is None:
 		return Config()
@@ -149,7 +149,8 @@ def get_config(path=None, parent_defaults=True): # Top level function
 
 	root = merge_configs(order, parent_defaults=parent_defaults) # update to connect parents and children in tree and remove reversed - see Config.update
 
-	root.info.history = pnames
+	if include_load_history:
+		root._load_history = pnames
 	if 'parents' in root:
 		del root.parents
 
@@ -166,7 +167,7 @@ class NoConfigFound(Exception):
 	def __init__(self):
 		super().__init__('Either provide a config name/path as the first argument, or set your $FOUNDATION_CONFIG environment variable to a config name/path')
 
-def parse_config(argv=None, parent_defaults=True):
+def parse_config(argv=None, parent_defaults=True, include_load_history=False):
 	# WARNING: 'argv' should not be equivalent to sys.argv here (no script name in element 0)
 
 	if argv is None:
@@ -216,7 +217,7 @@ def parse_config(argv=None, parent_defaults=True):
 				values = values[0]
 			root[keys] = values
 
-	root = get_config(root, parent_defaults=parent_defaults)
+	root = get_config(root, parent_defaults=parent_defaults, include_load_history=include_load_history)
 
 	return root
 

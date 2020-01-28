@@ -45,12 +45,15 @@ def setup_records(training):
 		'stats': {'train':[], 'val':[]},
 	}
 
-	if 'start' not in training:
-		training.start = 0
-	records['epoch'] = training.start
+	# if 'start' not in training:
+	# 	training.start = 0
+	records['epoch'] = 0
 
-	if training.track_best:
-		records['best'] = {'loss':None, 'epoch':None}
+	if 'track_best' in training and training.track_best:
+		records['best'] = {'loss':None, 'checkpoint':None}
+
+	if 'checkpoint' not in records:
+		records['checkpoint'] = 0
 
 	if 'stats_decay' in training:
 		util.set_default_tau(training.stats_decay)
