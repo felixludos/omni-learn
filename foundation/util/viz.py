@@ -28,8 +28,8 @@ def calc_tiling(N, H=None, W=None, prefer_tall=False):
 	if H > W and not prefer_tall:
 		H, W = W, H
 
-	if not prefer_tall:
-		H,W = W,H
+	# if not prefer_tall:
+	# 	H,W = W,H
 	return H, W
 
 
@@ -139,7 +139,7 @@ class Video(object):
 
 		asp = W/H
 
-		fig = plt.figure(figsize=(1, asp), dpi=int(H*scale),)
+		fig = plt.figure(figsize=(asp, 1), dpi=int(H*scale),)
 
 		ax = plt.axes([0, 0, 1, 1], frameon=False)
 		ax.get_xaxis().set_visible(False)

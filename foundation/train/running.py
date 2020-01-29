@@ -99,8 +99,8 @@ def new_run_full(A, get_data, get_model, get_name=None):
 			if extend is not None: # resume
 				assert 'step_limit' in A.training, 'Cannot extend steps, because there is no limit set'
 				A.training.step_limit = extend
-				print('Extending training to {} epochs'.format(extend))
-			print('Running {} more epochs'.format(A.training.step_limit - records['total_steps']))
+				print('Extending training to {} steps'.format(extend))
+			print('Running {} more steps'.format(A.training.step_limit - records['total_steps']))
 
 	if 'save_freq' not in A.output or 'save_dir' not in A.output:
 		A.output.save_freq = -1

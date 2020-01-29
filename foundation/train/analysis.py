@@ -509,6 +509,18 @@ class Run_Manager(object):
 
 		self.set_active(valid)
 
+	def load_records(self, pbar=None, force=False):
+
+		runs = self.active
+		if pbar is not None:
+			runs = pbar(runs)
+			runs.set_description('Loading records')
+
+		for run in runs:
+			if 'records' not in run or force:
+				ckpt = torch.load(run.ckpt_path)
+				run.records = ckpt['records']
+
 
 	def load_configs(self, force=False, clear_info=False, excluded_info=[]):
 		valid = []
@@ -634,17 +646,17 @@ class Run_Manager(object):
 		indicies = set(indicies)
 		self.set_active([run for i, run in enumerate(self.active) if i in indicies])
 
-	def sort_by(self, criterion='date'):
+	def sort_by(self, criterion='date', reverse=False):
 		if criterion == 'date':
-			active = sorted(self.active, key=lambda r: r.meta.date)
+			active = sorted(self.active, key=lambda r: r.meta.date, reverse=reverse)
 		elif criterion == 'job':
-			active = sorted(self.active, key=lambda r: r.meta.job)
+			active = sorted(self.active, key=lambda r: r.meta.job, reverse=reverse)
 		elif criterion == 'model':
-			active = sorted(self.active, key=lambda r: r.meta.model)
+			active = sorted(self.active, key=lambda r: r.meta.model, reverse=reverse)
 		elif criterion == 'data':
-			active = sorted(self.active, key=lambda r: r.meta.dataset)
+			active = sorted(self.active, key=lambda r: r.meta.dataset, reverse=reverse)
 		elif criterion == 'ckpt':
-			active = sorted(self.active, key=lambda r: r.meta.ckpt)
+			active = sorted(self.active, key=lambda r: r.meta.ckpt, reverse=reverse)
 		else:
 
 			active = criterion(self.active)
@@ -702,8 +714,8 @@ class Run_Manager(object):
 
 		if ckpt is not None:
 			self.sort_by('ckpt')
-			dates = sorted([run.meta.date[0] for run in self.active])
-			idx = bisect_left(dates, date)
+			ckpts = sorted([run.meta.ckpt for run in self.active])
+			idx = bisect_left(ckpts, ckpt)
 			self.set_active(self.active[idx:])
 
 		return self
@@ -859,7 +871,11 @@ class Run_Manager(object):
 			print('{:>3}) {}'.format(i, run.name))
 
 			if 'all' in props or 'checkpoint' in props or 'ckpt' in props:
-				print('{}Checkpoint: {}'.format(indent, run.meta.ckpt))
+				est = ' (approx {} steps)'.format(run.config.output.save_freq * run.meta.ckpt) if 'config' in run else ''
+				print('{}Checkpoint: {}{}'.format(indent, run.meta.ckpt, est))
+
+			if ('all' in props or 'steps' in props) and 'records' in run:
+				print('{}Steps: {}'.format(indent, run.records['total_steps']))
 
 			if ('all' in props or 'stats' in props) and 'stats' in run:
 				stats = ['{:>10} : {:3.2f}'.format(*item) for item in run.stats.items()]

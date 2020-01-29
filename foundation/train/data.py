@@ -149,26 +149,33 @@ def Dataset(name): # WARNING: datasets should not pull "name"
 	return _dataset
 
 
-def get_dataset(name, mode=None, info=None, **kwargs):
+def get_dataset(name=None, mode=None, info=None, **kwargs):
+
+	assert name is not None or info is not None, 'must provide either name (+ **kwargs) or config ("info")'
 
 	created_config = False
 	if info is None:
 		created_config = True
 		info = get_config()
-		info.begin()
+
 		print('Loading dataset: {}'.format(name))
 
-	info.name = name
+		info.name = name
+		info.update(kwargs)
 
-	if mode is not None: # TODO: doesn't allow for other modes
-		info.train = mode == 'train'
+
+	if '_type' not in info:
+		assert 'name' in info, 'no dataset specified'
+		info._type = _dataset_registry[info.name]
 
 	if 'dataroot' not in info and 'FOUNDATION_DATA_DIR' in os.environ:
 		info.dataroot = os.environ['FOUNDATION_DATA_DIR']
 
-	info.update(kwargs)
+	if mode is not None:  # TODO: doesn't allow for other modes
+		info.train = mode == 'train'
 
-	info._type = _dataset_registry[name]
+	if created_config:
+		info.begin()
 
 	dataset = create_component(info)
 
@@ -203,16 +210,18 @@ def default_load_data(info, mode='train'):
 
 
 
-	if '_type' in info:
-		if mode == 'test':  # TODO: maybe too heavy handed
-			info.train = False
+	# if '_type' in info:
+	# 	if mode == 'test':  # TODO: maybe too heavy handed
+	# 		info.train = False
+	#
+	# 	dataset = create_component(info)
+	# elif 'name' in info:
+	# 	name = info.pull('name')
+	# 	dataset = get_dataset(name, mode=mode, info=info)
+	# else:
+	# 	raise Exception('Unable to create dataset without either _type or name')
 
-		dataset = create_component(info)
-	elif 'name' in info:
-		name = info.pull('name')
-		dataset = get_dataset(name, mode=mode, info=info)
-	else:
-		raise Exception('Unable to create dataset without either _type or name')
+	dataset = get_dataset(info=info, mode=mode)
 
 	assert 'device' in info, 'No device selected'
 	device = info.device
