@@ -5,6 +5,7 @@ from tqdm import tqdm
 import yaml
 import torch
 from .. import util
+from ..data.collectors import Info_Dataset
 from ..framework import Visualizable, Recordable, Schedulable
 # from .load_data import old_get_loaders as get_loaders # TODO: update
 
@@ -33,7 +34,6 @@ def run_full(A, *args, **kwargs):
 
 
 def new_run_full(A, get_data, get_model, get_name=None):
-	## %%%%%%%%%%%%%%%%%%
 
 	if 'device' not in A or not torch.cuda.is_available():
 		A.device = 'cpu'
@@ -95,6 +95,8 @@ def new_run_full(A, get_data, get_model, get_name=None):
 		if 'load' in A: # load
 			del A.load
 			print('WARNING: you are loading a previous model!')
+			print('Previous model has trained for {} steps, {} epochs'.format(records['total_steps'],
+			                                                                  records['epoch']))
 		else: # resume, complete
 			if extend is not None: # resume
 				assert 'step_limit' in A.training, 'Cannot extend steps, because there is no limit set'
@@ -365,6 +367,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 	# records['epoch'] += 1 # incomplete epochs dont count as epochs
 	records['checkpoint'] += 1
 	model.pre_epoch('train', records['epoch'])
+	trainloader.dataset.pre_epoch('train', records['epoch'])
 	loader, epoch_seed = restart_loader(trainloader, epoch_seed)
 
 
@@ -397,6 +400,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 
 		except StopIteration:
 			model.post_epoch('train', records['epoch'], stats=train_stats)
+			trainloader.dataset.post_epoch('train', records['epoch'], stats=train_stats)
 			records['stats']['train'].append(train_stats.export())
 			loader, epoch_seed = restart_loader(trainloader, epoch_seed)
 			records['epoch'] += 1
@@ -471,6 +475,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 				model.stats = val_model_stats
 				val_stats.shallow_join(val_model_stats)
 			model.pre_epoch('val', records['epoch'])
+			valloader.dataset.pre_epoch('val', records['epoch'])
 
 			if not silent:
 				if bar is not None:
@@ -557,6 +562,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 
 			time_stats.update('eval', time.time() - start)
 			model.post_epoch('val', records['epoch'], stats=val_stats) # possibly takes scheduler step
+			valloader.dataset.post_epoch('val', records['epoch'], stats=val_stats)
 			model.train()
 
 			if val_model_stats is not None:

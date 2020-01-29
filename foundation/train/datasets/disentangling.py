@@ -170,7 +170,19 @@ class FullCelebA(Testable_Dataset, Info_Dataset): # TODO: automate downloading a
 		resize = A.pull('resize', (256, 256))
 
 		din = A.pull('din', self.din)
-		dout = A.pull('dout', None)
+
+		if label_type is None:
+			dout = din
+		elif label_type == 'attr':
+			dout = 40
+		elif label_type == 'landmark':
+			dout = 10
+		elif label_type == 'identity':
+			dout = 1
+		else:
+			raise Exception('unknown {}'.format(label_type))
+
+		dout = A.pull('dout', dout)
 
 		_labels = {
 			'attr': 'attrs',
@@ -181,17 +193,7 @@ class FullCelebA(Testable_Dataset, Info_Dataset): # TODO: automate downloading a
 		if resize is not None: # TODO: use Interpolated as modifier
 			din = 3, *resize
 
-		if dout is None:
-			if label_type is None:
-				dout = din
-			elif label_type == 'attr':
-				dout = 40
-			elif label_type == 'landmark':
-				dout = 10
-			elif label_type == 'identity':
-				dout = 1
-			else:
-				raise Exception('unknown {}'.format(label_type))
+
 
 		super().__init__(din=din, dout=dout, train=train,)
 
@@ -227,8 +229,11 @@ class FullCelebA(Testable_Dataset, Info_Dataset): # TODO: automate downloading a
 @Dataset('celeba')
 class CelebA(Cropped, FullCelebA):
 	def __init__(self, A):
-		raise NotImplementedError('doesnt work since FullCelebA automatically resizes to (256,256)')
+		# raise NotImplementedError('doesnt work since FullCelebA automatically resizes to (256,256)')
 		crop_size = A.pull('crop_size', 128) # essentially sets this as the default
+
+		A.resize = None
+
 		super().__init__(A, crop_size=crop_size)
 
 

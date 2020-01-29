@@ -30,9 +30,12 @@ def view_config_registry():
 	return _config_registry.copy()
 
 def find_config_path(name):
+	if os.path.isfile(name):
+		return name
+
 	if name in _config_registry:
 		return _config_registry[name]
-	elif 'FOUNDATION_SAVE_DIR' in os.environ and name in os.listdir(os.environ['FOUNDATION_SAVE_DIR']):
+	elif 'FOUNDATION_SAVE_DIR' in os.environ:
 
 		run_dir = name if os.path.isdir(name) else os.path.dirname(name) # full path to run dir or ckpt
 		path = os.path.join(run_dir, 'config.yml')

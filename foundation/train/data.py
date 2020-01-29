@@ -233,6 +233,13 @@ def default_load_data(info, mode='train'):
 	except RuntimeError:
 		print('Not enough memory to move dataset to {}'.format(device))
 
+	if not isinstance(dataset, Info_Dataset):
+		print('WARNING: it is strongly recommended for all datasets to be subclasses '
+		      'of fd.data.collectors.Info_Dataset, this dataset is not.')
+		dataset.pre_epoch = lambda x, y: 0
+		dataset.post_epoch = lambda x, y, z: 0
+		raise NotImplementedError
+
 	# if mode == 'test':
 	# 	return dataset
 

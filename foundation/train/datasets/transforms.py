@@ -39,11 +39,13 @@ class Cropped(Info_Dataset):
 
 		assert len(self.din) == 3 or len(self.din) == 1, 'must be an image dataset'
 
+		din = self.din
+
 		A.din = (self.din[0], *crop_size)
 
 		super().__init__(A)
 
-		_, self.cy, self.cx = self.din
+		_, self.cy, self.cx = din
 		self.cy, self.cx = self.cy // 2, self.cx // 2
 		self.r = crop_size[0] // 2
 

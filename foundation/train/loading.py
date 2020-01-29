@@ -33,6 +33,8 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 	if not os.path.isdir(path) and saveroot is not None:
 		try:
 			long_path = os.path.join(saveroot, path)
+			if os.path.isfile(long_path):
+				return long_path
 			assert os.path.isdir(long_path)
 		except AssertionError:
 			pass

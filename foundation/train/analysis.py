@@ -262,6 +262,10 @@ class Run_Manager(object):
 	def __iter__(self):
 		return iter(self.active)
 
+	def __delitem__(self, item):
+		del self.active[item]
+		self.set_active(self.active)
+
 	def map(self, fn, safe=False, pbar=None, reduce=None):
 		'''
 		fn is a callable taking one run as input
