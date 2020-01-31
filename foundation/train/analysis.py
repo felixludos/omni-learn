@@ -565,8 +565,8 @@ class Run_Manager(object):
 							run.meta.history = config.info.history
 						elif 'date' == k:
 							new = tuple(v.split('-'))
-							if 'date' in run.meta:
-								assert run.meta.date == new, '{} vs {}'.format(run.meta.date, new)
+							# if 'date' in run.meta:
+							# 	assert run.meta.date == new, '{} vs {}'.format(run.meta.date, new)
 							run.meta.date = new
 						else:
 							run.meta[k] = v

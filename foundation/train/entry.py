@@ -55,6 +55,8 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 				config.info.history = config._load_history
 				del config._load_history
 
+			config.info.argv = argv[1:]
+
 		if os.environ['FOUNDATION_TESTING'] == '1':
 			print('\nThis is a test run!\n')
 
