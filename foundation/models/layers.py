@@ -355,6 +355,9 @@ class DoubleConvLayer(nn.Module):
 		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
 
 		self.residual = residual
+		if in_channels != out_channels and residual:
+			print('WARNING: invalid residual setting, setting residual to False')
+			self.residual = False
 
 		self.nonlin_down = util.get_nonlinearity(nonlin) if down_type == 'conv' else None
 		self.down = util.get_pooling(down_type, factor, chn=out_channels)
@@ -417,6 +420,9 @@ class DoubleDeconvLayer(nn.Module):
 		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
 
 		self.residual = residual
+		if in_channels != out_channels and residual:
+			print('WARNING: invalid residual setting, setting residual to False')
+			self.residual = False
 
 		assert not self.residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(in_channels, internal_channels)
 
