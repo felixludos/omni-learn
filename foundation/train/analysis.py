@@ -385,6 +385,8 @@ class Run_Manager(object):
 					ckpt = None
 				elif len(terms) == 4 and terms[3][:4]=='ckpt':
 					nature, job, date, ckpt = terms
+				else:
+					assert False
 
 				terms = nature.split('-')
 				if len(terms) > 2:
@@ -402,7 +404,7 @@ class Run_Manager(object):
 
 
 			except (AssertionError, ValueError) as e:
-				raise e
+				# raise e
 				print('Auto parsing failed with: {}'.format(run.name))
 				pass
 

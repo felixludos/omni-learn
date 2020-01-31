@@ -405,6 +405,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 			loader, epoch_seed = restart_loader(trainloader, epoch_seed)
 			records['epoch'] += 1
 			model.pre_epoch('train', records['epoch'])
+			trainloader.dataset.pre_epoch('train', records['epoch'])
 			start = time.time()
 
 			batch = next(loader)
