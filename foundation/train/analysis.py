@@ -262,6 +262,13 @@ class Run_Manager(object):
 	def __iter__(self):
 		return iter(self.active)
 
+	def remove(self, name):
+
+		if name not in self:
+			raise ValueError(name)
+
+		del self[self(name).idx]
+
 	def __delitem__(self, item):
 		del self.active[item]
 		self.set_active(self.active)
@@ -595,14 +602,34 @@ class Run_Manager(object):
 			run.idx = i
 		self.name2idx = None
 		self.output = None
-	def extend(self, items):
-		self.active.extend(items)
-		if len(items):
-			self.name2idx = None
+	def extend(self, runs):
+		new = []
+		for item in runs:
+			if item.name not in self:
+				new.append(item)
+		if len(new):
+			self.set_active(self.active + new)
 	def append(self, item):
-		self.active.append(item)
-		self.name2idx = None
+		if item in self: # dont allow duplicates
+			return
+		self.append(item)
+		self.set_active(self.active)
 
+	def add(self, *names):
+		runs = []
+
+		for name in names:
+			for run in self.full_info:
+				if name == run.name:
+					runs.append(run)
+
+		if len(runs):
+			self.extend(runs)
+
+			print('Added {} run(s)'.format(len(runs)))
+
+	def clear(self):
+		self.set_active([])
 
 	def store_selection(self, name, runs=None):
 		self.selections[name] = self.active.copy() if runs is None else runs
