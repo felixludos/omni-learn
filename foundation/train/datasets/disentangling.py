@@ -284,17 +284,19 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 
 		self.labeled = labeled
 
-		fname = 'mpi3d_{}_{}.npz'.format(cat, 'train' if train else 'test')
+		fname = 'mpi3d_{}_{}.h5'.format(cat, 'train' if train else 'test')
 		if train is None:
 			fname = 'mpi3d_{}.npz'.format(cat)
 			print('WARNING: using full dataset (train+test)')
-		data = np.load(os.path.join(dataroot, fname))
+			images = np.load(os.path.join(dataroot, 'mpi3d', fname))['images']
+			indices = np.arange(len(images))
+		else:
+			with hf.File(os.path.join(dataroot, 'mpi3d', fname), 'r') as f:
+				images = f['images'][()]
+				indices = f['indices'][()]
 
-		images = data['images']
-		self.register_buffer('images', torch.from_numpy(images))
-
-		inds = data['indices']
-		self.register_buffer('indices', torch.from_numpy(inds))
+		self.register_buffer('images', torch.from_numpy(images).permute(0,3,1,2))
+		self.register_buffer('indices', torch.from_numpy(indices))
 
 	def get_label(self, inds):
 		try:
@@ -312,7 +314,7 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 		return len(self.images)
 
 	def __getitem__(self, idx):
-		imgs = self.images[idx]
+		imgs = self.images[idx].float().div(255)
 		if self.labeled:
 			labels = self.get_label(idx)
 			return imgs, labels
