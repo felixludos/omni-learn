@@ -370,7 +370,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 	trainloader.dataset.pre_epoch('train', records['epoch'])
 	loader, epoch_seed = restart_loader(trainloader, epoch_seed)
 
-
+	print('Training dataset len={} loader={}'.format(len(trainloader.dataset), len(trainloader)))
 
 	is_best = False
 

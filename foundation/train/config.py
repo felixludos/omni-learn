@@ -395,11 +395,13 @@ class Config(util.NS): # TODO: allow adding aliases
 
 			# TODO: should probably be deprecated - just register a "list" component separately
 			if val['_type'] == 'list':
+				_print_indent += 1
 				print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
 				terms = []
 				for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
 					terms.append(self._process_val('({})'.format(i), v))
 				val = tuple(terms)
+				_print_indent -= 1
 
 			else:
 

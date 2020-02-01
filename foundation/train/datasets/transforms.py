@@ -129,7 +129,36 @@ class Interpolated(Info_Dataset):
 		return (img, *other)
 
 
+@AutoModifier('resamplable')
+class Resamplable(Info_Dataset):
+	def __init__(self, A, budget=None):
+		if budget is None:
+			budget = A.pull('budget', None)
 
+		super().__init__(A)
 
+		self.budget = budget
+		self.inds = self.resample(self.budget)
+
+	def resample(self, budget=None):
+		if budget is None:
+			budget = self.budget
+		inds = None
+		if budget is not None:
+			inds = torch.randint(0, super().__len__(), size=(budget,))
+		return inds
+
+	def __len__(self):
+		return super().__len__() if self.budget is None else self.budget
+
+	def pre_epoch(self, mode, epoch):
+		if self.budget is not None and mode == 'train':
+			self.resample()
+		super().pre_epoch(mode, epoch)
+
+	def __getitem__(self, item):
+		if self.budget is not None:
+			item = self.inds[item]
+		return super().__getitem__(item)
 
 

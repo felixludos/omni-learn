@@ -237,3 +237,84 @@ class CelebA(Cropped, FullCelebA):
 		super().__init__(A, crop_size=crop_size)
 
 
+@Dataset('mpi3d')
+class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
+
+	din = (3, 64, 64)
+	dout = 7
+
+	def __init__(self, A):
+
+		dataroot = A.pull('dataroot', None)
+
+		train = A.pull('train', True)
+		labeled = A.pull('labeled', False)
+
+		din = A.pull('din', self.din)
+		dout = A.pull('dout', self.dout if labeled else din)
+
+		cat = A.pull('category', 'toy')
+
+		assert cat in {'toy', 'realistic', 'real'}, 'invalid category: {}'.format(cat)
+
+		super().__init__(din=din, dout=dout, train=train)
+
+		self.factor_order = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
+		                     'horizonal_axis', 'vertical_axis']
+		self.factor_sizes = [6,6,2,3,3,40,40]
+
+		self.factor_values = {
+			'object_color': ['white', 'green', 'red', 'blue', 'brown', 'olive'],
+			'object_shape': ['cone', 'cube', 'cylinder', 'hexagonal', 'pyramid', 'sphere'],
+			'object_size': ['small', 'large'],
+			'camera_height': ['top', 'center', 'bottom'],
+			'background_color': ['purple', 'sea_green', 'salmon'],
+			'horizonal_axis': list(range(40)),
+			'vertical_axis': list(range(40)),
+		}
+
+		sizes = np.array(self.factor_sizes)
+
+		flr = np.cumprod(sizes[::-1])[::-1]
+		flr[:-1] = flr[1:]
+		flr[-1] = 1
+
+		self._sizes = sizes
+		self._flr = flr
+
+		self.labeled = labeled
+
+		fname = 'mpi3d_{}_{}.npz'.format(cat, 'train' if train else 'test')
+		if train is None:
+			fname = 'mpi3d_{}.npz'.format(cat)
+			print('WARNING: using full dataset (train+test)')
+		data = np.load(os.path.join(dataroot, fname))
+
+		images = data['images']
+		self.register_buffer('images', torch.from_numpy(images))
+
+		inds = data['indices']
+		self.register_buffer('indices', torch.from_numpy(inds))
+
+	def get_label(self, inds):
+		try:
+			len(inds)
+			inds = inds.reshape(-1,1)
+		except TypeError:
+			pass
+
+		lvls = inds // self._flr
+		labels = lvls % self._sizes
+
+		return labels
+
+	def __len__(self):
+		return len(self.images)
+
+	def __getitem__(self, idx):
+		imgs = self.images[idx]
+		if self.labeled:
+			labels = self.get_label(idx)
+			return imgs, labels
+		return imgs,
+
