@@ -1,11 +1,45 @@
 
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
 
+from bisect import bisect_right
+
 from ... import util
 from ..registry import Component, Modifier, AutoModifier
+from ..data import Dataset
 from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset
+
+@Dataset('concat')
+class Concat(Info_Dataset):
+	def __init__(self, A):
+		datasets = A.pull('datasets')
+		assert len(datasets), 'no datasets'
+		super().__init__(datasets[0].din, datasets[0].dout)
+
+		self.cumlens = np.cumsum([len(dataset) for dataset in datasets])
+		self.datasets = datasets
+
+	def __len__(self):
+		return self.cumlens[-1]
+
+	def __getitem__(self, item):
+		idx = bisect_right(self.cumlens, item)
+		if idx > 0:
+			item -= int(self.cumlens[int(idx-1)])
+		return self.datasets[idx][item]
+
+	def pre_epoch(self, mode, epoch):
+		for dataset in self.datasets:
+			if isinstance(dataset, Info_Dataset):
+				dataset.pre_epoch(mode, epoch)
+
+	def post_epoch(self, mode, epoch, stats=None):
+		for dataset in self.datasets:
+			if isinstance(dataset, Info_Dataset):
+				dataset.post_epoch(mode, epoch, stats=stats)
+
 
 @AutoModifier('cropped')
 class Cropped(Info_Dataset):
@@ -93,6 +127,7 @@ class Interpolated(Info_Dataset):
 		img = F.interpolate(img, self.interpolate_size, mode=self.interpolate_mode).squeeze(0)
 
 		return (img, *other)
+
 
 
 

@@ -394,47 +394,48 @@ class Config(util.NS): # TODO: allow adding aliases
 
 
 			# TODO: should probably be deprecated - just register a "list" component separately
-			# if val['_type'] == 'list':
-			# 	print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
-			# 	terms = []
-			# 	for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
-			# 		terms.append(self._process_val('({})'.format(i), v))
-			# 	val = tuple(terms)
-			# else:
+			if val['_type'] == 'list':
+				print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
+				terms = []
+				for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
+					terms.append(self._process_val('({})'.format(i), v))
+				val = tuple(terms)
 
-			type_name = val['_type']
-			mod_info = ''
-			if '_mod' in val:
-				mods = val['_mod']
-				if not isinstance(mods, (list, tuple)):
-					mods = mods,
-
-				mod_info = ' (mods=[{}])'.format(', '.join(m for m in mods)) if len(mods) > 1 \
-					else ' (mod={})'.format(mods[0])
-
-			cmpn = None
-			if self.in_transaction() and '__obj' in val and not force_new:
-				print('WARNING: would usually reuse {} now, but instead creating a new one!!')
-				# cmpn = val['__obj']
-
-			creation_note = 'Creating ' if cmpn is None else 'Reusing '
-
-			if not silent:
-				print(_print_with_indent('{}{} (type={}){}{}'.format(creation_note, item, type_name, mod_info,
-				                                                     ' (in parent)' if byparent else '')))
-
-			if cmpn is None:
-				_print_indent += 1
-				cmpn = create_component(val)
-				_print_indent -= 1
-
-			if self.in_transaction():
-				self[item]['__obj'] = cmpn
 			else:
-				print('WARNING: this Config is NOT currently in a transaction, so all subcomponents will be created '
-				      'again everytime they are pulled')
 
-			val = cmpn
+				type_name = val['_type']
+				mod_info = ''
+				if '_mod' in val:
+					mods = val['_mod']
+					if not isinstance(mods, (list, tuple)):
+						mods = mods,
+
+					mod_info = ' (mods=[{}])'.format(', '.join(m for m in mods)) if len(mods) > 1 \
+						else ' (mod={})'.format(mods[0])
+
+				cmpn = None
+				if self.in_transaction() and '__obj' in val and not force_new:
+					print('WARNING: would usually reuse {} now, but instead creating a new one!!')
+					# cmpn = val['__obj']
+
+				creation_note = 'Creating ' if cmpn is None else 'Reusing '
+
+				if not silent:
+					print(_print_with_indent('{}{} (type={}){}{}'.format(creation_note, item, type_name, mod_info,
+					                                                     ' (in parent)' if byparent else '')))
+
+				if cmpn is None:
+					_print_indent += 1
+					cmpn = create_component(val)
+					_print_indent -= 1
+
+				if self.in_transaction():
+					self[item]['__obj'] = cmpn
+				else:
+					print('WARNING: this Config is NOT currently in a transaction, so all subcomponents will be created '
+					      'again everytime they are pulled')
+
+				val = cmpn
 
 
 		elif isinstance(val, str) and val[:2] == '<>':  # alias
