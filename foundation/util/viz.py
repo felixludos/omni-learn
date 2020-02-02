@@ -20,8 +20,13 @@ from .math import factors
 
 def calc_tiling(N, H=None, W=None, prefer_tall=False):
 
-	if H is not None or W is not None:
-		raise NotImplementedError
+	if H is not None and W is None:
+		W = N//H
+	if W is not None and H is None:
+		H = N//W
+
+	if H is not None and W is not None and N == H*W:
+		return H, W
 
 	H,W = tuple(factors(N))[-2:] # most middle 2 factors
 

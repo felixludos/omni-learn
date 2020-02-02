@@ -167,6 +167,8 @@ def get_dataset(name=None, mode=None, info=None, **kwargs):
 	if '_type' not in info:
 		assert 'name' in info, 'no dataset specified'
 		info._type = _dataset_registry[info.name]
+	elif 'name' in info:
+		del info.name
 
 	if 'dataroot' not in info and 'FOUNDATION_DATA_DIR' in os.environ:
 		info.dataroot = os.environ['FOUNDATION_DATA_DIR']

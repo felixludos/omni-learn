@@ -26,9 +26,7 @@ class Concat(Info_Dataset):
 
 	def __getitem__(self, item):
 		idx = bisect_right(self.cumlens, item)
-		if idx > 0:
-			item -= int(self.cumlens[int(idx-1)])
-		return self.datasets[idx][item]
+		return self.datasets[idx][item - int(self.cumlens[int(idx-1)]) if idx > 0 else item]
 
 	def pre_epoch(self, mode, epoch):
 		for dataset in self.datasets:
@@ -153,7 +151,7 @@ class Resamplable(Info_Dataset):
 
 	def pre_epoch(self, mode, epoch):
 		if self.budget is not None and mode == 'train':
-			self.resample()
+			self.inds = self.resample()
 		super().pre_epoch(mode, epoch)
 
 	def __getitem__(self, item):

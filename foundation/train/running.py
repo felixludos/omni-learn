@@ -314,6 +314,8 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 	if save_freq < len(trainloader):
 		print('WARNING: saving more than once per epoch: checkpoint every {} iterations'.format(save_freq))
 
+		assert save_freq > 100, 'not allowed to save more often than once every 100 steps -- remember 55-8'
+
 		if 'quick_save' not in A.output or not A.output.quick_save:
 			A.output.save_freq = len(trainloader)
 
@@ -402,10 +404,10 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 			model.post_epoch('train', records['epoch'], stats=train_stats)
 			trainloader.dataset.post_epoch('train', records['epoch'], stats=train_stats)
 			records['stats']['train'].append(train_stats.export())
-			loader, epoch_seed = restart_loader(trainloader, epoch_seed)
 			records['epoch'] += 1
 			model.pre_epoch('train', records['epoch'])
 			trainloader.dataset.pre_epoch('train', records['epoch'])
+			loader, epoch_seed = restart_loader(trainloader, epoch_seed)
 			start = time.time()
 
 			batch = next(loader)

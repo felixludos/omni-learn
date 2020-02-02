@@ -210,11 +210,11 @@ class Shuffle_Dataset(DatasetWrapper):
 	def __init__(self, dataset):
 		super().__init__(dataset)
 
-		self.indices = torch.randperm(len(self.dataset))
+		self._shfl_indices = torch.randperm(len(self.dataset)).clone()
 
 		try:
 			device = self.dataset.get_device()
-			self.indices = self.indices.to(device)
+			self._shfl_indices = self._shfl_indices.to(device).clone()
 		except AttributeError:
 			pass
 
@@ -222,7 +222,7 @@ class Shuffle_Dataset(DatasetWrapper):
 		return len(self.dataset)
 
 	def __getitem__(self, idx):
-		return self.dataset[self.indices[idx]]
+		return self.dataset[self._shfl_indices[idx]]
 
 class Uneven_Seq_Dataset(Dataset):
 
