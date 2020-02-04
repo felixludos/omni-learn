@@ -15,6 +15,10 @@ except ImportError:
 # 	import ffmpeg
 # except ImportError:
 # 	print('WARNING: ffmpeg not found')
+try:
+	from IPython.display import HTML
+except ImportError:
+	print('WARNING: ipython not found')
 
 from .math import factors
 
@@ -131,14 +135,16 @@ class Video(object):
 		self.frames = frames
 		# self.path = path
 
-	def play(self, mode='mpl'):
+	def play(self, mode='mpl', scale=1):
 
 		if mode == 'mpl':
 			play_back(self.frames)
+		elif mode == 'jupyter':
+			return HTML(self.as_animation(scale=scale).to_html5_video())
 		else:
 			raise Exception('Unknonwn mode: {}'.format(mode))
 
-	def as_animation(self, scale=1):
+	def as_animation(self, scale=1, fps=20):
 
 		H, W, C = self.frames[0].shape
 
@@ -164,16 +170,19 @@ class Video(object):
 			im.set_data(self.frames[i])
 			return im
 
-		anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(self.frames), interval=50)
+		anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(self.frames), interval=1000//fps)
 
 		return anim
 
 	def export(self, path, fmt='mp4'):
 
-		assert fmt in {'mp4', 'gif',}
+		assert fmt in {'mp4', 'gif', 'jpg', 'png'}
 
 		if fmt in {'mp4', 'gif'}:
 			imageio.mimsave(path, self.frames)
+
+		elif fmt in {'jpg', 'png'}:
+			raise NotImplementedError
 
 		# elif fmt == 'mp4':
 		# 	imageio.mimwrite('test2.mp4', self.frames, fps=30)
@@ -198,6 +207,48 @@ class Video(object):
 			# 	)
 			# process.stdin.close()
 			# process.wait()
+
+class Animation(Video):
+
+	def __init__(self, anim):
+		super().__init__(None) # no frames
+		self.anim = anim
+
+	def play(self, mode='jupyter', scale=1):
+
+		if mode != 'jupyter':
+			raise NotImplementedError
+
+		if scale != 1:
+			print('WARNING: scale has no effect for animations that are already done')
+
+		return HTML(self.anim.to_html5_video())
+
+	def as_animation(self, scale=1, fps=None):
+		if scale != 1 or fps is not None:
+			print('WARNING: scale/fps has no effect for animations that are already done')
+		return self.anim
+
+	def export(self, path, fmt=None, fps=20):
+
+		assert not os.path.isdir(path), 'path is already a dir'
+
+		if fmt is None:
+			fmt = os.path.basename(path).split('.')[-1]
+			if fmt in {'png', 'jpg'}:
+				fmt = 'frames'
+
+		if fmt == 'mp4':
+			Writer = animation.writers['ffmpeg']
+			writer = Writer(fps=fps, metadata=dict(artist='Me'), bitrate=1800)
+			self.anim.save(path, writer=writer, fps=fps)
+
+		elif fmt == 'gif':
+			self.anim.save(path, writer='imagemagick', fps=fps)
+
+		elif fmt == 'frames':
+			self.anim.save(path, fps=fps)
+
 
 ###################
 # Flow visualization - using yiq
