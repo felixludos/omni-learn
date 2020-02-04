@@ -768,11 +768,21 @@ class Run_Manager(object):
 	def filter_jobs(self, *jobs):
 		remaining = []
 		allowed = {str(job) for job in jobs}
+
+		filled = set()
+		for job in allowed:
+			if '-' in job:
+				j,p = job.split('-')
+				filled.add('{}-{}'.format(j.zfill(4),p.zfill(2)))
+		allowed.update(filled)
+
 		allowed.update({job.zfill(4) for job in allowed})
 
 		for run in self.active:
 			job, sch, proc = run.meta.job
-			if job in allowed:
+			long_job = '{}-{}'.format(job, proc)
+			# print(long_job)
+			if job in allowed or long_job in allowed:
 				remaining.append(run)
 
 		self.set_active(remaining)
