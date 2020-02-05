@@ -101,6 +101,11 @@ class Run(util.tdict):
 
 		self._manager._load_fn(self.state, **kwargs)
 
+	def __str__(self):
+		return self.name
+	def __repr__(self):
+		return 'Run({})'.format(self.name)
+
 	def run(self, **kwargs):
 		self._manager._run_model_fn(self.state, **kwargs)
 
@@ -317,11 +322,12 @@ class Run_Manager(object):
 			key = name.split('.')[0]
 
 		def _load(run):
-			path = os.path.join(run.path, name)
-			if not os.path.isfile(path):
-				print('{} not found in: {}'.format(name, run.name))
-			else:
-				run[key] = torch.load(path)
+			if key not in run:
+				path = os.path.join(run.path, name)
+				if not os.path.isfile(path):
+					print('{} not found in: {}'.format(name, run.name))
+				else:
+					run[key] = torch.load(path)
 
 		self.map(_load, **kwargs)
 
