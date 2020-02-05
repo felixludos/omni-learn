@@ -241,13 +241,13 @@ class Animation(Video):
 		if fmt == 'mp4':
 			Writer = animation.writers['ffmpeg']
 			writer = Writer(fps=fps, metadata=dict(artist='Me'), bitrate=1800)
-			self.anim.save(path, writer=writer, fps=fps)
+			self.anim.save(path, writer=writer)
 
 		elif fmt == 'gif':
 			self.anim.save(path, writer='imagemagick', fps=fps)
 
 		elif fmt == 'frames':
-			self.anim.save(path, fps=fps)
+			self.anim.save(path, writer="imagemagick")
 
 
 ###################
