@@ -69,6 +69,8 @@ class Info_Dataset(Dataset):
 	def post_epoch(self, mode, epoch, stats=None):
 		pass
 
+
+
 # class Resizeable_Dataset(Dataset):
 # 	def __init__(self, *args, size=None, **kwargs):
 # 		super().__init__(*args, **kwargs)
@@ -77,10 +79,18 @@ class Device_Dataset(Dataset): # Full dataset is in memory, so it can be moved t
 	def __init__(self, *args, device='cpu', **kwargs):
 		super().__init__(*args, **kwargs)
 		self.device = device
-		self._buffers = set()
+		self._buffers = []
 
 	def register_buffer(self, name, buffer):
-		self._buffers.add(name)
+		'''
+		By convention, all input buffers should be registered before output (label) buffers.
+		This will register the buffer and set the `buffer` as an attribute of `self` with key `name`.
+
+		:param name: name of this buffer
+		:param buffer: torch.Tensor with data
+		:return:
+		'''
+		self._buffers.append(name)
 		self.__setattr__(name, buffer)
 
 	def get_device(self):

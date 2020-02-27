@@ -62,6 +62,44 @@ def tile_imgs(imgs, dim=0, H=None, W=None): # for numpy images
 	assert H*W == imgs.shape[dim], 'Invalid tiling'
 
 
+def show_nums(imgs, titles=None, H=None, W=None, figsize=(6, 6),
+			  reverse_rows=False, grdlines=False, tight=False,
+			  border=0.02, between=0.01):
+	H,W = calc_tiling(imgs.size(0), H=H, W=W)
+
+	imgs = imgs.cpu().permute(0, 2, 3, 1).squeeze().numpy()
+
+	fig, axes = plt.subplots(H, W, figsize=figsize)
+
+	if titles is None:
+		titles = [None] * len(imgs)
+
+	iH, iW = imgs.shape[1], imgs.shape[2]
+
+	for ax, img, title in zip(axes.flat, imgs, titles):
+		plt.sca(ax)
+		if reverse_rows:
+			img = img[::-1]
+		plt.imshow(img)
+		if grdlines:
+			plt.plot([0, iW], [iH / 2, iH / 2], c='r', lw=.5, ls='--')
+			plt.plot([iW / 2, iW / 2], [0, iH], c='r', lw=.5, ls='--')
+			plt.xlim(0, iW)
+			plt.ylim(0, iH)
+		if title is not None:
+			plt.xticks([])
+			plt.yticks([])
+			plt.title(title)
+		else:
+			plt.axis('off')
+
+	if tight:
+		plt.subplots_adjust(wspace=between, hspace=between,
+							left=border, right=1 - border, bottom=border, top=1 - border)
+
+	return fig, axes
+
+
 
 def play_back(imgs, figax=None, batch_first=True): # imgs is numpy: either (seq, H, W, C) or (batch, seq, H, W, C)
 	if len(imgs.shape) > 4:  # tile first
@@ -248,6 +286,104 @@ class Animation(Video):
 
 		elif fmt == 'frames':
 			self.anim.save(path, writer="imagemagick")
+
+
+class Pretty_Formatter(object):
+	def __init__(self, lf='\n', ht='  '):
+		self.types = {}
+		self.lf, self.ht = lf, ht
+		self.reset()
+
+	def set_formater(self, typ, callback):
+		self.types[typ] = callback
+
+	def reset(self):
+		self.types = {
+			object: self.format_object,
+			dict: self.format_dict,
+			list: self.make_iter_format(['['], [']']),
+			set: self.make_iter_format(['{'], ['}']),
+			tuple: self.make_iter_format(['('], [')']),
+		}
+
+	def _indent(self, num=None):
+		return self.lf + self.ht*num
+
+	def __call__(self, value, formatters={}, lf=None, ht=None):
+
+		self.types.update(formatters)
+
+		if lf is not None:
+			self.lf = lf
+		if ht is not None:
+			self.ht = ht
+
+		deep_lines = self._format(value)
+
+		s = self._flatten(deep_lines)
+		if s[0] == self.lf:
+			s = s[1:]
+		return s
+
+	def _format(self, value):
+		out = None
+		for cls in value.__class__.__mro__:
+			if cls in self.types:
+				out = self.types[cls](value, self._format) # should return a list of tuples/strings/lists
+				break
+
+		if out is None:
+			print(f'WARNING: unable to format {value}')
+
+		return out
+
+	def _flatten(self, line, indent=0):
+
+		if type(line) == str:
+			return line.replace(self.lf, self._indent(indent+2))
+
+		if type(line) == tuple:
+			return ''.join(self._flatten(w, indent=indent) for w in line)
+
+		if type(line) == list:
+			ind = self._indent(indent+1)
+			lines = [self._flatten((l,) if type(l) == str else l, indent=indent+1)
+			                for l in line]
+			start = ind.join(lines[:-1])
+			ret = self._indent(indent)
+			start += ret + lines[-1]
+			return start
+
+		raise Exception(f'not recognized: {line}')
+
+
+	@staticmethod
+	def format_object(value, fmt):
+		return repr(value)
+
+	@staticmethod
+	def format_dict(value, fmt):
+		lines = []
+		lines.append('{')
+		lines.extend((repr(key),': ', fmt(val)) for key, val in value.items())
+		# lines.extend((repr(key), ': ', fmt(val), ',') for key, val in value.items())
+		lines.append('}')
+		return lines
+
+	@staticmethod
+	def make_iter_format(start, end):
+		def _iter_format(value, fmt):
+			nonlocal start, end
+			lines = []
+			lines.extend(start)
+			lines.extend((fmt(val)) for val in value)
+			# lines.extend((fmt(val), ',') for val in value)
+			lines.extend(end)
+			return lines
+		return _iter_format
+
+pretty_format = Pretty_Formatter()
+
 
 
 ###################

@@ -10,20 +10,7 @@ from .. import util
 from .. import framework as fm
 from .. import models
 
-from .registry import create_component, register_component, Component, Modifier, AutoModifier
-
-#
-# _model_registry = {}
-# _reserved_names = {'list'}
-# def register_model(name, create_fn):
-# 	assert name not in _reserved_names, '{} is reserved'.format(name)
-# 	_model_registry[name] = create_fn
-#
-# _mod_registry = {}
-# def register_modifier(name, mod_fn):
-# 	assert name not in _reserved_names, '{} is reserved'.format(name)
-# 	_mod_registry[name] = mod_fn
-
+from .registry import create_component, register_component, Component, AutoComponent, Modifier, AutoModifier
 
 
 def default_create_model(info):
@@ -36,17 +23,19 @@ def default_create_model(info):
 	return model
 
 
-# register standard components
+AutoComponent('criterion')(util.get_loss_type)
+AutoComponent('nonlin')(util.get_nonlinearity)
+AutoComponent('normalization')(util.get_normalization)
+AutoComponent('pooling')(util.get_pooling)
+AutoComponent('upsampling')(util.get_upsample)
 
-# def _component_list(info):
-# 	return [create_component(x) for x in info.components]
-#
-# register_model('list', _component_list)
 
 Component('double-enc')(models.Double_Encoder)
 Component('double-dec')(models.Double_Decoder)
 
 AutoModifier('normal')(models.Normal)
+
+Component('mlp')(models.MLP)
 
 
 def _create_mlp(info): # mostly for selecting/formatting args (and creating sub components!)
@@ -64,8 +53,6 @@ def _create_mlp(info): # mostly for selecting/formatting args (and creating sub 
 	return model
 # register_model('mlp', _create_mlp) # Outdated
 
-Component('mlp')(models.MLP)
-Component('nn')(models.MLP) # TODO: remove
 
 # @Component('stage') # TODO
 class Stage_Model(fm.Schedulable, fm.Trainable_Model):

@@ -89,6 +89,7 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 @Dataset('mnist')
 class MNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
+	dout = 10
 
 	def __init__(self, A):
 		dataroot, kwargs = _get_common_args(A)
@@ -101,6 +102,7 @@ class MNIST(Torchvision_Toy_Dataset):
 @Dataset('kmnist')
 class KMNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
+	dout = 10
 
 	def __init__(self, A):
 
@@ -114,6 +116,7 @@ class KMNIST(Torchvision_Toy_Dataset):
 @Dataset('data/fmnist')
 class FashionMNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
+	dout = 10
 
 	def __init__(self, A):
 
@@ -127,6 +130,7 @@ class FashionMNIST(Torchvision_Toy_Dataset):
 @Dataset('emnist')
 class EMNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
+	dout = 26
 
 	def __init__(self, A):
 
@@ -151,6 +155,7 @@ class EMNIST(Torchvision_Toy_Dataset):
 @Dataset('svhn')
 class SVHN(Torchvision_Toy_Dataset):
 	din = (3, 32, 32)
+	dout = 10
 
 	def __init__(self, A):
 
@@ -168,6 +173,7 @@ class SVHN(Torchvision_Toy_Dataset):
 @Dataset('cifar')
 class CIFAR(Torchvision_Toy_Dataset):
 	din = (3, 32, 32)
+	dout = 10
 
 	def __init__(self, A):
 

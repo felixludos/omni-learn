@@ -16,14 +16,14 @@ import matplotlib.pyplot as plt
 import foundation as fd
 from foundation import models
 from foundation import util
-from foundation import train
+from foundation import train as trn
 from foundation import data
 
 MY_PATH = os.path.dirname(os.path.abspath(__file__))
 
-train.register_config('model', os.path.join(MY_PATH, 'config', 'test.yaml'))
-train.register_config('pycharm', os.path.join(MY_PATH, 'config', 'pycharm.yaml'))
+trn.register_config_dir(os.path.join(MY_PATH, 'config'), recursive=True)
 
+@fd.Component('model')
 class Model(fd.Visualizable, fd.Trainable_Model):
 	def __init__(self, info):
 
@@ -80,22 +80,21 @@ class Model(fd.Visualizable, fd.Trainable_Model):
 
 		return out
 
-train.register_model('model', Model)
-
 def get_data(A, mode='train'):
-	return train.default_load_data(A, mode=mode)
+	return trn.default_load_data(A, mode=mode)
 
 def get_model(A):
-	return train.default_create_model(A)
+	return trn.default_create_model(A)
 
 def get_name(A):
 	assert 'name' in A, 'Must provide a name manually'
 	return A.name
 
+def main(argv=None):
+	return trn.main(argv=argv, get_data=get_data, get_model=get_model, get_name=get_name)
 
 if __name__ == '__main__':
-	sys.exit(train.main(get_data=get_data, get_model=get_model, get_name=get_name))
-
+	sys.exit(main(sys.argv))
 
 
 

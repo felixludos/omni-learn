@@ -6,3 +6,4 @@ __pycache__
 trained_nets/
 old_trained_nets/
 foundation.egg-info/
+extra/

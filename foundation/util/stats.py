@@ -119,10 +119,10 @@ class StatsMeter(object):
 		return {fmt.format(k):v.val.item() for k,v in self._stats.items()}
 
 	def avgs(self, fmt='{}'):
-		return {fmt.format(k):v.avg.item() for k,v in self._stats.items()}
+		return {fmt.format(k):v.avg.item() for k,v in self._stats.items() if v.count > 0}
 	
 	def smooths(self, fmt='{}'):
-		return {fmt.format(k): (v.smooth.item() if v.smooth is not None else v.val.item()) for k,v in self._stats.items()}
+		return {fmt.format(k): (v.smooth.item()) for k,v in self._stats.items() if v.smooth is not None}
 
 	def split(self):
 		all_vals = {k:v.export() for k,v in self.__dict__.items()}

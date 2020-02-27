@@ -8,13 +8,23 @@ import socket
 from contextlib import nullcontext, redirect_stdout, redirect_stderr
 
 from .config import parse_config
-from .model import default_create_model
-from .data import default_load_data
 
-from .running import run_full
 
-def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
-	# WARNING: 'argv' should be equivalent to sys.argv here (with script name in element 0)
+from .running import iterative_run
+
+def main(config=None, argv=None, cmd=None, **cmd_kwargs):
+	'''
+	Should be the entry point of ALL scripts that use foundation (especially those that use Configs).
+
+	:param config: root config
+	:param argv: equivalent to sys.argv (with script name in element 0)
+	:param cmd: callable takes as input the loaded config and any cmd_kwargs that are provided
+	:param cmd_kwargs: any kwargs that (generally this should only include fixed functions to process the config in cmd)
+	:return: the output of running cmd with the loaded config and cmd_kwargs
+	'''
+
+	if cmd is None:
+		cmd = iterative_run
 
 	ctxt, ctxt2 = nullcontext(), nullcontext()
 
@@ -98,10 +108,7 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 		config.dataroot = os.environ['FOUNDATION_DATA_DIR']
 		print('Set dataroot to: {}'.format(config.dataroot))
 
-		if get_model is None:
-			get_model = default_create_model
-		if get_data is None:
-			get_data = default_load_data
+
 
 		if mode == 'cluster' and 'JOBDIR' in os.environ: # TODO: setup links for restarts
 
@@ -148,7 +155,7 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 
 
 		try:
-			run_full(config, get_data, get_model, get_name=get_name)
+			out = cmd(config, **cmd_kwargs)
 
 		except KeyboardInterrupt:
 			extype, value, tb = sys.exc_info()
@@ -163,4 +170,4 @@ def main(config=None, argv=None, get_model=None, get_data=None, get_name=None):
 			else:
 				raise e
 
-	return 0
+	return out

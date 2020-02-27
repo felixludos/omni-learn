@@ -163,6 +163,8 @@ def get_normalization(norm, num, **kwargs):
 		return Lp_Normalization(1)
 	if norm == 'l2':
 		return Lp_Normalization(2)
+	if norm == 'lp':
+		return Lp_Normalization(**kwargs)
 	if norm == 'group':
 		return nn.GroupNorm(8, num)
 

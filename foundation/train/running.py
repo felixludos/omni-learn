@@ -9,31 +9,46 @@ from ..data.collectors import Info_Dataset
 from ..framework import Visualizable, Recordable, Schedulable
 # from .load_data import old_get_loaders as get_loaders # TODO: update
 
+from .model import default_create_model
+from .data import default_load_data
+
 from .setup import setup_records, setup_logging
 from .loading import load, save_checkpoint
 from .data import get_loaders
 
 from .running_legacy import legacy_run_full
 
-def run_full(A, *args, **kwargs):
+# def run_full(A, *args, **kwargs):
+#
+# 	if 'legacy' not in A:
+# 		print('\n\n\n\nWARNING: USING DEPRECATED TRAINING CODE.\n\n\n\n')
+# 		print('To use newest code: use config files in ./config/n/')
+# 		print('To use the legacy code (NOT recommended): set "legacy" to True in the config, '
+# 		      'or include the legacy.yaml config.')
+# 		raise Exception('legacy flag not set.')
+#
+# 	elif A.legacy:
+# 		print('\n\n\n\nWARNING: USING LEGACY TRAINING CODE (this will be deprecated soon).\n\n\n\n')
+# 		print('To use newest code: use config files in ./config/n/')
+# 		return legacy_run_full(A, *args, **kwargs)
+# 	else:
+# 		print('Using *NEWEST* running code')
+# 		return new_run_full(A, *args, **kwargs)
 
-	if 'legacy' not in A:
-		print('\n\n\n\nWARNING: USING DEPRECATED TRAINING CODE.\n\n\n\n')
-		print('To use newest code: use config files in ./config/n/')
-		print('To use the legacy code (NOT recommended): set "legacy" to True in the config, '
-		      'or include the legacy.yaml config.')
+def iterative_run(A, *args, **kwargs):
+
+	if 'legacy' in A:
+		print('\n\n\n\nERROR: Legacy code is no longer supported\n\n\n\n')
 		raise Exception('legacy flag not set.')
 
-	elif A.legacy:
-		print('\n\n\n\nWARNING: USING LEGACY TRAINING CODE (this will be deprecated soon).\n\n\n\n')
-		print('To use newest code: use config files in ./config/n/')
-		return legacy_run_full(A, *args, **kwargs)
-	else:
-		print('Using *NEWEST* running code')
-		return new_run_full(A, *args, **kwargs)
+	return new_run_full(A, *args, **kwargs)
 
 
-def new_run_full(A, get_data, get_model, get_name=None):
+def new_run_full(A, get_data=None, get_model=None, get_name=None):
+	if get_model is None:
+		get_model = default_create_model
+	if get_data is None:
+		get_data = default_load_data
 
 	if 'device' not in A or not torch.cuda.is_available():
 		A.device = 'cpu'
@@ -485,7 +500,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 					bar.close()
 					bar = None
 					print()
-				print('Evaluating on Validation set')
+				# print('Evaluating on Validation set')
 
 			vloader = restart_loader(valloader, epoch_seed=None)
 			vloader = pbar(enumerate(vloader), total=len(valloader)) if pbar is not None else enumerate(vloader)
@@ -520,13 +535,15 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 
 					logger.set_tag_format('{}/val')
 
+					if isinstance(model, Visualizable):
+						model.visualize(out, logger)
+
 					with torch.no_grad():
-						display = val_stats.smooths()  # if smooths else stats.avgs()
+						display = val_stats.avgs()  # if smooths else stats.avgs()
 						for k, v in display.items():
 							logger.add('scalar', k, v)
 
-					if isinstance(model, Visualizable):
-						model.visualize(out, logger)
+
 
 					logger.set_tag_format('{}/train') # reset
 

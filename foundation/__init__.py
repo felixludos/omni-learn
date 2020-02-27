@@ -1,10 +1,9 @@
 from . import util
-#from .models import networks as nets
-#from foundation.foundation.rl import baselines, policies
-#from .models import vision
+from .train import Component, AutoComponent, Modifier, AutoModifier
+from . import framework
 from . import data
 # from . import sim
+
 from . import models
-# from .framework import *
-from .train import Component, Modifier, AutoModifier
-from .framework import *
+from .framework import * # TODO: cleanup
+

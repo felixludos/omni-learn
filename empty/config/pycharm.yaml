@@ -1,6 +1,6 @@
 parents: ['model']
 
-name: 'test-pycharm'
+inline: True
 
 #dataset.kwargs.download = true
 

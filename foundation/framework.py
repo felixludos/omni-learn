@@ -237,6 +237,56 @@ class Regularizable(object):
 	def regularize(self, q):
 		return torch.tensor(0).type_as(q)
 
+class Cacheable(Model):
+	def __init__(self, *args, cache_device=None, **kwargs):
+		self._cache_names = set()
+		self._cache_device = cache_device
+		super().__init__(*args, **kwargs)
+
+	def register_cache(self, name, value=None):
+		self._cache_for_buffers.add(name)
+
+		setattr(self, name,
+		        value if self._cache_device is None else value.to(self._cache_device))
+
+	def cuda(self, device=None):
+		super(Model, self).cuda(device)
+		if self._cache_device is None:
+			for name in self._cache_names:
+				obj = getattr(self, name)
+				if obj is not None:
+					setattr(self, name, obj.cuda(device))
+
+	def cpu(self):
+		super(Model, self).cpu()
+		if self._cache_device is None:
+			for name in self._cache_names:
+				obj = getattr(self, name)
+				if obj is not None:
+					setattr(self, name, obj.cpu())
+
+	def to(self, device):
+		super(Model, self).to(device)
+		if self._cache_device is None:
+			for name in self._cache_names:
+				obj = getattr(self, name)
+				if obj is not None:
+					setattr(self, name, obj.to(device))
+
+	def state_dict(self, *args, **kwargs): # dont include cached items in the state_dict
+		cache = {}
+		for name in self._cache_names:
+			cache[name] = getattr(self, name)
+			delattr(self, name)
+
+		out = super().state_dict()
+
+		for name, value in cache.items():
+			setattr(self, name, value)
+
+		return out
+
+
 class Trainable_Model(Optimizable, Model): # top level - must be implemented to train
 	def step(self, batch):  # Override pre-processing mixins
 		return self._step(batch)
@@ -256,6 +306,9 @@ class Trainable_Model(Optimizable, Model): # top level - must be implemented to 
 	# NOTE: before any call to an optimizer check with self.train_me()
 	def train_me(self):
 		return self.training and self.optim is not None
+
+
+
 
 
 

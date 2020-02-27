@@ -384,61 +384,78 @@ class Config(util.NS): # TODO: allow adding aliases
 	def _process_val(self, item, val, *defaults, silent=False, force_new=False, defaulted=False, byparent=False):
 		global _print_indent, _print_waiting
 
-		if isinstance(val, dict) and '_type' in val:
-			# WARNING: using pull will automatically create registered sub components
+		if isinstance(val, dict):
 
-			# no longer an issue
-			# assert not byparent, 'Pulling a sub-component from a parent is not supported (yet): {}'.format(item)
+			if '_type' in val:
 
-			assert not defaulted
+				# WARNING: using pull will automatically create registered sub components
+
+				# no longer an issue
+				# assert not byparent, 'Pulling a sub-component from a parent is not supported (yet): {}'.format(item)
+
+				assert not defaulted
 
 
-			# TODO: should probably be deprecated - just register a "list" component separately
-			if val['_type'] == 'list':
-				_print_indent += 1
-				print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
-				terms = []
-				for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
-					terms.append(self._process_val('({})'.format(i), v))
-				val = tuple(terms)
-				_print_indent -= 1
-
-			else:
-
-				type_name = val['_type']
-				mod_info = ''
-				if '_mod' in val:
-					mods = val['_mod']
-					if not isinstance(mods, (list, tuple)):
-						mods = mods,
-
-					mod_info = ' (mods=[{}])'.format(', '.join(m for m in mods)) if len(mods) > 1 \
-						else ' (mod={})'.format(mods[0])
-
-				cmpn = None
-				if self.in_transaction() and '__obj' in val and not force_new:
-					print('WARNING: would usually reuse {} now, but instead creating a new one!!')
-					# cmpn = val['__obj']
-
-				creation_note = 'Creating ' if cmpn is None else 'Reusing '
-
-				if not silent:
-					print(_print_with_indent('{}{} (type={}){}{}'.format(creation_note, item, type_name, mod_info,
-					                                                     ' (in parent)' if byparent else '')))
-
-				if cmpn is None:
+				# TODO: should probably be deprecated - just register a "list" component separately
+				if val['_type'] == 'list':
 					_print_indent += 1
-					cmpn = create_component(val)
+					print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
+					terms = []
+					for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
+						terms.append(self._process_val('({})'.format(i), v))
+					val = tuple(terms)
 					_print_indent -= 1
 
-				if self.in_transaction():
-					self[item]['__obj'] = cmpn
-				else:
-					print('WARNING: this Config is NOT currently in a transaction, so all subcomponents will be created '
-					      'again everytime they are pulled')
+				elif val['_type'] == 'config': # get the actual config (raw, no view)
 
-				val = cmpn
+					if not silent:
+						print(_print_with_indent('{} (type={}) containing: {}'.format(item, 'config',
+						                                                              ', '.join(val.keys()))))
 
+				else: # create component
+
+					type_name = val['_type']
+					mod_info = ''
+					if '_mod' in val:
+						mods = val['_mod']
+						if not isinstance(mods, (list, tuple)):
+							mods = mods,
+
+						mod_info = ' (mods=[{}])'.format(', '.join(m for m in mods)) if len(mods) > 1 \
+							else ' (mod={})'.format(mods[0])
+
+					cmpn = None
+					if self.in_transaction() and '__obj' in val and not force_new:
+						print('WARNING: would usually reuse {} now, but instead creating a new one!!')
+						# cmpn = val['__obj']
+
+					creation_note = 'Creating ' if cmpn is None else 'Reusing '
+
+					if not silent:
+						print(_print_with_indent('{}{} (type={}){}{}'.format(creation_note, item, type_name, mod_info,
+						                                                     ' (in parent)' if byparent else '')))
+
+					if cmpn is None:
+						_print_indent += 1
+						cmpn = create_component(val)
+						_print_indent -= 1
+
+					if self.in_transaction():
+						self[item]['__obj'] = cmpn
+					else:
+						print('WARNING: this Config is NOT currently in a transaction, so all subcomponents will be created '
+						      'again everytime they are pulled')
+
+					val = cmpn
+
+			else: # convert config to dict (by pulling all entries) and return full dict
+				_print_indent += 1
+				print(_print_with_indent('{} (type={}): '.format(item, 'dict')))
+				terms = {}
+				for k, v in val.items():  # WARNING: pulls all entries in dict
+					terms[k] = self._process_val('({})'.format(k), v)
+				val = terms
+				_print_indent -= 1
 
 		elif isinstance(val, str) and val[:2] == '<>':  # alias
 			alias = val[2:]
@@ -478,7 +495,7 @@ class Config(util.NS): # TODO: allow adding aliases
 			val = self._process_val(item, val, *defaults, silent=silent, defaulted=defaulted or _defaulted,
 			                        byparent=byparent or _byparent, force_new=force_new, )
 
-		if type(val) == list: # TODO: a little heavy handed
+		if type(val) in {list, set}: # TODO: a little heavy handed
 			val = tuple(val)
 
 		return val

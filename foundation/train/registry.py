@@ -159,6 +159,65 @@ def Component(name=None):
 		return cmp
 	return _cmp
 
+def AutoComponent(name=None, aliases=None):
+	'''
+	Instead of directly passing the config to an AutoComponent, the necessary args are auto filled and passed in.
+	This means AutoComponents are somewhat limited in that they cannot modify the config object and they cannot be
+	modified with AutoModifiers.
+
+	Note: AutoComponents are usually components that are created with functions (rather than classes) since they can't
+	be automodified. When registering classes as components, you should probably use `Component` instead, and pull
+	from the config directly.
+
+	:param name: name to use when registering the auto component
+	:param aliases: optional aliases for arguments used when autofilling (should be a dict[name,list[aliases]])
+	:return: decorator function
+	'''
+
+	def _auto_cmp(cmp):
+		nonlocal name, aliases
+
+		def _create(config):
+			nonlocal cmp, aliases
+			return autofill_args(cmp, config, aliases)
+
+		Component(name)(_create)
+
+	return _auto_cmp
+
+def autofill_args(fn, config, aliases=None):
+
+	params = inspect.signature(fn).parameters
+
+	args = []
+	kwargs = {}
+
+	for n, p in params.items():
+
+		order = [n]
+		if aliases is not None and n in aliases: # include aliases
+			order.extend('<>{}'.format(a) for a in aliases[n])
+		if p.default != inspect._empty:
+			order.append(p.default)
+		elif p.kind == p.VAR_POSITIONAL:
+			order.append(())
+		elif p.kind == p.VAR_KEYWORD:
+			order.append({})
+
+		arg = config.pull(*order)
+
+		if p.kind == p.POSITIONAL_ONLY:
+			args.append(arg)
+		elif p.kind == p.VAR_POSITIONAL:
+			args.extend(arg)
+		elif p.kind == p.VAR_KEYWORD:
+			kwargs.update(arg)
+		else:
+			kwargs[n] = arg
+
+	return fn(*args, **kwargs)
+
+
 class MissingConfigError(Exception): # TODO: move to a file containing all custom exceptions
 	def __init__(self, key):
 		super().__init__(key)
