@@ -183,6 +183,8 @@ def AutoComponent(name=None, aliases=None):
 
 		Component(name)(_create)
 
+		return cmp
+
 	return _auto_cmp
 
 def autofill_args(fn, config, aliases=None):

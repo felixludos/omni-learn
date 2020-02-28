@@ -167,6 +167,8 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	if 'drop_last' not in A.dataset:
 		A.dataset.drop_last = True
 
+	# TODO: pull loader info instead of accessing directly.
+
 	loaders = get_loaders(*datasets, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
 	                                            shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
 

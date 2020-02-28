@@ -8,10 +8,10 @@ import torch.multiprocessing as mp
 from itertools import chain
 
 class Model(nn.Module):  # any vector function
-	def __init__(self, in_dim, out_dim):
+	def __init__(self, din, dout):
 		super().__init__()
-		self.din = in_dim
-		self.dout = out_dim
+		self.din = din
+		self.dout = dout
 		self.device = 'cpu'
 
 	def cuda(self, device=None):
@@ -244,7 +244,7 @@ class Cacheable(Model):
 		super().__init__(*args, **kwargs)
 
 	def register_cache(self, name, value=None):
-		self._cache_for_buffers.add(name)
+		self._cache_names.add(name)
 
 		setattr(self, name,
 		        value if self._cache_device is None else value.to(self._cache_device))

@@ -381,7 +381,7 @@ class Config(util.NS): # TODO: allow adding aliases
 			return super().__getitem__(item) != '__x__'
 		return False
 
-	def _process_val(self, item, val, *defaults, silent=False, force_new=False, defaulted=False, byparent=False):
+	def _process_val(self, item, val, *defaults, silent=False, reuse=False, defaulted=False, byparent=False):
 		global _print_indent, _print_waiting
 
 		if isinstance(val, dict):
@@ -425,9 +425,9 @@ class Config(util.NS): # TODO: allow adding aliases
 							else ' (mod={})'.format(mods[0])
 
 					cmpn = None
-					if self.in_transaction() and '__obj' in val and not force_new:
+					if self.in_transaction() and '__obj' in val and reuse:
 						print('WARNING: would usually reuse {} now, but instead creating a new one!!')
-						# cmpn = val['__obj']
+						cmpn = val['__obj']
 
 					creation_note = 'Creating ' if cmpn is None else 'Reusing '
 
@@ -475,7 +475,7 @@ class Config(util.NS): # TODO: allow adding aliases
 		return val
 
 
-	def pull(self, item, *defaults, silent=False, force_new=False, _byparent=False, _defaulted=False):
+	def pull(self, item, *defaults, silent=False, ref=False, _byparent=False, _defaulted=False):
 		# TODO: change defaults to be a keyword argument providing *1* default, and have item*s* instead,
 		#  which are the keys to be checked in order
 
@@ -490,10 +490,10 @@ class Config(util.NS): # TODO: allow adding aliases
 			val = self[item]
 
 		if byparent: # if the object was found
-			val = self.__dict__['_parent_obj_for_defaults'].pull(item, silent=silent, force_new=force_new, _byparent=True)
+			val = self.__dict__['_parent_obj_for_defaults'].pull(item, silent=silent, ref=ref, _byparent=True)
 		else:
 			val = self._process_val(item, val, *defaults, silent=silent, defaulted=defaulted or _defaulted,
-			                        byparent=byparent or _byparent, force_new=force_new, )
+			                        byparent=byparent or _byparent, reuse=ref, )
 
 		if type(val) in {list, set}: # TODO: a little heavy handed
 			val = tuple(val)

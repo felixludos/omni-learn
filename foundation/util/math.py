@@ -150,7 +150,28 @@ class Lp_Normalization(nn.Module):
 	def forward(self, x):
 		return F.normalize(x, p=self.p, dim=self.dim, eps=self.eps)
 
-def get_normalization(norm, num, **kwargs):
+class Lp_Norm(nn.Module):
+	def __init__(self, p=2, dim=None, reduction='mean'):
+		super().__init__()
+		self.p = p
+		self.dim = dim
+		self.reduction = reduction
+
+	def forward(self, x):
+
+		mag = x.norm(p=self.p, dim=self.dim)
+
+		if self.dim is None:
+			return mag
+
+		if self.reduction == 'mean':
+			return mag.mean()
+		elif self.reduction == 'sum':
+			return mag.sum()
+		else:
+			return mag
+
+def get_normalization(norm, num, groups=8, **kwargs):
 
 	if not isinstance(norm, str):
 		return norm
@@ -166,7 +187,7 @@ def get_normalization(norm, num, **kwargs):
 	if norm == 'lp':
 		return Lp_Normalization(**kwargs)
 	if norm == 'group':
-		return nn.GroupNorm(8, num)
+		return nn.GroupNorm(groups, num, **kwargs)
 
 	raise Exception('unknown norm type: {}'.format(norm))
 
