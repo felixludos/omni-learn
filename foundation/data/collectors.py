@@ -93,6 +93,9 @@ class Device_Dataset(Dataset): # Full dataset is in memory, so it can be moved t
 		self._buffers.append(name)
 		self.__setattr__(name, buffer)
 
+	def get_raw_data(self):
+		raise NotImplementedError
+
 	def get_device(self):
 		return self.device
 

@@ -84,6 +84,8 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	                                              get_model=get_model, get_data=get_data,
 	                                              return_args=True, return_ckpt=True, )#strict='load' not in A)
 
+	model.prep(*datasets)
+
 	# endregion
 
 	#####################

@@ -74,6 +74,11 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 
 		self.labeled = hasattr(self, 'labels')
 
+	def get_raw_data(self):
+		if self.labeled:
+			return self.images, self.labels
+		return self.images
+
 	def __len__(self):
 		return len(self.images)
 
@@ -137,6 +142,11 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 		self.factor_order = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
 		self.factor_num_values = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10,
                           'scale': 8, 'shape': 4, 'orientation': 15}
+
+	def get_raw_data(self):
+		if self.labeled:
+			return self.images, self.labels
+		return self.images
 
 	def __len__(self):
 		return len(self.images)

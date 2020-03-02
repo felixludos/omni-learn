@@ -77,6 +77,11 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 
 		self.register_buffer('images', images)
 
+	def get_raw_data(self):
+		if self.labeled:
+			return self.images, self.labels
+		return self.images
+
 	def __len__(self):
 		return len(self.dataset)
 

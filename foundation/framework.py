@@ -249,6 +249,10 @@ class Cacheable(Model):
 		setattr(self, name,
 		        value if self._cache_device is None else value.to(self._cache_device))
 
+	def clear_cache(self):
+		for name in self._cache_names:
+			setattr(self, name, None)
+
 	def cuda(self, device=None):
 		super(Model, self).cuda(device)
 		if self._cache_device is None:
@@ -301,6 +305,9 @@ class Trainable_Model(Optimizable, Model): # top level - must be implemented to 
 
 	def _test(self, batch):  # Override post-processing mixins
 		return self._step(batch)  # by default do the same thing as during training
+
+	def prep(self, *datasets):
+		pass
 
 	# NOTE: never call an optimizer outside of _step (not in mixinable functions)
 	# NOTE: before any call to an optimizer check with self.train_me()
