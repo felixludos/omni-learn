@@ -8,7 +8,7 @@ import torch.multiprocessing as mp
 from itertools import chain
 
 class Model(nn.Module):  # any vector function
-	def __init__(self, din, dout):
+	def __init__(self, din=None, dout=None):
 		super().__init__()
 		self.din = din
 		self.dout = dout
@@ -48,12 +48,16 @@ class Generative(object):
 		raise NotImplementedError
 
 class Encodable(object):
-	def encode(self, x):
-		raise NotImplementedError # should output q
+	def encode(self, x): # by default this is just forward pass
+		return self(x)
 
-class Decodable(object):
+class Decodable(object): # by default this is just the forward pass
 	def decode(self, q):
-		return NotImplementedError # should output x
+		return self(q)
+
+class Invertible(object):
+	def inverse(self, *args, **kwargs):
+		raise NotImplementedError
 
 class Recordable(Model):
 	def __init__(self, *args, stats=None, **kwargs):

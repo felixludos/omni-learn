@@ -406,6 +406,11 @@ class Config(util.NS): # TODO: allow adding aliases
 					val = tuple(terms)
 					_print_indent -= 1
 
+				elif val['_type'] == 'iter':
+					elms = val['_elements']
+					print(_print_with_indent('{} (type={}) with {} elements'.format(item, val['_type'], len(elms))))
+					val = _Config_Iter(self, item, elms)
+
 				elif val['_type'] == 'config': # get the actual config (raw, no view)
 
 					if not silent:
@@ -515,4 +520,36 @@ class Config(util.NS): # TODO: allow adding aliases
 			return path
 
 		return data
+
+class _Config_Iter(object):
+
+	def __init__(self, config, name, elms):
+		self._idx = 0
+		self._name = name
+		self._elms = elms
+		self._origin = config
+
+	def __len__(self):
+		return len(self._elms)
+
+	def remaining(self):
+		return len(self._elms) - self._idx
+
+	def current(self):
+		return self._elms[self._idx] if self._idx < len(self._elms) else None
+
+	def __next__(self):
+
+		if len(self._elms) == self._idx:
+			raise StopIteration
+
+		obj = self._origin._process_val(f'{self._name}[{self._idx}]', self.current())
+		self._idx += 1
+		return obj
+
+	def __iter__(self):
+		return self
+
+
+
 
