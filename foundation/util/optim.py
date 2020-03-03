@@ -13,6 +13,8 @@ def get_optimizer(optim_type, parameters, lr=1e-3, weight_decay=0, momentum=0, b
 		optimizer = O.RMSprop(parameters, lr=lr, weight_decay=weight_decay, momentum=momentum, **optim_args)
 	elif optim_type == 'adam':
 		optimizer = O.Adam(parameters, lr=lr, weight_decay=weight_decay, betas=(beta1, beta2), **optim_args)
+	elif optim_type == 'adamw':
+		optimizer = O.AdamW(parameters, lr=lr, weight_decay=weight_decay, betas=(beta1, beta2), **optim_args)
 	elif optim_type == 'cg':
 		optimizer = Conjugate_Gradient(parameters, **optim_args)
 	elif optim_type == 'rprop':

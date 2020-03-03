@@ -14,7 +14,7 @@ from torch.distributions.utils import lazy_property
 
 def factors(n): # has duplicates, starts from the extremes and ends with the middle
 	return (x for tup in ([i, n//i]
-	            for i in range(1, int(n**0.5)+1) if n % i == 0) for x in tup)
+				for i in range(1, int(n**0.5)+1) if n % i == 0) for x in tup)
 
 def atanh(x): # probably shouldnt be used
 	return (1+x).div(1-x).log() / 2
@@ -106,6 +106,13 @@ def get_loss_type(name, **kwargs):
 	else:
 		assert False, "Unknown loss type: " + name
 
+class Mish(nn.Module):
+	def forward(self, x):
+		return x * torch.tanh(F.softplus(x))
+class Swish(nn.Module):
+	def forward(self, x):
+		return x * F.sigmoid(x)
+
 # Choose non-linearities
 def get_nonlinearity(nonlinearity, dim=1, inplace=True):
 
@@ -134,6 +141,12 @@ def get_nonlinearity(nonlinearity, dim=1, inplace=True):
 		return nn.Sigmoid()
 	elif nonlinearity == 'elu':
 		return nn.ELU(inplace=inplace)
+
+	elif nonlinearity == 'mish':
+		return Mish()
+	elif nonlinearity == 'swish':
+		return Swish()
+
 	else:
 		assert False, "Unknown nonlin type: " + nonlinearity
 
@@ -265,8 +278,8 @@ def subset(seq, k=None, seed=None):
 class OUNoise(nn.Module):
 	"""docstring for OUNoise"""
 	def __init__(self, dim=1, batch_size=None,
-	             mu=0., theta=1., sigma=1.,
-	             batch_first=True):
+				 mu=0., theta=1., sigma=1.,
+				 batch_first=True):
 		super(OUNoise, self).__init__()
 
 		if not isinstance(mu, torch.Tensor):
