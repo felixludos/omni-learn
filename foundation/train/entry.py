@@ -153,7 +153,7 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 
 				print('Resuming: {}'.format(config.resume))
 
-
+		out = 0
 		try:
 			out = cmd(config, **cmd_kwargs)
 
