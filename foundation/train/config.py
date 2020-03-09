@@ -422,6 +422,8 @@ class _ConfigType(hp.Transactionable):
 				else: # create component
 
 					type_name = val['_type']
+					if type_name[:2] == '<>':
+						type_name = val.pull('_type', silent=True)
 					mod_info = ''
 					if '_mod' in val:
 						mods = val['_mod']
@@ -476,7 +478,7 @@ class _ConfigType(hp.Transactionable):
 
 		elif isinstance(val, str) and val[:2] == '<>':  # alias
 			alias = val[2:]
-			assert not byparent, 'Using an alias from a parent is not supported: {} {}'.format(item, alias)
+			# assert not byparent, 'Using an alias from a parent is not supported: {} {}'.format(item, alias)
 
 			if not silent:
 				print(_print_with_indent('{} --> '.format(item)), end='')

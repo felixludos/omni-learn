@@ -272,7 +272,8 @@ class ConvLayer(fm.Model):
 	             din=None,
 
 	             down_type='stride', norm=None, pool='max',
-	             nonlin='elu', residual=False, **conv_kwargs):
+	             nonlin='elu', output_nonlin=None,
+	             residual=False, **conv_kwargs):
 
 		if isinstance(kernel_size, int):
 			kernel_size = kernel_size, kernel_size
@@ -313,13 +314,13 @@ class ConvLayer(fm.Model):
 
 		self.pool = util.get_pooling(pool, factor=factor) if down_type == 'pool' else None
 		self.norm = util.get_normalization(norm, out_channels)
-		self.nonlin = util.get_nonlinearity(nonlin)
+		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
 
 		self.res = residual
 		assert not self.res or in_channels == out_channels, 'residual connections not possible'
 
 	def extra_repr(self):
-		return 'residual={}'.format(self.residual)
+		return 'residual={}'.format(self.res)
 
 	def forward(self, x):
 		c = self.conv(x)
@@ -338,29 +339,37 @@ class ConvLayer(fm.Model):
 class Deconv_Layer(fm.Model):
 	def __init__(self, in_channels, out_channels, factor=2,
 
-	             kernel_size=3, stride=1, padding=None, dilation=1,
+	             kernel_size=None, stride=1, padding=1, dilation=1,
 				 output_padding=0,
 
 	             din=None, dout=None,
 
-	             up_type='stride', norm=None,
-	             nonlin='elu', residual=False, **conv_kwargs):
+	             up_type='deconv', norm=None,
+	             nonlin='elu', output_nonlin='_unused',
+	             residual=False, **conv_kwargs):
 
 		if isinstance(kernel_size, int):
 			kernel_size = kernel_size, kernel_size
 		if isinstance(dilation, int):
 			dilation = dilation, dilation
-		if padding is None:
-			padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
-		elif isinstance(padding, int):
+		# if padding is None:
+		# 	padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
+		if isinstance(padding, int):
 			padding = padding, padding
 		if isinstance(output_padding, int):
 			output_padding = output_padding, output_padding
 
+		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
+
 		if up_type == 'deconv':
 			stride = factor, factor
+			if kernel_size is None:
+				kernel_size = 4, 4
+			assert kernel_size[0] % 2 == 0 and kernel_size[1] % 2 == 0, 'kernel_size should be even for deconvs (eg. 4)'
 		else:
 			stride = 1, 1
+			if kernel_size is None:
+				kernel_size = 3, 3
 
 		if din is not None:
 			C, H, W = din
@@ -378,25 +387,25 @@ class Deconv_Layer(fm.Model):
 		elif dout is not None:
 			raise NotImplementedError
 
-		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
-
 		super().__init__(din, dout)
 
-		if self.up_type == 'deconv':
-			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, stride=stride,
+		if up_type == 'deconv':
+			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size,
+			                                 stride=stride, padding=padding, dilation=dilation,
 			                                 output_padding=output_padding, **conv_kwargs)
 		else:
 			self.deconv = nn.Sequential(nn.Upsample(size=factor, mode=up_type),
-			                            nn.Conv2d(in_channels, out_channels, **conv_kwargs))
+			                            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
+			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs))
 
 		self.norm = util.get_normalization(norm, out_channels)
-		self.nonlin = util.get_nonlinearity(nonlin)
+		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
 
 		self.res = residual
 		assert not self.res or in_channels == out_channels, 'residual connections not possible'
 
 	def extra_repr(self):
-		return 'residual={}'.format(self.residual)
+		return 'residual={}'.format(self.res)
 
 	def forward(self, x):
 		c = self.deconv(x)
@@ -467,7 +476,7 @@ class DoubleConvLayer(fm.Model):
 			assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
 
 	def extra_repr(self):
-		return 'residual={}'.format(self.residual)
+		return 'residual={}'.format(self.res)
 
 	def forward(self, x):
 
@@ -549,7 +558,7 @@ class DoubleDeconvLayer(fm.Cacheable, fm.Model):
 		self.register_cache('_skipadd')
 
 	def extra_repr(self):
-		return 'residual={}'.format(self.residual)
+		return 'residual={}'.format(self.res)
 
 	def set_skipadd(self, y):
 		self._skipadd = y

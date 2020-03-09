@@ -294,7 +294,7 @@ class Normal(fm.Model):
 
 	def __init__(self, A, latent_dim=None):
 		if latent_dim is None:
-			dout = A.pull('latent_dim', '<>dout')
+			dout = A.pull('dout')
 
 		if isinstance(dout, tuple):
 			cut, *rest = dout
@@ -321,9 +321,9 @@ class Normal(fm.Model):
 
 		self.min_log_std = min_log_std
 
-	def forward(self, x):
+	def forward(self, *args, **kwargs):
 
-		q = super().forward(x)
+		q = super().forward(*args, **kwargs)
 
 		mu, logsigma = q.narrow(1, 0, self.cut), q.narrow(1, self.cut, self.cut)
 
