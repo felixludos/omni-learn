@@ -1,5 +1,6 @@
 
 import sys, os
+import humpack as hp
 import yaml
 import json
 
@@ -7,16 +8,21 @@ from .registry import find_config_path, create_component, MissingConfigError, _r
 from .. import util
 
 
-nones = {'None', '_none', '_None', 'null', 'nil', }
+nones = {'None', 'none', '_none', '_None', 'null', 'nil', }
 
 def configurize(data):
 	if isinstance(data, dict):
-		return Config({k:configurize(v) for k,v in data.items()})
+		return ConfigDict({k:configurize(v) for k, v in data.items()})
 	if isinstance(data, list):
-		return [configurize(x) for x in data]
+		return ConfigList(configurize(x) for x in data)
+		ls = []
+		cfg = False
+		for x in data:
+			x = configurize(x)
+			cfg = cfg or isinstance(x, _ConfigType)
+		return ConfigList(ls) if cfg else util.tlist(ls)
 	if isinstance(data, str) and data in nones:
 		return None
-		# return util.tlist(configurize(x) for x in data)
 	return data
 
 class YamlifyError(Exception):
@@ -81,7 +87,7 @@ def merge_configs(configs, parent_defaults=True):
 	'''
 
 	if not len(configs):
-		return Config()
+		return ConfigDict()
 
 	child = configs.pop()
 	merged = merge_configs(configs, parent_defaults=parent_defaults)
@@ -102,7 +108,7 @@ def merge_configs(configs, parent_defaults=True):
 def get_config(path=None, parent_defaults=True, include_load_history=False): # Top level function
 
 	if path is None:
-		return Config()
+		return ConfigDict()
 
 	parents = {}
 
@@ -175,7 +181,7 @@ def parse_config(argv=None, parent_defaults=True, include_load_history=False):
 
 	# argv = argv[1:]
 
-	root = Config() # from argv
+	root = ConfigDict() # from argv
 
 	parents = []
 	for term in argv:
@@ -225,12 +231,12 @@ _reserved_names.update({'_x_'})
 
 def _add_default_parent(C):
 	for k, child in C.items():
-		if isinstance(child, Config):
+		if isinstance(child, ConfigDict):
 			child._parent_obj_for_defaults = C
 			_add_default_parent(child)
 		elif isinstance(child, (tuple, list, set)):
 			for c in child:
-				if isinstance(c, Config):
+				if isinstance(c, ConfigDict):
 					c._parent_obj_for_defaults = C
 					_add_default_parent(c)
 
@@ -239,7 +245,7 @@ def _clean_up_reserved(C):
 	for k,v in C.items():
 		if v == '_x_': # maybe include other _reserved_names
 			bad.append(k)
-		elif isinstance(v, Config):
+		elif isinstance(v, ConfigDict):
 			_clean_up_reserved(v)
 	for k in bad:
 		del C[k]
@@ -251,84 +257,15 @@ def _print_with_indent(s):
 	return s if _print_waiting else ''.join(['  '*_print_indent, s])
 
 
+class _ConfigType(hp.Transactionable):
 
-class Config(util.NS): # TODO: allow adding aliases
-	'''
-	Features:
-
-	Keys:
-	'_{}' = protected - not visible to children
-	({1}, {2}, ...) = [{1}][{2}]...
-	'{1}.{2}' = ['{1}']['{2}']
-	if {} not found: first check parent (if exists) otherwise create self[{}] = Config(parent=self)
-
-	Values:
-	'<>{}' = alias to key '{}'
-	'_x_' = (only when merging) remove this key locally, if exists
-	'__x__' = dont default this key and behaves as though it doesnt exist (except on iteration)
-	(for values of "appendable" keys)
-	"+{}" = '{}' gets appended to preexisting value if if it exists
-		(otherwise, the "+" is removed and the value is turned into a list with itself as the only element)
-
-	Also, this is Transactionable, so when creating subcomponents, the same instance is returned when pulling the same
-	sub component again.
-
-	NOTE: avoid setting '__obj' keys (unless you really know what you are doing)
-
-	'''
 	def __init__(self, *args, _parent_obj_for_defaults=None, **kwargs):
 		self.__dict__['_parent_obj_for_defaults'] = _parent_obj_for_defaults
-		# self.__dict__['_aliases'] = {}
 		super().__init__(*args, **kwargs)
-
-	# def register_alias(self, attr, alias):
-	# 	if attr not in self._aliases:
-	# 		self._aliases[attr] = set()
-	# 	self._aliases[attr].add(alias)
-
-
-	def update(self, other, parent_defaults=True):
-		if not isinstance(other, Config):
-			super().update(other)
-		else:
-			for k, v in other.items():
-				if self.contains_nodefault(k) and '_x_' == v: # reserved for deleting settings in parents
-					del self[k]
-				elif self.contains_nodefault(k) and isinstance(v, Config) and isinstance(self[k], Config):
-					self[k].update(v)
-
-				elif k in _appendable_keys and v[0] == '+':
-					# values of appendable keys can be appended instead of overwritten,
-					# only when the new value starts with "+"
-					vs = []
-					if self.contains_nodefault(k):
-						prev = self[k]
-						if not isinstance(prev, list):
-							prev = [prev]
-						vs = prev
-					vs.append(v[1:])
-					self[k] = vs
-				else:
-					self[k] = v
-
-		_clean_up_reserved(self)
-
-		if parent_defaults:
-			_add_default_parent(self)
-
-
-	def _single_get(self, item):
-
-		if not self.contains_nodefault(item) \
-				and self._parent_obj_for_defaults is not None \
-				and item[0] != '_':
-			return self._parent_obj_for_defaults[item]
-
-		return self.get_nodefault(item)
 
 	def __getitem__(self, item):
 
-		if '.' in item:
+		if isinstance(item, str) and '.' in item:
 			item = item.split('.')
 
 		if isinstance(item, (list, tuple)):
@@ -339,15 +276,22 @@ class Config(util.NS): # TODO: allow adding aliases
 		return self._single_get(item)
 
 	def __setitem__(self, key, value):
-		if '.' in key:
+		if isinstance(key, str) and '.' in key:
 			key = key.split('.')
 
 		if isinstance(key, (list, tuple)):
 			if len(key) == 1:
 				return self.__setitem__(key[0], value)
-			return self.__getitem__(key[0]).__setitem__(key[1:], value)
+			got = self.__getitem__(key[0])
+			if isinstance(got, list):
+				idx = int(key[1])
+				if len(key) == 2:
+					return got.__setitem__(idx, value)
+				got = got[idx]
+				key = key[1:]
+			return got.__setitem__(key[1:], value)
 
-		return super().__setitem__(key, value)
+		return super().__setitem__(key, configurize(value))
 
 	def __contains__(self, item):
 		if '.' in item:
@@ -357,6 +301,17 @@ class Config(util.NS): # TODO: allow adding aliases
 			if len(item) == 1:
 				item = item[0]
 			else:
+
+				# got = self._single_get(item[0])
+				#
+				# if len(item) >= 2 and isinstance(got, list):
+				# 	idx = int(item[1])
+				# 	got = got[idx]
+				# 	if len(item) == 2:
+				# 		return got
+				# 	item = item[1:]
+				# return got[item[1:]]
+
 				return item[0] in self and item[1:] in self[item[0]]
 
 		return self.contains_nodefault(item) \
@@ -364,6 +319,15 @@ class Config(util.NS): # TODO: allow adding aliases
 				and self._parent_obj_for_defaults is not None
 				and item[0] != '_'
 			    and item in self._parent_obj_for_defaults)
+
+	def _single_get(self, item):
+
+		if not self.contains_nodefault(item) \
+				and self._parent_obj_for_defaults is not None \
+				and item[0] != '_':
+			return self._parent_obj_for_defaults[item]
+
+		return self.get_nodefault(item)
 
 	def get_nodefault(self, item):
 		val = super().__getitem__(item)
@@ -381,7 +345,45 @@ class Config(util.NS): # TODO: allow adding aliases
 			return super().__getitem__(item) != '__x__'
 		return False
 
-	def _process_val(self, item, val, *defaults, silent=False, reuse=False, defaulted=False, byparent=False):
+
+	def pull(self, item, *defaults, silent=False, ref=False, _byparent=False, _bychild=False, _defaulted=False):
+		# TODO: change defaults to be a keyword argument providing *1* default, and have item*s* instead,
+		#  which are the keys to be checked in order
+
+		if '.' in item:
+			item = item.split('.')
+
+		line = []
+		if isinstance(item, (list, tuple)):
+			line = item[1:]
+			item = item[0]
+
+		defaulted = item not in self
+		byparent = False
+		if defaulted:
+			if len(defaults) == 0:
+				raise MissingConfigError(item)
+			val, *defaults = defaults
+		else:
+			byparent = not self.contains_nodefault(item)
+			val = self[item]
+
+		if len(line): # child pull
+			val = val.pull(line, *defaults, silent=silent, ref=ref, _byparent=_byparent, _bychild=True,
+			               _defaulted=_defaulted)
+		elif byparent: # parent pull
+			val = self.__dict__['_parent_obj_for_defaults'].pull(item, silent=silent, ref=ref, _byparent=True)
+		else: # pull from me
+			val = self._process_val(item, val, *defaults, silent=silent, defaulted=defaulted or _defaulted,
+			                        byparent=byparent or _byparent, bychild=_bychild, reuse=ref, )
+
+			if type(val) in {list, set}: # TODO: a little heavy handed
+				val = tuple(val)
+
+		return val
+
+
+	def _process_val(self, item, val, *defaults, silent=False, reuse=False, defaulted=False, byparent=False, bychild=False):
 		global _print_indent, _print_waiting
 
 		if isinstance(val, dict):
@@ -402,7 +404,7 @@ class Config(util.NS): # TODO: allow adding aliases
 					print(_print_with_indent('{} (type={}): '.format(item, val['_type'])))
 					terms = []
 					for i, v in enumerate(val._elements): # WARNING: elements must be listed with '_elements' key
-						terms.append(self._process_val('({})'.format(i), v))
+						terms.append(self._process_val('[{}]'.format(i), v, reuse=reuse, silent=silent))
 					val = tuple(terms)
 					_print_indent -= 1
 
@@ -458,9 +460,19 @@ class Config(util.NS): # TODO: allow adding aliases
 				print(_print_with_indent('{} (type={}): '.format(item, 'dict')))
 				terms = {}
 				for k, v in val.items():  # WARNING: pulls all entries in dict
-					terms[k] = self._process_val('({})'.format(k), v)
+					terms[k] = self._process_val('({})'.format(k), v, reuse=reuse, silent=silent)
 				val = terms
 				_print_indent -= 1
+
+		elif isinstance(val, list):
+			_print_indent += 1
+			print(_print_with_indent('{} (type={}): '.format(item, 'list')))
+			terms = []
+			for i, v in enumerate(val):  # WARNING: elements must be listed with '_elements' key
+				terms.append(self._process_val('[{}]'.format(i), v, reuse=reuse, silent=silent))
+			val = terms
+			_print_indent -= 1
+
 
 		elif isinstance(val, str) and val[:2] == '<>':  # alias
 			alias = val[2:]
@@ -474,39 +486,11 @@ class Config(util.NS): # TODO: allow adding aliases
 
 		else:
 			if not silent:
-				print(_print_with_indent('{}: {}{}'.format(item, val, ' (by default)' if defaulted
-						else (' (in parent)' if byparent else ''))))
+				print(_print_with_indent('{}: {}{}{}'.format(item, val, ' (by default)' if defaulted
+						else (' (in parent)' if byparent else ''), ' (by child)' if bychild else '')))
 
 		return val
 
-
-	def pull(self, item, *defaults, silent=False, ref=False, _byparent=False, _defaulted=False):
-		# TODO: change defaults to be a keyword argument providing *1* default, and have item*s* instead,
-		#  which are the keys to be checked in order
-
-		defaulted = item not in self
-		byparent = False
-		if defaulted:
-			if len(defaults) == 0:
-				raise MissingConfigError(item)
-			val, *defaults = defaults
-		else:
-			byparent = not self.contains_nodefault(item)
-			val = self[item]
-
-		if byparent: # if the object was found
-			val = self.__dict__['_parent_obj_for_defaults'].pull(item, silent=silent, ref=ref, _byparent=True)
-		else:
-			val = self._process_val(item, val, *defaults, silent=silent, defaulted=defaulted or _defaulted,
-			                        byparent=byparent or _byparent, reuse=ref, )
-
-		if type(val) in {list, set}: # TODO: a little heavy handed
-			val = tuple(val)
-
-		return val
-
-	def __str__(self):
-		return super().__repr__()
 
 	def export(self, path=None):
 
@@ -520,6 +504,131 @@ class Config(util.NS): # TODO: allow adding aliases
 			return path
 
 		return data
+
+	def _update_tree(self, parent_defaults=True):
+		_clean_up_reserved(self)
+
+		if parent_defaults:
+			_add_default_parent(self)
+
+
+
+class ConfigDict(_ConfigType, util.NS): # TODO: allow adding aliases
+	'''
+	Features:
+
+	Keys:
+	'_{}' = protected - not visible to children
+	({1}, {2}, ...) = [{1}][{2}]...
+	'{1}.{2}' = ['{1}']['{2}']
+	'{1}.{2}' = ['{1}'][{2}] (where {2} is an int and self['{1}'] is a list)
+	if {} not found: first check parent (if exists) otherwise create self[{}] = Config(parent=self)
+
+	Values:
+	'<>{}' = alias to key '{}'
+	'_x_' = (only when merging) remove this key locally, if exists
+	'__x__' = dont default this key and behaves as though it doesnt exist (except on iteration)
+	(for values of "appendable" keys)
+	"+{}" = '{}' gets appended to preexisting value if if it exists
+		(otherwise, the "+" is removed and the value is turned into a list with itself as the only element)
+
+	Also, this is Transactionable, so when creating subcomponents, the same instance is returned when pulling the same
+	sub component again.
+
+	NOTE: avoid setting '__obj' keys (unless you really know what you are doing)
+
+	'''
+
+	def update(self, other={}, parent_defaults=True):
+		if not isinstance(other, ConfigDict):
+			super().update(other)
+		else:
+			for k, v in other.items():
+				if self.contains_nodefault(k) and '_x_' == v: # reserved for deleting settings in parents
+					del self[k]
+				elif self.contains_nodefault(k) and isinstance(v, ConfigDict) and isinstance(self[k], ConfigDict):
+					self[k].update(v)
+
+				elif k in _appendable_keys and v[0] == '+':
+					# values of appendable keys can be appended instead of overwritten,
+					# only when the new value starts with "+"
+					vs = []
+					if self.contains_nodefault(k):
+						prev = self[k]
+						if not isinstance(prev, list):
+							prev = [prev]
+						vs = prev
+					vs.append(v[1:])
+					self[k] = vs
+				else:
+					self[k] = v
+
+		self._update_tree(parent_defaults=parent_defaults)
+
+	def __str__(self):
+		return super().__repr__()
+
+
+
+class InvalidKeyError(Exception):
+	pass
+
+class ConfigList(_ConfigType, util.tlist):
+
+	# def pull_iter(self):
+	# 	return _Config_Iter(self, '', self)
+
+	def _str_to_int(self, item):
+		if isinstance(item, int):
+			return item
+
+		if item[0] == '_':
+			item = item[1:]
+
+		try:
+			return int(item)
+		except TypeError:
+			pass
+
+		raise InvalidKeyError(f'failed to convert {item} to an index')
+
+
+	def update(self, other=[], parent_defaults=True):
+		for i, x in enumerate(other):
+			if len(self) == i:
+				self.append(x)
+			else:
+				self[i] = x
+
+
+	def _single_get(self, item):
+
+		try:
+			idx = self._str_to_int(item)
+		except InvalidKeyError:
+			idx = None
+
+		if idx is not None and self.contains_nodefault(idx):
+			return self.get_nodefault(idx)
+
+		if self._parent_obj_for_defaults is not None and item[0] != '_':
+			return self._parent_obj_for_defaults[item]
+
+		return self.get_nodefault(item)
+
+
+	def contains_nodefault(self, item):
+		idx = self._str_to_int(item)
+		return 0 <= idx < len(self)
+
+	def append(self, item, parent_defaults=True):
+		super().append(item)
+		self._update_tree(parent_defaults=parent_defaults)
+
+	def extend(self, item, parent_defaults=True):
+		super().extend(item)
+		self._update_tree(parent_defaults=parent_defaults)
+
 
 class _Config_Iter(object):
 

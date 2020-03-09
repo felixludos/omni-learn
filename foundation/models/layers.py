@@ -8,6 +8,7 @@ from torch.nn import functional as F
 from .. import framework as fm
 from .. import util
 from . import atom
+from ..train import Component, AutoComponent
 
 #################
 # Functions
@@ -246,7 +247,7 @@ class RunningNormalization(fm.Model):
 
 class PowerLinear(fm.Model):  # includes powers of input as features
 	def __init__(self):
-		raise Exception('not implemented')
+		raise NotImplementedError
 
 
 class DenseLayer(fm.Model):
@@ -261,8 +262,326 @@ class DenseLayer(fm.Model):
 			x = self.nonlin(x)
 		return x
 
+@AutoComponent('conv-layer')
+class ConvLayer(fm.Model):
 
-class ConvLayer(nn.Module):
+	def __init__(self, in_channels, out_channels, factor=2,
+
+	             kernel_size=3, padding=None, dilation=1,
+
+	             din=None,
+
+	             down_type='stride', norm=None, pool='max',
+	             nonlin='elu', residual=False, **conv_kwargs):
+
+		if isinstance(kernel_size, int):
+			kernel_size = kernel_size, kernel_size
+		if isinstance(dilation, int):
+			dilation = dilation, dilation
+		if padding is None:
+			padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
+		elif isinstance(padding, int):
+			padding = padding, padding
+
+		assert down_type in {'stride', 'pool'}
+
+		if down_type == 'stride':
+			stride = factor, factor
+		else:
+			stride = 1, 1
+
+		assert 'stride' not in conv_kwargs, 'stride is set automatically using factor'
+
+
+		if din is not None:
+
+			C, H, W = din
+
+			H = (H + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
+			W = (W + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
+
+			dout = out_channels, H, W
+
+		else:
+			din = in_channels
+			dout = out_channels
+
+		super().__init__(din, dout)
+
+		self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding,
+		                      stride=stride, dilation=dilation, **conv_kwargs)
+
+		self.pool = util.get_pooling(pool, factor=factor) if down_type == 'pool' else None
+		self.norm = util.get_normalization(norm, out_channels)
+		self.nonlin = util.get_nonlinearity(nonlin)
+
+		self.res = residual
+		assert not self.res or in_channels == out_channels, 'residual connections not possible'
+
+	def extra_repr(self):
+		return 'residual={}'.format(self.residual)
+
+	def forward(self, x):
+		c = self.conv(x)
+		x = c + x if self.res else c
+
+		if self.pool is not None:
+			x = self.pool(x)
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.nonlin is not None:
+			x = self.nonlin(x)
+		return x
+
+
+@AutoComponent('deconv-layer')
+class Deconv_Layer(fm.Model):
+	def __init__(self, in_channels, out_channels, factor=2,
+
+	             kernel_size=3, stride=1, padding=None, dilation=1,
+				 output_padding=0,
+
+	             din=None, dout=None,
+
+	             up_type='stride', norm=None,
+	             nonlin='elu', residual=False, **conv_kwargs):
+
+		if isinstance(kernel_size, int):
+			kernel_size = kernel_size, kernel_size
+		if isinstance(dilation, int):
+			dilation = dilation, dilation
+		if padding is None:
+			padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
+		elif isinstance(padding, int):
+			padding = padding, padding
+		if isinstance(output_padding, int):
+			output_padding = output_padding, output_padding
+
+		if up_type == 'deconv':
+			stride = factor, factor
+		else:
+			stride = 1, 1
+
+		if din is not None:
+			C, H, W = din
+
+			if factor > 1 and up_type != 'deconv':
+				H, W = H*factor, W*factor
+
+			H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
+			W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
+			C = out_channels
+
+			if dout is not None:
+				print(f'WARNING: ignoring given dout {dout}, using: {(C,H,W)}')
+			dout = C, H, W
+		elif dout is not None:
+			raise NotImplementedError
+
+		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
+
+		super().__init__(din, dout)
+
+		if self.up_type == 'deconv':
+			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, stride=stride,
+			                                 output_padding=output_padding, **conv_kwargs)
+		else:
+			self.deconv = nn.Sequential(nn.Upsample(size=factor, mode=up_type),
+			                            nn.Conv2d(in_channels, out_channels, **conv_kwargs))
+
+		self.norm = util.get_normalization(norm, out_channels)
+		self.nonlin = util.get_nonlinearity(nonlin)
+
+		self.res = residual
+		assert not self.res or in_channels == out_channels, 'residual connections not possible'
+
+	def extra_repr(self):
+		return 'residual={}'.format(self.residual)
+
+	def forward(self, x):
+		c = self.deconv(x)
+		x = c+x if self.res else c
+
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.nonlin is not None:
+			x = self.nonlin(x)
+		return x
+
+@AutoComponent('double-conv-layer')
+class DoubleConvLayer(fm.Model):
+
+	def __init__(self, in_channels, out_channels, factor=2,
+
+	             internal_channels=None, squeeze=False, residual=False,
+
+	             din=None,
+
+	             down_type='pool', norm=None, pool='max',
+	             nonlin='elu', output_nonlin=None, **conv_kwargs):
+
+		assert factor in {1, 2}, 'factor {} not supported'.format(factor)
+		assert nonlin is not None, 'not deep'
+
+		assert down_type in {'conv', 'pool'}
+
+		assert 'stride' not in conv_kwargs, 'stride is set automatically using factor'
+
+		if din is not None:
+
+			C, H, W = din
+
+			assert H%2==0 and W%2==0, f'invalid shape for double conv: {(C,H,W)}'
+
+			H = H//factor
+			W = W//factor
+
+			dout = out_channels, H, W
+
+		super().__init__(din, dout)
+
+		if internal_channels is None:
+			internal_channels = out_channels
+
+		self.conv = nn.Conv2d(in_channels, internal_channels, kernel_size=2, padding=1, stride=1)
+		self.nonlin = util.get_nonlinearity(nonlin)
+
+		self.squeeze = None
+		if squeeze:
+			self.squeeze = nn.Conv2d(internal_channels, out_channels, kernel_size=1, padding=0, stride=1)
+			self.nonlin_squeeze = util.get_nonlinearity(nonlin)
+			internal_channels = out_channels
+
+		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
+
+		self.nonlin_down = util.get_nonlinearity(nonlin) if down_type == 'conv' else None
+		self.down = util.get_pooling(pool, factor, chn=out_channels)
+
+		self.norm = util.get_normalization(norm, out_channels)
+		if 'default' == output_nonlin:
+			output_nonlin = nonlin
+		self.out_nonlin = util.get_nonlinearity(output_nonlin)
+
+		self.res = residual
+		if self.res:
+			assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
+
+	def extra_repr(self):
+		return 'residual={}'.format(self.residual)
+
+	def forward(self, x):
+
+		c = self.nonlin(self.conv(x))
+		if self.squeeze is not None:
+			c = self.nonlin_squeeze(self.squeeze(c))
+		c = self.conv2(c)
+
+		x = c+x if self.res else c
+
+		if self.down is not None:
+			if self.nonlin_down is not None:
+				x = self.nonlin_down(x)
+			x = self.down(x)
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.out_nonlin is not None:
+			x = self.out_nonlin(x)
+		return x
+
+
+@AutoComponent('double-deconv-layer')
+class DoubleDeconvLayer(fm.Cacheable, fm.Model):
+	def __init__(self, in_channels, out_channels, factor=1, up_type='deconv',
+
+	             din=None,
+
+	             norm=None, nonlin='elu', output_nonlin='default',
+
+	             internal_channels=None, squeeze=False, residual=True,
+	             ):
+
+		if din is not None:
+
+			C, H, W = din
+
+			assert H%2==0 and W%2==0, f'invalid shape for double conv: {(C,H,W)}'
+
+			H = H*factor
+			W = W*factor
+
+			dout = out_channels, H, W
+
+		super().__init__(din, dout)
+
+		assert factor in {1, 2}, 'factor {} not supported'.format(factor)
+		assert nonlin is not None, 'not deep'
+		# assert factor == 1 or not residual, 'residual requires same size after conv2'
+
+		if internal_channels is None:
+			internal_channels = out_channels
+
+		self.up = util.get_upsample(up_type, factor, chn=in_channels)
+		self.nonlin_up = util.get_nonlinearity(nonlin) if up_type == 'conv' else None
+
+		self.conv = nn.Conv2d(in_channels, internal_channels, kernel_size=2, padding=1, stride=1)
+		self.nonlin = util.get_nonlinearity(nonlin)
+
+		self.squeeze = None
+		if squeeze:
+			self.squeeze = nn.Conv2d(internal_channels, out_channels, kernel_size=1, padding=0, stride=1)
+			self.nonlin_squeeze = util.get_nonlinearity(nonlin)
+			internal_channels = out_channels
+
+		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
+
+		assert not self.residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(
+			in_channels, internal_channels)
+
+		self.norm = util.get_normalization(norm, out_channels)
+		if 'default' == output_nonlin:
+			output_nonlin = nonlin
+		self.out_nonlin = util.get_nonlinearity(output_nonlin)
+
+		self.res = residual
+		if self.res:
+			assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
+
+		self.register_cache('_skipadd')
+
+	def extra_repr(self):
+		return 'residual={}'.format(self.residual)
+
+	def set_skipadd(self, y):
+		self._skipadd = y
+
+	def forward(self, x, y=None):
+		if y is None and self._skipadd is not None:
+			y = self._skipadd
+			self._skipadd = None
+
+		if self.up is not None:
+			x = self.up(x)
+			if self.nonlin_up is not None:
+				x = self.nonlin_up(x)
+
+		c = self.nonlin(self.conv(x))
+		if self.squeeze is not None:
+			c = self.nonlin_squeeze(self.squeeze(c))
+		c = self.conv2(c)
+
+		x = c + x if self.res else c
+		if y is not None:
+			x += y
+
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.out_nonlin is not None:
+			x = self.out_nonlin(x)
+		return x
+
+
+
+class _old_ConvLayer(nn.Module):
 	def __init__(self, in_channels, out_channels, pool=None, pool_type='max',
 				 norm_type=None, nonlin='elu', residual=False, **conv_kwargs):
 		super().__init__()
@@ -290,7 +609,7 @@ class ConvLayer(nn.Module):
 		return x
 
 
-class DeconvLayer(nn.Module):
+class _old_DeconvLayer(nn.Module):
 	def __init__(self, in_channels, out_channels, up_type='deconv', upsize=None, stride=1,
 				 norm_type=None, nonlin='elu', output_padding=None, **conv_kwargs):
 		super().__init__()
@@ -328,7 +647,7 @@ class DeconvLayer(nn.Module):
 		return x
 
 
-class DoubleConvLayer(nn.Module):
+class _old_DoubleConvLayer(nn.Module):
 	def __init__(self, in_channels, out_channels, factor=1, down_type='max',
 	             norm_type=None, nonlin='elu', output_nonlin='default',
 
@@ -390,7 +709,7 @@ class DoubleConvLayer(nn.Module):
 		return x
 
 
-class DoubleDeconvLayer(nn.Module):
+class _old_DoubleDeconvLayer(nn.Module):
 	def __init__(self, in_channels, out_channels, factor=None, up_type='deconv',
 				 norm_type=None, nonlin='elu', output_nonlin='default',
 

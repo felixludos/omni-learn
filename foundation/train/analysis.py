@@ -9,7 +9,7 @@ from torch import multiprocessing as mp
 from bisect import bisect_left
 
 from .. import util
-from .config import get_config, Config, parse_config
+from .config import get_config, ConfigDict, parse_config
 from .loading import find_checkpoint
 
 # import tensorflow as tf
@@ -1047,11 +1047,11 @@ def compare_config(base, other=None, bi=False, ignore_keys=None):
 	if ignore_keys is not None:
 		protected_keys.update(ignore_keys)
 
-	diffs = Config()#util.NS()
+	diffs = ConfigDict()#util.NS()
 	_compare_configs(base, other, diffs=diffs, protected_keys=protected_keys)
 
 	if bi:
-		adiffs = Config()#util.NS()
+		adiffs = ConfigDict()#util.NS()
 		_compare_configs(other, base, diffs=adiffs, protected_keys=protected_keys)
 		return diffs, adiffs
 
@@ -1069,7 +1069,7 @@ def _compare_configs(base, other, diffs, protected_keys=None):
 			pass
 		elif k not in other:
 			diffs[k] = '__removed__'
-		elif isinstance(v, Config):
+		elif isinstance(v, ConfigDict):
 			_compare_configs(v, other[k], diffs=diffs[k], protected_keys=protected_keys)
 			if len(diffs[k]) == 0:
 				del diffs[k]

@@ -7,3 +7,8 @@ from . import data
 from . import models
 from .framework import * # TODO: cleanup
 
+try:
+	from . import legacy
+except:
+	print('WARNING: failed to import legacy models')
+
