@@ -500,13 +500,13 @@ class DoubleConvLayer(fm.Model):
 
 @AutoComponent('double-deconv-layer')
 class DoubleDeconvLayer(fm.Cacheable, fm.Model):
-	def __init__(self, in_channels, out_channels, factor=1, up_type='deconv',
+	def __init__(self, in_channels, out_channels, factor=1, up_type='conv',
 
 	             din=None,
 
 	             norm=None, nonlin='elu', output_nonlin='default',
 
-	             internal_channels=None, squeeze=False, residual=True,
+	             internal_channels=None, squeeze=False, residual=False,
 	             ):
 
 		if din is not None:
@@ -543,7 +543,7 @@ class DoubleDeconvLayer(fm.Cacheable, fm.Model):
 
 		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
 
-		assert not self.residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(
+		assert not residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(
 			in_channels, internal_channels)
 
 		self.norm = util.get_normalization(norm, out_channels)
