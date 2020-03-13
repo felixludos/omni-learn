@@ -145,8 +145,8 @@ def build_conv_layers(settings, factors=1, pool_type='max',
 
 	layers = []
 	for params, f, bn, n in zip(settings, factors, bns, nonlins):
-		layers.append(layerslib.ConvLayer(norm_type=bn, nonlin=n, pool=f,
-								pool_type=pool_type, residual=residual,
+		layers.append(layerslib.ConvLayer(norm=bn, nonlin=n, factor=f,
+								pool=pool_type, residual=residual,
 								**params))
 
 	return layers  # can be used as sequential or module list
@@ -240,7 +240,7 @@ def build_deconv_layers(settings, sizes=None, up_type='deconv',
 
 	layers = []
 	for params, sz, bn, n in zip(settings, sizes, bns, nonlins):
-		layers.append(layerslib.DeconvLayer(norm_type=bn, nonlin=n, up_type=up_type, upsize=sz[-2:],
+		layers.append(layerslib.DeconvLayer(norm=bn, nonlin=n, up_type=up_type, size=sz[-2:],
 								  **params))
 
 	return layers  # can be used as sequential or module list

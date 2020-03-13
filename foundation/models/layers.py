@@ -267,7 +267,7 @@ class ConvLayer(fm.Model):
 
 	def __init__(self, in_channels, out_channels, factor=2,
 
-	             kernel_size=3, padding=None, dilation=1,
+	             kernel_size=3, padding=None, dilation=1, stride=None,
 
 	             din=None,
 
@@ -279,6 +279,8 @@ class ConvLayer(fm.Model):
 			kernel_size = kernel_size, kernel_size
 		if isinstance(dilation, int):
 			dilation = dilation, dilation
+		if isinstance(stride, int):
+			stride = stride, stride
 		if padding is None:
 			padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
 		elif isinstance(padding, int):
@@ -286,12 +288,13 @@ class ConvLayer(fm.Model):
 
 		assert down_type in {'stride', 'pool'}
 
-		if down_type == 'stride':
-			stride = factor, factor
-		else:
-			stride = 1, 1
+		if stride is None:
+			if down_type == 'stride':
+				stride = factor, factor
+			else:
+				stride = 1, 1
 
-		assert 'stride' not in conv_kwargs, 'stride is set automatically using factor'
+		# assert 'stride' not in conv_kwargs, 'stride is set automatically using factor'
 
 
 		if din is not None:
@@ -336,8 +339,8 @@ class ConvLayer(fm.Model):
 
 
 @AutoComponent('deconv-layer')
-class Deconv_Layer(fm.Model):
-	def __init__(self, in_channels, out_channels, factor=2,
+class DeconvLayer(fm.Model):
+	def __init__(self, in_channels, out_channels, factor=2, size=None,
 
 	             kernel_size=None, stride=1, padding=1, dilation=1,
 				 output_padding=0,
@@ -352,12 +355,22 @@ class Deconv_Layer(fm.Model):
 			kernel_size = kernel_size, kernel_size
 		if isinstance(dilation, int):
 			dilation = dilation, dilation
+		if isinstance(stride, int):
+			stride = stride, stride
 		# if padding is None:
 		# 	padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
 		if isinstance(padding, int):
 			padding = padding, padding
 		if isinstance(output_padding, int):
 			output_padding = output_padding, output_padding
+			
+		try:
+			len(factor)
+		except TypeError:
+			pass
+		else:
+			assert factor[0] == factor[1], f'{factor}'
+			factor = factor[0]
 
 		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
 
@@ -394,7 +407,8 @@ class Deconv_Layer(fm.Model):
 			                                 stride=stride, padding=padding, dilation=dilation,
 			                                 output_padding=output_padding, **conv_kwargs)
 		else:
-			self.deconv = nn.Sequential(nn.Upsample(size=factor, mode=up_type),
+			assert size is not None, 'must specify an explicit output size'
+			self.deconv = nn.Sequential(nn.Upsample(size=size, mode=up_type),
 			                            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
 			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs))
 
