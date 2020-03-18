@@ -294,7 +294,7 @@ class Normal(fm.Model):
 
 	def __init__(self, A, latent_dim=None):
 		if latent_dim is None:
-			dout = A.pull('dout')
+			dout = A.pull('latent_dim', '<>dout')
 
 		if isinstance(dout, tuple):
 			cut, *rest = dout

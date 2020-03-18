@@ -62,7 +62,7 @@ def tile_imgs(imgs, dim=0, H=None, W=None): # for numpy images
 	assert H*W == imgs.shape[dim], 'Invalid tiling'
 
 
-def show_nums(imgs, titles=None, H=None, W=None, figsize=(6, 6),
+def show_imgs(imgs, titles=None, H=None, W=None, figsize=(6, 6),
 			  reverse_rows=False, grdlines=False, tight=False,
 			  border=0.02, between=0.01):
 	H,W = calc_tiling(imgs.size(0), H=H, W=W)

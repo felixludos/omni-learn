@@ -39,6 +39,9 @@ class Logger(object):
 	def set_tag_format(self, fmt):
 		self.tag_fmt = fmt
 
+	def add_hparams(self, param_dict, metrics={}):
+		self.tblog.add_hparams(param_dict, metrics)
+
 	def add(self, data_type, tag, *args, global_step=None, **kwargs): # TODO: test and maybe clean
 
 		if self.tblog is None:

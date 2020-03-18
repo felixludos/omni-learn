@@ -99,6 +99,11 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		del A.output.save_dir
 
 	logger = setup_logging(A.output)
+	
+	if path is None:
+		hparams = model.get_hparams()
+		if len(hparams):
+			logger.add_hparams(hparams)
 
 	if 'date' not in A.info and '_logged_date' in A.output:
 		A.info.date = A.output._logged_date
@@ -546,8 +551,6 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 						display = val_stats.avgs()  # if smooths else stats.avgs()
 						for k, v in display.items():
 							logger.add('scalar', k, v)
-
-
 
 					logger.set_tag_format('{}/train') # reset
 

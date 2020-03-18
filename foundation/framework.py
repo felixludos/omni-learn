@@ -32,6 +32,9 @@ class Model(nn.Module):  # any vector function
 	def post_epoch(self, mode, epoch, stats=None): # called at the end of each epoch
 		pass
 
+	def get_hparams(self):
+		return {}
+
 class CompositeModel(Model): # TODO integrate with component based models
 	def __init__(self, *models):
 		super().__init__(models[0].din, models[-1].dout)
@@ -258,7 +261,7 @@ class Cacheable(Model):
 			setattr(self, name, None)
 
 	def cuda(self, device=None):
-		super(Model, self).cuda(device)
+		super().cuda(device)
 		if self._cache_device is None:
 			for name in self._cache_names:
 				obj = getattr(self, name)
@@ -266,7 +269,7 @@ class Cacheable(Model):
 					setattr(self, name, obj.cuda(device))
 
 	def cpu(self):
-		super(Model, self).cpu()
+		super().cpu()
 		if self._cache_device is None:
 			for name in self._cache_names:
 				obj = getattr(self, name)
@@ -274,7 +277,7 @@ class Cacheable(Model):
 					setattr(self, name, obj.cpu())
 
 	def to(self, device):
-		super(Model, self).to(device)
+		super().to(device)
 		if self._cache_device is None:
 			for name in self._cache_names:
 				obj = getattr(self, name)
