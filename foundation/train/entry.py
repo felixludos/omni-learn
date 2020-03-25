@@ -140,7 +140,7 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 				autoname = '-'.join(terms) if len(terms) else 'run'
 				
 				if 'extra' in config.info:
-					autoname = '{}-{}'.format(autoname, config.extra)
+					autoname = '{}-{}'.format(autoname, config.info.extra)
 
 				prefix = config.name if 'name' in config else autoname
 
