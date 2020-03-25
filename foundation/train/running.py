@@ -1,5 +1,6 @@
 
 import sys, os, time
+import socket
 # import traceback, ipdb
 from tqdm import tqdm
 import yaml
@@ -156,7 +157,8 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 				# register job
 				if 'JOB_ID' in os.environ:
 					with open(os.environ['JOB_REGISTRY_PATH'], 'a+') as f:
-						f.write('{:<12} - {} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1],
+						f.write('{:<12} - {} - {} - {}\n'.format(os.environ['JOB_ID'].split('#')[-1],
+						                                         socket.gethostname(),
 						                                    os.path.basename(A.output.save_dir),
 						                                    os.path.basename(jobdir)))
 
