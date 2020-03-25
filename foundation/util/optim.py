@@ -4,6 +4,10 @@ import torch
 from torch import optim as O
 from torch import nn
 from torch.optim import Optimizer
+try:
+	from ranger import Ranger
+except ImportError:
+	print('WARNING: failed to import Ranger optimizer')
 from .stats import StatsMeter
 
 def get_optimizer(optim_type, parameters, lr=1e-3, weight_decay=0, momentum=0, beta1=.9, beta2=.999, **optim_args):
@@ -15,6 +19,8 @@ def get_optimizer(optim_type, parameters, lr=1e-3, weight_decay=0, momentum=0, b
 		optimizer = O.Adam(parameters, lr=lr, weight_decay=weight_decay, betas=(beta1, beta2), **optim_args)
 	elif optim_type == 'adamw':
 		optimizer = O.AdamW(parameters, lr=lr, weight_decay=weight_decay, betas=(beta1, beta2), **optim_args)
+	elif optim_type == 'ranger':
+		optimizer = Ranger(parameters, lr=lr, weight_decay=weight_decay,betas=(beta1, beta2), **optim_args) #alpha=0.5, k=6, N_sma_threshhold=5, betas=(.95,0.999))
 	elif optim_type == 'cg':
 		optimizer = Conjugate_Gradient(parameters, **optim_args)
 	elif optim_type == 'rprop':
@@ -67,6 +73,12 @@ def default_create_scheduler(optimizer, info):
 		                                       min_lr=min_lr, cooldown=cooldown)
 		req_loss = True
 
+	elif name == 'cos':
+		step_size = info.pull('scheduler_max_steps')
+		eta_min = min_lr
+		
+		out = CosineAnnealing(optimizer, T_max=step_size, eta_min=eta_min)
+
 	out.req_loss = req_loss
 
 	return out
@@ -95,6 +107,13 @@ class ReduceOnPlateau(O.lr_scheduler.ReduceLROnPlateau):
 	def __repr__(self):
 		return 'ReduceOnPlateau(factor={}, patience={}, cooldown={})'.format(self.factor, self.patience, self.cooldown)
 
+class CosineAnnealing(O.lr_scheduler.CosineAnnealingLR):
+	
+	def __str__(self):
+		return self.__repr__()
+	
+	def __repr__(self):
+		return 'CosineAnnealing(T_max={},eta_min={})'.format(self.T_max, self.eta_min)
 
 
 class Complex_Optimizer(Optimizer):

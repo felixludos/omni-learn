@@ -67,18 +67,23 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	#####################
 
 	path, extend = None, None
+	override = None
 	if 'resume' in A:
 		path = A.resume
 		assert not os.path.isfile(path), 'When resuming you should only specify the directory of the run, not the specific checkpoint'
 		if 'extend' in A:
 			extend = A.extend
-		A.clear()
+		if 'override' in A:
+			A = A.override
+			override = A
+		else:
+			A.clear()
 	if 'load' in A:
 		path = A.load
 		A.loaded = path
 
 	A, (*datasets, testset), model, ckpt = load(path=path, A=A, mode='train',
-	                                            update_config='load' not in A,
+	                                            update_config='load' not in A or override is not None,
 	                                            load_last=True, # load will load the best, rather than last
 	                                            load_optim='load' not in A, load_scheduler='load' not in A, # only load network parameters when "loading" pretrained model
 	                                              get_model=get_model, get_data=get_data,
@@ -100,10 +105,10 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 
 	logger = setup_logging(A.output)
 	
-	if path is None:
-		hparams = model.get_hparams()
-		if len(hparams):
-			logger.add_hparams(hparams)
+	# if path is None:
+	# 	hparams = model.get_hparams()
+	# 	if len(hparams):
+	# 		logger.add_hparams(hparams)
 
 	if 'date' not in A.info and '_logged_date' in A.output:
 		A.info.date = A.output._logged_date
@@ -125,6 +130,10 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 				A.training.step_limit = extend
 				print('Extending training to {} steps'.format(extend))
 			print('Running {} more steps'.format(A.training.step_limit - records['total_steps']))
+
+			# if override is not None:
+			# 	A.update(override)
+			# 	print('Overrode config for resume')
 
 	if 'save_freq' not in A.output or 'save_dir' not in A.output:
 		A.output.save_freq = -1
@@ -615,7 +624,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 				'epoch_seed': epoch_seed,
 			}
 
-			path = save_checkpoint(ckpt, A.output.save_dir, is_best=is_best, epoch=records['checkpoint'])
+			path = save_checkpoint(ckpt, A.output.save_dir, is_best=is_best, epoch=records['total_steps'])
 			best_info = '(new best) ' if is_best else ''
 			is_best = False
 

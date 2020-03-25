@@ -317,7 +317,7 @@ class ConvLayer(fm.Model):
 
 		self.pool = util.get_pooling(pool, factor=factor) if down_type == 'pool' else None
 		self.norm = util.get_normalization(norm, out_channels)
-		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
+		self.nonlin = util.get_nonlinearity(nonlin) #if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
 
 		self.res = residual
 		assert not self.res or in_channels == out_channels, 'residual connections not possible'

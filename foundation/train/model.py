@@ -20,6 +20,13 @@ def default_create_model(info):
 	print('Model-type: {}'.format(info._type))
 
 	model = create_component(info)
+	
+	if isinstance(model, fm.Optimizable):
+		model.set_optim(info)
+	
+	if isinstance(model, fm.Schedulable):
+		model.set_scheduler(info)
+	
 	return model
 
 

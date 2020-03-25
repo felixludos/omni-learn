@@ -170,6 +170,9 @@ class Lp_Norm(nn.Module):
 		self.dim = dim
 		self.reduction = reduction
 
+	def extra_repr(self):
+		return 'p={}'.format(self.p)
+
 	def forward(self, x):
 
 		mag = x.norm(p=self.p, dim=self.dim)
@@ -883,7 +886,7 @@ distrib.kl.register_kl(Joint_Distribution, Joint_Distribution)(group_kl)
 
 def standard_kl(p, q=None):
 	mu, sigma = p.loc, p.scale
-	return (mu.pow(2) - sigma.log() + sigma - 1) / 2
+	return (mu.pow(2) - sigma.clamp(min=1e-20).log() + sigma - 1) / 2
 distrib.kl.register_kl(distrib.Normal, type(None))(standard_kl)
 
 

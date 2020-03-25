@@ -192,7 +192,7 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 			if 'scheduler' in params and not load_scheduler:
 				del params['scheduler']
 
-			model.load_state_dict(params)
+			model.load_state_dict(params, strict=False)
 			print('Loaded model_state from checkpoint')
 
 		out.append(model)

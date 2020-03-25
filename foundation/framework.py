@@ -142,28 +142,35 @@ class Optimizable(Recordable):
 		self.record_lr()
 
 	def set_optim(self, optim_info=None):
+		
+		if self.optim is not None:
+			return
+		
+		sub_optims = {}
+		for name, child in self.named_children():
+			if isinstance(child, Optimizable) and child.optim is not None:
+				sub_optims[name] = child.optim
 
-		optim = None
-		if optim_info is not None and 'optim_type' in optim_info:
-			optim = util.default_create_optim(self.parameters(), optim_info)
-		else: # aggregate optimizers of children
-			sub_optims = {}
-			for name, child in self.named_children():
-				if isinstance(child, Optimizable) and child.optim is not None:
-					sub_optims[name] = child.optim
+		if len(sub_optims):
 
-			# assert len(sub_optims) > 0, 'no children have optimizers'
-
-
-			# if len(sub_optims) == 1:
-			# 	optim = next(iter(sub_optims.values()))
-			# else:
-			# 	optim = util.Complex_Optimizer(**sub_optims)
-			if len(sub_optims):
+			params = [] # param eters not already covered by sub_optims
+			for name, param in self.named_parameters():
+				name = name.split('.')[0]
+				if name not in sub_optims:
+					params.append(param)
+		
+			if len(sub_optims) == 1 and len(params) == 0: # everything convered by a single sub_optim
+				optim = next(iter(sub_optims.values()))
+			else:
+				if len(params):
+					if 'self' in sub_optims:
+						raise Exception('invalid names: {} already in {}'.format('self', sub_optims.keys()))
+					sub_optims['self'] = util.default_create_optim(params, optim_info)
 				optim = util.Complex_Optimizer(**sub_optims)
-
+		else:
+			optim = util.default_create_optim(self.parameters(), optim_info)
+			
 		self.optim = optim
-
 
 	def optim_step(self, loss): # should only be called during training
 		if self.optim is None:
@@ -172,10 +179,10 @@ class Optimizable(Recordable):
 		loss.backward()
 		self.optim.step()
 
-	def load_state_dict(self, state_dict):
+	def load_state_dict(self, state_dict, strict=True):
 		if self.optim is not None and 'optim' in state_dict:
 			self.optim.load_state_dict(state_dict['optim'])
-		super().load_state_dict(state_dict['model'])
+		super().load_state_dict(state_dict['model'], strict=strict)
 
 	def state_dict(self, *args, **kwargs):
 		state_dict = {
@@ -194,28 +201,38 @@ class Schedulable(Optimizable):
 	def set_scheduler(self, info=None):
 		if self.optim is None:
 			return
-		sch = None
-		if info is not None and 'scheduler_type' in info:
-			sch = util.default_create_scheduler(self.optim, info)
+		
+		schs = {}
+		
+		if isinstance(self.optim, util.Complex_Optimizer):
+			my_opt = None
+			for name, opt in self.optim.items():
+				if name == 'self':
+					my_opt = opt
+				else:
+					child = getattr(self, name)
+					if isinstance(child, Schedulable) and child.scheduler is not None:
+						schs[name] = child.scheduler
+		
+			if my_opt is not None:
+				schs['self'], req = util.default_create_scheduler(my_opt, info)
+				if schs['self'] is not None:
+				
+					schs['self'].req_loss = req
+		
+			sch = util.Complex_Scheduler(**schs)
+		
 		else:
-			sub_sch = {}
-			for name, child in self.named_children():
-				if isinstance(child, Schedulable) and child.scheduler is not None:
-					sub_sch[name] = child.scheduler
-
-			if len(sub_sch):
-				# if len(sub_sch) == 1:
-				# 	sch = next(iter(sub_sch.values()))
-				# else:
-				# 	sch = util.Complex_Scheduler(**sub_sch)
-				sch = util.Complex_Scheduler(**sub_sch)
-
+			sch, req = util.default_create_scheduler(self.optim, info)
+			if sch is not None:
+				sch.req_loss = req
+		
 		self.scheduler = sch
-
-	def load_state_dict(self, state_dict):
+		
+	def load_state_dict(self, state_dict, strict=True):
 		if self.scheduler is not None and 'scheduler' in state_dict:
 			self.scheduler.load_state_dict(state_dict['scheduler'])
-		super().load_state_dict(state_dict)
+		super().load_state_dict(state_dict, strict=strict)
 
 	def state_dict(self, *args, **kwargs):
 		state_dict = super().state_dict(*args, **kwargs)

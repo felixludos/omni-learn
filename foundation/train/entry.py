@@ -67,6 +67,10 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 
 			config.info.argv = argv[1:]
 
+		if 'test_mode' in config:
+			os.environ['FOUNDATION_TESTING'] = str(int(config.test_mode))
+			print('Test mode set to: {}'.format(config.test_mode))
+
 		if os.environ['FOUNDATION_TESTING'] == '1':
 			print('\nThis is a test run!\n')
 
@@ -93,7 +97,7 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 			# if 'info' in config:
 			# 	del config.info
 
-		if 'name' not in config and mode in {'cmd', 'pycharm'} and 'test_override' not in config:
+		if 'name' not in config and os.environ['FOUNDATION_TESTING'] == '1':
 			config.name = 'test-{}'.format(mode)
 			print('Name defaulting to: {}'.format(config.name))
 
