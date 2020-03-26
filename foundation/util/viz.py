@@ -34,7 +34,7 @@ def calc_tiling(N, H=None, W=None, prefer_tall=False):
 
 	H,W = tuple(factors(N))[-2:] # most middle 2 factors
 
-	if H > W and not prefer_tall:
+	if H > W or prefer_tall:
 		H, W = W, H
 
 	# if not prefer_tall:

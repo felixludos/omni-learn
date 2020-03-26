@@ -25,6 +25,7 @@ class AdaIN(fm.Model):
 		if 'net' in A:
 			A.net.din = qdim
 			A.net.dout = ndim
+			A.net.latent_dim = ndim
 
 		net = A.pull('net', None)
 

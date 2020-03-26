@@ -336,7 +336,7 @@ class Normal(fm.Model):
 
 
 
-
+@AutoComponent('conv')
 class Conv_Encoder(fm.Encodable, fm.Model):
 
 	def __init__(self, in_shape, latent_dim=None, feature_dim=None,
