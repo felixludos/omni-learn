@@ -111,7 +111,7 @@ class Mish(nn.Module):
 		return x * torch.tanh(F.softplus(x))
 class Swish(nn.Module):
 	def forward(self, x):
-		return x * F.sigmoid(x)
+		return x * torch.sigmoid(x)
 
 # Choose non-linearities
 def get_nonlinearity(nonlinearity, dim=1, inplace=True):

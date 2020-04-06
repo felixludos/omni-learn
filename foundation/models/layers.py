@@ -446,6 +446,9 @@ class DoubleConvLayer(fm.Model):
 		assert factor in {1, 2}, 'factor {} not supported'.format(factor)
 		assert nonlin is not None, 'not deep'
 
+		if down_type == 'max':
+			down_type = 'pool'
+
 		assert down_type in {'conv', 'pool'}
 
 		assert 'stride' not in conv_kwargs, 'stride is set automatically using factor'
@@ -460,6 +463,8 @@ class DoubleConvLayer(fm.Model):
 			W = W//factor
 
 			dout = out_channels, H, W
+		else:
+			dout = None
 
 		super().__init__(din, dout)
 
@@ -533,6 +538,8 @@ class DoubleDeconvLayer(fm.Cacheable, fm.Model):
 			W = W*factor
 
 			dout = out_channels, H, W
+		else:
+			dout = None
 
 		super().__init__(din, dout)
 

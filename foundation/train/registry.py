@@ -33,8 +33,12 @@ def find_config_path(name):
 	if os.path.isfile(name):
 		return name
 
+	reg = _config_registry
+
 	if name in _config_registry:
 		return _config_registry[name]
+	elif name.replace('/', '\\') in _config_registry: # TODO: clean up this hack for windows compat
+		return _config_registry[name.replace('/', '\\')]
 	elif 'FOUNDATION_SAVE_DIR' in os.environ:
 
 		run_dir = name if os.path.isdir(name) else os.path.dirname(name) # full path to run dir or ckpt

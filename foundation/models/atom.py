@@ -13,7 +13,9 @@ from . import layers as layerslib
 
 
 def make_MLP(input_dim, output_dim, hidden_dims=[],
-             nonlin='prelu', output_nonlin=None):
+             initializer=None,
+             nonlin='prelu', output_nonlin=None,
+             bias=True, output_bias=None):
 	'''
 	:param input_dim: int
 	:param output_dim: int
@@ -22,6 +24,9 @@ def make_MLP(input_dim, output_dim, hidden_dims=[],
 	:param output_nonlin: str - nonlinearity to be applied after the last (output) layer
 	:return: an nn.Sequential instance with the corresponding layers
 	'''
+
+	if output_bias is None:
+		output_bias = bias
 
 	flatten = False
 	reshape = None
@@ -37,13 +42,17 @@ def make_MLP(input_dim, output_dim, hidden_dims=[],
 		output_dim = int(np.product(output_dim))
 
 	nonlins = [nonlin] * len(hidden_dims) + [output_nonlin]
+	biases = [bias] * len(hidden_dims) + [output_bias]
 	hidden_dims = input_dim, *hidden_dims, output_dim
 
 	layers = []
 	if flatten:
 		layers.append(nn.Flatten())
-	for in_dim, out_dim, nonlin in zip(hidden_dims, hidden_dims[1:], nonlins):
-		layers.append(nn.Linear(in_dim, out_dim))
+	for in_dim, out_dim, nonlin, bias in zip(hidden_dims, hidden_dims[1:], nonlins, biases):
+		layer = nn.Linear(in_dim, out_dim, bias=bias)
+		if initializer is not None:
+			layer = initializer(layer, nonlin)
+		layers.append(layer)
 		if nonlin is not None:
 			layers.append(util.get_nonlinearity(nonlin))
 	if reshape is not None:

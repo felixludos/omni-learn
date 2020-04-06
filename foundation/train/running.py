@@ -17,30 +17,11 @@ from .setup import setup_records, setup_logging
 from .loading import load, save_checkpoint
 from .data import get_loaders
 
-from .running_legacy import legacy_run_full
-
-# def run_full(A, *args, **kwargs):
-#
-# 	if 'legacy' not in A:
-# 		print('\n\n\n\nWARNING: USING DEPRECATED TRAINING CODE.\n\n\n\n')
-# 		print('To use newest code: use config files in ./config/n/')
-# 		print('To use the legacy code (NOT recommended): set "legacy" to True in the config, '
-# 		      'or include the legacy.yaml config.')
-# 		raise Exception('legacy flag not set.')
-#
-# 	elif A.legacy:
-# 		print('\n\n\n\nWARNING: USING LEGACY TRAINING CODE (this will be deprecated soon).\n\n\n\n')
-# 		print('To use newest code: use config files in ./config/n/')
-# 		return legacy_run_full(A, *args, **kwargs)
-# 	else:
-# 		print('Using *NEWEST* running code')
-# 		return new_run_full(A, *args, **kwargs)
-
 def iterative_run(A, *args, **kwargs):
 
 	if 'legacy' in A:
 		print('\n\n\n\nERROR: Legacy code is no longer supported\n\n\n\n')
-		raise Exception('legacy flag not set.')
+		raise Exception('legacy flag set.')
 
 	return new_run_full(A, *args, **kwargs)
 

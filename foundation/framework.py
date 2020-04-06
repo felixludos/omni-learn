@@ -223,10 +223,8 @@ class Schedulable(Optimizable):
 			sch = util.Complex_Scheduler(**schs)
 		
 		else:
-			sch, req = util.default_create_scheduler(self.optim, info)
-			if sch is not None:
-				sch.req_loss = req
-		
+			sch = util.default_create_scheduler(self.optim, info)
+			
 		self.scheduler = sch
 		
 	def load_state_dict(self, state_dict, strict=True):

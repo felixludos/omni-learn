@@ -62,6 +62,25 @@ def tile_imgs(imgs, dim=0, H=None, W=None): # for numpy images
 	assert H*W == imgs.shape[dim], 'Invalid tiling'
 
 
+def plot_vec_fn(f, din=None, dim=None, lim=(-5, 5), N=1000, figax=None):
+	if din is None:
+		din = f.din
+	if dim is not None:
+		raise NotImplementedError
+	
+	if figax is None:
+		figax = plt.subplots()
+	fig, ax = figax
+	plt.sca(ax)
+	
+	vals = torch.linspace(*lim, N)
+	with torch.no_grad():
+		outs = f(vals.unsqueeze(-1).expand(-1, din))
+	plt.plot(vals, outs)
+	plt.xlabel('Input = [1,...,1] * x')
+	plt.ylabel('Output')
+	return fig, ax
+
 def show_imgs(imgs, titles=None, H=None, W=None, figsize=(6, 6),
 			  reverse_rows=False, grdlines=False, tight=False,
 			  border=0.02, between=0.01):

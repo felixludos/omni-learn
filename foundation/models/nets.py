@@ -253,7 +253,7 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 		for ichn, ochn in zip(chns, chns[1:]):
 			layers.append(
 				layerslib.DoubleDeconvLayer(in_channels=ichn, out_channels=ochn, factor=next(factors),
-				                            up_type=up_type, norm_type=norm_type,
+				                            up_type=up_type, norm=norm_type,
 				                            nonlin=nonlin, output_nonlin=nonlin,
 				                            internal_channels=next(internal_channels), squeeze=next(squeeze),
 				                            residual=residual,
@@ -261,7 +261,7 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 			)
 		layers.append(
 			layerslib.DoubleDeconvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(factors),
-			                            up_type=up_type, norm_type=output_norm_type,
+			                            up_type=up_type, norm=output_norm_type,
 			                            nonlin=nonlin, output_nonlin=output_nonlin,
 			                            internal_channels=next(internal_channels), squeeze=next(squeeze),
 			                            residual=residual,
