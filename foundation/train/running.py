@@ -7,7 +7,7 @@ import yaml
 import torch
 from .. import util
 from ..data.collectors import Info_Dataset
-from ..framework import Visualizable, Recordable, Schedulable
+from ..framework import Visualizable, Recordable, Schedulable, Evaluatable
 # from .load_data import old_get_loaders as get_loaders # TODO: update
 
 from .model import default_create_model
@@ -226,11 +226,10 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 
 
 	# endregion
-
+	
 	#####################
 	# region Model
 	#####################
-
 
 	print(model)
 	print(model.optim)
@@ -252,10 +251,52 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 
 
 	print('Training complete.')
+	
+	# endregion
+	
+	#####################
+	# region Evaluation
+	#####################
+	
+	
+	if isinstance(model, Evaluatable):
+		
+		info = {
+			'A':A,
+			'loaders': loaders,
+			'logger': logger,
+			
+		}
+		
+		if A.training.track_best and 'save_dir' in A.output:
+			try:
+				model, ckpt = load(path=A.output.save_dir, mode='test', get_model=get_model, get_data=None,
+				                   return_args=False, return_ckpt=True, force_load_model=True)
+				print('Loaded best model, trained for {} epochs'.format(ckpt['records']['epoch']))
+				records['test_epoch'] = ckpt['records']['epoch']
+			except FileNotFoundError:
+				print('Using current model for testing')
 
-	return model, datasets, loaders, records
+		if testset is None:
+			testset = get_data(A, mode='test')
+
+		testloader = get_loaders(testset, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
+		                         shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
+
+		print('testdata len={}, testloader len={}'.format(len(testset), len(testloader)))
+
+		model.eval()
+		
+		results = model.evaluate(info)
+		
+		if results is not None:
+			
+			pass
+	
 
 	# endregion
+	
+	return model, datasets, loaders, records
 
 	#####################
 	# region Run Test

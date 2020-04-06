@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='foundation',
-      version='0.1',
+      version='0.2',
       description='Framework for RL and beyond',
       url='https://gitlab.cs.washington.edu/fleeb/foundation',
       author='Felix Leeb',

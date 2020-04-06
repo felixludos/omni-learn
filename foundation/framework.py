@@ -96,23 +96,23 @@ class Visualizable(Recordable):
 		super().pre_epoch(mode, epoch)
 
 class Evaluatable(Recordable): # TODO: maybe not needed
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.reset_eval_counter()
+	# def __init__(self, *args, **kwargs):
+	# 	super().__init__(*args, **kwargs)
+		# self.reset_eval_counter()
 
-	def reset_eval_counter(self):
-		self._eval_counter = -1
+	# def reset_eval_counter(self):
+	# 	self._eval_counter = -1
 	def evaluate(self, info):
-		self._eval_counter += 1
+		# self._eval_counter += 1
 		with torch.no_grad():
 			self._evaluate(info)
 
 	def _evaluate(self, info):
 		raise NotImplementedError
 
-	def pre_epoch(self, mode, epoch):
-		self.reset_eval_counter()
-		super().pre_epoch(mode, epoch)
+	# def pre_epoch(self, mode, epoch):
+	# 	self.reset_eval_counter()
+	# 	super().pre_epoch(mode, epoch)
 
 
 
