@@ -184,7 +184,7 @@ class Stage_Model(fm.Schedulable, fm.Trainable_Model):
 # 			q = stage(q)
 # 		return q
 
-@Component('conv')
+# @Component('conv')
 class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
 	def __init__(self, A):
 		kwargs = _get_conv_args(A)
@@ -261,10 +261,10 @@ def _create_conv(info):
 	return conv
 # register_model('conv', _create_conv)
 
-class Trainable_Normal_Enc(fm.Schedulable, models.Normal_Conv_Encoder):
-	pass
+# class Trainable_Normal_Enc(fm.Schedulable, models.Normal_Conv_Encoder):
+# 	pass
 
-@Component('normal-conv')
+# @Component('normal-conv')
 def _create_normal_conv(info):
 
 	kwargs = _get_conv_args(info)
@@ -286,7 +286,7 @@ def _create_normal_conv(info):
 	return conv
 # register_model('normal-conv', _create_normal_conv)
 
-@Component('deconv')
+# @Component('deconv')
 class Trainable_Deconv(fm.Schedulable, models.Conv_Decoder):
 	def __init__(self, A):
 		kwargs = {
