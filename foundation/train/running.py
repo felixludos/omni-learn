@@ -234,7 +234,9 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	# region Run Train/Val
 	#####################
 	
-	if A.training.step_limit - records['total_steps'] > 0:
+	eval_only = A.pull('eval_only', False)
+	
+	if not eval_only and A.training.step_limit - records['total_steps'] > 0:
 
 		print('Training for {} steps'.format(A.training.step_limit - records['total_steps']))
 		run_continuous(A, records, model, trainloader, valloader,
@@ -315,47 +317,7 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	
 	# endregion
 	
-	return model, datasets, loaders, records, results
-
-	#####################
-	# region Run Test
-	#####################
-
-	if 'no_test' not in A.training or not A.training.no_test:
-
-		records['test_epoch'] = records['epoch']
-
-		if A.training.track_best and 'save_dir' in A.output:
-			try:
-				model, ckpt = load(path=A.output.save_dir, mode='test', get_model=get_model, get_data=None,
-				                   return_args=False, return_ckpt=True, force_load_model=True)
-				print('Loaded best model, trained for {} epochs'.format(ckpt['records']['epoch']))
-				records['test_epoch'] = ckpt['records']['epoch']
-			except FileNotFoundError:
-				print('Using current model for testing')
-
-		if testset is None:
-			testset = get_data(A, mode='test')
-
-		testloader = get_loaders(testset, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
-		                         shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
-
-		print('testdata len={}, testloader len={}'.format(len(testset), len(testloader)))
-
-		test_stats = run_epoch(model, testloader, A, records=records, mode='test',
-		                       logger=logger, silent=False, inline='inline' in A and A.inline)
-
-		records['stats']['test'] = test_stats.export()
-
-		if 'save_dir' in A.output:
-			results_path = os.path.join(A.output.save_dir, 'results.yaml')
-			with open(results_path, 'w') as f:
-				yaml.dump(records, f)
-			print('Final results saved to {}'.format(results_path))
-
-	# endregion
-
-	return model, datasets, loaders, records
+	return A, model, datasets, loaders, records, results
 
 
 def restart_loader(loader, epoch_seed=None):

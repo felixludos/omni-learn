@@ -12,7 +12,7 @@ _config_registry = {}
 def register_config(name, path):
 	assert os.path.isfile(path), 'Cant find config file: {}'.format(path)
 	_config_registry[name] = path
-def register_config_dir(path, recursive=False, prefix=None, joiner=''):
+def register_config_dir(path, recursive=False, prefix=None, joiner='/'):
 	assert os.path.isdir(path)
 	for fname in os.listdir(path):
 		parts = fname.split('.')
@@ -24,7 +24,7 @@ def register_config_dir(path, recursive=False, prefix=None, joiner=''):
 			register_config(name, os.path.join(path, fname))
 		elif recursive and os.path.isdir(candidate):
 			newprefix = fname if prefix is None else os.path.join(prefix, fname)
-			register_config_dir(candidate, recursive=recursive, prefix=newprefix, joiner=os.sep)
+			register_config_dir(candidate, recursive=recursive, prefix=newprefix, joiner=joiner)
 
 def view_config_registry():
 	return _config_registry.copy()
@@ -37,21 +37,25 @@ def find_config_path(name):
 
 	if name in _config_registry:
 		return _config_registry[name]
-	elif name.replace('/', '\\') in _config_registry: # TODO: clean up this hack for windows compat
-		return _config_registry[name.replace('/', '\\')]
+	elif os.path.isfile(name):
+		return name
 	elif 'FOUNDATION_SAVE_DIR' in os.environ:
 
-		run_dir = name if os.path.isdir(name) else os.path.dirname(name) # full path to run dir or ckpt
+		run_dir = name if os.path.isdir(name) else os.path.join(os.environ['FOUNDATION_SAVE_DIR'], name)
 		path = os.path.join(run_dir, 'config.yml')
+		
+		if os.path.isfile(path):
+			return path
+		
+		# path = os.path.join(os.environ['FOUNDATION_SAVE_DIR'], name)
+		# run_dir = os.path.dirname(path)
+		#
+		# path = os.path.join(run_dir, 'config.yml') # run dir
+		#
+		# name = path
+	
+	raise Exception(f'Unknown config: {name}')
 
-		if not os.path.isfile(path) and 'FOUNDATION_SAVE_DIR' in os.environ:  # path (using default save dir) to run dir or ckpt
-
-			path = os.path.join(os.environ['FOUNDATION_SAVE_DIR'], name)
-			run_dir = path if os.path.isdir(path) else os.path.dirname(path)
-
-			path = os.path.join(run_dir, 'config.yml') # run dir
-
-		name = path
 
 	assert os.path.isfile(name), 'invalid path: {}'.format(name)
 	return name
