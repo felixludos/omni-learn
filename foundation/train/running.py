@@ -63,6 +63,9 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	if 'load' in A:
 		path = A.load
 		A.loaded = path
+		if 'override' in A:
+			override = A.override
+			A = override
 
 	A, (*datasets, testset), model, ckpt = load(path=path, A=A, mode='train',
 	                                            update_config='load' not in A or override is not None,
@@ -102,7 +105,7 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		records = ckpt['records']
 		epoch_seed = ckpt['epoch_seed']
 		if 'load' in A: # load
-			del A.load
+			# del A.load
 			print('WARNING: you are loading a previous model!')
 			print('Previous model has trained for {} steps, {} epochs'.format(records['total_steps'],
 			                                                                  records['epoch']))
@@ -230,10 +233,16 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	#####################
 	# region Run Train/Val
 	#####################
+	
+	if A.training.step_limit - records['total_steps'] > 0:
 
-	run_continuous(A, records, model, trainloader, valloader,
-	               logger=logger, silent=False, display_samples=False,
-                   epoch_seed=epoch_seed, pbar=pbar)
+		print('Training for {} steps'.format(A.training.step_limit - records['total_steps']))
+		run_continuous(A, records, model, trainloader, valloader,
+		               logger=logger, silent=False, display_samples=False,
+	                   epoch_seed=epoch_seed, pbar=pbar)
+
+	else:
+		print('No training')
 
 
 	print('Training complete.')
@@ -249,8 +258,10 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	results = None
 	if isinstance(model, Evaluatable):
 		
+		identifier = A.eval.pull('identifier', 'eval')
+		
 		print('*'*50)
-		print('Evaluating trained model')
+		print(f'Evaluating trained model: {identifier}')
 		print('*'*50)
 		
 		if 'use_testset' in A.eval and A.eval.use_testset:
@@ -280,7 +291,7 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		records['training_steps'] = records['total_steps']
 		
 		logger.set_step(records['total_steps'])
-		logger.set_tag_format('eval/{}')
+		logger.set_tag_format('{}/{}'.format(identifier, '{}'))
 		
 		info = {
 			'A': A,

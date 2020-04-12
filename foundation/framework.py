@@ -14,7 +14,13 @@ class Model(nn.Module):  # any vector function
 		self.dout = dout
 		self.device = 'cpu'
 		
+		self.savable_buffers = set()
+		
 		self.volatile = util.TensorDict()
+
+	def register_buffer(self, name, tensor=None, save=True):
+		super().register_buffer(name, tensor)
+		self.savable_buffers.add(name)
 
 	def cuda(self, device=None):
 		self.device = 'cuda' if device is None else device
@@ -38,7 +44,14 @@ class Model(nn.Module):  # any vector function
 		out = super().state_dict(*args, **kwargs)
 		
 		self.volatile = volatile
-		return out
+		return {'parameters': out,
+		        'buffers': {name: getattr(self, name, None)
+		                    for name in self.savable_buffers}}
+	
+	def load_state_dict(self, state_dict, **kwargs):
+		for name, buffer in state_dict['buffers'].items():
+			self.register_buffer(name, buffer, save=True)
+		return super().load_state_dict(state_dict['parameters'], **kwargs)
 
 	def pre_epoch(self, mode, epoch): # called at the beginning of each epoch
 		pass
