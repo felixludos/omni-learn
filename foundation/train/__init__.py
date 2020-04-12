@@ -1,5 +1,6 @@
 
-from .registry import Component, AutoComponent, Modifier, AutoModifier, create_component, register_config, \
+from .registry import Component, AutoComponent, Modifier, AutoModifier, Modification, \
+	create_component, register_config, \
 	register_config_dir,register_component, register_modifier, \
 	view_config_registry, view_component_registry, view_modifier_registry
 from .config import get_config, parse_config, ConfigDict

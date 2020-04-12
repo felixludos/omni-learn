@@ -54,7 +54,7 @@ def default_create_optim(parameters, info): # info is a train.Config
 def default_create_scheduler(optimizer, info):
 
 	if 'scheduler_type' not in info:
-		return None, False
+		return None
 
 	name = info.pull('scheduler_type')
 

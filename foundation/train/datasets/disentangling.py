@@ -1,5 +1,6 @@
 import os
 
+import pickle
 import h5py as hf
 import numpy as np
 import torch
@@ -101,6 +102,7 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 		load_memory = A.pull('load_memory', True)
 		train = A.pull('train', True)
 		labeled = A.pull('labeled', False)
+		label_type = A.pull('label_type', 'class')
 		noise = A.pull('noise', None)
 
 		din = A.pull('din', self.din)
@@ -126,12 +128,21 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 
 				self.register_buffer('images', images)
 
-				if labeled:
-					labels = data['labels']
-					labels = torch.from_numpy(labels[()]).float()
+				labels = data['labels']
+				labels = torch.from_numpy(labels[()]).float()
 
-					self.register_buffer('labels', labels)
+				self.register_buffer('labels', labels)
 
+		myroot = os.path.join(dataroot, '3dshapes')
+		if '3dshapes_stats_fid.pkl' in os.listdir(myroot):
+			
+			p = pickle.load(open(os.path.join(myroot, '3dshapes_stats_fid.pkl'), 'rb'))
+			
+			self.fid_stats = p['m'], p['sigma']
+			
+			print('Found FID Stats')
+		else:
+			print('WARNING: Unable to load FID stats for this dataset')
 
 		# if noise is not None:
 		# 	print('Adding {} noise'.format(noise))
@@ -140,8 +151,14 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 		self.labeled = labeled
 
 		self.factor_order = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
+		self.factor_sizes = [10, 10, 10, 8, 4, 15]
 		self.factor_num_values = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10,
                           'scale': 8, 'shape': 4, 'orientation': 15}
+		
+		if label_type == 'class':
+			labels -= labels.min(0, keepdim=True)[0]
+			labels *= ((torch.tensor(self.factor_sizes).float() - 1) / labels.max(0, keepdim=True)[0])
+			self.labels = labels.long()
 
 	def get_raw_data(self):
 		if self.labeled:
@@ -265,7 +282,7 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 
 		cat = A.pull('category', 'toy')
 
-		assert cat in {'toy', 'realistic', 'real'}, 'invalid category: {}'.format(cat)
+		assert cat in {'toy', 'realistic', 'real', 'complex'}, 'invalid category: {}'.format(cat)
 
 		super().__init__(din=din, dout=dout, train=train)
 
@@ -282,6 +299,12 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 			'horizonal_axis': list(range(40)),
 			'vertical_axis': list(range(40)),
 		}
+		
+		if cat == 'complex':
+		
+			self.factor_sizes[0], self.factor_sizes[1] = 4, 4
+			self.factor_values['object_shape'] = ['mug', 'ball', 'banana', 'cup']
+			self.factor_values['object_color'] = ['yellow', 'green', 'olive', 'red']
 
 		sizes = np.array(self.factor_sizes)
 
@@ -326,7 +349,7 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 	def __getitem__(self, idx):
 		imgs = self.images[idx].float().div(255)
 		if self.labeled:
-			labels = self.get_label(idx)
+			labels = self.get_label(self.indices[idx].numpy())
 			return imgs, labels
 		return imgs,
 

@@ -112,8 +112,8 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 
 		self.tail = tail
 
-		self.set_optim(A)
-		self.set_scheduler(A)
+		# self.set_optim(A)
+		# self.set_scheduler(A)
 
 	def _create_layers(self, chns, factors, internal_channels, squeeze, A, set_nonlin):
 
@@ -231,8 +231,8 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 		self.head = head
 		self.layers = layers
 
-		self.set_optim(A)
-		self.set_scheduler(A)
+		# self.set_optim(A)
+		# self.set_scheduler(A)
 
 	def _create_layers(self, chns, factors, internal_channels, squeeze, A):
 

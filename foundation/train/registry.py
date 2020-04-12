@@ -145,6 +145,29 @@ def AutoModifier(name=None):
 
 	return _auto_mod
 
+def _make_post_mod(mod):
+	def _make_cmpn(cmpn):
+		def _make_mod(info):
+			return mod(cmpn(info), info)
+		return _make_mod
+	return _make_cmpn
+
+def Modification(name=None):
+	'''
+	A specific kind of Modifier that modifies the component after it is created
+	
+	expects a callable with input (component, config)
+	
+	:param name: name to register
+	'''
+	
+	def _reg_modification(mod):
+		nonlocal name
+		Modifier(name)(_make_post_mod(mod))
+		return mod
+	
+	return _reg_modification
+
 
 def Component(name=None):
 	'''

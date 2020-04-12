@@ -346,7 +346,8 @@ class _ConfigType(hp.Transactionable):
 		return False
 
 
-	def pull(self, item, *defaults, silent=False, ref=False, _byparent=False, _bychild=False, _defaulted=False):
+	def pull(self, item, *defaults, silent=False, ref=False, no_parent=False,
+	         _byparent=False, _bychild=False, _defaulted=False):
 		# TODO: change defaults to be a keyword argument providing *1* default, and have item*s* instead,
 		#  which are the keys to be checked in order
 
@@ -359,6 +360,8 @@ class _ConfigType(hp.Transactionable):
 			item = item[0]
 
 		defaulted = item not in self
+		if no_parent and not self.contains_nodefault(item):
+			defaulted = True
 		byparent = False
 		if defaulted:
 			if len(defaults) == 0:
@@ -369,10 +372,12 @@ class _ConfigType(hp.Transactionable):
 			val = self[item]
 
 		if len(line): # child pull
-			val = val.pull(line, *defaults, silent=silent, ref=ref, _byparent=_byparent, _bychild=True,
+			val = val.pull(line, *defaults, silent=silent, ref=ref, no_parent=no_parent,
+			               _byparent=_byparent, _bychild=True,
 			               _defaulted=_defaulted)
 		elif byparent: # parent pull
-			val = self.__dict__['_parent_obj_for_defaults'].pull(item, silent=silent, ref=ref, _byparent=True)
+			val = self.__dict__['_parent_obj_for_defaults'].pull(item, silent=silent, ref=ref, no_parent=no_parent,
+			                                                     _byparent=True)
 		else: # pull from me
 			val = self._process_val(item, val, *defaults, silent=silent, defaulted=defaulted or _defaulted,
 			                        byparent=byparent or _byparent, bychild=_bychild, reuse=ref, )

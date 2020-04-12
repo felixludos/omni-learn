@@ -163,21 +163,22 @@ class List_Dataset(Dataset):
 
 class Subset_Dataset(DatasetWrapper):
 
-	def __init__(self, dataset, indices):
+	def __init__(self, dataset, indices=None):
 		super().__init__(dataset)
 		self.indices = indices
 
 		try:
 			device = self.dataset.get_device()
-			self.indices = self.indices.to(device)
+			if self.indices is not None:
+				self.indices = self.indices.to(device)
 		except AttributeError:
 			pass
 
 	def __getitem__(self, idx):
-		return self.dataset[self.indices[idx]]
+		return self.dataset[idx] if self.indices is None else self.dataset[self.indices[idx]]
 
 	def __len__(self):
-		return len(self.indices)
+		return len(self.dataset) if self.indices is None else len(self.indices)
 
 class Repeat_Dataset(DatasetWrapper):
 

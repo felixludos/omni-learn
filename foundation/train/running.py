@@ -165,11 +165,16 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		A.dataset.shuffle = True
 	if 'drop_last' not in A.dataset:
 		A.dataset.drop_last = True
+		
+	num_workers = A.pull('num_workers', 0)
+	batch_size = A.dataset.pull('batch_size', 64)
+	shuffle = A.dataset.pull('shuffle', True)
+	drop_last = A.dataset.pull('drop_last', True)
 
 	# TODO: pull loader info instead of accessing directly.
 
-	loaders = get_loaders(*datasets, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
-	                                            shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
+	loaders = get_loaders(*datasets, batch_size=batch_size, num_workers=num_workers,
+	                                            shuffle=shuffle, drop_last=drop_last, silent=True)
 
 	if len(datasets) > 1:
 		trainloader, *valloaders = loaders
@@ -189,7 +194,7 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		print('testdata len={}'.format(len(testset[-1])))
 	else:
 		print('testdata not loaded yet')
-	print('Batch size: {} samples'.format(A.dataset.batch_size))
+	# print('Batch size: {} samples'.format(A.dataset.batch_size))
 
 	if 'stats_decay' not in A.output:
 		A.output.stats_decay = max(0.01, min(100/len(trainloader), 0.1))
@@ -240,44 +245,66 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	#####################
 	
 	
+	
+	results = None
 	if isinstance(model, Evaluatable):
 		
-		info = {
-			'A':A,
-			'loaders': loaders,
-			'logger': logger,
-			
-		}
+		print('*'*50)
+		print('Evaluating trained model')
+		print('*'*50)
 		
-		if A.training.track_best and 'save_dir' in A.output:
+		if 'use_testset' in A.eval and A.eval.use_testset:
+			if testset is None:
+				testset = get_data(A, mode='test')
+		else:
+			print('Test dataset NOT used!')
+			testset = None
+
+		if testset is not None:
+			testloader = get_loaders(testset, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
+			                         shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
+	
+			print('testdata len={}, testloader len={}'.format(len(testset), len(testloader)))
+		else:
+			testloader = None
+		
+		if 'use_best' in A.eval and A.eval.use_best and 'save_dir' in A.output and records['checkpoint'] > 0:
 			try:
 				model, ckpt = load(path=A.output.save_dir, mode='test', get_model=get_model, get_data=None,
 				                   return_args=False, return_ckpt=True, force_load_model=True)
-				print('Loaded best model, trained for {} epochs'.format(ckpt['records']['epoch']))
-				records['test_epoch'] = ckpt['records']['epoch']
+				print('Loaded best model, trained for {} iterations'.format(ckpt['records']['total_steps']))
+				records = ckpt['records']
 			except FileNotFoundError:
 				print('Using current model for testing')
-
-		if testset is None:
-			testset = get_data(A, mode='test')
-
-		testloader = get_loaders(testset, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
-		                         shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
-
-		print('testdata len={}, testloader len={}'.format(len(testset), len(testloader)))
-
-		model.eval()
 		
+		records['training_steps'] = records['total_steps']
+		
+		logger.set_step(records['total_steps'])
+		logger.set_tag_format('eval/{}')
+		
+		info = {
+			'A': A,
+			'datasets': datasets,
+			'loaders': loaders,
+			
+			'logger': logger,
+			
+			'testset': testset,
+			'testloader': testloader,
+		}
+		
+		model.eval()
 		results = model.evaluate(info)
 		
-		if results is not None:
+		if results is not None and 'save_dir' in A.output:
+			results_path = os.path.join(A.output.save_dir, 'results.pth.tar')
+			torch.save(results, results_path)
+			print(f'Results saved to {results_path}')
 			
-			pass
 	
-
 	# endregion
 	
-	return model, datasets, loaders, records
+	return model, datasets, loaders, records, results
 
 	#####################
 	# region Run Test
@@ -580,10 +607,9 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 					if isinstance(model, Visualizable):
 						model.visualize(out, logger)
 
-					with torch.no_grad():
-						display = val_stats.avgs()  # if smooths else stats.avgs()
-						for k, v in display.items():
-							logger.add('scalar', k, v)
+					display = val_stats.avgs()  # if smooths else stats.avgs()
+					for k, v in display.items():
+						logger.add('scalar', k, v)
 
 					logger.set_tag_format('{}/train') # reset
 

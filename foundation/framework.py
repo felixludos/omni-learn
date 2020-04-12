@@ -13,18 +13,32 @@ class Model(nn.Module):  # any vector function
 		self.din = din
 		self.dout = dout
 		self.device = 'cpu'
+		
+		self.volatile = util.TensorDict()
 
 	def cuda(self, device=None):
 		self.device = 'cuda' if device is None else device
+		self.volatile.to(self.device)
 		super(Model, self).cuda(device)
 
 	def cpu(self):
 		self.device = 'cpu'
+		self.volatile.to('cpu')
 		super(Model, self).cpu()
 
 	def to(self, device):
 		self.device = device
+		self.volatile.to(self.device)
 		super(Model, self).to(device)
+
+	def state_dict(self, *args, **kwargs):
+		volatile = self.volatile
+		self.volatile = None
+		
+		out = super().state_dict(*args, **kwargs)
+		
+		self.volatile = volatile
+		return out
 
 	def pre_epoch(self, mode, epoch): # called at the beginning of each epoch
 		pass
@@ -105,7 +119,8 @@ class Evaluatable(Recordable): # TODO: maybe not needed
 	def evaluate(self, info):
 		# self._eval_counter += 1
 		with torch.no_grad():
-			self._evaluate(info)
+			out = self._evaluate(info)
+		return out
 
 	def _evaluate(self, info):
 		raise NotImplementedError

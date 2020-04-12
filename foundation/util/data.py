@@ -19,6 +19,32 @@ import itertools
 import h5py as hf
 
 
+class make_infinite(DataLoader):
+	def __init__(self, loader):
+		assert len(loader) >= 1, 'has no len'
+		self.loader = loader
+		self.itr = None
+	
+	def __len__(self):
+		return len(self.loader)
+	
+	def end(self):
+		self.itr = None
+	
+	def __next__(self):
+		if self.itr is not None:
+			try:
+				return next(self.itr)
+			except StopIteration:
+				pass
+		return next(iter(self))
+	
+	def __iter__(self):
+		self.itr = iter(self.loader)
+		return self
+	
+
+
 def get_h5_data(path, key, idx=None):
 	with hf.File(path, 'r') as f:
 		return f[key].value if idx is None else f[key][idx]

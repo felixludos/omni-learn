@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from .collectors import Batchable_Dataset, Device_Dataset
 
+
 class BatchedDataLoader(object): # loads full batches at a time (dataset must be Batched
 
 	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False, auto_reset=False):

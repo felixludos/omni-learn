@@ -190,11 +190,11 @@ class Trainable_Conv(fm.Schedulable, models.Conv_Encoder):
 		kwargs = _get_conv_args(A)
 		super().__init__(**kwargs)
 
-		if 'optim_type' in A:
-			self.set_optim(A)
-
-		if 'scheduler_type' in A:
-			self.set_scheduler(A)
+		# if 'optim_type' in A:
+		# 	self.set_optim(A)
+		#
+		# if 'scheduler_type' in A:
+		# 	self.set_scheduler(A)
 
 def _get_conv_args(info):
 	kwargs = {
@@ -338,11 +338,11 @@ class Trainable_Deconv(fm.Schedulable, models.Conv_Decoder):
 
 		super().__init__(**kwargs)
 
-		if 'optim_type' in A:
-			self.set_optim(A)
-
-		if 'scheduler_type' in A:
-			self.set_scheduler(A)
+		# if 'optim_type' in A:
+		# 	self.set_optim(A)
+		#
+		# if 'scheduler_type' in A:
+		# 	self.set_scheduler(A)
 
 # register_model('deconv', Trainable_Deconv)
 

@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader, ConcatDataset
 from ..data.loaders import BatchedDataLoader
 from ..data.collectors import *
 from ..data.collate import _collate_movable
-from .registry import create_component, Component
+from .registry import create_component, Component, Modifier, Modification
 from .config import get_config
 
 # _dataset_registry = {}
@@ -38,7 +38,11 @@ def get_loaders(*datasets, batch_size=64, num_workers=0, shuffle=True, pin_memor
 	else:
 		shuffles = [False]*3
 
-	ds = datasets[0]
+	for ds in datasets:
+		if ds is not None:
+			break
+	if ds is None:
+		return datasets if len(datasets) > 1 else None # all are None
 
 	loader_cls = DataLoader
 	kwargs = {
@@ -70,7 +74,8 @@ def get_loaders(*datasets, batch_size=64, num_workers=0, shuffle=True, pin_memor
 		})
 
 
-	loaders = [loader_cls(ds, shuffle=s, **kwargs) for ds, s in zip(datasets, shuffles)]
+	loaders = [(loader_cls(ds, shuffle=s, **kwargs) if ds is not None else None)
+	           for ds, s in zip(datasets, shuffles)]
 
 	# if not silent: # TODO: deprecated!
 	# 	trainloader = loaders[0]
@@ -175,6 +180,7 @@ def get_dataset(name=None, mode=None, info=None, **kwargs):
 
 	if mode is not None:  # TODO: doesn't allow for other modes
 		info.train = mode == 'train'
+		info.mode = mode
 
 	if created_config:
 		info.begin()
@@ -191,7 +197,7 @@ class UntestableDatasetError(Exception):
 		super().__init__('Unable to only load testset for {}, since it doesnt subclass Testable_Dataset'.format(name))
 
 
-def default_load_data(info, mode='train'):
+def default_load_data(info, mode=None):
 	'''
 	req: A.dataset, A.device
 	optional: A.dataset[mode], A.dataset.device
@@ -238,14 +244,50 @@ def default_load_data(info, mode='train'):
 	if not isinstance(dataset, Info_Dataset):
 		print('WARNING: it is strongly recommended for all datasets to be subclasses '
 		      'of fd.data.collectors.Info_Dataset, this dataset is not.')
-		dataset.pre_epoch = lambda x, y: 0
-		dataset.post_epoch = lambda x, y, z: 0
-		raise NotImplementedError
+	# 	dataset.pre_epoch = lambda x, y: 0
+	# 	dataset.post_epoch = lambda x, y, z: 0
+	# 	raise NotImplementedError
 
 	# if mode == 'test':
 	# 	return dataset
 
 	return dataset
+
+@Modification('subset')
+def make_subset(dataset, info):
+	
+	num = info.pull('num', None)
+	
+	shuffle = info.pull('shuffle', True)
+	
+	if num is None or num == len(dataset):
+		print('WARNING: no subset provided, using original dataset')
+		return dataset
+	
+	assert num <= len(dataset), '{} vs {}'.format(num, len(dataset))
+	
+	inds = torch.randperm(len(dataset))[:num].numpy() if shuffle else np.arange(num)
+	return Subset_Dataset(dataset, inds)
+
+
+
+# @Dataset('subset')
+# def make_subset(info):
+#
+# 	dataset = default_load_data(info.dataset) # don't default
+#
+# 	num = info.pull('num', None)
+#
+# 	shuffle = info.pull('shuffle', True)
+#
+# 	if num is None or num == len(dataset):
+# 		print('WARNING: no subset provided, using original dataset')
+# 		return dataset
+#
+# 	assert num <= len(dataset), '{} vs {}'.format(num, len(dataset))
+#
+# 	inds = torch.randperm(len(dataset))[:num].numpy() if shuffle else np.arange(num)
+# 	return Subset_Dataset(dataset, inds)
 
 #
 # def default_load_data(A, mode='train'):
