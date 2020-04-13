@@ -10,6 +10,7 @@ from .. import framework as fm
 from .atom import *
 from .layers import *
 
+@Component('mlp')
 class MLP(fm.Model):
 	def __init__(self, A):
 		kwargs = {
@@ -37,7 +38,66 @@ class MLP(fm.Model):
 	def forward(self, x):
 		return self.net(x)
 
+@Component('multihead')
+class Multihead(fm.Model): # currently, the input dim for each head must be the same (but output can be different) TODO: generalize
+	def __init__(self, A):
+		
+		din = A.pull('din')
+		pin, N = din
+		
+		n_first = A.pull('n_first', False) # to change the "pin" and "N" dimensions
+		if n_first:
+			raise NotImplementedError
+		
+		merge = A.pull('merge', 'concat')
+		if merge != 'concat':
+			raise NotImplementedError
+		
+		A.heads.din = pin
+		create_head = A.pull('heads')
+		
+		head_douts = A.pull('head_douts', None)
+		try:
+			len(head_douts)
+		except TypeError:
+			idouts = iter([head_douts]*len(create_head))
+		else:
+			idouts = iter(head_douts)
+		
+		heads = []
+		
+		nxt = create_head.current()
+		if head_douts is not None:
+			nxt.dout = next(idouts)
+		for head in create_head:
+			heads.append(head)
+			nxt = create_head.current()
+			if nxt is not None and head_douts is not None:
+				nxt.dout = next(idouts)
+		
+		assert N == len(heads), f'{N} vs {len(heads)}'
+		
+		douts = [head.dout for head in heads]
+		
+		if merge == 'concat':
+			dout = sum(douts)
+		
+		super().__init__(din, dout)
+		
+		self.heads = nn.ModuleList(heads)
+		
+		self.merge = merge
+		
+	def forward(self, xs):
+		
+		xs = xs.permute(2,0,1)
+		
+		ys = [head(x) for head, x in zip(self.heads, xs)]
+		
+		return torch.cat(ys, dim=1)
 
+
+@Component('double-enc')
 class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
 		
@@ -162,6 +222,7 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 
 		return q
 
+@Component('double-dec')
 class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
 
@@ -285,7 +346,7 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 
 		return x
 
-
+@AutoModifier('normal')
 class Normal(fm.Model):
 	'''
 	This is a modifier (basically mixin) to turn the parent's output of forward() to a normal distribution.
@@ -331,10 +392,6 @@ class Normal(fm.Model):
 			logsigma = logsigma.clamp(min=self.min_log_std)
 
 		return NormalDistribution(loc=mu, scale=logsigma.exp())
-
-
-
-
 
 @AutoComponent('conv')
 class Conv_Encoder(fm.Encodable, fm.Model):
@@ -425,6 +482,8 @@ class Conv_Decoder(fm.Decodable, fm.Model):
 	def decode(self, q):
 		return self(q)
 
+
+# TODO: update
 class Rec_Encoder(Conv_Encoder): # fc before and after recurrence
 	def __init__(self, in_shape, rec_dim,
 	             

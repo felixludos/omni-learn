@@ -125,12 +125,7 @@ def get_config(path=None, parent_defaults=True, include_load_history=False): # T
 
 		# for analysis, record the history of all loaded parents
 
-		for p in order:
-			if 'parents' in p:
-				for prt in p.parents:
-					if len(pnames) == 0 or prt != pnames[-1]:
-						pnames.append(prt)
-
+		
 		# root = merge_configs(order, parent_defaults=parent_defaults)
 		# root = _check_for_load(order.pop(), parent_defaults=parent_defaults)
 		# while len(order):
@@ -148,6 +143,14 @@ def get_config(path=None, parent_defaults=True, include_load_history=False): # T
 		# 	            parent_defaults=parent_defaults)
 
 		order = list(reversed(order))
+		
+		for p in order:
+			if 'parents' in p:
+				for prt in p.parents:
+					if len(pnames) == 0 or prt not in pnames:
+						pnames.append(prt)
+		pnames = list(reversed(pnames))
+
 
 
 	else: # TODO: clean up

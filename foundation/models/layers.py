@@ -8,7 +8,7 @@ from torch.nn import functional as F
 from .. import framework as fm
 from .. import util
 from . import atom
-from ..train import Component, AutoComponent
+from ..train import Component, AutoComponent, AutoModifier, Modifier
 
 #################
 # Functions
@@ -310,11 +310,17 @@ class DeconvLayer(fm.Model):
 		if din is not None:
 			C, H, W = din
 
-			if factor > 1 and up_type != 'deconv':
+			if factor == 1:
+				H = (H + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
+				W = (W + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
+			elif up_type != 'deconv':
 				H, W = H*factor, W*factor
-
-			H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
-			W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
+				if size is None:
+					size = H, W
+			else:
+				H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
+				W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
+			
 			C = out_channels
 
 			if dout is not None:
@@ -324,8 +330,11 @@ class DeconvLayer(fm.Model):
 			raise NotImplementedError
 
 		super().__init__(din, dout)
-
-		if up_type == 'deconv':
+		
+		if factor == 1:
+			self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
+			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
+		elif up_type == 'deconv':
 			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size,
 			                                 stride=stride, padding=padding, dilation=dilation,
 			                                 output_padding=output_padding, **conv_kwargs)
@@ -334,7 +343,7 @@ class DeconvLayer(fm.Model):
 			self.deconv = nn.Sequential(nn.Upsample(size=size, mode=up_type),
 			                            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
 			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs))
-
+		
 		self.norm = util.get_normalization(norm, out_channels)
 		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
 

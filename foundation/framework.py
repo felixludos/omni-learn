@@ -115,20 +115,17 @@ class Visualizable(Recordable):
 		self._viz_counter += 1
 		with torch.no_grad():
 			self._visualize(info, logger)
+			
 	def _visualize(self, info, logger):
-		raise NotImplementedError
+		pass # by default nothing is visualized
+		# raise NotImplementedError
 
 	def pre_epoch(self, mode, epoch):
 		self.reset_viz_counter()
 		super().pre_epoch(mode, epoch)
 
 class Evaluatable(Recordable): # TODO: maybe not needed
-	# def __init__(self, *args, **kwargs):
-	# 	super().__init__(*args, **kwargs)
-		# self.reset_eval_counter()
 
-	# def reset_eval_counter(self):
-	# 	self._eval_counter = -1
 	def evaluate(self, info):
 		# self._eval_counter += 1
 		with torch.no_grad():
@@ -136,11 +133,9 @@ class Evaluatable(Recordable): # TODO: maybe not needed
 		return out
 
 	def _evaluate(self, info):
-		raise NotImplementedError
+		pass # by default eval does nothing
+	# 	raise NotImplementedError
 
-	# def pre_epoch(self, mode, epoch):
-	# 	self.reset_eval_counter()
-	# 	super().pre_epoch(mode, epoch)
 
 
 

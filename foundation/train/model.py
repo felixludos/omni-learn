@@ -37,12 +37,12 @@ AutoComponent('pooling')(util.get_pooling)
 AutoComponent('upsampling')(util.get_upsample)
 
 
-Component('double-enc')(models.Double_Encoder)
-Component('double-dec')(models.Double_Decoder)
+# Component('double-enc')(models.Double_Encoder)
+# Component('double-dec')(models.Double_Decoder)
 
-AutoModifier('normal')(models.Normal)
+# AutoModifier('normal')(models.Normal)
 
-Component('mlp')(models.MLP)
+# Component('mlp')(models.MLP)
 
 
 def _create_mlp(info): # mostly for selecting/formatting args (and creating sub components!)
