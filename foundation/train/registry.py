@@ -207,10 +207,23 @@ def AutoComponent(name=None, aliases=None):
 
 	def _auto_cmp(cmp):
 		nonlocal name, aliases
+		
+		if type(cmp) == type: # to allow AutoModifiers
+			
+			cls = type('Auto_{}'.format(cmp.__name__), (cmp,), {})
+			
+			def cmp_init(self, info):
+				args, kwargs = autofill_args(cmp, info, aliases=aliases, run=False)
+				super(cls, self).__init__(*args, **kwargs)
+			
+			cls.__init__ = cmp_init
+			
+			_create = cls
 
-		def _create(config):
-			nonlocal cmp, aliases
-			return autofill_args(cmp, config, aliases)
+		else:
+			def _create(config):
+				nonlocal cmp, aliases
+				return autofill_args(cmp, config, aliases)
 
 		Component(name)(_create)
 
@@ -218,7 +231,7 @@ def AutoComponent(name=None, aliases=None):
 
 	return _auto_cmp
 
-def autofill_args(fn, config, aliases=None):
+def autofill_args(fn, config, aliases=None, run=True):
 
 	params = inspect.signature(fn).parameters
 
@@ -247,8 +260,9 @@ def autofill_args(fn, config, aliases=None):
 			kwargs.update(arg)
 		else:
 			kwargs[n] = arg
-
-	return fn(*args, **kwargs)
+	if run:
+		return fn(*args, **kwargs)
+	return args, kwargs
 
 
 class MissingConfigError(Exception): # TODO: move to a file containing all custom exceptions
