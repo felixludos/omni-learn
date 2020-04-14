@@ -35,6 +35,10 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	if 'device' not in A or not torch.cuda.is_available():
 		A.device = 'cpu'
 	print('Using device: {}'.format(A.device))
+	
+	if 'cuda' in A.device and not ('no_det' in A and A.no_det):
+		torch.backends.cudnn.deterministic = True
+		print('Set cudnn backends to deterministic')
 
 	# Set seed
 	if 'seed' not in A:
