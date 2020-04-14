@@ -32,8 +32,12 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	if get_data is None:
 		get_data = default_load_data
 
-	if 'device' not in A or not torch.cuda.is_available():
+	if 'device' not in A:
+		A.device = 'cuda'
+
+	if A.device == 'cuda' and not torch.cuda.is_available():
 		A.device = 'cpu'
+		print('cuda not available, falling back to cpu')
 	print('Using device: {}'.format(A.device))
 	
 	if 'cuda' in A.device and not ('no_det' in A and A.no_det):
