@@ -20,6 +20,16 @@ try:
 except ImportError:
 	print('WARNING: ipython not found')
 
+try:
+	import pandas as pd
+except ImportError:
+	print('WARNING: pandas not found')
+try:
+	import seaborn as sns
+except ImportError:
+	print('WARNING: seaborn not found')
+
+
 from .math import factors
 
 def calc_tiling(N, H=None, W=None, prefer_tall=False):
@@ -80,6 +90,46 @@ def plot_vec_fn(f, din=None, dim=None, lim=(-5, 5), N=1000, figax=None):
 	plt.xlabel('Input = [1,...,1] * x')
 	plt.ylabel('Output')
 	return fig, ax
+
+def plot_distribs(pts, figax=None, figsize=(6, 6), lim_y=None,
+                  scale='count', inner='box', gridsize=100, cut=None, split=False,
+                  color=None, palette=None, hue=None, **kwargs):
+	Xs = np.arange(pts.shape[-1]) + 1
+	inds = np.stack([Xs] * pts.shape[0])
+	
+	vals = pts.cpu().numpy()
+	df = pd.DataFrame({'x': inds.reshape(-1), 'y': vals.reshape(-1)})
+	
+	if figax is None:
+		figax = plt.subplots(figsize=figsize)
+	fig, ax = figax
+	
+	plt.sca(ax)
+	
+	# hue = None
+	# split = False
+	# color = 'C0'
+	# inner = 'box'
+	# palette = None
+	
+	if cut is not None:
+		kwargs['cut'] = cut
+	
+	sns.violinplot(x='x', y='y', hue=hue,
+	               data=df, split=split, color=color, palette=palette,
+	               scale=scale, inner=inner, gridsize=gridsize, **kwargs)
+	if lim_y is not None:
+		plt.ylim(-lim_y, lim_y)
+	# plt.title('Distributions of Latent Dimensions')
+	# plt.xlabel('Dimension')
+	# plt.ylabel('Values')
+	# plt.tight_layout()
+	# border, between = 0.02, 0.01
+	# 	plt.subplots_adjust(wspace=between, hspace=between,
+	# 						left=border, right=1 - border, bottom=border, top=1 - border)
+	return fig, ax
+	
+	
 
 def show_imgs(imgs, titles=None, H=None, W=None, figsize=(6, 6),
 			  reverse_rows=False, grdlines=False, tight=False,

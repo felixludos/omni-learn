@@ -60,7 +60,7 @@ class TensorDict(Movable, OrderedDict):
 		return self[self._size_key].size(*args, **kwargs)
 
 	def __getattr__(self, item):
-		if item in self.__dict__:
+		if item in self.__dict__ or item in {'__setattr__', '__setstate__'}:
 			return super().__getattribute__(item)
 		return self.__getitem__(item)
 
