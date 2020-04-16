@@ -331,29 +331,40 @@ class DeconvLayer(fm.Model):
 
 		super().__init__(din, dout)
 		
-		if factor == 1:
-			self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
-			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
-		elif up_type == 'deconv':
+		# if factor == 1:
+		# 	self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
+		# 	                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
+		self.up = None
+		if size is not None:
+			self.up = nn.Upsample(size=size, mode=up_type)
+		
+		if up_type == 'deconv':
 			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size,
 			                                 stride=stride, padding=padding, dilation=dilation,
 			                                 output_padding=output_padding, **conv_kwargs)
+			if factor != 1:
+				assert not residual, 'cant use residual when the size changes'
 		else:
-			assert size is not None, 'must specify an explicit output size'
-			self.deconv = nn.Sequential(nn.Upsample(size=size, mode=up_type),
-			                            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
-			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs))
+			# assert size is not None, 'must specify an explicit output size'
+			self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
+			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
+		
 		
 		self.norm = util.get_normalization(norm, out_channels)
 		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
 
 		self.res = residual
-		assert not self.res or in_channels == out_channels, 'residual connections not possible'
+		if self.res and (in_channels != out_channels):
+			print('WARNING: removing residual connections because channels dont match')
+			self.res = False
+		# assert not self.res or in_channels == out_channels, 'residual connections not possible'
 
 	def extra_repr(self):
 		return 'residual={}'.format(self.res)
 
 	def forward(self, x):
+		if self.up is not None:
+			x = self.up(x)
 		c = self.deconv(x)
 		x = c+x if self.res else c
 
