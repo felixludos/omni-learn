@@ -83,6 +83,26 @@ _appendable_keys = {'_mod'} # mods can be appended when updating (instead of ove
 # def register_appendable_key(key): # At that point, they might as well manipulate _appendable_keys directly
 # 	_appendable_keys.add(key)
 
+_script_registry = {}
+def register_script(name, fn, use_config=False):
+	if name in _script_registry:
+		print(f'WARNING: A script with name {name} was already registered')
+	_script_registry[name] = fn, use_config
+
+def view_script_registry():
+	return _script_registry.copy()
+
+def Script(name, use_config=False):
+	def _reg_script(fn):
+		nonlocal name, use_config
+		register_script(name, fn, use_config=use_config)
+		return fn
+	
+	return _reg_script
+
+def AutoScript(name):
+	return Script(name)
+
 _mod_registry = {}
 def register_modifier(name, mod_fn, expects_config=False):
 	'''
@@ -231,6 +251,7 @@ def AutoComponent(name=None, aliases=None):
 
 	return _auto_cmp
 
+
 def autofill_args(fn, config, aliases=None, run=True):
 
 	params = inspect.signature(fn).parameters
@@ -263,7 +284,6 @@ def autofill_args(fn, config, aliases=None, run=True):
 	if run:
 		return fn(*args, **kwargs)
 	return args, kwargs
-
 
 class MissingConfigError(Exception): # TODO: move to a file containing all custom exceptions
 	def __init__(self, key):

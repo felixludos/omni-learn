@@ -335,7 +335,7 @@ class DeconvLayer(fm.Model):
 		# 	self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
 		# 	                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
 		self.up = None
-		if size is not None:
+		if size is not None and up_type != 'deconv':
 			self.up = nn.Upsample(size=size, mode=up_type)
 		
 		if up_type == 'deconv':

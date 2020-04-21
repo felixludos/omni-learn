@@ -23,4 +23,6 @@ setup(name='foundation',
             'tqdm',
             'pandas',
       ],
+      scripts=['scripts/fdrun'],
+      # console_scripts=['scripts/fdrun.py'],
       zip_safe=False)
