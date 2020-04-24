@@ -104,7 +104,7 @@ def print_current(full, simple=True):
 		              f'{info.str_date}', f'{info.status}'])
 		
 	if simple:
-		print(tabulate(table, ['ClusterId', 'Host', 'JobId', 'StartDate', 'Status']))
+		print(tabulate(table, ['ClusterId', 'Host', 'JobId', 'StartDate', 'Status'], floatfmt='.10g'))
 	
 	else:
 		for row, info in zip(table, full):
