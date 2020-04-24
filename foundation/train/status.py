@@ -71,6 +71,8 @@ def collect_q_cmd():
 	# raw = subprocess.check_output(['condor_q', 'fleeb', '-af', 'ClusterId', 'ProcId', 'Args', 'JobStatus', 'RemoteHost', 'Env'])
 	raw = subprocess.check_output(['condor_q', 'fleeb', '-af:t'] + colattrs).decode()
 	
+	print(raw)
+	
 	if len(raw) == 0:
 		print(' No jobs running.')
 		return None
@@ -117,8 +119,6 @@ def get_status(peek=None):
 	print()
 	
 	current = collect_q_cmd()
-	
-	print(current)
 	
 	if current is None or len(current) == 0:
 		# print('No jobs running.')
