@@ -78,11 +78,12 @@ def collect_q_cmd():
 		print(' No jobs running.')
 		return None
 	else:
-		print(' found {} jobs'.format(len(raw)))
+		lines = raw.split('\n')
+		print(' found {} jobs'.format(len(lines)))
 	
-	# print(raw)
+	print(lines)
 	
-	R = util.MultiDict(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in raw.split('\n'))
+	R = util.MultiDict(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in lines)
 	
 	return R
 
