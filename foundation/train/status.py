@@ -124,6 +124,8 @@ def get_status(peek=None):
 	
 	current = collect_q_cmd()
 	
+	print(current)
+	
 	if current is None or len(current) == 0:
 		# print('No jobs running.')
 		return 0
