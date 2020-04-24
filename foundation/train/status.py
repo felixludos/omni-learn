@@ -60,8 +60,11 @@ def parse_job_status(info):
 		del info.Args
 	
 	if 'RemoteHost' in info:
-		info.host = parse_remotehost(info.RemoteHost)
-		del info.RemoteHost
+		try:
+			info.host = parse_remotehost(info.RemoteHost)
+			del info.RemoteHost
+		except Exception:
+			pass
 	
 	return info
 
@@ -71,13 +74,13 @@ def collect_q_cmd():
 	# raw = subprocess.check_output(['condor_q', 'fleeb', '-af', 'ClusterId', 'ProcId', 'Args', 'JobStatus', 'RemoteHost', 'Env'])
 	raw = subprocess.check_output(['condor_q', 'fleeb', '-af:t'] + colattrs).decode()
 	
-	print(raw)
-	
 	if len(raw) == 0:
 		print(' No jobs running.')
 		return None
 	else:
 		print(' found {} jobs'.format(len(raw)))
+	
+	# print(raw)
 	
 	R = util.MultiDict(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in raw.split('\n'))
 	
