@@ -120,8 +120,8 @@ def get_status(peek=None):
 	
 	print(current)
 	
-	if len(current) == 0:
-		print('No jobs running.')
+	if current is None or len(current) == 0:
+		# print('No jobs running.')
 		return 0
 	
 	if peek is not None:
