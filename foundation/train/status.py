@@ -66,9 +66,9 @@ def parse_job_status(info):
 	if 'RemoteHost' in info:
 		try:
 			info.host = parse_remotehost(info.RemoteHost)
-			del info.RemoteHost
 		except Exception:
-			pass
+			info.host = info.RemoteHost
+		del info.RemoteHost
 	
 	return info
 
@@ -100,10 +100,11 @@ def peek_file(opath, peek=0):
 def print_current(full, simple=True):
 	table = []
 	for info in full:
-		table.append([f'{info.job_id}.{info.proc_id}', f'{info.num}-{info.proc_id}', f'{info.str_date}', f'{info.status}'])
+		table.append([f'{info.job_id}.{info.proc_id}', f'{info.host}', f'{info.num}-{info.proc_id}',
+		              f'{info.str_date}', f'{info.status}'])
 		
 	if simple:
-		print(tabulate(table, ['ClusterId', 'JobId', 'StartDate', 'Status']))
+		print(tabulate(table, ['ClusterId', 'Host', 'JobId', 'StartDate', 'Status']))
 	
 	else:
 		for row, info in zip(table, full):
