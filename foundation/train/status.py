@@ -83,7 +83,7 @@ def collect_q_cmd():
 	
 	print(lines)
 	
-	R = util.MultiDict(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in lines)
+	R = util.MultiDict(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in lines if len(line))
 	
 	return R
 
