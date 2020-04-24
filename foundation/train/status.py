@@ -107,7 +107,7 @@ def print_current(full, simple=True):
 			tail = '-'*len(head)
 			
 			print(head)
-			print(info.peek)
+			print(''.join(info.peek))
 			print(tail)
 			print()
 
@@ -135,7 +135,7 @@ def get_status(peek=None):
 		for info in current:
 			if 'path' in info and 'num' in info:
 				opath = os.path.join(info.path, 'out{}.log'.format(info.proc_id))
-				print(opath)
+				# print(opath)
 				info.peek = peek_file(opath, peek)
 	
 	print_current(current, simple=peek is None)
