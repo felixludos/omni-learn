@@ -666,7 +666,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 				bar = None
 				print()
 
-			print('--- {}checkpoint {} saved to {} ---'.format(best_info, records['checkpoint'], path))
+			print('[[ {}checkpoint {} saved to {} ]]'.format(best_info, records['checkpoint'], path))
 
 			if time_limit is not None and ((time.time() - start_time) > time_limit):
 				print('*** Exiting for restart after checkpoint {}, time limit ({:2.2f} hr) has been reached'.format(

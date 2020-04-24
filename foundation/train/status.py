@@ -108,7 +108,7 @@ def print_current(full, simple=True):
 	
 	else:
 		for row, info in zip(table, full):
-			head = '----- {} -----'.format(' - '.join(row))
+			head = '----- {} -----'.format(' -- '.join(row))
 			tail = '-'*len(head)
 			
 			print(head)
