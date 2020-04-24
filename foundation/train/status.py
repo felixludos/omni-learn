@@ -73,6 +73,7 @@ def collect_q_cmd():
 	
 	if len(raw) == 0:
 		print(' No jobs running.')
+		return None
 	else:
 		print(' found {} jobs'.format(len(raw)))
 	
