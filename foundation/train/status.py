@@ -130,7 +130,7 @@ def get_status(peek=None):
 	if peek is not None:
 		for info in current:
 			if 'path' in info and 'num' in info:
-				opath = os.path.join(info.path, info.num)
+				opath = os.path.join(info.path, 'out{}.log'.format(info.num))
 				info.peek = peek_file(opath, peek)
 	
 	print_current(current, simple=peek is None)
