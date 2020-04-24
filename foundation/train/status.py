@@ -1,6 +1,7 @@
 
 import sys, os, shutil
 import subprocess
+from datetime import datetime
 from tabulate import tabulate
 import numpy as np
 
@@ -31,7 +32,10 @@ def parse_jobexec(raw, info=None):
 		info = util.tdict()
 	
 	info.num = num
-	info.date = date
+	info.raw_date = date
+	info.date = datetime.strptime(date, '%y%m%d-%H%M%S')
+	info.str_date = info.date.ctime()#.strftime()
+	
 	info.exe = jexe
 	info.path = os.path.dirname(raw)
 	
@@ -96,7 +100,7 @@ def peek_file(opath, peek=0):
 def print_current(full, simple=True):
 	table = []
 	for info in full:
-		table.append([f'{info.job_id}.{info.proc_id}', f'{info.num}-{info.proc_id}', f'{info.date}', f'{info.status}'])
+		table.append([f'{info.job_id}.{info.proc_id}', f'{info.num}-{info.proc_id}', f'{info.str_date}', f'{info.status}'])
 		
 	if simple:
 		print(tabulate(table, ['ClusterId', 'JobId', 'StartDate', 'Status']))
@@ -107,7 +111,7 @@ def print_current(full, simple=True):
 			tail = '-'*len(head)
 			
 			print(head)
-			print(''.join(info.peek))
+			print(''.join(info.peek),end='')
 			print(tail)
 			print()
 
