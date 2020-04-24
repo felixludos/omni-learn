@@ -111,7 +111,7 @@ def get_status(peek=None):
 	Script to get a status of the cluster jobs
 	'''
 	
-	assert 'FOUNDATION_RUN_MODE' in os.environ and os.environ['FOUNDATION_RUN_MODE'] == 'cluster', 'Should be the cluster'
+	# assert 'FOUNDATION_RUN_MODE' in os.environ and os.environ['FOUNDATION_RUN_MODE'] == 'cluster', 'Should be the cluster'
 	
 	print()
 	
