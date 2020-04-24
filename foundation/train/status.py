@@ -81,7 +81,7 @@ def collect_q_cmd():
 		lines = raw.split('\n')
 		print(' found {} jobs'.format(len(lines)))
 	
-	print(lines)
+	# print(lines)
 	
 	R = util.MultiDict(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in lines if len(line))
 	
@@ -124,7 +124,8 @@ def get_status(peek=None):
 	
 	current = collect_q_cmd()
 	
-	print(current)
+	# print(current)
+	print()
 	
 	if current is None or len(current) == 0:
 		# print('No jobs running.')
@@ -133,7 +134,7 @@ def get_status(peek=None):
 	if peek is not None:
 		for info in current:
 			if 'path' in info and 'num' in info:
-				opath = os.path.join(info.path, 'out{}.log'.format(info.num))
+				opath = os.path.join(info.path, 'out{}.log'.format(info.proc_id))
 				print(opath)
 				info.peek = peek_file(opath, peek)
 	
