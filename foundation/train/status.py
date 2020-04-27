@@ -202,7 +202,7 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	# print(runs[0])
 	# print(runs[0].keys())
 	# print(runs[0].values())
-	
+	print(list(runs.by('job')), sel)
 	runs.filter(lambda run: run.job in sel)
 	
 	return runs
@@ -264,7 +264,7 @@ def evaluate_status(runs, active=None, cmpl=None):
 		
 def print_table(table, cols=None, name=None):
 	print()
-	print('-' * 50)
+	# print('-' * 50)
 	if name is not None:
 		print(name)
 	
@@ -273,7 +273,7 @@ def print_table(table, cols=None, name=None):
 	else:
 		print(tabulate(table, cols))
 	
-	print('-' * 50)
+	# print('-' * 50)
 	
 def print_run_status(runs):
 	
