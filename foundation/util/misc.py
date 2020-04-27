@@ -77,6 +77,11 @@ class MultiDict(tlist):
 			elif not skip:
 				yield None, None
 
+	def filter(self, fn):
+		for x in self:
+			if not fn(x):
+				self.remove(x)
+
 	def new(self, *args, **kwargs):
 		self.append(self._el_type(*args, **kwargs))
 
