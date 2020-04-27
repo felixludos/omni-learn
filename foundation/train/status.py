@@ -199,9 +199,9 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	
 	print('Including jobs:', sel)
 	
-	print(runs[0])
-	print(runs[0].keys())
-	print(runs[0].values())
+	# print(runs[0])
+	# print(runs[0].keys())
+	# print(runs[0].values())
 	
 	runs.filter(lambda run: run.job in sel)
 	
@@ -212,8 +212,8 @@ def load_runs(runs, load_configs=False):
 	# print(runs)
 	
 	for run in runs:
-		print(run)
-		print(dict(run))
+		# print(run)
+		# print(dict(run))
 		contents = os.listdir(run.path)
 		if 'config.yml' in contents:
 			
@@ -383,7 +383,7 @@ def check_runs(since=None, last=5, running=True,
 	else:
 		print(f'Found {len(runs)} runs')
 	
-	load_runs(path, load_configs=load_configs)
+	load_runs(runs, load_configs=load_configs)
 	
 	
 	active = None
