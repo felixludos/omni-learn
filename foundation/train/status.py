@@ -199,10 +199,6 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	
 	print('Including jobs:', sel)
 	
-	# print(runs[0])
-	# print(runs[0].keys())
-	# print(runs[0].values())
-	print(list(runs.by('job')), sel)
 	runs.filter(lambda run: run.job in sel)
 	
 	return runs

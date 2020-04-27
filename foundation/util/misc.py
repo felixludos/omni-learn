@@ -78,9 +78,7 @@ class MultiDict(tlist):
 				yield None, None
 
 	def filter(self, fn):
-		for x in self:
-			if not fn(x):
-				self.remove(x)
+		self.__dict__['_data'] = [x for x in self if fn(x)]
 
 	def new(self, *args, **kwargs):
 		self.append(self._el_type(*args, **kwargs))
