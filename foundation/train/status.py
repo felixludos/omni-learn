@@ -198,7 +198,11 @@ def collect_runs(path, recursive=False, since=None, last=5):
 		sel = {x for x in runs.by('job') if x >= since}
 	
 	print('Including jobs:', sel)
+	
+	print(runs)
 	runs.filter(lambda run: run.job in sel)
+	
+	print(runs)
 	
 	return runs
 
