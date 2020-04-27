@@ -212,8 +212,6 @@ def load_runs(runs, load_configs=False):
 	# print(runs)
 	
 	for run in runs:
-		# print(run)
-		# print(dict(run))
 		contents = os.listdir(run.path)
 		if 'config.yml' in contents:
 			
@@ -393,12 +391,13 @@ def check_runs(since=None, last=5, running=True,
 		
 		active = util.tdict()
 		
-		for info in current:
-			cname = f'checkpoints{info.proc_id}.txt'
-			if cname in os.listdir(info.path):
-				with open(os.path.join(info.path, cname), 'r') as f:
-					info.run_name = f.read()
-				active[info.run_name] = info
+		if current is not None:
+			for info in current:
+				cname = f'checkpoints{info.proc_id}.txt'
+				if cname in os.listdir(info.path):
+					with open(os.path.join(info.path, cname), 'r') as f:
+						info.run_name = f.read()
+					active[info.run_name] = info
 		print()
 	
 	evaluate_status(runs, active, cmpl=def_cmpl)
