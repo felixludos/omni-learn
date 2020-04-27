@@ -207,7 +207,7 @@ def load_runs(runs, load_configs=False):
 		if 'config.yml' in contents:
 			
 			ckpts = [int(name.split('.')[0].split('_')[-1]) for name in contents if 'checkpoint' in name]
-			run.done = max(ckpts) if len(ckpts) > 0 else None
+			run.done = max(ckpts) if len(ckpts) > 0 else 0
 			run.num_ckpts = len(ckpts)
 			
 			if load_configs:
@@ -215,14 +215,15 @@ def load_runs(runs, load_configs=False):
 		
 		else:
 			run.no_config = True
-
+			
+			if load_configs:
+				run.config = None
 
 # _run_status = ['Completed', 'Error', 'Failed', ]
 
 def evaluate_status(runs, active=None, cmpl=None):
 	for run in runs:
 		try:
-			target = None
 			
 			if 'no_config' in run and run.no_config:
 				run.status = 'NoConfig'
@@ -230,24 +231,123 @@ def evaluate_status(runs, active=None, cmpl=None):
 			elif active is not None and run.name in active:
 				run.status = active[run.name].status
 			
-			elif 'config' in run and 'training' in run.config and 'step_limit' in run.config['training']:
+			else:
+				run.status = 'Failed'
+
+			target = None
+			if 'config' in run and 'training' in run.config and 'step_limit' in run.config['training']:
 				target = run.config['training']['step_limit']
-			
 			elif cmpl is not None:
 				target = cmpl
 			
+			run.progress = -1
 			if target is not None:
-				if 'done' in run and run.done is not None:
-					run.status = 'Failed' if run.done < target else 'Completed'
-			else:
-				run.status = 'Error'
-			
+				if 'done' not in run:
+					run.status = 'Error'
+				else:
+					run.progress = run.done / target
+					if run.progress >= 1:
+						run.status = 'Completed'
+					
 		except Exception as e:
 			run.status = 'Error'
 			raise e
 		
+def print_table(table, cols=None, name=None):
+	print()
+	print('-' * 50)
+	if name is not None:
+		print(name)
+	
+	if len(table) == 0:
+		print('None')
+	else:
+		print(tabulate(table, cols))
+	
+	print('-' * 50)
+	
 def print_run_status(runs):
-
+	
+	success = []
+	running = []
+	fail = []
+	
+	for run in runs:
+		if 'status' not in run:
+			fail.append(run)
+		elif run.status == 'Completed':
+			success.append(run)
+		elif run.status in _status_codes.values():
+			running.append(run)
+		else:
+			fail.append(run)
+	
+	assert len(success) + len(running) + len(fail) == len(runs), f'{len(success)}, {len(running)}, ' \
+	                                                             f'{len(fail)} vs {len(runs)}'
+	
+	# sort runs
+	
+	success = sorted(success, key=lambda r: r.date)
+	running = sorted(running, key=lambda r: r.progress)
+	fail = sorted(fail, key=lambda r: r.progress)
+	
+	# completed jobs
+	
+	cols = ['Name', 'Date', ]
+	
+	rows = []
+	for run in success:
+		row = [run.name, run.date, ]
+		rows.append(row)
+	
+	if 'config' in run:
+		cols.append('Command')
+		for row, run in zip(rows, runs):
+			row.append(' '.join(run.config['info']['argv']))
+	
+	print_table(rows, cols, 'Completed jobs:')
+	
+	# running jobs
+	
+	cols = ['Name', 'Date', 'Progress', 'Status']
+	
+	rows = []
+	for run in running:
+		row = [run.name, run.date, f'{run.progress * 100:3.1f}', run.status]
+		rows.append(row)
+	
+	if 'config' in run:
+		cols.append('Command')
+		for row, run in zip(rows, runs):
+			row.append(' '.join(run.config['info']['argv']))
+	
+	print_table(rows, cols, 'Running jobs:')
+	
+	# failed jobs
+	
+	cols = ['Name', 'Date', 'Progress', 'Status']
+	
+	rows = []
+	for run in fail:
+		row = [run.name, run.date, f'{run.progress * 100:3.1f}', run.status]
+		rows.append(row)
+	
+	if 'config' in run:
+		cols.append('Command')
+		for row, run in zip(rows, runs):
+			row.append(' '.join(run.config['info']['argv']))
+	
+	print_table(rows, cols, 'Failed jobs:')
+	
+	
+	# summary
+	
+	print()
+	print(tabulate([
+		['Completed', len(success)],
+		['Running', len(running)],
+		['Failed', len(fail)],
+	]))
 	
 
 @Script('status')
