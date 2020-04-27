@@ -199,6 +199,8 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	
 	print('Including jobs:', sel)
 	runs.filter(lambda run: run.job in sel)
+	
+	return runs
 
 def load_runs(runs, load_configs=False):
 	
