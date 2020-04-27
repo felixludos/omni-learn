@@ -205,7 +205,7 @@ def collect_runs(path, recursive=False, since=None, last=5):
 
 def load_runs(runs, load_configs=False):
 	
-	print(len(runs))
+	print(runs)
 	
 	for run in runs:
 		print(run)
