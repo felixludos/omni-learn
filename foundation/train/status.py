@@ -199,16 +199,17 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	
 	print('Including jobs:', sel)
 	
-	print(runs)
 	runs.filter(lambda run: run.job in sel)
-	
-	print(runs)
 	
 	return runs
 
 def load_runs(runs, load_configs=False):
 	
+	print(len(runs))
+	
 	for run in runs:
+		print(dict(run))
+		print(run)
 		contents = os.listdir(run.path)
 		if 'config.yml' in contents:
 			
