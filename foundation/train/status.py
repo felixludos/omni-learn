@@ -113,7 +113,10 @@ def print_current(full, simple=True):
 			tail = '-'*len(head)
 			
 			print(head)
-			print(''.join(info.peek),end='')
+			if info.peek is not None:
+				print(''.join(info.peek),end='')
+			else:
+				print('[no output file found]')
 			print(tail)
 			print()
 
