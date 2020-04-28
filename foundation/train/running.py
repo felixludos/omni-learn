@@ -276,7 +276,7 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		
 		if 'use_testset' in A.eval and A.eval.use_testset:
 			if testset is None:
-				testset = get_data(A, mode='test')
+				testset = get_data(A.dataset, mode='test')
 		else:
 			print('Test dataset NOT used!')
 			testset = None
@@ -304,10 +304,12 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		logger.set_tag_format('{}/{}'.format(identifier, '{}'))
 		
 		info = {
-			'A': A,
+			'_A': A, # full config, probably shouldnt be used
+			'A': A.eval, # eval settings
 			'datasets': datasets,
 			'loaders': loaders,
 			
+			'identifier': identifier,
 			'logger': logger,
 			
 			'testset': testset,

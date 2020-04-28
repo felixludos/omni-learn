@@ -160,6 +160,14 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 			labels *= ((torch.tensor(self.factor_sizes).float() - 1) / labels.max(0, keepdim=True)[0])
 			self.labels = labels.long()
 
+	def get_factor_sizes(self):
+		return self.factor_sizes
+	def get_factor_order(self):
+		return self.factor_order
+
+	def get_labels(self):
+		return self.labels
+
 	def get_raw_data(self):
 		if self.labeled:
 			return self.images, self.labels
@@ -285,6 +293,18 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 		assert cat in {'toy', 'realistic', 'real', 'complex'}, 'invalid category: {}'.format(cat)
 
 		super().__init__(din=din, dout=dout, train=train)
+		
+		myroot = os.path.join(dataroot, 'mpi3d')
+		fid_name = f'mpi3d_{cat}_stats_fid.pkl'
+		if fid_name in os.listdir(myroot):
+			
+			p = pickle.load(open(os.path.join(myroot, fid_name), 'rb'))
+			
+			self.fid_stats = p['m'], p['sigma']
+			
+			print('Found FID Stats')
+		else:
+			print('WARNING: Unable to load FID stats for this dataset')
 
 		self.factor_order = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
 		                     'horizonal_axis', 'vertical_axis']
@@ -330,6 +350,14 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 
 		self.register_buffer('images', torch.from_numpy(images).permute(0,3,1,2))
 		self.register_buffer('indices', torch.from_numpy(indices))
+
+	def get_factor_sizes(self):
+		return self.factor_sizes
+	def get_factor_order(self):
+		return self.factor_order
+
+	def get_labels(self):
+		return self.get_label(self.indices)
 
 	def get_label(self, inds):
 		try:

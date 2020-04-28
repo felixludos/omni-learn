@@ -361,6 +361,9 @@ class Trainable_Model(Optimizable, Model): # top level - must be implemented to 
 
 
 
+class Full_Model(Cacheable, Visualizable, Evaluatable, Schedulable, Trainable_Model): # simple shortcut for subclassing
+	pass
+
 
 
 

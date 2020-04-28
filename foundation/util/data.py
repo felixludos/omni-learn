@@ -31,6 +31,31 @@ class make_infinite(DataLoader):
 	def end(self):
 		self.itr = None
 	
+	def demand(self, N, extract=None, merge=None):
+		'''
+		
+		:param N:
+		:param extract: callable input: raw batch; output: mergable data with len()
+		:param merge: callable input: list of extracted batches; output: whatever is expected
+		:return:
+		'''
+		
+		missing = N
+		batches = []
+		
+		while missing > 0:
+			x = next(self)
+			if extract is None:# by default, assume batch is a tuple and pull first element
+				x = x[0]
+			else:
+				x = extract(x)
+			if len(x) > missing:
+				x = x[:missing]
+			missing -= len(x)
+			batches.append(x)
+		
+		return (torch.cat(batches),) if merge is None else merge(batches)
+	
 	def __next__(self):
 		if self.itr is not None:
 			try:

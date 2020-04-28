@@ -19,7 +19,10 @@ def load_inception_model(dim=2048, device='cuda'):
 
 	block_idx = utils.InceptionV3.BLOCK_INDEX_BY_DIM[dim]
 
-	return utils.InceptionV3([block_idx]).to(device).eval()
+	model = utils.InceptionV3([block_idx]).to(device).eval()
+	model._dim = dim
+	model._device = device
+	return model
 
 
 
@@ -36,7 +39,11 @@ def compute_inception_stat(generate, inception=None, batch_size=50, n_samples=50
 	:param device: device for inception model (only used if inception is not provided)
 	"""
 
-	pred_arr = np.empty((n_samples, 2048)) # TODO: refactor to keep incremental statistics to avoid storing the full set
+	if inception is not None:
+		dim = inception._dim
+		device = inception._device
+
+	pred_arr = np.empty((n_samples, dim)) # TODO: refactor to keep incremental statistics to avoid storing the full set
 
 	if inception is None:
 		inception = load_inception_model(dim=dim, device=device)

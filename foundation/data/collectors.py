@@ -6,6 +6,37 @@ import h5py as hf
 
 from .. import util
 
+def simple_split_dataset(dataset, split, shuffle=True):
+	'''
+
+	:param dataset:
+	:param split: split percent as ratio [0,1]
+	:param shuffle:
+	:return:
+	'''
+
+	assert 0 < split < 1
+
+	if shuffle:
+		dataset = Shuffle_Dataset(dataset)
+
+	ncut = int(len(dataset) * split)
+
+	part1 = Subset_Dataset(dataset, torch.arange(0,ncut))
+	part2 = Subset_Dataset(dataset, torch.arange(ncut, len(dataset)))
+
+	return part1, part2
+
+def split_dataset(dataset, split1, split2=None, shuffle=True):
+	p1, p2 = simple_split_dataset(dataset, split1, shuffle=shuffle)
+	if split2 is None:
+		return p1, p2
+	split2 = split2 / (1 - split1)
+	p2, p3 = simple_split_dataset(p2, split2, shuffle=False)
+	return p1, p2, p3
+
+
+
 class DatasetWrapper(util.Simple_Child, Dataset):
 	def __init__(self, dataset):
 		super().__init__(_parent=dataset)
@@ -46,7 +77,23 @@ class Batchable_Dataset(Dataset): # you can select using a full batch
 	def allow_batched(self):
 		return True
 
-class Info_Dataset(Dataset):
+
+class Splitable_Dataset(Dataset):
+	
+	def split(self, info):
+		'''
+		Should split the dataset according to info.val_split, and
+		probably support shuffled splitting depending oninfo.shuffle_split
+		:param info: config
+		:return: tuple of "training" datasets
+		'''
+		val_per = info.pull('val_split', 0.1)
+		assert 0 < val_per < 1, f'invalid: {val_per}'
+		shuffle_split = info.pull('shuffle_split', True)
+		return simple_split_dataset(self, 1 - val_per, shuffle=shuffle_split)
+
+
+class Info_Dataset(Splitable_Dataset):
 
 	'''
 	If possible, din and dout should already be set by the class, in which as they only have to be passed in to
@@ -68,7 +115,6 @@ class Info_Dataset(Dataset):
 
 	def post_epoch(self, mode, epoch, stats=None):
 		pass
-
 
 
 # class Resizeable_Dataset(Dataset):
@@ -105,7 +151,9 @@ class Device_Dataset(Dataset): # Full dataset is in memory, so it can be moved t
 			try:
 				val = getattr(self,name)
 				if val is not None:
-					self.__setattr__(name, val.to(device))
+					new = val.to(device)
+					if new is not None:
+						self.__setattr__(name, new)
 			except AttributeError:
 				pass
 

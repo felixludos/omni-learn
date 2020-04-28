@@ -94,34 +94,7 @@ def get_loaders(*datasets, batch_size=64, num_workers=0, shuffle=True, pin_memor
 	return loaders
 
 
-def simple_split_dataset(dataset, split, shuffle=True):
-	'''
 
-	:param dataset:
-	:param split: split percent as ratio [0,1]
-	:param shuffle:
-	:return:
-	'''
-
-	assert 0 < split < 1
-
-	if shuffle:
-		dataset = Shuffle_Dataset(dataset)
-
-	ncut = int(len(dataset) * split)
-
-	part1 = Subset_Dataset(dataset, torch.arange(0,ncut))
-	part2 = Subset_Dataset(dataset, torch.arange(ncut, len(dataset)))
-
-	return part1, part2
-
-def split_dataset(dataset, split1, split2=None, shuffle=True):
-	p1, p2 = simple_split_dataset(dataset, split1, shuffle=shuffle)
-	if split2 is None:
-		return p1, p2
-	split2 = split2 / (1 - split1)
-	p2, p3 = simple_split_dataset(p2, split2, shuffle=False)
-	return p1, p2, p3
 
 _dataset_registry = {}
 def register_dataset(name, dataset):

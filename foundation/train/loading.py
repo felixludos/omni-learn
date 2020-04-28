@@ -7,7 +7,7 @@ import torch
 from .. import util
 
 from .config import get_config
-from .data import default_load_data, split_dataset, simple_split_dataset
+from .data import default_load_data#, split_dataset, simple_split_dataset
 from .model import default_create_model
 
 
@@ -153,11 +153,12 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 			trainsets = dataset,
 			testset = None
 			if 'test_split' in info:
+				raise NotImplementedError
 				assert 0 < info.test_split < 1, 'cant split: {}'.format(info.val_split)
 				*trainsets, testset = simple_split_dataset(dataset, 1-info.test_split, shuffle=True)
 			if 'val_split' in info:  # use/create validation set
-				assert 0 < info.val_split < 1, 'cant split: {}'.format(info.val_split)
-				trainsets = simple_split_dataset(trainsets[0], 1 - info.val_split, shuffle=True)
+				# assert 0 < info.val_split < 1, 'cant split: {}'.format(info.val_split)
+				trainsets = dataset.split(info)
 
 			datasets = (*trainsets, testset)
 

@@ -205,8 +205,6 @@ def collect_runs(path, recursive=False, since=None, last=5):
 
 def load_runs(runs, load_configs=False):
 	
-	# print(runs)
-	
 	for run in runs:
 		contents = os.listdir(run.path)
 		if 'config.yml' in contents:
