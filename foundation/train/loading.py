@@ -61,12 +61,35 @@ def find_checkpoint(path, load_last=False, saveroot=None):
 
 
 
-def load(path=None, A=None, get_model='default', get_data='default', mode='train',
+def load(path=None, config=None,
+         get_model='default', get_data='default', mode='train',
          update_config=False,
          load_optim=True, load_scheduler=True,
-         load_state_dict=True, load_last=False, force_load_model=False,
-         return_args=False, return_ckpt=False, seed=0):
-	assert path is not None or A is not None, 'must provide either path to checkpoint or args'
+         load_state_dict=True, load_last=False, force_load_model=True,
+         strict_load_state=True,
+         return_args=False, return_ckpt=False, seed=0, silent=False):
+	'''
+	Top-level (generally recommended for training/evaluation scripts) function to load models and/or datasets
+	
+	:param path: name of (or path to) run dir (usually dir in FOUNDATION_DATA_DIR) containing config.yml and checkpoints
+	:param config: optional config to use to load if path is not provided
+	:param get_model: usually best to leave this as default
+	:param get_data: usually best to leave this as default
+	:param mode: usually best to leave this as "train"
+	:param update_config: if a 'path' and 'config' is provided, this bool determines whether the config should
+	be updated with the loaded config
+	:param load_optim: usually true unless the optimizer has to be changed
+	:param load_scheduler: usually true unless a new scheduler should be used
+	:param load_state_dict: load the saved model parameters (not just architecture/hyperparams)
+	:param load_last: load last checkpoint found (
+	:param force_load_model: throw exception if unable to load a model
+	:param return_args:
+	:param return_ckpt:
+	:param seed: initial random seed (gets reset for model loading and dataset loading)
+	:param silent: don't print progress messages
+	:return: a list of objects, usually including model and datasets but possibly also the config and loaded checkpoint
+	'''
+	assert path is not None or config is not None, 'must provide either path to checkpoint or config'
 	assert get_model is not None or get_data is not None or return_ckpt, 'nothing to load'
 
 	if get_model is 'default':
@@ -74,16 +97,19 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	if get_data is 'default':
 		get_data = default_load_data
 
-	if A is not None and 'load' in A:
-		path = A.load
+	if config is not None and 'load' in config:
+		path = config.load
+		if not silent:
+			print(f'Will attempt to load {path} found in the config')
+		del config.load
 
 	checkpoint = None
 	if path is not None:
 		ckptpath = find_checkpoint(path, load_last=load_last)
 
-		print(ckptpath)
-		print(os.path.isfile(ckptpath))
-		sys.stdout.flush()
+		# print(ckptpath)
+		# print(os.path.isfile(ckptpath))
+		# sys.stdout.flush()
 
 		if os.path.isfile(ckptpath):
 
@@ -96,7 +122,8 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 				raise e
 			run_dir = os.path.dirname(ckptpath)
 
-			print('load successful')
+			if not silent:
+				print('load successful')
 
 		elif force_load_model:
 			raise FileNotFoundError
@@ -104,48 +131,50 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 			run_dir = ckptpath
 		config_name = 'config.yml' #if 'config.yml' in os.listdir(run_dir) else 'config.tml'
 		load_A = get_config(os.path.join(run_dir, config_name))
-		if A is None: # if no config is provided, the loaded config is adopted
-			A = load_A
+		if config is None: # if no config is provided, the loaded config is adopted
+			config = load_A
 		elif update_config:
-			new_A = A.copy()
-			A.clear()
-			A.update(load_A)
-			A.update(new_A)
-		print('Loaded {}'.format(ckptpath))
+			new_A = config.copy()
+			config.clear()
+			config.update(load_A)
+			config.update(new_A)
+		if not silent:
+			print('Loaded {}'.format(ckptpath))
 
 		if 'FOUNDATION_DATA_DIR' in os.environ: # TODO: necessary?
-			A.dataroot = os.environ['FOUNDATION_DATA_DIR']
-			print('Set dataroot to: {}'.format(A.dataroot))
+			config.dataroot = os.environ['FOUNDATION_DATA_DIR']
+			if not silent:
+				print('Set dataroot to: {}'.format(config.dataroot))
 
-	assert A is not None, 'Nothing to get'
+	assert config is not None, 'Nothing to get'
 
-	if 'seed' in A:
-		seed = A.seed
-	else:
+	if 'seed' in config:
+		seed = config.seed
+	elif not silent:
 		print('WARNING: no seed found, using: seed={}'.format(seed))
 
 	out = []
 
 	if return_args:
-		out.append(A)
+		out.append(config)
 
 	if get_data is not None:
 		util.set_seed(seed)
 
-		info = A.dataset
+		info = config.dataset
 
 		if checkpoint is not None and 'datasets' in checkpoint:
 			datasets = checkpoint['datasets']
 		else:
-			A.begin()
+			config.begin()
 
-			dataset = get_data(A.dataset, mode=mode)
+			dataset = get_data(config.dataset, mode=mode)
 
 			if get_model is None:
-				A.abort() # TODO: don't abort when creating the model right afterwards (wait until after model)
+				config.abort() # TODO: don't abort when creating the model right afterwards (wait until after model)
 
 			try:
-				A.din, A.dout = dataset.din, dataset.dout
+				config.din, config.dout = dataset.din, dataset.dout
 			except AttributeError as e:
 				print('WARNING: Dataset does not have a "din" and "dout"')
 				raise e
@@ -168,20 +197,22 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 	if get_model is not None:
 		util.set_seed(seed)
 
-		info = A.model
+		info = config.model
 
 		if get_data is None:
-			A.begin()
+			config.begin()
 		model = get_model(info)
-		A.abort() # undo all changes to the config throughout model creation
+		config.abort() # undo all changes to the config throughout model creation
 
-		print('Moving model to {}'.format(A.device))
-		sys.stdout.flush()
+		if not silent:
+			print('Moving model to {}'.format(config.device))
+			sys.stdout.flush()
 
-		model.to(A.device)
+		model.to(config.device)
 
-		print('Model on {}'.format(A.device))
-		sys.stdout.flush()
+		if not silent:
+			print('Model on {}'.format(config.device))
+			sys.stdout.flush()
 
 		if checkpoint is not None and 'model_state' in checkpoint and load_state_dict:
 
@@ -193,8 +224,9 @@ def load(path=None, A=None, get_model='default', get_data='default', mode='train
 			if 'scheduler' in params and not load_scheduler:
 				del params['scheduler']
 
-			model.load_state_dict(params, strict=False)
-			print('Loaded model_state from checkpoint')
+			model.load_state_dict(params, strict=strict_load_state)
+			if not silent:
+				print('Loaded model_state from checkpoint')
 
 		out.append(model)
 

@@ -69,16 +69,16 @@ def load_single_config(data, process=True, parents=None): # data can either be a
 
 	return data
 
-def _check_for_load(config, parent_defaults=True):
-
-	if 'load' in config:
-		lparents = {}
-		load = load_single_config(config.load, parents=lparents)
-		assert len(lparents) == 0, 'Loaded configs are not allowed to have parents.'
-		load.update(config, parent_defaults=parent_defaults)
-		config = load
-
-	return config
+# def _check_for_load(config, parent_defaults=True):
+#
+# 	if 'load' in config:
+# 		lparents = {}
+# 		load = load_single_config(config.load, parents=lparents)
+# 		assert len(lparents) == 0, 'Loaded configs are not allowed to have parents.'
+# 		load.update(config, parent_defaults=parent_defaults)
+# 		config = load
+#
+# 	return config
 
 def merge_configs(configs, parent_defaults=True):
 	'''
@@ -156,12 +156,22 @@ def get_config(path=None, parent_defaults=True, include_load_history=False): # T
 	else: # TODO: clean up
 		order = [root]
 
+	load = None
+	for part in order:
+		if 'load' in part:
+			assert load is None, 'Only one load config is allowed in a config'
+			load = part.load
+	
+	order.insert(0, get_config(load, parent_defaults=parent_defaults, include_load_history=include_load_history))
+	
 	root = merge_configs(order, parent_defaults=parent_defaults) # update to connect parents and children in tree and remove reversed - see Config.update
 
 	if include_load_history:
-		root._load_history = pnames
-	if 'parents' in root:
-		del root.parents
+		root._history = pnames
+		if load is not None:
+			root._loaded = load
+		if 'load' in root:
+			del root.load
 
 	return root
 
@@ -214,6 +224,7 @@ def parse_config(argv=None, parent_defaults=True, include_load_history=False):
 					try:
 						values.append(configurize(json.loads(val)))
 					except json.JSONDecodeError:
+						print('Json failed to parse: {}'.format(repr(val)))
 						values.append(val)
 					val = next(terms)
 				term = val

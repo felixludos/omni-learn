@@ -13,7 +13,7 @@ def setup_logging(info):
 	assert 'name' in info, 'This run is missing a name'
 
 	if 'save_dir' not in info:
-		now = time.strftime("%y%m%d-%H%M%S")
+		now = util.get_now()
 		if 'logdate' in info and info.logdate and '_logged_date' not in info:
 			info.name = '{}_{}'.format(info.name, now)
 			info._logged_date = now

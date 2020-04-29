@@ -55,7 +55,10 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	#####################
 	# region Create Data/Model
 	#####################
-
+	
+	if '_loaded' in A and ('soft_load' not in A or not A.soft_load):
+		A.loaded = A._loaded
+	
 	path, extend = None, None
 	override = None
 	if 'resume' in A:
@@ -68,17 +71,15 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 			override = A
 		else:
 			A.clear()
-	if 'load' in A:
-		path = A.load
-		A.loaded = path
-		if 'override' in A:
-			override = A.override
-			A = override
+	elif 'loaded' in A:
+		path = A.loaded
+		A.info.loaded = path
 
-	A, (*datasets, testset), model, ckpt = load(path=path, A=A, mode='train',
-	                                            update_config='load' not in A or override is not None,
+	A, (*datasets, testset), model, ckpt = load(path=path, config=A, mode='train',
+	                                            update_config='loaded' not in A or override is not None,
 	                                            load_last=True, # load will load the best, rather than last
-	                                            load_optim='load' not in A, load_scheduler='load' not in A, # only load network parameters when "loading" pretrained model
+	                                            load_optim='skip_optim' not in A or not A.skip_optim,
+	                                            load_scheduler='skip_scheduler' not in A or not A.skip_scheduler,
 	                                              get_model=get_model, get_data=get_data,
 	                                              return_args=True, return_ckpt=True, )#strict='load' not in A)
 
@@ -103,7 +104,7 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	# 	if len(hparams):
 	# 		logger.add_hparams(hparams)
 
-	if 'date' not in A.info and '_logged_date' in A.output:
+	if '_logged_date' in A.output:
 		A.info.date = A.output._logged_date
 
 	if ckpt is None: # novel
@@ -112,11 +113,12 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 	else: # resume, load, complete
 		records = ckpt['records']
 		epoch_seed = ckpt['epoch_seed']
-		if 'load' in A: # load
+		if 'loaded' in A: # load
 			# del A.load
 			print('WARNING: you are loading a previous model!')
 			print('Previous model has trained for {} steps, {} epochs'.format(records['total_steps'],
 			                                                                  records['epoch']))
+			del A.loaded
 		else: # resume, complete
 			if extend is not None: # resume
 				assert 'step_limit' in A.training, 'Cannot extend steps, because there is no limit set'

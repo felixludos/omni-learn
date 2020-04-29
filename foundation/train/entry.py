@@ -62,12 +62,12 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 
 			config = parse_config(argv[1:], include_load_history=True)
 
-			assert '_load_history' in config, 'should not happen'
-			if '_load_history' in config:
-				config.info.history = config._load_history
-				del config._load_history
+			assert '_history' in config, 'should not happen'
+			if '_history' in config:
+				config.info.history = config._history
+				del config._history
 
-			config.info.argv = argv[1:]
+			config.info.argv = argv#[1:]
 
 		if 'test_mode' in config:
 			os.environ['FOUNDATION_TESTING'] = str(int(config.test_mode))
@@ -77,8 +77,8 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 			print('\nThis is a test run!\n')
 
 
-		if 'load' in config:
-			print('Loaded model from: {}'.format(config.load))
+		if '_loaded' in config:
+			print('Loaded config from: {}'.format(config._loaded))
 
 			if 'name' in config:
 				del config.name
@@ -155,6 +155,8 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 			                                ', ' + os.environ['CUDA_VISIBLE_DEVICES']
 			                                if 'CUDA_VISIBLE_DEVICES' in os.environ
 			                                else ''))
+			
+			# Check if this job has already made some progress, and if so, resume.
 			if cname in os.listdir(os.environ['JOBDIR']):
 				print('This job has already made progress')
 				with open(os.path.join(os.environ['JOBDIR'], cname), 'r') as f:

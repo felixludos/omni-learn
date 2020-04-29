@@ -1,5 +1,5 @@
 
-import sys, os
+import sys, os, time
 import traceback
 import torch
 import numpy as np
@@ -148,6 +148,9 @@ class Simple_Child(object): # a simple wrapper that delegates __getattr__s to so
 			except AttributeError:
 				raise e
 
+
+def get_now():
+	return time.strftime("%y%m%d-%H%M%S")
 
 def to_np(tensor):
 	return tensor.detach().cpu().numpy()
