@@ -179,10 +179,10 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 
 		nonlin = A.pull('nonlin', 'elu')
 		output_nonlin = A.pull('output_nonlin', None)
-		output_norm_type = A.pull('output_norm_type', None)
+		output_norm_type = A.pull('output_norm', None)
 
-		down_type = A.pull('down_type', 'max')
-		norm_type = A.pull('norm_type', None)
+		down_type = A.pull('down', 'max')
+		norm_type = A.pull('norm', None)
 		residual = A.pull('residual', False)
 
 		last_chn = chns[-2:]
@@ -299,10 +299,10 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 
 		nonlin = A.pull('nonlin', 'elu')
 		output_nonlin = A.pull('output_nonlin', None)
-		output_norm_type = A.pull('output_norm_type', None)
+		output_norm_type = A.pull('output_norm', None)
 
-		up_type = A.pull('up_type', 'bilinear')
-		norm_type = A.pull('norm_type', None)
+		up_type = A.pull('up', 'bilinear')
+		norm_type = A.pull('norm', None)
 		residual = A.pull('residual', False)
 
 		last_chn = chns[-2:]

@@ -433,9 +433,11 @@ class DoubleConvLayer(fm.Model):
 			output_nonlin = nonlin
 		self.out_nonlin = util.get_nonlinearity(output_nonlin)
 
+
+		residual = residual and in_channels == out_channels
 		self.res = residual
-		if self.res:
-			assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
+		# if self.res:
+		# 	assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
 
 	def extra_repr(self):
 		return 'residual={}'.format(self.res)
@@ -507,8 +509,9 @@ class DoubleDeconvLayer(fm.Cacheable, fm.Model):
 
 		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
 
-		assert not residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(
-			in_channels, internal_channels)
+		residual = residual and in_channels == out_channels
+		# assert not residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(
+		# 	in_channels, internal_channels)
 
 		self.norm = util.get_normalization(norm, out_channels)
 		if 'default' == output_nonlin:
@@ -516,8 +519,8 @@ class DoubleDeconvLayer(fm.Cacheable, fm.Model):
 		self.out_nonlin = util.get_nonlinearity(output_nonlin)
 
 		self.res = residual
-		if self.res:
-			assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
+		# if self.res:
+		# 	assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
 
 		self.register_cache('_skipadd')
 
