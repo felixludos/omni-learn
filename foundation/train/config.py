@@ -95,12 +95,12 @@ def merge_configs(configs, parent_defaults=True):
 	load = child.load if 'load' in child else None
 	merged.update(child)
 
-	if load is not None:
-		lparents = {}
-		load = load_single_config(load, parents=lparents)
-		assert len(lparents) == 0, 'Loaded configs are not allowed to have parents.'
-		load.update(merged, parent_defaults=parent_defaults)
-		merged = load
+	# if load is not None:
+		# lparents = {}
+		# load = load_single_config(load, parents=lparents)
+		# assert len(lparents) == 0, 'Loaded configs are not allowed to have parents.'
+		# load.update(merged, parent_defaults=parent_defaults)
+		# merged = load
 
 	return merged
 

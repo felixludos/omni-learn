@@ -84,7 +84,7 @@ def collect_q_cmd():
 		return None
 	else:
 		lines = raw.split('\n')
-		print(' found {} jobs'.format(len(lines)))
+		print(' found {} jobs'.format(len(lines)-1))
 	
 	# print(lines)
 	
@@ -272,7 +272,7 @@ def print_table(table, cols=None, name=None):
 	
 	# print('-' * 50)
 	
-def print_run_status(runs):
+def print_run_status(runs, list_failed=False):
 	
 	success = []
 	running = []
@@ -306,10 +306,10 @@ def print_run_status(runs):
 		row = [run.name, run.date, ]
 		rows.append(row)
 	
-	if 'config' in run:
-		cols.append('Command')
-		for row, run in zip(rows, runs):
-			row.append(' '.join(run.config['info']['argv']))
+	# if 'config' in run:
+	# 	cols.append('Command')
+	# 	for row, run in zip(rows, runs):
+	# 		row.append(' '.join(run.config['info']['argv']))
 	
 	print_table(rows, cols, 'Completed jobs:')
 	
@@ -322,10 +322,10 @@ def print_run_status(runs):
 		row = [run.name, run.date, f'{run.progress * 100:3.1f}', run.status]
 		rows.append(row)
 	
-	if 'config' in run:
-		cols.append('Command')
-		for row, run in zip(rows, runs):
-			row.append(' '.join(run.config['info']['argv']))
+	# if 'config' in run:
+	# 	cols.append('Command')
+	# 	for row, run in zip(rows, runs):
+	# 		row.append(' '.join(run.config['info']['argv']))
 	
 	print_table(rows, cols, 'Running jobs:')
 	
@@ -338,10 +338,10 @@ def print_run_status(runs):
 		row = [run.name, run.date, f'{run.progress * 100:3.1f}', run.status]
 		rows.append(row)
 	
-	if 'config' in run:
-		cols.append('Command')
-		for row, run in zip(rows, runs):
-			row.append(' '.join(run.config['info']['argv']))
+	# if 'config' in run:
+	# 	cols.append('Command')
+	# 	for row, run in zip(rows, runs):
+	# 		row.append(' '.join(run.config['info']['argv']))
 	
 	print_table(rows, cols, 'Failed jobs:')
 	
@@ -354,6 +354,9 @@ def print_run_status(runs):
 		['Running', len(running)],
 		['Failed', len(fail)],
 	]))
+	
+	if list_failed:
+		print('/n'.join(r.name for r in fail))
 	
 
 @Script('status')
