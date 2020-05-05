@@ -33,7 +33,7 @@ def parse_jobexec(raw, info=None):
 	if info is None:
 		info = util.tdict()
 	
-	info.num = num
+	info.jnum = num
 	# info.raw_date = date
 	info.jdate = datetime.strptime(date, '%y%m%d-%H%M%S')
 	# info.str_date = info.date.ctime()#.strftime()
@@ -342,7 +342,9 @@ def get_status(path=None, homedir=None,
 	if on_cluster:
 		print()
 		current = collect_q_cmd()
-		connect_current(jobs, current)
+		
+		if current is not None:
+			connect_current(jobs, current)
 		
 	if peek is not None:
 		for info in jobs:
