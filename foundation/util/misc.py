@@ -54,8 +54,10 @@ class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attr
 	def __repr__(self):
 		return '{}{}{}'.format('{{', ', '.join(['{}:{}'.format(repr(k), repr(v)) for k,v in self.items()]), '}}')
 
-class MultiDict(tlist):
+class Table(tlist):
 	'''
+	Essentially a database (elements are rows, keys are cols)
+	Allowing nonrectangular entries
 	All elements should be dicts (or ideally tdicts)
 	'''
 	
@@ -63,25 +65,71 @@ class MultiDict(tlist):
 		super().__init__(*args, **kwargs)
 		self.__dict__['_el_type'] = _type
 	
-	def by(self, key, skip=True):
-		for x in self:
-			if key in x:
-				yield x[key]
-			elif not skip:
-				yield None
+	def sort_by(self, *keys):
+		self.__dict__['_data'] = sorted(self, key=lambda x: tuple(x[k] for k in keys))
 	
-	def by_items(self, key, skip=True):
+	def select(self, key, skip=True):
+		for x in self.selects(key, skip=skip):
+			yield x[0]
+	
+	def selects(self, *keys, skip=True):
+		for x in self:
+			l = []
+			for k in keys:
+				if k in x:
+					l.append(x[k])
+				elif skip:
+					l = None
+					break
+				else:
+					raise KeyError(k)
+			if l is not None:
+				yield l
+	
+	def select_items(self, key, skip=True, skip_flag=None):
 		for x in self:
 			if key in x:
 				yield x[key], x
 			elif not skip:
-				yield None, None
+				yield skip_flag, x
 
-	def filter(self, fn):
+	def _join(self, other, cmp, merge_fn=None):
+		
+		if isinstance(cmp, str):
+			cmp = lambda a,b: a[cmp] == b[cmp]
+		elif isinstance(cmp, tuple):
+			ca, cb = cmp
+			cmp = lambda a,b: a[ca] == b[cb]
+		if merge_fn is None:
+			def merge_fn(a,b):
+				a = a.copy()
+				a.update(b)
+				return a
+		
+		for a in self:
+			for b in other:
+				if cmp(a,b):
+					yield merge_fn(a,b)
+		
+	def join_(self, other, cmp, merge_fn=None):
+		if merge_fn is None:
+			merge_fn = lambda a,b: a.update(b)
+		for _ in self._join(other, cmp, merge_fn=merge_fn):
+			pass
+	
+	def join(self, other, cmp, merge_fn=None):
+		return self.__class__(self._join(other, cmp, merge_fn=merge_fn))
+
+	def filter_(self, fn):
 		self.__dict__['_data'] = [x for x in self if fn(x)]
 
+	def filter(self, fn):
+		return self.__class__(x for x in self if fn(x))
+
 	def new(self, *args, **kwargs):
-		self.append(self._el_type(*args, **kwargs))
+		obj = self._el_type(*args, **kwargs)
+		self.append(obj)
+		return obj
 
 	def map(self, fn, indexed=False, safe=False, pbar=None, reduce=None):
 		'''

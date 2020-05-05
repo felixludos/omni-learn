@@ -7,6 +7,7 @@ from tabulate import tabulate
 import numpy as np
 
 from .. import util
+from .config import get_config
 
 from .registry import Script
 
@@ -33,11 +34,11 @@ def parse_jobexec(raw, info=None):
 		info = util.tdict()
 	
 	info.num = num
-	info.raw_date = date
-	info.date = datetime.strptime(date, '%y%m%d-%H%M%S')
-	info.str_date = info.date.ctime()#.strftime()
+	# info.raw_date = date
+	info.jdate = datetime.strptime(date, '%y%m%d-%H%M%S')
+	# info.str_date = info.date.ctime()#.strftime()
 	
-	info.exe = jexe
+	info.jexe = jexe
 	info.path = os.path.dirname(raw)
 	
 	return info
@@ -47,29 +48,27 @@ def parse_remotehost(raw):
 	s = s.split('_')[-1]
 	return f'{s}{g}'
 
-def parse_job_status(info):
-	if 'ClusterId' in info:
-		info.job_id = info.ClusterId
-		del info.ClusterId
-		
-	if 'ProcId' in info:
-		info.proc_id = int(info.ProcId)
-		del info.ProcId
-		
-	if 'JobStatus' in info:
-		info.status = _status_codes[info.JobStatus]
-		del info.JobStatus
-		
-	if 'Args' in info:
-		parse_jobexec(info.Args, info)
-		del info.Args
+def parse_job_status(raw):
 	
-	if 'RemoteHost' in info:
+	info = util.tdict()
+	
+	if 'ClusterId' in raw:
+		info.ID = raw.ClusterId
+		
+	if 'ProcId' in raw:
+		info.proc = int(raw.ProcId)
+		
+	if 'JobStatus' in raw:
+		info.status = _status_codes[raw.JobStatus]
+		
+	if 'Args' in raw:
+		parse_jobexec(raw.Args, info)
+	
+	if 'RemoteHost' in raw:
 		try:
-			info.host = parse_remotehost(info.RemoteHost)
+			info.host = parse_remotehost(raw.RemoteHost)
 		except Exception:
-			info.host = info.RemoteHost
-		del info.RemoteHost
+			info.host = raw.RemoteHost
 	
 	return info
 
@@ -88,9 +87,9 @@ def collect_q_cmd():
 	
 	# print(lines)
 	
-	R = util.MultiDict(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in lines if len(line))
+	active = util.Table(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in lines if len(line))
 	
-	return R
+	return active
 
 def peek_file(opath, peek=0):
 	if os.path.isfile(opath):
@@ -101,11 +100,11 @@ def peek_file(opath, peek=0):
 def print_current(full, simple=True):
 	table = []
 	for info in full:
-		table.append([f'{info.job_id}.{info.proc_id}', f'{info.host}', f'{info.num}-{info.proc_id}',
+		table.append([f'{info.job_id}.{info.proc_id}', f'{info.host}', f'{info.ID}-{info.proc_id}',
 		              f'{info.str_date}', f'{info.status}'])
 		
 	if simple:
-		print(tabulate(table, ['ClusterId', 'Host', 'JobId', 'StartDate', 'Status'], floatfmt='.10g'))
+		print(tabulate(table, ['ClusterId', 'Host', 'JobId', 'StartDate', 'Status'], floatfmt='.10g', disable_numparse=True))
 	
 	else:
 		for row, info in zip(table, full):
@@ -120,9 +119,252 @@ def print_current(full, simple=True):
 			print(tail)
 			print()
 
+def load_registry(path, last=5, since=None):
+	with open(os.path.join(path, 'registry.txt'), 'r') as f:
+		lines = f.readlines()
+		
+	keys = ['JobID', 'HostName', 'RunName', 'JobDir']
+	terms = [[w.strip(' ').strip('\n') for w in row.split(' - ')] for row in lines]
+
+	jobs = util.Table()
+	for row in terms:
+		raw = util.tdict(zip(keys, row))
+		info = jobs.new()
+
+		info.ID, info.proc = map(int, raw.JobID.split('.'))
+		
+		info.name = raw.JobDir
+		info.host = raw.HostName
+		info.rname = raw.RunName
+		
+		words = raw.JobDir.split('_')
+		info.jname = '_'.join(words[:-1])
+		info.jdate = datetime.strptime(words[-1], '%y%m%d-%H%M%S')
+
+		info.path = os.path.join(path, info.name)
+
+		try:
+			if info.jname.startswith('job'):
+				info.jnum = int(info.jname.strip('job'))
+		except Exception as e:
+			raise e
+			info.jnum = None
+
+	available = set(jobs.select('ID'))
+	
+	if since is not None:
+		
+		lim = None
+		if since in available:
+			lim = since
+		else:
+			for info in jobs:
+				if since in {info.jname, info.name, info.jnum}:
+					lim = info.ID
+		assert lim is not None, f'{since} not found'
+		
+		jobs.filter_(lambda info: info.ID >= lim)
+		
+	else:
+		options = sorted(map(int, available))
+		accepted = options[-last:]
+		# print('Processing the last {} jobs: {}'.format(len(accepted), ', '.join(accepted)))
+		
+		accepted = set(map(str, accepted))
+		jobs.filter_(lambda x: x.ID in accepted)
+
+	mpath = os.path.join(path, 'manifest.txt')
+	if os.path.isfile(mpath):
+		with open(mpath, 'r') as f:
+			lines = [line.split(' - ') for line in f.read().split('\n')]
+		
+		counts = {name: int(num) for name, num, _ in lines}
+		nums = {}
+		present = {}
+		
+		for info in jobs:
 			
+			if info.name not in present:
+				present[info.name] = [None]*counts[info.name]
+			
+			if info.name not in nums:
+				nums[info.name] = info.ID
+			
+			if present[info.name][info.proc] is not None:
+				raise Exception(f'Duplicate: {info.name} {info.ID}.{info.proc}')
+		
+			present[info.name][info.proc] = info
+			
+		for name, procs in present.items():
+			for proc, info in enumerate(procs):
+				if info is None:
+					jobs.new(name=name, num=nums[name], proc=proc, status='Missing',
+					         path=os.path.join(path, name), )
+		
+	return jobs
+
+def connect_current(jobs, current):
+	
+	IDs = {(j.ID, j.proc): j for j in jobs}
+	
+	for run in current:
+		if (run.ID, run.proc) in IDs:
+			job = IDs[run.ID, run.proc]
+			job.host = run.host
+			job.status = run.status
+		else:
+			jobs.append(run)
+			run.section = 'extra'
+			
+	return jobs
+
+def connect_saves(jobs, saveroot=None, load_configs=False):
+	
+	if saveroot is None:
+		saveroot = os.environ['FOUNDATION_SAVE_DIR']
+	
+	for info in jobs:
+		cname = os.path.join(info.path, f'checkpoints{info.proc}.txt')
+		if 'rname' not in info and os.path.isfile(cname):
+			with open(cname, 'r') as f:
+				info.rname = f.read()
+	
+		if 'rname' in info:
+			
+			info.rpath = os.path.join(saveroot, info.rname)
+			
+			if load_configs:
+				info.config = get_config(os.path.join(saveroot, info.rname))
+			
+			contents = os.listdir(info.rpath)
+			ckpts = [int(name.split('.')[0].split('_')[-1]) for name in contents if 'checkpoint' in name]
+			info.done = max(ckpts) if len(ckpts) > 0 else 0
+			info.num_ckpts = len(ckpts)
+			
+	return jobs
+
+def fill_status(jobs, target=None):
+	for info in jobs:
+		if 'config' in info:
+			info.target = info.config.training.step_limit
+		elif target is not None:
+			info.target = target
+		
+		if 'target' in info and 'done' in info:
+			info.progress = info.done / info.target
+		
+		if 'status' not in info:
+			info.status = 'Completed' if 'progress' in info and info.progress >= 1 else 'Failed'
+			
+	return jobs
+
+def print_status(jobs, list_failed=False):
+	success = []
+	running = []
+	fail = []
+	
+	for info in jobs:
+		if 'status' not in info:
+			fail.append(info)
+		elif info.status == 'Completed':
+			success.append(info)
+		elif info.status in _status_codes.values():
+			running.append(info)
+		else:
+			fail.append(info)
+	
+	assert len(success) + len(running) + len(fail) == len(jobs), f'{len(success)}, {len(running)}, ' \
+	                                                             f'{len(fail)} vs {len(jobs)}'
+	
+	# sort runs
+	
+	success = sorted(success, key=lambda r: r.date)
+	running = sorted(running, key=lambda r: r.progress)
+	fail = sorted(fail, key=lambda r: r.progress)
+	
+	cols = ['Name', 'Date', ]
+	rows = []
+	for info in success:
+		row = [info.name, info.date.ctime(), ]
+		rows.append(row)
+	print_table(rows, cols, 'Completed jobs:')
+	
+	
+	cols = ['Name', 'Date', 'Progress', 'Status']
+	rows = []
+	for info in running:
+		row = [info.name, info.date.ctime(), f'{info.done//1000}/{info.target//1000}', info.status]
+		rows.append(row)
+	print_table(rows, cols, 'Running jobs:')
+	
+	
+	cols = ['Name', 'Date', 'Progress', 'Status']
+	rows = []
+	for info in fail:
+		row = [info.name, info.date, f'{info.done//1000}/{info.target//1000}', info.status]
+		rows.append(row)
+	print_table(rows, cols, 'Failed jobs:')
+	
+	# summary
+	
+	print()
+	print(tabulate([
+		['Completed', len(success)],
+		['Running', len(running)],
+		['Failed', len(fail)],
+	]))
+	
+	if list_failed:
+		print('/n'.join(r.name for r in fail))
+	
+
 @Script('cls')
-def get_status(peek=None):
+def get_status(path=None, homedir=None,
+               load_configs=False, target=None, list_failed=False,
+               since=None, last=5, peek=None):
+	'''
+	Script to get a status of the cluster jobs
+	'''
+	
+	if path is None:
+		assert 'FOUNDATION_SAVE_DIR' in os.environ, 'FOUNDATION_SAVE_DIR not set'
+		path = os.environ['FOUNDATION_SAVE_DIR']
+	save_dir = path
+	del path
+	
+	on_cluster = os.path.isdir('/lustre/home/fleeb')
+	
+	if homedir is None:
+		homedir = '/home/fleeb/jobs' if on_cluster else '/is/ei/fleeb/workspace/chome/jobs'
+	
+	jobs = load_registry(homedir, since=since, last=last)
+	
+	if on_cluster:
+		print()
+		current = collect_q_cmd()
+		connect_current(jobs, current)
+		
+	if peek is not None:
+		for info in jobs:
+			if 'job_path' in info and 'job_proc' in info:
+				opath = os.path.join(info.job_path, 'out{}.log'.format(info.job_proc))
+				# print(opath)
+				info.peek = peek_file(opath, peek)
+	
+	connect_saves(jobs, saveroot=save_dir, load_configs=load_configs)
+	fill_status(jobs, target=target)
+	
+	print_status(jobs, list_failed=list_failed)
+	
+	# print_current(current, simple=peek is None)
+	
+	
+	
+	return 0
+
+
+# @Script('cls')
+def get_old_status(peek=None):
 	'''
 	Script to get a status of the cluster jobs
 	'''
@@ -160,7 +402,7 @@ def parse_run_name(raw, info=None):
 
 	info.jname = name
 	
-	info.job, info.cls, info.num = map(int, job.split('-'))
+	info.jnum, info.ID, info.proc = map(int, job.split('-'))
 	
 	info.date = datetime.strptime(date, '%y%m%d-%H%M%S')
 	info.str_date = info.date.ctime()  # .strftime()
@@ -172,7 +414,7 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	if recursive:
 		raise NotImplementedError
 	
-	runs = util.MultiDict()
+	runs = util.Table()
 	
 	for rname in os.listdir(path):
 		rpath = os.path.join(path, rname)
@@ -202,7 +444,7 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	
 	print('Including jobs:', sel)
 	
-	runs.filter(lambda run: run.job in sel)
+	runs.filter_self(lambda run: run.job in sel)
 	
 	return runs
 
@@ -268,7 +510,7 @@ def print_table(table, cols=None, name=None):
 	if len(table) == 0:
 		print('None')
 	else:
-		print(tabulate(table, cols))
+		print(tabulate(table, cols, disable_numparse=True))
 	
 	# print('-' * 50)
 	
@@ -359,6 +601,7 @@ def print_run_status(runs, list_failed=False):
 		print('/n'.join(r.name for r in fail))
 	
 
+
 @Script('status')
 def check_runs(since=None, last=5, running=True,
                recursive_runs=False,
@@ -405,5 +648,8 @@ def check_runs(since=None, last=5, running=True,
 	print_run_status(runs)
 	
 	return 0
+
+
+
 
 
