@@ -231,10 +231,10 @@ def connect_saves(jobs, saveroot=None, load_configs=False):
 			info.rpath = os.path.join(saveroot, info.rname)
 			
 			if load_configs:
-				info.config = get_config(os.path.join(saveroot, info.rname))
+				# info.config = get_config(os.path.join(saveroot, info.rname))
+				info.config = yaml.load(open(os.path.join(saveroot, info.rname, 'config.yml')))
 			
 			if os.path.isdir(info.rpath):
-			
 				contents = os.listdir(info.rpath)
 				ckpts = [int(name.split('.')[0].split('_')[-1]) for name in contents if 'checkpoint' in name]
 				info.done = max(ckpts) if len(ckpts) > 0 else 0
@@ -249,7 +249,7 @@ def connect_saves(jobs, saveroot=None, load_configs=False):
 def fill_status(jobs, target=None):
 	for info in jobs:
 		if 'config' in info:
-			info.target = info.config.training.step_limit
+			info.target = info.config['training']['step_limit']
 		elif target is not None:
 			info.target = target
 		
@@ -356,7 +356,7 @@ def get_status(path=None, homedir=None,
 		if current is not None:
 			connect_current(jobs, current)
 		
-	if peek is not None:
+	if peek is not None and peek > 0:
 		for info in jobs:
 			if 'job_path' in info and 'job_proc' in info:
 				opath = os.path.join(info.job_path, 'out{}.log'.format(info.job_proc))
