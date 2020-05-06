@@ -286,7 +286,7 @@ def print_separate_table(table, cols=None, name=None, peeks=None):
 		print('None')
 	else:
 		for row, peek in zip(table, peeks):
-			msg = '--- {} ---'.format(' - '.join(row))
+			msg = '--- {} ---'.format(' - '.join(map(str,row)))
 			print(msg)
 			if peek is not None:
 				print(''.join(peek),end='')
