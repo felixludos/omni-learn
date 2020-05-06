@@ -285,10 +285,11 @@ def print_status(jobs, list_failed=False):
 	running = sorted(running, key=lambda r: r.progress)
 	fail = sorted(fail, key=lambda r: r.progress if 'progress' in r else 0)
 	
-	cols = ['Name', 'Date', ]
+	cols = ['Name', 'Date', 'Progress']
 	rows = []
 	for info in success:
-		row = [info.rname if 'rname' in info else info.name, info.date.ctime(), ]
+		row = [info.rname if 'rname' in info else info.name, info.date,
+		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',]
 		rows.append(row)
 	print_table(rows, cols, 'Completed jobs:')
 	
@@ -296,7 +297,7 @@ def print_status(jobs, list_failed=False):
 	cols = ['Name', 'Date', 'Progress', 'Status']
 	rows = []
 	for info in running:
-		row = [info.rname if 'rname' in info else info.name, info.date.ctime(),
+		row = [info.rname if 'rname' in info else info.name, info.date,
 		       f'{info.done//1000}/{info.target//1000}', info.status]
 		rows.append(row)
 	print_table(rows, cols, 'Running jobs:')
