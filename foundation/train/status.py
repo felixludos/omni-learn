@@ -35,7 +35,7 @@ def parse_jobexec(raw, info=None):
 	
 	info.jnum = num
 	# info.raw_date = date
-	info.jdate = datetime.strptime(date, '%y%m%d-%H%M%S')
+	info.date = datetime.strptime(date, '%y%m%d-%H%M%S')
 	# info.str_date = info.date.ctime()#.strftime()
 	
 	info.jexe = jexe
@@ -139,7 +139,7 @@ def load_registry(path, last=5, since=None):
 		
 		words = raw.JobDir.split('_')
 		info.jname = '_'.join(words[:-1])
-		info.jdate = datetime.strptime(words[-1], '%y%m%d-%H%M%S')
+		info.date = datetime.strptime(words[-1], '%y%m%d-%H%M%S')
 
 		info.path = os.path.join(path, info.name)
 
@@ -167,10 +167,7 @@ def load_registry(path, last=5, since=None):
 		
 	else:
 		options = sorted(map(int, available))
-		accepted = options[-last:]
-		# print('Processing the last {} jobs: {}'.format(len(accepted), ', '.join(accepted)))
-		
-		accepted = set(map(str, accepted))
+		accepted = set(options[-last:])
 		jobs.filter_(lambda x: x.ID in accepted)
 
 	mpath = os.path.join(path, 'manifest.txt')
@@ -236,10 +233,16 @@ def connect_saves(jobs, saveroot=None, load_configs=False):
 			if load_configs:
 				info.config = get_config(os.path.join(saveroot, info.rname))
 			
-			contents = os.listdir(info.rpath)
-			ckpts = [int(name.split('.')[0].split('_')[-1]) for name in contents if 'checkpoint' in name]
-			info.done = max(ckpts) if len(ckpts) > 0 else 0
-			info.num_ckpts = len(ckpts)
+			if os.path.isdir(info.rpath):
+			
+				contents = os.listdir(info.rpath)
+				ckpts = [int(name.split('.')[0].split('_')[-1]) for name in contents if 'checkpoint' in name]
+				info.done = max(ckpts) if len(ckpts) > 0 else 0
+				info.num_ckpts = len(ckpts)
+			
+			else:
+				info.status = 'Error'
+				info.error_msg = f'Run path not found: {info.rpath}'
 			
 	return jobs
 
@@ -280,7 +283,7 @@ def print_status(jobs, list_failed=False):
 	
 	success = sorted(success, key=lambda r: r.date)
 	running = sorted(running, key=lambda r: r.progress)
-	fail = sorted(fail, key=lambda r: r.progress)
+	fail = sorted(fail, key=lambda r: r.progress if 'progress' in r else 0)
 	
 	cols = ['Name', 'Date', ]
 	rows = []
@@ -298,10 +301,17 @@ def print_status(jobs, list_failed=False):
 	print_table(rows, cols, 'Running jobs:')
 	
 	
-	cols = ['Name', 'Date', 'Progress', 'Status']
+	cols = ['Name', 'Date', 'Progress', 'Status', 'Message']
 	rows = []
 	for info in fail:
-		row = [info.name, info.date, f'{info.done//1000}/{info.target//1000}', info.status]
+		if 'done' not in info:
+			info.done = 0
+		if 'target' not in info:
+			info.target = '?'
+		row = [info.name, info.date,
+		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',
+		       info.status,
+		       info.error_msg if 'error_msg' in info else '--']
 		rows.append(row)
 	print_table(rows, cols, 'Failed jobs:')
 	
