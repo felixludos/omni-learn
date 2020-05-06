@@ -288,7 +288,7 @@ def print_status(jobs, list_failed=False):
 	cols = ['Name', 'Date', ]
 	rows = []
 	for info in success:
-		row = [info.name, info.date.ctime(), ]
+		row = [info.rname if 'rname' in info else info.name, info.date.ctime(), ]
 		rows.append(row)
 	print_table(rows, cols, 'Completed jobs:')
 	
@@ -296,7 +296,8 @@ def print_status(jobs, list_failed=False):
 	cols = ['Name', 'Date', 'Progress', 'Status']
 	rows = []
 	for info in running:
-		row = [info.name, info.date.ctime(), f'{info.done//1000}/{info.target//1000}', info.status]
+		row = [info.rname if 'rname' in info else info.name, info.date.ctime(),
+		       f'{info.done//1000}/{info.target//1000}', info.status]
 		rows.append(row)
 	print_table(rows, cols, 'Running jobs:')
 	
@@ -308,7 +309,7 @@ def print_status(jobs, list_failed=False):
 			info.done = 0
 		if 'target' not in info:
 			info.target = '?'
-		row = [info.name, info.date,
+		row = [info.rname if 'rname' in info else info.name, info.date,
 		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',
 		       info.status,
 		       info.error_msg if 'error_msg' in info else '--']
