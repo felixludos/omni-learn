@@ -261,7 +261,41 @@ def fill_status(jobs, target=None):
 			
 	return jobs
 
-def print_status(jobs, list_failed=False):
+
+def print_table(table, cols=None, name=None):
+	print()
+	# print('-' * 50)
+	if name is not None:
+		print(name)
+	
+	if len(table) == 0:
+		print('None')
+	else:
+		print(tabulate(table, cols, disable_numparse=True))
+
+def print_separate_table(table, cols=None, name=None, peeks=None):
+	print()
+	
+	if name is not None:
+		print(name)
+	
+	if peeks is None:
+		peeks = [None]*len(table)
+	
+	if len(table) == 0:
+		print('None')
+	else:
+		for row, peek in zip(table, peeks):
+			msg = '--- {} ---'.format(' - '.join(row))
+			print(msg)
+			if peek is not None:
+				print(''.join(peek),end='')
+			else:
+				print('[no output file found]')
+			print('-'*len(msg))
+			print()
+
+def print_status(jobs, list_failed=False, show_peeks=None):
 	success = []
 	running = []
 	fail = []
@@ -287,24 +321,32 @@ def print_status(jobs, list_failed=False):
 	
 	cols = ['Name', 'Date', 'Progress']
 	rows = []
+	peeks = []
 	for info in success:
 		row = [info.rname if 'rname' in info else info.name, info.date,
 		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',]
 		rows.append(row)
-	print_table(rows, cols, 'Completed jobs:')
-	
+		peeks.append(info.peek if 'peek' in info else None)
+	title = 'Completed jobs:'
+	print_table(rows, cols, title)
 	
 	cols = ['Name', 'Date', 'Progress', 'Status']
 	rows = []
+	peeks = []
 	for info in running:
 		row = [info.rname if 'rname' in info else info.name, info.date,
 		       f'{info.done//1000}/{info.target//1000}', info.status]
 		rows.append(row)
-	print_table(rows, cols, 'Running jobs:')
-	
+		peeks.append(info.peek if 'peek' in info else None)
+	title = 'Running jobs:'
+	if show_peeks:
+		print_separate_table(rows, cols, title, peeks)
+	else:
+		print_table(rows, cols, title)
 	
 	cols = ['Name', 'Date', 'Progress', 'Status', 'Message']
 	rows = []
+	peeks = []
 	for info in fail:
 		if 'done' not in info:
 			info.done = 0
@@ -315,7 +357,12 @@ def print_status(jobs, list_failed=False):
 		       info.status,
 		       info.error_msg if 'error_msg' in info else '--']
 		rows.append(row)
-	print_table(rows, cols, 'Failed jobs:')
+		peeks.append(info.peek if 'peek' in info else None)
+	title = 'Failed jobs:'
+	if show_peeks:
+		print_separate_table(rows, cols, title, peeks)
+	else:
+		print_table(rows, cols, title)
 	
 	# summary
 	
@@ -327,7 +374,7 @@ def print_status(jobs, list_failed=False):
 	]))
 	
 	if list_failed:
-		print('/n'.join(r.name for r in fail))
+		print('\n'.join(r.name for r in fail))
 	
 
 @Script('cls')
@@ -337,6 +384,9 @@ def get_status(path=None, homedir=None,
 	'''
 	Script to get a status of the cluster jobs
 	'''
+	
+	if peek is not None and peek <= 0:
+		peek = None
 	
 	if path is None:
 		assert 'FOUNDATION_SAVE_DIR' in os.environ, 'FOUNDATION_SAVE_DIR not set'
@@ -368,13 +418,19 @@ def get_status(path=None, homedir=None,
 	connect_saves(jobs, saveroot=save_dir, load_configs=load_configs)
 	fill_status(jobs, target=target)
 	
-	print_status(jobs, list_failed=list_failed)
+	print_status(jobs, list_failed=list_failed, show_peeks=peek)
 	
 	# print_current(current, simple=peek is None)
 	
 	
 	
 	return 0
+
+
+
+
+
+
 
 
 # @Script('cls')
@@ -423,7 +479,7 @@ def parse_run_name(raw, info=None):
 
 	return info
 
-def collect_runs(path, recursive=False, since=None, last=5):
+def old_collect_runs(path, recursive=False, since=None, last=5):
 	
 	if recursive:
 		raise NotImplementedError
@@ -462,7 +518,7 @@ def collect_runs(path, recursive=False, since=None, last=5):
 	
 	return runs
 
-def load_runs(runs, load_configs=False):
+def old_load_runs(runs, load_configs=False):
 	
 	for run in runs:
 		contents = os.listdir(run.path)
@@ -515,20 +571,9 @@ def evaluate_status(runs, active=None, cmpl=None):
 			run.status = 'Error'
 			raise e
 		
-def print_table(table, cols=None, name=None):
-	print()
-	# print('-' * 50)
-	if name is not None:
-		print(name)
+
 	
-	if len(table) == 0:
-		print('None')
-	else:
-		print(tabulate(table, cols, disable_numparse=True))
-	
-	# print('-' * 50)
-	
-def print_run_status(runs, list_failed=False):
+def print_run_status(runs, list_failed=False, peek=None):
 	
 	success = []
 	running = []
@@ -562,11 +607,6 @@ def print_run_status(runs, list_failed=False):
 		row = [run.name, run.date, ]
 		rows.append(row)
 	
-	# if 'config' in run:
-	# 	cols.append('Command')
-	# 	for row, run in zip(rows, runs):
-	# 		row.append(' '.join(run.config['info']['argv']))
-	
 	print_table(rows, cols, 'Completed jobs:')
 	
 	# running jobs
@@ -578,11 +618,6 @@ def print_run_status(runs, list_failed=False):
 		row = [run.name, run.date, f'{run.progress * 100:3.1f}', run.status]
 		rows.append(row)
 	
-	# if 'config' in run:
-	# 	cols.append('Command')
-	# 	for row, run in zip(rows, runs):
-	# 		row.append(' '.join(run.config['info']['argv']))
-	
 	print_table(rows, cols, 'Running jobs:')
 	
 	# failed jobs
@@ -593,11 +628,6 @@ def print_run_status(runs, list_failed=False):
 	for run in fail:
 		row = [run.name, run.date, f'{run.progress * 100:3.1f}', run.status]
 		rows.append(row)
-	
-	# if 'config' in run:
-	# 	cols.append('Command')
-	# 	for row, run in zip(rows, runs):
-	# 		row.append(' '.join(run.config['info']['argv']))
 	
 	print_table(rows, cols, 'Failed jobs:')
 	
@@ -623,6 +653,8 @@ def check_runs(since=None, last=5, running=True,
 	'''
 	Check the status of the saved runs
 	'''
+	
+	
 	
 	print()
 	
