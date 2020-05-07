@@ -322,7 +322,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	# sort runs
 	
 	success = sorted(success, key=lambda r: r.date)
-	running = sorted(running, key=lambda r: r.progress)
+	running = sorted(running, key=lambda r: r.progress if 'progress' in r else 0)
 	fail = sorted(fail, key=lambda r: r.progress if 'progress' in r else 0)
 	
 	cols = ['Name', 'Date', 'Progress']
