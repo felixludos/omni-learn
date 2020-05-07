@@ -344,8 +344,12 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	rows = []
 	peeks = []
 	for info in running:
-		row = [info.rname if 'rname' in info else info.name, info.date,
-		       f'{info.done//1000}/{info.target//1000}', info.status]
+		try:
+			row = [info.rname if 'rname' in info else info.name, info.date,
+			       f'{info.done//1000}/{info.target//1000}', info.status]
+		except Exception as e:
+			print(dict(info))
+			raise e
 		rows.append(row)
 		peeks.append(info.peek if 'peek' in info else None)
 	title = 'Running jobs:'
