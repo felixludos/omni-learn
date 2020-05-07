@@ -328,6 +328,10 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 		rows.append(row)
 		peeks.append(info.peek if 'peek' in info else None)
 	title = 'Completed jobs:'
+	# if show_peeks:
+	# 	print_separate_table(rows, cols, title, peeks)
+	# else:
+	# 	print_table(rows, cols, title)
 	print_table(rows, cols, title)
 	
 	cols = ['Name', 'Date', 'Progress', 'Status']
