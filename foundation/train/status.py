@@ -201,7 +201,7 @@ def load_registry(path, last=5, since=None):
 		for name, procs in present.items():
 			for proc, info in enumerate(procs):
 				if info is None:
-					jobs.new(name=name, num=nums[name], proc=proc, status='Missing',
+					jobs.new(name=name, ID=nums[name], proc=proc, status='Missing',
 					         path=os.path.join(path, name), )
 		
 	return jobs
