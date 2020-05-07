@@ -201,13 +201,14 @@ def load_registry(path, last=5, since=None):
 		for name, procs in present.items():
 			for proc, info in enumerate(procs):
 				if info is None:
+					print(f'Missing: {name} {nums[name]} {proc}')
 					jobs.new(name=name, ID=nums[name], proc=proc, status='Missing',
 					         path=os.path.join(path, name), )
 		
 	return jobs
 
 def connect_current(jobs, current):
-	print(list(map(dict,jobs)))
+	# print(list(map(dict,jobs)))
 	IDs = {(j.ID, j.proc): j for j in jobs}
 	
 	for run in current:
@@ -306,6 +307,8 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	running = []
 	fail = []
 	
+	print(len(jobs))
+	
 	for info in jobs:
 		if 'status' not in info:
 			fail.append(info)
@@ -324,6 +327,8 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	success = sorted(success, key=lambda r: r.date)
 	running = sorted(running, key=lambda r: r.progress if 'progress' in r else 0)
 	fail = sorted(fail, key=lambda r: r.progress if 'progress' in r else 0)
+	
+	print(len(success),len(running),len(fail))
 	
 	cols = ['Name', 'Date', 'Progress']
 	rows = []
@@ -369,7 +374,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 		row = [info.rname if 'rname' in info else info.name, info.date,
 		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',
 		       info.status,
-		       info.error_msg if 'error_msg' in info else '--']
+		       info.error_msg if 'error_msg' in info else '?']
 		rows.append(row)
 		peeks.append(info.peek if 'peek' in info else None)
 	title = 'Failed jobs:'
@@ -424,8 +429,8 @@ def get_status(path=None, homedir=None,
 		
 	if peek is not None and peek > 0:
 		for info in jobs:
-			if 'job_path' in info and 'job_proc' in info:
-				opath = os.path.join(info.job_path, 'out{}.log'.format(info.job_proc))
+			if 'path' in info and 'proc' in info:
+				opath = os.path.join(info.path, 'out{}.log'.format(info.proc))
 				# print(opath)
 				info.peek = peek_file(opath, peek)
 	
