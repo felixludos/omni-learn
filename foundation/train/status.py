@@ -175,6 +175,13 @@ def load_registry(path, last=5, since=None):
 		with open(mpath, 'r') as f:
 			lines = [line.split(' - ') for line in f.read().split('\n')]
 		
+		counts = {}
+		for row in lines:
+			if len(row) == 3:
+				counts[row[0]] = int(row[1])
+			else:
+				print('Failed: {row}')
+		
 		counts = {name: int(num) for name, num, _ in lines}
 		nums = {}
 		present = {}
