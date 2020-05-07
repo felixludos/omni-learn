@@ -152,6 +152,8 @@ def load_registry(path, last=5, since=None):
 
 	available = set(jobs.select('ID'))
 	
+	print(1,len(jobs))
+	
 	if since is not None:
 		
 		lim = None
@@ -169,6 +171,8 @@ def load_registry(path, last=5, since=None):
 		options = sorted(map(int, available))
 		accepted = set(options[-last:])
 		jobs.filter_(lambda x: x.ID in accepted)
+	
+	print(2,len(jobs))
 
 	mpath = os.path.join(path, 'manifest.txt')
 	if os.path.isfile(mpath):
@@ -204,7 +208,9 @@ def load_registry(path, last=5, since=None):
 					print(f'Missing: {name} {nums[name]} {proc}')
 					jobs.new(name=name, ID=nums[name], proc=proc, status='Missing',
 					         path=os.path.join(path, name), )
-		
+	
+	print(3, len(jobs))
+	
 	return jobs
 
 def connect_current(jobs, current):
@@ -219,7 +225,9 @@ def connect_current(jobs, current):
 		else:
 			jobs.append(run)
 			run.section = 'extra'
-			
+	
+	print(4, len(jobs))
+	
 	return jobs
 
 def connect_saves(jobs, saveroot=None, load_configs=False):
@@ -328,7 +336,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	running = sorted(running, key=lambda r: r.progress if 'progress' in r else 0)
 	fail = sorted(fail, key=lambda r: r.progress if 'progress' in r else 0)
 	
-	print(len(success),len(running),len(fail))
+	# print(len(success),len(running),len(fail))
 	
 	cols = ['Name', 'Date', 'Progress']
 	rows = []
@@ -374,7 +382,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 		row = [info.rname if 'rname' in info else info.name, info.date,
 		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',
 		       info.status,
-		       info.error_msg if 'error_msg' in info else '?']
+		       info.error_msg if 'error_msg' in info else '[None]']
 		rows.append(row)
 		peeks.append(info.peek if 'peek' in info else None)
 	title = 'Failed jobs:'
