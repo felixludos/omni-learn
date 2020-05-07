@@ -333,7 +333,8 @@ def print_status(jobs, list_failed=False, show_peeks=None, skip_missing=None):
 	# sort runs
 	
 	success = sorted(success, key=lambda r: r.date)
-	running = sorted(running, key=lambda r: r.progress if 'progress' in r else 0)
+	# running = sorted(running, key=lambda r: r.progress if 'progress' in r else 0)
+	running = sorted(running, key=lambda r: (r.ID, r.proc))
 	fail = sorted(fail, key=lambda r: r.progress if 'progress' in r else 0)
 	
 	if skip_missing:
