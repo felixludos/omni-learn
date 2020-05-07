@@ -180,9 +180,9 @@ def load_registry(path, last=5, since=None):
 			if len(row) == 3:
 				counts[row[0]] = int(row[1])
 			else:
-				print('Failed: {row}')
+				print(f'Failed: {row}')
 		
-		counts = {name: int(num) for name, num, _ in lines}
+		# counts = {name: int(num) for name, num, _ in lines}
 		nums = {}
 		present = {}
 		
