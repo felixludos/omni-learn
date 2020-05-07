@@ -348,13 +348,14 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	# 	print_table(rows, cols, title)
 	print_table(rows, cols, title)
 	
-	cols = ['Name', 'Date', 'Progress', 'Status', 'ID']
+	cols = ['Name', 'Date', 'Progress', 'Host', 'Status', 'ID']
 	rows = []
 	peeks = []
 	for info in running:
 		try:
 			row = [info.rname if 'rname' in info else info.name, info.date,
-			       f'{info.done//1000}/{info.target//1000}', info.status, f'{info.ID}.{info.proc}']
+			       f'{info.done//1000}/{info.target//1000}', info.host if 'host' in info else 'N/A'
+			       info.status, f'{info.ID}.{info.proc}']
 		except Exception as e:
 			print(dict(info))
 			raise e
