@@ -253,6 +253,7 @@ def connect_saves(jobs, saveroot=None, load_configs=False):
 				info.num_ckpts = len(ckpts)
 			
 			else:
+				info.done = 0
 				info.status = 'Error'
 				info.error_msg = f'Run path not found: {info.rpath}'
 			
