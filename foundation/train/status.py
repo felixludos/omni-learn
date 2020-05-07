@@ -230,6 +230,8 @@ def connect_saves(jobs, saveroot=None, load_configs=False):
 	if saveroot is None:
 		saveroot = os.environ['FOUNDATION_SAVE_DIR']
 	
+	# rnames = set(os.listdir(saveroot))
+	
 	for info in jobs:
 		cname = os.path.join(info.path, f'checkpoints{info.proc}.txt')
 		if 'rname' not in info and os.path.isfile(cname):
@@ -240,11 +242,11 @@ def connect_saves(jobs, saveroot=None, load_configs=False):
 			
 			info.rpath = os.path.join(saveroot, info.rname)
 			
-			if load_configs:
-				# info.config = get_config(os.path.join(saveroot, info.rname))
-				info.config = yaml.load(open(os.path.join(saveroot, info.rname, 'config.yml')))
-			
 			if os.path.isdir(info.rpath):
+				if load_configs:
+					with open(os.path.join(saveroot, info.rname, 'config.yml')) as f:
+						info.config = yaml.load(f)
+				
 				contents = os.listdir(info.rpath)
 				ckpts = [int(name.split('.')[0].split('_')[-1]) for name in contents if 'checkpoint' in name]
 				info.done = max(ckpts) if len(ckpts) > 0 else 0
@@ -305,10 +307,11 @@ def print_separate_table(table, cols=None, name=None, peeks=None):
 			print('-'*len(msg))
 			print()
 
-def print_status(jobs, list_failed=False, show_peeks=None):
+def print_status(jobs, list_failed=False, show_peeks=None, skip_missing=None):
 	success = []
 	running = []
 	fail = []
+	errors = []
 	
 	# print(len(jobs))
 	
@@ -319,6 +322,8 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 			success.append(info)
 		elif info.status in _status_codes.values():
 			running.append(info)
+		elif skip_missing and info.status == 'Error':
+			errors.append(info)
 		else:
 			fail.append(info)
 	
@@ -330,6 +335,10 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	success = sorted(success, key=lambda r: r.date)
 	running = sorted(running, key=lambda r: r.progress if 'progress' in r else 0)
 	fail = sorted(fail, key=lambda r: r.progress if 'progress' in r else 0)
+	
+	if skip_missing:
+		print('Errors')
+		print('\n'.join(e.rname for e in errors))
 	
 	# print(len(success),len(running),len(fail))
 	
@@ -367,7 +376,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	else:
 		print_table(rows, cols, title)
 	
-	cols = ['Name', 'Date', 'Progress', 'Status', 'Message']
+	cols = ['Name', 'Date', 'Progress', 'Status']
 	rows = []
 	peeks = []
 	for info in fail:
@@ -378,7 +387,8 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 		row = [info.rname if 'rname' in info else info.name, info.date,
 		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',
 		       info.status,
-		       info.error_msg if 'error_msg' in info else '[None]']
+		       # info.error_msg if 'error_msg' in info else '[None]'
+		       ]
 		rows.append(row)
 		peeks.append(info.peek if 'peek' in info else None)
 	title = 'Failed jobs:'
@@ -403,6 +413,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 @Script('cls')
 def get_status(path=None, homedir=None,
                load_configs=False, target=None, list_failed=False,
+				skip_missing=False,
                since=None, last=5, peek=None):
 	'''
 	Script to get a status of the cluster jobs
@@ -441,7 +452,7 @@ def get_status(path=None, homedir=None,
 	connect_saves(jobs, saveroot=save_dir, load_configs=load_configs)
 	fill_status(jobs, target=target)
 	
-	print_status(jobs, list_failed=list_failed, show_peeks=peek)
+	print_status(jobs, list_failed=list_failed, show_peeks=peek, skip_missing=skip_missing)
 	
 	# print_current(current, simple=peek is None)
 	
