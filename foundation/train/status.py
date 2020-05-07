@@ -203,7 +203,7 @@ def load_registry(path, last=5, since=None):
 				if info is None:
 					print(f'Missing: {name} {nums[name]} {proc}')
 					jobs.new(name=name, ID=nums[name], proc=proc, status='Missing',
-					         path=os.path.join(path, name), )
+					         path=os.path.join(path, name), done=0)
 	
 	return jobs
 
@@ -218,6 +218,8 @@ def connect_current(jobs, current):
 			job.status = run.status
 		else:
 			print(run.ID, run.proc, 'not found')
+			if 'done' not in run:
+				run.done = 0
 			jobs.append(run)
 			run.section = 'extra'
 	
