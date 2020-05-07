@@ -354,7 +354,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	for info in running:
 		try:
 			row = [info.rname if 'rname' in info else info.name, info.date,
-			       f'{info.done//1000}/{info.target//1000}', info.host if 'host' in info else 'N/A'
+			       f'{info.done//1000}/{info.target//1000}', info.host if 'host' in info else 'N/A',
 			       info.status, f'{info.ID}.{info.proc}']
 		except Exception as e:
 			print(dict(info))
