@@ -152,8 +152,6 @@ def load_registry(path, last=5, since=None):
 
 	available = set(jobs.select('ID'))
 	
-	print(1,len(jobs))
-	
 	if since is not None:
 		
 		lim = None
@@ -172,8 +170,6 @@ def load_registry(path, last=5, since=None):
 		accepted = set(options[-last:])
 		jobs.filter_(lambda x: x.ID in accepted)
 	
-	print(2,len(jobs))
-
 	mpath = os.path.join(path, 'manifest.txt')
 	if os.path.isfile(mpath):
 		with open(mpath, 'r') as f:
@@ -209,8 +205,6 @@ def load_registry(path, last=5, since=None):
 					jobs.new(name=name, ID=nums[name], proc=proc, status='Missing',
 					         path=os.path.join(path, name), )
 	
-	print(3, len(jobs))
-	
 	return jobs
 
 def connect_current(jobs, current):
@@ -227,7 +221,7 @@ def connect_current(jobs, current):
 			jobs.append(run)
 			run.section = 'extra'
 	
-	print(4, len(jobs))
+	# print(4, len(jobs))
 	
 	return jobs
 
@@ -316,7 +310,7 @@ def print_status(jobs, list_failed=False, show_peeks=None):
 	running = []
 	fail = []
 	
-	print(len(jobs))
+	# print(len(jobs))
 	
 	for info in jobs:
 		if 'status' not in info:
