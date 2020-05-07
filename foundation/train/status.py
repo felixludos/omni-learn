@@ -179,10 +179,9 @@ def load_registry(path, last=5, since=None):
 		for row in lines:
 			if len(row) == 3:
 				counts[row[0]] = int(row[1])
-			else:
-				print(f'Failed: {row}')
+			# else:
+			# 	print(f'Failed: {row}')
 		
-		# counts = {name: int(num) for name, num, _ in lines}
 		nums = {}
 		present = {}
 		
@@ -208,7 +207,7 @@ def load_registry(path, last=5, since=None):
 	return jobs
 
 def connect_current(jobs, current):
-	
+	print(list(map(dict,jobs)))
 	IDs = {(j.ID, j.proc): j for j in jobs}
 	
 	for run in current:
