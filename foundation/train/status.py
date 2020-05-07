@@ -53,7 +53,7 @@ def parse_job_status(raw):
 	info = util.tdict()
 	
 	if 'ClusterId' in raw:
-		info.ID = raw.ClusterId
+		info.ID = int(raw.ClusterId)
 		
 	if 'ProcId' in raw:
 		info.proc = int(raw.ProcId)
@@ -223,6 +223,7 @@ def connect_current(jobs, current):
 			job.host = run.host
 			job.status = run.status
 		else:
+			print(run.ID, run.proc, 'not found')
 			jobs.append(run)
 			run.section = 'extra'
 	
