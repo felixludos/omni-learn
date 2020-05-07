@@ -327,8 +327,8 @@ def print_status(jobs, list_failed=False, show_peeks=None, skip_missing=None):
 		else:
 			fail.append(info)
 	
-	assert len(success) + len(running) + len(fail) == len(jobs), f'{len(success)}, {len(running)}, ' \
-	                                                             f'{len(fail)} vs {len(jobs)}'
+	assert len(success) + len(running) + len(fail) + len(errors) == len(jobs), f'{len(success)}, {len(running)}, ' \
+	                                                             f'{len(fail)}, {len(errors)} vs {len(jobs)}'
 	
 	# sort runs
 	
