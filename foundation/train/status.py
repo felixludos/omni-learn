@@ -350,7 +350,7 @@ def print_status(jobs, list_failed=False, show_peeks=None, skip_missing=None):
 	rows = []
 	peeks = []
 	for info in success:
-		row = [info.rname if 'rname' in info else info.name, info.date,
+		row = [info.rname if 'rname' in info else info.name, info.date if 'date' in info else 'N/A',
 		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',]
 		rows.append(row)
 		peeks.append(info.peek if 'peek' in info else None)
@@ -367,7 +367,7 @@ def print_status(jobs, list_failed=False, show_peeks=None, skip_missing=None):
 	for info in running:
 		try:
 			row = [info.rname if 'rname' in info else (info.name if 'name' in info else f'{info.ID}.{info.proc}'),
-			       info.date,
+			       info.date if 'date' in info else 'N/A',
 			       f'{info.done//1000}/{info.target//1000}', info.host if 'host' in info else 'N/A',
 			       info.status, f'{info.ID}.{info.proc}']
 		except Exception as e:
@@ -390,7 +390,7 @@ def print_status(jobs, list_failed=False, show_peeks=None, skip_missing=None):
 		if 'target' not in info:
 			info.target = '?'
 		row = [info.rname if 'rname' in info else (info.name if 'name' in info else f'{info.ID}.{info.proc}'),
-		       info.date,
+		       info.date if 'date' in info else 'N/A',
 		       f'{info.done//1000}/{info.target//1000 if isinstance(info.target, int) else info.target}',
 		       info.status,
 		       # info.error_msg if 'error_msg' in info else '[None]'
