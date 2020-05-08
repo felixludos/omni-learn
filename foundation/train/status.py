@@ -120,6 +120,10 @@ def print_current(full, simple=True):
 			print()
 
 def load_registry(path, last=5, since=None):
+	
+	if not os.path.isfile(os.path.join(path, 'registry.txt')):
+		return util.Table()
+	
 	with open(os.path.join(path, 'registry.txt'), 'r') as f:
 		lines = f.readlines()
 		
