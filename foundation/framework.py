@@ -328,7 +328,7 @@ class Cacheable(Model):
 			cache[name] = getattr(self, name)
 			delattr(self, name)
 
-		out = super().state_dict()
+		out = super().state_dict(*args, **kwargs)
 
 		for name, value in cache.items():
 			setattr(self, name, value)

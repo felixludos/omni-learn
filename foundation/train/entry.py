@@ -164,6 +164,10 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 
 				print('Resuming: {}'.format(config.resume))
 
+		debug = True
+		if mode == 'cmd' and 'no_debug' in config:
+			debug = not config.no_debug
+
 		out = 0
 		try:
 			out = cmd(config, **cmd_kwargs)
@@ -173,12 +177,13 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 			traceback.print_exc()
 
 		except Exception as e:
-			if mode == 'cmd':
+			if mode == 'cmd' and debug:
 				import ipdb
 				extype, value, tb = sys.exc_info()
 				traceback.print_exc()
 				ipdb.post_mortem(tb)
 			else:
+				print('[Skipping debug]')
 				raise e
 
 	return out
