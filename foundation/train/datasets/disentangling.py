@@ -332,8 +332,8 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 		flr[:-1] = flr[1:]
 		flr[-1] = 1
 
-		self._sizes = sizes
-		self._flr = flr
+		self._sizes = torch.from_numpy(sizes.copy()).long()
+		self._flr = torch.from_numpy(flr.copy()).long()
 
 		self.labeled = labeled
 
