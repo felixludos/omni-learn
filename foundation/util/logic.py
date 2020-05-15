@@ -1,4 +1,6 @@
 
+# from toposort import toposort as toposort_lib, toposort_flatten
+from c3linearize import linearize
 from collections import deque
 
 class CycleDetectedError(Exception):
@@ -10,7 +12,26 @@ class CycleDetectedError(Exception):
 # produces: [0, 1, 3, 7, 2, 4, 6, 5]
 # but should be: [0, 1, 3, 7, 2, 4, 5, 6]
 
-def toposort(root, get_edges, depth_first=False):
+def graph_conv(x, g, d=None):
+	if d is None:
+		d = {}
+	if x not in d:
+		e = g(x)
+		if x not in d:
+			d[x] = e
+		for v in e:
+			graph_conv(v, g, d)
+	return d
+	
+		
+def toposort(root, get_edges, ordered=True):
+	src = graph_conv(root, get_edges)
+	
+	return linearize(src, heads=[root], order=ordered)[root]
+	
+
+
+def _toposort_bad(root, get_edges, depth_first=False):
 
 	if depth_first:
 		raise NotImplementedError # not working atm
