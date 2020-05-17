@@ -139,7 +139,7 @@ def plan_conv(in_shape, channels, kernels=3, factors=1, strides=1, padding=None,
 def build_conv_layers(settings, factors=1, pool_type='max',
 					  norm_type='batch', out_norm_type=None,
 					  nonlin='elu', out_nonlin=None, residual=False):
-	assert not residual
+	# assert not residual
 
 	L = len(settings)  # number of layers
 
@@ -156,6 +156,7 @@ def build_conv_layers(settings, factors=1, pool_type='max',
 	for params, f, bn, n in zip(settings, factors, bns, nonlins):
 		layers.append(layerslib.ConvLayer(norm=bn, nonlin=n, factor=f,
 								pool=pool_type, residual=residual,
+								down_type='stride' if f == 1 else 'pool',
 								**params))
 
 	return layers  # can be used as sequential or module list
@@ -233,9 +234,9 @@ def plan_deconv(out_shape, channels, kernels=2, factors=1, strides=1, padding=No
 
 
 def build_deconv_layers(settings, sizes=None, up_type='deconv',
-						norm_type='batch', out_norm_type=None,
+						norm_type='batch', out_norm_type=None, factors=None,
 						nonlin='elu', out_nonlin=None, residual=False):
-	assert not residual
+	# assert not residual
 
 	L = len(settings)  # number of layers
 
@@ -244,12 +245,16 @@ def build_deconv_layers(settings, sizes=None, up_type='deconv',
 	except TypeError:
 		sizes = [sizes] * L
 
+	if factors is None:
+		factors = [1]*L
+
 	bns = [norm_type] * (L - 1) + [out_norm_type]
 	nonlins = [nonlin] * (L - 1) + [out_nonlin]
 
 	layers = []
-	for params, sz, bn, n in zip(settings, sizes, bns, nonlins):
+	for params, f, sz, bn, n in zip(settings, factors, sizes, bns, nonlins):
 		layers.append(layerslib.DeconvLayer(norm=bn, nonlin=n, up_type=up_type, size=sz[-2:],
+		                                    residual=residual, factor=f,
 								  **params))
 
 	return layers  # can be used as sequential or module list

@@ -397,7 +397,7 @@ class Normal(fm.Model):
 class Conv_Encoder(fm.Encodable, fm.Model):
 
 	def __init__(self, in_shape, latent_dim=None, feature_dim=None,
-				 nonlin='prelu', output_nonlin=None,
+				 nonlin='prelu', output_nonlin=None, residual=False,
 				 channels=[], kernels=3, strides=1, factors=2, down='max',
 				 norm='instance', output_norm=None,
 				 fc_hidden=[]):
@@ -408,7 +408,7 @@ class Conv_Encoder(fm.Encodable, fm.Model):
 
 		conv_layers = build_conv_layers(csets, factors=factors, pool_type=down, norm_type=norm,
 										out_norm_type=(output_norm if latent_dim is None else norm),
-										nonlin=nonlin,
+										nonlin=nonlin, residual=residual,
 										out_nonlin=(output_nonlin if latent_dim is None else nonlin))
 
 		out_shape = cshapes[-1]
@@ -446,7 +446,7 @@ class Conv_Decoder(fm.Decodable, fm.Model):
 	
 	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,
 	             channels=[], kernels=[], factors=[], strides=[], up='deconv',
-	             norm='instance', output_norm=None,
+	             norm='instance', output_norm=None, residual=False,
 	             fc_hidden=[]):
 		
 		self.out_shape = out_shape
@@ -454,8 +454,10 @@ class Conv_Decoder(fm.Decodable, fm.Model):
 		dshapes, dsets = plan_deconv(self.out_shape, channels=channels, kernels=kernels, factors=factors,
 		                             strides=strides if up == 'deconv' else 1)
 		
+		# dsizes = [(s if s[-2:] != ps[-2:] else None) for ps, s in zip(dshapes, dshapes[1:])]
+		
 		deconv_layers = build_deconv_layers(dsets, sizes=dshapes[1:], nonlin=nonlin, out_nonlin=output_nonlin,
-		                                    up_type=up, norm_type=norm,
+		                                    up_type=up, norm_type=norm, factors=factors, residual=residual,
 		                                    out_norm_type=output_norm)
 		
 		super().__init__(dshapes[0] if latent_dim is None else latent_dim, out_shape)

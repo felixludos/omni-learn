@@ -238,19 +238,33 @@ class ConvLayer(fm.Model):
 		self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding,
 		                      stride=stride, dilation=dilation, **conv_kwargs)
 
-		self.pool = util.get_pooling(pool, factor=factor) if down_type == 'pool' else None
+		self.pool = util.get_pooling(pool, factor=factor) if down_type == 'pool' \
+		                                                     and (factor[0] > 1 or factor[1] > 1) else None
 		self.norm = util.get_normalization(norm, out_channels)
 		self.nonlin = util.get_nonlinearity(nonlin) #if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
-
+		
 		self.res = residual
-		assert not self.res or in_channels == out_channels, 'residual connections not possible'
+		if self.res and (in_channels != out_channels):
+			print('WARNING: residual connections will be partial, because channels dont match')
+			# print('WARNING: removing residual connections because channels dont match')
+			# self.res = False
+		# assert not self.res or in_channels == out_channels, 'residual connections not possible'
 
 	def extra_repr(self):
 		return 'residual={}'.format(self.res)
 
 	def forward(self, x):
 		c = self.conv(x)
-		x = c + x if self.res else c
+		if self.res:
+			din, dout = x.size(1), c.size(1)
+			if din > dout:
+				x = c + x.narrow(1, 0, dout)
+			else:
+				if din < dout:
+					B, _, H, W = x.size()
+					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
+				x = c+x
+		# x = c + x if self.res else c
 
 		if self.pool is not None:
 			x = self.pool(x)
@@ -294,6 +308,8 @@ class DeconvLayer(fm.Model):
 		else:
 			assert factor[0] == factor[1], f'{factor}'
 			factor = factor[0]
+		if size is not None and factor == 1:
+			size = None
 
 		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
 
@@ -355,8 +371,9 @@ class DeconvLayer(fm.Model):
 
 		self.res = residual
 		if self.res and (in_channels != out_channels):
-			print('WARNING: removing residual connections because channels dont match')
-			self.res = False
+			print('WARNING: residual connections will be partial, because channels dont match')
+			# print('WARNING: removing residual connections because channels dont match')
+			# self.res = False
 		# assert not self.res or in_channels == out_channels, 'residual connections not possible'
 
 	def extra_repr(self):
@@ -366,7 +383,16 @@ class DeconvLayer(fm.Model):
 		if self.up is not None:
 			x = self.up(x)
 		c = self.deconv(x)
-		x = c+x if self.res else c
+		if self.res:
+			din, dout = x.size(1), c.size(1)
+			if din > dout:
+				x = c + x.narrow(1, 0, dout)
+			else:
+				if din < dout:
+					B, _, H, W = x.size()
+					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
+				x = c+x
+		# x = c+x if self.res else c
 
 		if self.norm is not None:
 			x = self.norm(x)
