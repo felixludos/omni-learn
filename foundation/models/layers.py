@@ -264,6 +264,8 @@ class ConvLayer(fm.Model):
 					B, _, H, W = x.size()
 					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
 				x = c+x
+		else:
+			x = c
 		# x = c + x if self.res else c
 
 		if self.pool is not None:
@@ -392,6 +394,8 @@ class DeconvLayer(fm.Model):
 					B, _, H, W = x.size()
 					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
 				x = c+x
+		else:
+			x = c
 		# x = c+x if self.res else c
 
 		if self.norm is not None:
