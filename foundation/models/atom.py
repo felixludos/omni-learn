@@ -245,8 +245,10 @@ def build_deconv_layers(settings, sizes=None, up_type='deconv',
 	except TypeError:
 		sizes = [sizes] * L
 
-	if factors is None:
-		factors = [1]*L
+	try:
+		assert len(factors) == L
+	except TypeError:
+		factors = [factors] * L
 
 	bns = [norm_type] * (L - 1) + [out_norm_type]
 	nonlins = [nonlin] * (L - 1) + [out_nonlin]
