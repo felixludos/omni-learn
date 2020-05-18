@@ -624,6 +624,9 @@ class ConfigList(_ConfigType, util.tlist):
 
 	def _single_get(self, item):
 
+		if isinstance(item, slice):
+			return self.get_nodefault(item)
+
 		try:
 			idx = self._str_to_int(item)
 		except InvalidKeyError:

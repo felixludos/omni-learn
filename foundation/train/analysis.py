@@ -101,6 +101,69 @@ class Run(util.tdict):
 
 		self._manager._load_fn(self.state, **kwargs)
 
+	def load_into(self, name, key=None):
+		if key is None:
+			key = name.split('.')[0]
+		if key not in self:
+			path = os.path.join(self.path, name)
+			if not os.path.isfile(path):
+				print('{} not found in: {}'.format(name, self.name))
+			else:
+				self[key] = torch.load(path)
+
+	def load_config(self, force=False, clear_info=False, excluded_info=[]):
+		if 'config' not in self or force:
+			
+			fname = os.path.join(self.path, 'config.yml')
+			
+			if not os.path.isfile(fname):
+				print('{} has no config'.format(self.name))
+				return
+			
+			config = get_config(fname)
+			
+			if clear_info:
+				del self.config.info
+			elif 'info' in config:
+				
+				for k, v in config.info.items():
+					if k in excluded_info:
+						pass
+					elif 'dataset_type' == k:
+						new = v
+						# if 'dataset' in self.meta:
+						# 	assert self.meta.dataset == new, '{} vs {}'.format(self.meta.dataset, new)
+						self.meta.dataset = new
+					elif 'model_type' == k:
+						new = v
+						# if 'model' in self.meta:
+						# 	assert self.meta.model == new, '{} vs {}'.format(self.meta.model, new)
+						self.meta.model = new
+					elif 'history' == k:
+						self.meta.history = config.info.history
+					elif 'date' == k:
+						new = tuple(v.split('-'))
+						# if 'date' in self.meta:
+						# 	assert self.meta.date == new, '{} vs {}'.format(self.meta.date, new)
+						self.meta.date = new
+					else:
+						self.meta[k] = v
+			if 'job' in config:
+				self.meta.job = config.job.num, config.job.ID, config.job.ps
+			
+			try:
+				base = get_base_config(config)
+			except Exception:
+				# print('WARNING: loading base failed')
+				base = None
+			
+			if base is None:
+				print('{} has no base'.format(self.name))
+				return
+			
+			self.config = config
+			self.base = base
+
 	def __str__(self):
 		return self.name
 	def __repr__(self):
@@ -321,15 +384,7 @@ class Run_Manager(object):
 		if key is None:
 			key = name.split('.')[0]
 
-		def _load(run):
-			if key not in run:
-				path = os.path.join(run.path, name)
-				if not os.path.isfile(path):
-					print('{} not found in: {}'.format(name, run.name))
-				else:
-					run[key] = torch.load(path)
-
-		self.map(_load, **kwargs)
+		self.map(lambda r: r.load_into(name, key=key), **kwargs)
 
 	def stats_dataframe(self): # gets all stats
 
@@ -541,64 +596,17 @@ class Run_Manager(object):
 				run.records = ckpt['records']
 
 
-	def load_configs(self, force=False, clear_info=False, excluded_info=[]):
-		valid = []
-
+	def load_configs(self, force=False, clear_info=False, excluded_info=[],
+	                 update_active=True, **kwargs):
+		
 		excluded_info = set(excluded_info)
+		
+		self.map(lambda r: r.load_config(force=force, clear_info=clear_info, excluded_info=excluded_info), **kwargs)
 
-		for run in self.active:
-			if 'config' not in run or force:
-
-				fname = os.path.join(run.path, 'config.yml')
-
-				if not os.path.isfile(fname):
-					print('{} has no config'.format(run.name))
-					continue
-
-				config = get_config(fname)
-
-				if clear_info:
-					del run.config.info
-				elif 'info' in config:
-
-					for k,v in config.info.items():
-						if k in excluded_info:
-							pass
-						elif 'dataset_type' == k:
-							new = v
-							if 'dataset' in run.meta:
-								assert run.meta.dataset == new, '{} vs {}'.format(run.meta.dataset, new)
-							run.meta.dataset = new
-						elif 'model_type' == k:
-							new = v
-							if 'model' in run.meta:
-								assert run.meta.model == new, '{} vs {}'.format(run.meta.model, new)
-							run.meta.model = new
-						elif 'history' == k:
-							run.meta.history = config.info.history
-						elif 'date' == k:
-							new = tuple(v.split('-'))
-							# if 'date' in run.meta:
-							# 	assert run.meta.date == new, '{} vs {}'.format(run.meta.date, new)
-							run.meta.date = new
-						else:
-							run.meta[k] = v
-				if 'job' in config:
-					run.meta.job = config.job.num, config.job.ID, config.job.ps
-
-				base = get_base_config(config)
-
-				if base is None:
-					print('{} has no base'.format(run.name))
-					continue
-
-				run.config = config
-				run.base = base
-
-			valid.append(run)
-
+		if update_active:
+			valid = [run for run in self.active if 'config' in run]
+			self.set_active(valid)
 		print('Loaded configs')
-		self.set_active(valid)
 
 	def set_active(self, active=None):
 		if active is None:
