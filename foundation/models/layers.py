@@ -316,6 +316,8 @@ class DeconvLayer(fm.Model):
 		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
 
 		if up_type == 'deconv':
+			if factor is None:
+				factor = stride[0]
 			stride = factor, factor
 			if kernel_size is None:
 				kernel_size = 4, 4
