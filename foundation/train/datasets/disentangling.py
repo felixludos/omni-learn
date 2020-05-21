@@ -337,7 +337,7 @@ class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
 
 		self.labeled = labeled
 
-		fname = 'mpi3d_{}_{}.h5'.format(cat, 'train' if train else 'test')
+		fname = 'mpi3d_{}_{}.h5'.format(cat, 'full' if train is None else ('train' if train else 'test'))
 		if train is None:
 			fname = 'mpi3d_{}.npz'.format(cat)
 			print('WARNING: using full dataset (train+test)')
