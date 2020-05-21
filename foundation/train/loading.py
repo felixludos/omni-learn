@@ -170,8 +170,9 @@ def load(path=None, config=None,
 
 			dataset = get_data(config.dataset, mode=mode)
 
-			if get_model is None:
-				config.abort() # TODO: don't abort when creating the model right afterwards (wait until after model)
+			# if get_model is None:
+			# 	config.abort() # TODO: don't abort when creating the model right afterwards (wait until after model)
+			config.abort()
 
 			try:
 				config.din, config.dout = dataset.din, dataset.dout
@@ -199,8 +200,9 @@ def load(path=None, config=None,
 
 		info = config.model
 
-		if get_data is None:
-			config.begin()
+		# if get_data is None:
+		# 	config.begin()
+		config.begin()
 		model = get_model(info)
 		config.abort() # undo all changes to the config throughout model creation
 
