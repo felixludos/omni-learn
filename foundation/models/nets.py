@@ -346,8 +346,11 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 
 		return x
 
+class Normal_Distrib_Model(fm.Model): # means calling forward() will output a normal distribution
+	pass
+
 @AutoModifier('normal')
-class Normal(fm.Model):
+class Normal(Normal_Distrib_Model):
 	'''
 	This is a modifier (basically mixin) to turn the parent's output of forward() to a normal distribution.
 
@@ -416,6 +419,7 @@ class Conv_Encoder(fm.Encodable, fm.Model):
 		super().__init__(in_shape, out_shape if latent_dim is None else latent_dim)
 
 		self.conv = nn.Sequential(*conv_layers)
+		self._conv_shapes = cshapes
 
 		self.conv_shape = out_shape
 		if feature_dim is None:

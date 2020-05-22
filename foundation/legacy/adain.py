@@ -15,12 +15,12 @@ from .. import models
 class AdaIN(fm.Model):
 	def __init__(self, A):
 
-		qdim = A.pull('style_dim', '<>din')
+		qdim = A.pull('style_dim', '<>din') # note: terminologywise style_dim and noise_dim should be swapped
 		cdim = A.pull('features', '<>dout')
 
 		pixelwise = A.pull('pixelwise', False)
 
-		ndim = cdim[0] if isinstance(cdim, (tuple, list)) and not pixelwise else cdim
+		ndim = A.pull('noise_dim', cdim[0] if isinstance(cdim, (tuple, list)) and not pixelwise else cdim)
 
 		if 'net' in A:
 			A.net.din = qdim
@@ -38,6 +38,8 @@ class AdaIN(fm.Model):
 		super().__init__(cdim, cdim)
 
 		self.net = net
+		self.style_dim = qdim
+		self.noise_dim = ndim
 		self.noise = None
 
 	def default_noise(self, n):

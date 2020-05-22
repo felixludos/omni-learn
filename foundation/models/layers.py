@@ -188,7 +188,7 @@ class DenseLayer(fm.Model):
 @AutoComponent('conv-layer')
 class ConvLayer(fm.Model):
 
-	def __init__(self, in_channels, out_channels, factor=2,
+	def __init__(self, in_channels=None, out_channels=None, factor=2,
 
 	             kernel_size=3, padding=None, dilation=1, stride=None,
 
@@ -197,6 +197,8 @@ class ConvLayer(fm.Model):
 	             down_type='stride', norm=None, pool='max',
 	             nonlin='elu', output_nonlin=None,
 	             residual=False, **conv_kwargs):
+		assert out_channels is not None, 'must specify an output channel size'
+		assert in_channels is not None or din is not None, 'no input size info'
 
 		if isinstance(kernel_size, int):
 			kernel_size = kernel_size, kernel_size
