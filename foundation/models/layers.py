@@ -265,6 +265,7 @@ class ConvLayer(fm.Model):
 				if din < dout:
 					B, _, H, W = x.size()
 					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
+				
 				x = c+x
 		else:
 			x = c
