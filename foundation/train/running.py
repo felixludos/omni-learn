@@ -252,12 +252,11 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		run_continuous(A, records, model, trainloader, valloader,
 		               logger=logger, silent=False, display_samples=False,
 	                   epoch_seed=epoch_seed, pbar=pbar)
-
+		print('Training complete.')
+		
 	else:
 		print('No training')
 
-
-	print('Training complete.')
 	
 	# endregion
 	
@@ -272,59 +271,68 @@ def new_run_full(A, get_data=None, get_model=None, get_name=None):
 		
 		identifier = A.eval.pull('identifier', 'eval')
 		
-		print('*'*50)
-		print(f'Evaluating trained model: {identifier}')
-		print('*'*50)
+		results_path = os.path.join(A.output.save_dir, f'{identifier}.pth.tar')
+		overwrite = A.eval.pull('overwrite', False)
 		
-		if 'use_testset' in A.eval and A.eval.use_testset:
-			if testset is None:
-				testset = get_data(A.dataset, mode='test')
+		if os.path.isfile(results_path) and not overwrite:
+			print('WARNING: will not overwrite results, so skipping evaluation')
+		
 		else:
-			print('Test dataset NOT used!')
-			testset = None
-
-		if testset is not None:
-			testloader = get_loaders(testset, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
-			                         shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
+			print('*'*50)
+			print(f'Evaluating trained model: {identifier} (overwrite={overwrite})')
+			print('*'*50)
+			
+			if 'use_testset' in A.eval and A.eval.use_testset:
+				if testset is None:
+					testset = get_data(A.dataset, mode='test')
+			else:
+				print('Test dataset NOT used!')
+				testset = None
 	
-			print('testdata len={}, testloader len={}'.format(len(testset), len(testloader)))
-		else:
-			testloader = None
+			if testset is not None:
+				testloader = get_loaders(testset, batch_size=A.dataset.batch_size, num_workers=A.num_workers,
+				                         shuffle=A.dataset.shuffle, drop_last=A.dataset.drop_last, silent=True)
 		
-		if 'use_best' in A.eval and A.eval.use_best and 'save_dir' in A.output and records['checkpoint'] > 0:
-			try:
-				model, ckpt = load(path=A.output.save_dir, mode='test', get_model=get_model, get_data=None,
-				                   return_args=False, return_ckpt=True, force_load_model=True)
-				print('Loaded best model, trained for {} iterations'.format(ckpt['records']['total_steps']))
-				records = ckpt['records']
-			except FileNotFoundError:
-				print('Using current model for testing')
-		
-		records['training_steps'] = records['total_steps']
-		
-		logger.set_step(records['total_steps'])
-		logger.set_tag_format('{}/{}'.format(identifier, '{}'))
-		
-		info = {
-			'_A': A, # full config, probably shouldnt be used
-			'A': A.eval, # eval settings
-			'datasets': datasets,
-			'loaders': loaders,
+				print('testdata len={}, testloader len={}'.format(len(testset), len(testloader)))
+			else:
+				testloader = None
 			
-			'identifier': identifier,
-			'logger': logger,
+			if 'use_best' in A.eval and A.eval.use_best and 'save_dir' in A.output and records['checkpoint'] > 0:
+				try:
+					model, ckpt = load(path=A.output.save_dir, mode='test', get_model=get_model, get_data=None,
+					                   return_args=False, return_ckpt=True, force_load_model=True)
+					print('Loaded best model, trained for {} iterations'.format(ckpt['records']['total_steps']))
+					records = ckpt['records']
+				except FileNotFoundError:
+					print('Using current model for testing')
 			
-			'testset': testset,
-			'testloader': testloader,
-		}
-		
-		model.eval()
-		results = model.evaluate(info)
-		
-		if results is not None and 'save_dir' in A.output:
-			results_path = os.path.join(A.output.save_dir, 'results.pth.tar')
-			torch.save(results, results_path)
-			print(f'Results saved to {results_path}')
+			records['training_steps'] = records['total_steps']
+			
+			logger.set_step(records['total_steps'])
+			logger.set_tag_format('{}/{}'.format(identifier, '{}'))
+			
+			info = {
+				'_A': A, # full config, probably shouldnt be used
+				'A': A.eval, # eval settings
+				'datasets': datasets,
+				'loaders': loaders,
+				
+				'identifier': identifier,
+				'logger': logger,
+				
+				'testset': testset,
+				'testloader': testloader,
+			}
+			
+			model.eval()
+			results = model.evaluate(info)
+			
+			if results is not None and 'save_dir' in A.output:
+				if overwrite:
+					print('Results already found, but not overwriting.')
+				
+				torch.save(results, results_path)
+				print(f'Results saved to {results_path}')
 			
 	
 	# endregion
