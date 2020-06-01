@@ -67,7 +67,7 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 				config.info.history = config._history
 				del config._history
 
-			config.info.argv = argv#[1:]
+			config.info.argv = argv
 
 		if 'test_mode' in config:
 			os.environ['FOUNDATION_TESTING'] = str(int(config.test_mode))
@@ -75,7 +75,6 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 
 		if os.environ['FOUNDATION_TESTING'] == '1':
 			print('\nThis is a test run!\n')
-
 
 		if '_loaded' in config:
 			print('Loaded config from: {}'.format(config._loaded))
@@ -90,14 +89,6 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 					del config.output.name
 			if 'save_dir' in config:
 				del config.save_dir
-			# del config.info
-
-			# if 'name' in config:
-			# 	del config.name
-			# if 'output' in config and '_logged_date' in config.output:
-			# 	del config.output._logged_date
-			# if 'info' in config:
-			# 	del config.info
 
 		if 'name' not in config and os.environ['FOUNDATION_TESTING'] == '1':
 			config.name = 'test-{}'.format(mode)
@@ -171,7 +162,6 @@ def main(config=None, argv=None, cmd=None, **cmd_kwargs):
 		out = 0
 		try:
 			out = cmd(config, **cmd_kwargs)
-
 		except KeyboardInterrupt:
 			extype, value, tb = sys.exc_info()
 			traceback.print_exc()

@@ -104,6 +104,8 @@ def merge_configs(configs, parent_defaults=True):
 
 	return merged
 
+from collections import defaultdict
+from c3linearize import linearize
 
 def get_config(path=None, parent_defaults=True, include_load_history=False): # Top level function
 
@@ -116,31 +118,25 @@ def get_config(path=None, parent_defaults=True, include_load_history=False): # T
 
 	pnames = []
 	if len(parents): # topo sort parents
-		def _get_parents(n):
-			if 'parents' in n:
-				return [parents[find_config_path(p)] for p in n.parents]
-			return []
+		# def _get_parents(n):
+		# 	if 'parents' in n:
+		# 		return [parents[find_config_path(p)] for p in n.parents]
+		# 	return []
+		
+		root_id = 'root'
+		src = defaultdict(list)
+		src[root_id] = list(find_config_path(p) for p in root.parents) if 'parents' in root else []
+		
+		for n, data in parents.items():
+			src[n] = [find_config_path(p) for p in data.parents] if 'parents' in data else []
 
-		order = util.toposort(root, _get_parents)
+		# order = util.toposort(root, _get_parents)
+		order = linearize(src, heads=['root'], order=True)['root']
+		
+		order = [root] + [parents[p] for p in order[1:]]
 
 		# for analysis, record the history of all loaded parents
 
-		
-		# root = merge_configs(order, parent_defaults=parent_defaults)
-		# root = _check_for_load(order.pop(), parent_defaults=parent_defaults)
-		# while len(order):
-		#
-		# 	child = order.pop()
-		# 	will_load = None
-		# 	if 'load' in child:
-		# 		will_load = child.load
-		#
-		#
-		#
-		# 	root.update()
-		#
-		# 	root.update(_check_for_load(order.pop(), parent_defaults=parent_defaults),
-		# 	            parent_defaults=parent_defaults)
 
 		order = list(reversed(order))
 		

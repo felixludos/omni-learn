@@ -22,11 +22,14 @@ def graph_conv(x, g, d=None):
 		for v in e:
 			graph_conv(v, g, d)
 	return d
-	
+
+
+# def toposort(root, src):
+# 	return linearize(src, heads=[root], order=True)[root]
 		
 def toposort(root, get_edges, ordered=True):
 	src = graph_conv(root, get_edges)
-	
+
 	return linearize(src, heads=[root], order=ordered)[root]
 	
 
