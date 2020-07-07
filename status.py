@@ -1,6 +1,4 @@
-
-import sys, os
-from foundation import train as trn
+from foundation.old import train as trn
 
 if __name__ == '__main__':
 	A = trn.parse_config()

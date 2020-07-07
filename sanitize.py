@@ -1,7 +1,6 @@
 
-import sys, os
-from foundation import train as trn
-
+import sys
+from foundation.old import train as trn
 
 if __name__ == '__main__':
 	

@@ -6,6 +6,8 @@ import numpy as np
 #from itertools import imap
 from collections import deque, Mapping
 
+from omnibelt import Simple_Child, get_now, create_dir
+
 from humpack import tdict, tlist, tset
 
 import torch.nn as nn
@@ -17,7 +19,6 @@ from .farming import make_ghost
 
 FD_PATH = os.path.dirname(os.path.dirname(__file__))
 
-primitives = (str, int, float, bool)
 
 class NS(tdict): # NOTE: avoid hasattr! - always returns true (creating new attrs), use __contains__ instead
 	'''
@@ -166,39 +167,6 @@ class Table(tlist):
 			                **map_kwargs)
 
 		return make_ghost(self._el_type, _execute)
-
-
-def deep_get(tree, keys):
-	if isinstance(keys, (tuple, list)):
-		if len(keys) == 1:
-			return tree[keys[0]]
-	return deep_get(tree[keys[0]], keys[1:])
-
-def sort_by(seq, vals, reverse=False):
-	return [x[0] for x in sorted(zip(seq, vals), key=lambda x: x[1], reverse=reverse)]
-
-
-
-class Simple_Child(object): # a simple wrapper that delegates __getattr__s to some parent attribute
-
-	def __init__(self, *args, _parent=None, **kwargs):
-		super().__init__(*args, **kwargs)
-		self._parent = _parent
-
-	def __getattribute__(self, item):
-
-		try:
-			return super().__getattribute__(item)
-		except AttributeError as e:
-			try: # check the parent first
-				parent = super().__getattribute__('_parent')
-				return parent.__getattribute__(item)
-			except AttributeError:
-				raise e
-
-
-def get_now():
-	return time.strftime("%y%m%d-%H%M%S")
 
 def to_np(tensor):
 	return tensor.detach().cpu().numpy()

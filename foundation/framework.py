@@ -53,10 +53,10 @@ class Model(nn.Module):  # any vector function
 			self.register_buffer(name, buffer, save=True)
 		return super().load_state_dict(state_dict['parameters'], **kwargs)
 
-	def pre_epoch(self, mode, epoch): # called at the beginning of each epoch
+	def pre_epoch(self, mode, records): # called at the beginning of each epoch
 		pass
 
-	def post_epoch(self, mode, epoch, stats=None): # called at the end of each epoch
+	def post_epoch(self, mode, records, stats=None): # called at the end of each epoch
 		pass
 
 	def get_hparams(self):

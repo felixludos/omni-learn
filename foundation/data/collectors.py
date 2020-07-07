@@ -110,10 +110,10 @@ class Info_Dataset(Splitable_Dataset):
 	def get_info(self):
 		return self.din, self.dout
 
-	def pre_epoch(self, mode, epoch): # TODO: integrate in train.running
+	def pre_epoch(self, mode, records): # TODO: integrate in train.running
 		pass
 
-	def post_epoch(self, mode, epoch, stats=None):
+	def post_epoch(self, mode, records, stats=None):
 		pass
 
 

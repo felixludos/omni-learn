@@ -7,21 +7,6 @@ import cv2
 
 FOUNDATION_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
-def create_dir(directory):
-	if not os.path.exists(directory):
-		os.makedirs(directory)
-
-def crawl(d, cond):
-	if os.path.isdir(d):
-		options = []
-		for f in os.listdir(d):
-			path = os.path.join(d, f)
-			options.extend(crawl(path, cond))
-		return options
-	if cond(d):
-		return [d]
-	return []
-
 
 def get_patch(path, ht=None, wd=None, ret_bgr=False):
 

@@ -1,0 +1,35 @@
+
+name: foundation
+long_name: foundation
+
+version: 0.2
+
+url: 'https://github.com/felixludos/foundation'
+
+description: 'High level utilities and routines for optimization and simulation'
+
+author: Felix Leeb
+author_email: 'felixludos.info@gmail.com'
+
+license: GPL3
+
+readme: 'README.md'
+
+packages: ['foundation']
+
+install_requires:
+  - numpy
+  - matplotlib
+  - torch
+  - tensorflow
+  - gym
+  - OpenCV-Python
+  - tabulate
+  - configargparse
+  - ipdb
+  - h5py
+  - pyyaml
+  - tqdm
+  - pandas
+  - humpack
+

@@ -1,5 +1,5 @@
 from . import util
-from .train import Component, AutoComponent, Modifier, AutoModifier
+from . import op
 from . import framework
 from . import data
 from . import eval

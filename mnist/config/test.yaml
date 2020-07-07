@@ -8,19 +8,20 @@ output:
 dataset:
     name: 'kmnist'
 
-    kwargs:
-        download: false
-        label: True
+    download: False
+    labeled: True
 
     batch_size: 128
 
     val_split: 0.166666
 
+    store_keys: ['din', 'dout']
+
 training:
     epochs: 5
 
 model:
-    _type: 'model'
+    _type: 'simple'
 
     nonlin: 'elu'
 

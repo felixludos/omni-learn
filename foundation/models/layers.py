@@ -1,14 +1,13 @@
-
-import sys, os, time
 import numpy as np
 import torch
 from torch import nn
-from torch.nn import functional as F
+
+import omnifig as fig
 
 from .. import framework as fm
 from .. import util
 from . import atom
-from ..train import Component, AutoComponent, AutoModifier, Modifier
+
 
 #################
 # Functions
@@ -185,7 +184,7 @@ class DenseLayer(fm.Model):
 			x = self.nonlin(x)
 		return x
 
-@AutoComponent('conv-layer')
+@fig.AutoComponent('conv-layer')
 class ConvLayer(fm.Model):
 
 	def __init__(self, in_channels=None, out_channels=None, factor=2,
@@ -280,7 +279,7 @@ class ConvLayer(fm.Model):
 		return x
 
 
-@AutoComponent('deconv-layer')
+@fig.AutoComponent('deconv-layer')
 class DeconvLayer(fm.Model):
 	def __init__(self, in_channels, out_channels, factor=2, size=None,
 
@@ -409,7 +408,7 @@ class DeconvLayer(fm.Model):
 			x = self.nonlin(x)
 		return x
 
-@AutoComponent('double-conv-layer')
+@fig.AutoComponent('double-conv-layer')
 class DoubleConvLayer(fm.Model):
 
 	def __init__(self, in_channels, out_channels, factor=2,
@@ -497,7 +496,7 @@ class DoubleConvLayer(fm.Model):
 		return x
 
 
-@AutoComponent('double-deconv-layer')
+@fig.AutoComponent('double-deconv-layer')
 class DoubleDeconvLayer(fm.Cacheable, fm.Model):
 	def __init__(self, in_channels, out_channels, factor=1, up_type='conv',
 

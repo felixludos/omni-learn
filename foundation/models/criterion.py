@@ -1,14 +1,11 @@
-
-import sys, os, time
-import numpy as np
 import torch
 from torch import nn
-from torch.nn import functional as F
+
+from omnifig import AutoComponent
 
 from .. import framework as fm
 from .. import util
-from . import atom
-from ..train import Component, AutoComponent
+# from foundation.old.train import AutoComponent
 
 @AutoComponent('multigroup-cls')
 class MultiGroupClassification(fm.Model):

@@ -7,10 +7,12 @@ import torch.nn.functional as F
 from torch.distributions import Normal as NormalDistribution
 from .. import framework as fm
 
+import omnifig as fig
+
 from .atom import *
 from .layers import *
 
-@Component('mlp')
+@fig.Component('mlp')
 class MLP(fm.Model):
 	def __init__(self, A):
 		kwargs = {
@@ -38,7 +40,7 @@ class MLP(fm.Model):
 	def forward(self, x):
 		return self.net(x)
 
-@Component('multihead')
+@fig.Component('multihead')
 class Multihead(fm.Model): # currently, the input dim for each head must be the same (but output can be different) TODO: generalize
 	def __init__(self, A):
 		
@@ -97,7 +99,7 @@ class Multihead(fm.Model): # currently, the input dim for each head must be the 
 		return torch.cat(ys, dim=1)
 
 
-@Component('double-enc')
+@fig.Component('double-enc')
 class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
 		
@@ -222,7 +224,7 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 
 		return q
 
-@Component('double-dec')
+@fig.Component('double-dec')
 class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 	def __init__(self, A):
 
@@ -349,7 +351,7 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 class Normal_Distrib_Model(fm.Model): # means calling forward() will output a normal distribution
 	pass
 
-@AutoModifier('normal')
+@fig.AutoModifier('normal')
 class Normal(Normal_Distrib_Model):
 	'''
 	This is a modifier (basically mixin) to turn the parent's output of forward() to a normal distribution.
@@ -396,7 +398,7 @@ class Normal(Normal_Distrib_Model):
 
 		return NormalDistribution(loc=mu, scale=logsigma.exp())
 
-@AutoComponent('conv')
+@fig.AutoComponent('conv')
 class Conv_Encoder(fm.Encodable, fm.Model):
 
 	def __init__(self, in_shape, latent_dim=None, feature_dim=None,
@@ -445,7 +447,7 @@ class Conv_Encoder(fm.Encodable, fm.Model):
 		c = self.conv(x)
 		return self.transform_conv_features(c)
 
-@AutoComponent('deconv')
+@fig.AutoComponent('deconv')
 class Conv_Decoder(fm.Decodable, fm.Model):
 	
 	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,

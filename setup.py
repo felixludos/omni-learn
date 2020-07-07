@@ -1,28 +1,39 @@
+import os
+from yaml import safe_load
 from setuptools import setup
 
-setup(name='foundation',
-      version='0.2',
-      description='Framework for RL and beyond',
-      url='https://gitlab.cs.washington.edu/fleeb/foundation',
-      author='Felix Leeb',
-      author_email='fleeb@uw.edu',
-      license='MIT',
-      packages=['foundation'],
-      install_requires=[
-            'numpy',
-            'matplotlib',
-            'torch',
-            # 'tensorflow',
-            'gym',
-            'OpenCV-Python',
-            'tabulate',
-            'configargparse',
-            'ipdb',
-            'h5py',
-            'pyyaml',
-            'tqdm',
-            'pandas',
-      ],
-      scripts=['scripts/fdrun'],
-      # console_scripts=['scripts/fdrun.py'],
-      zip_safe=False)
+with open('.fig.yaml', 'r') as f:
+	info = safe_load(f)
+
+if 'readme' in info:
+	with open(info['readme'], 'r') as f:
+		lines = f.readlines()
+	
+	readme = []
+	valid = False
+	for line in lines:
+		if valid:
+			if 'end-setup-marker-do-not-remove' in line:
+				valid = False
+			else:
+				readme.append(line)
+		elif 'setup-marker-do-not-remove' in line:
+			valid = True
+	
+	README = '\n'.join(readme)
+else:
+	README = ''
+
+setup(name=info.get('name', None),
+      version=info.get('version', None),
+      description=info.get('description', None),
+      long_description=README,
+      url=info.get('url', None),
+      author=info.get('author', None),
+      author_email=info.get('author_email', None),
+      license=info.get('license', None),
+      packages=info.get('packages', [info['name']]),
+      entry_points=info.get('entry_points', {}),
+      install_requires=info.get('install_requires', []),
+      zip_safe=info.get('zip_safe', False),
+      )

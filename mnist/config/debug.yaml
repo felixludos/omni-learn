@@ -1,0 +1,12 @@
+
+_meta:
+  script_name: train
+
+
+parents: ['test']
+
+name: 'test-pycharm'
+
+inline: True
+
+dataset.name: mnist

@@ -1,0 +1,6 @@
+name: mnist-example
+author: Workerbee
+
+related: ['foundation']
+
+src: 'main.py'

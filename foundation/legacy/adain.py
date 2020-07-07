@@ -1,12 +1,7 @@
-
-import sys, os
-import numpy as np
-
 import torch
 from torch import nn
-from torch.nn import functional as F
 
-from .. import train as trn
+from ..old import train as trn
 from .. import framework as fm
 from .. import models
 
