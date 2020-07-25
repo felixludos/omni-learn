@@ -51,7 +51,7 @@ class Parallel_Agent(fm.Agent): # wrapper class for agents, executing train_step
 		if 'advantages' not in paths:
 			paths.advantages = self.compute_advantages(paths.returns, paths.observations)
 		
-		collated_paths = util.NS()
+		collated_paths = util.TreeSpace()
 		if isinstance(paths.returns, list):
 			collated_paths.returns = torch.cat(paths.returns)
 		if isinstance(paths.advantages, list):

@@ -31,7 +31,8 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 
 
 
-	def __init__(self, dataset, train=True, label_attr=None, din=None, dout=None, **unused):
+	def __init__(self, dataset, train=True, label_attr=None, din=None, dout=None,
+	             A=None, **unused):
 		'''
 		Requires dataset object to wrap it (since this is a `util.Simple_Child`).
 
@@ -54,8 +55,14 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 		# din = A.pull('din', self.din)
 		# dout = A.pull('dout', 10)
 
+		resize = A.pull('resize', True)
+		C, H, W = self.din
+		if resize and (H != 32 or W != 32):
+			self.din = C, 32, 32
+
 		if label_attr is None:
 			dout = self.din if din is None else din
+
 
 		super().__init__(din=din, dout=dout, train=train, _parent='dataset')
 
@@ -68,6 +75,10 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 		images = images.float().div(255)
 		if images.ndimension() == 3:
 			images = images.unsqueeze(1)
+		
+		if resize:
+			images = F.interpolate(images, (32, 32), mode='bilinear')
+		
 		self.labels = None
 		if label_attr is not None:
 			labels = getattr(self.dataset, label_attr)
@@ -102,7 +113,7 @@ class MNIST(Torchvision_Toy_Dataset):
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
 
 @Dataset('kmnist')
 class KMNIST(Torchvision_Toy_Dataset):
@@ -116,7 +127,7 @@ class KMNIST(Torchvision_Toy_Dataset):
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
 
 @Dataset('data/fmnist')
 class FashionMNIST(Torchvision_Toy_Dataset):
@@ -130,7 +141,7 @@ class FashionMNIST(Torchvision_Toy_Dataset):
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
 
 @Dataset('emnist')
 class EMNIST(Torchvision_Toy_Dataset):
@@ -155,7 +166,7 @@ class EMNIST(Torchvision_Toy_Dataset):
 				raise NotImplementedError
 			dout = 26
 
-		super().__init__(dataset, label_attr='targets' if labeled else None, dout=dout, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, dout=dout, **kwargs)
 
 @Dataset('svhn')
 class SVHN(Torchvision_Toy_Dataset):
@@ -173,7 +184,7 @@ class SVHN(Torchvision_Toy_Dataset):
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, label_attr='labels' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='labels' if labeled else None, **kwargs)
 
 @Dataset('cifar')
 class CIFAR(Torchvision_Toy_Dataset):
@@ -193,7 +204,7 @@ class CIFAR(Torchvision_Toy_Dataset):
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
 
 		self.images = self.images.permute(0, 3, 1, 2).contiguous()
 

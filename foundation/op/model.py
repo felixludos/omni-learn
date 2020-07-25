@@ -9,7 +9,7 @@ from .. import framework as fm
 
 
 def load_checkpoint(path):  # model parameters - TODO: maybe add more options
-	return torch.load(path)['model_state']
+	return torch.load(path)
 
 @fig.Script('load_model')
 def load_model(A):
@@ -40,12 +40,12 @@ def load_model(A):
 		params = ckpt['model_state']
 		
 		if 'optim' in params:
-			load_optim = A.pul('load_optim_params', True)
+			load_optim = A.pull('load_optim_params', True)
 			if not load_optim:
 				del params['optim']
 	
 		if 'scheduler' in params:
-			load_scheduler = A.pul('load_scheduler_params', True)
+			load_scheduler = A.pull('load_scheduler_params', True)
 			if not load_scheduler:
 				del params['scheduler']
 				
@@ -65,6 +65,27 @@ fig.AutoComponent('normalization')(util.get_normalization)
 fig.AutoComponent('pooling')(util.get_pooling)
 fig.AutoComponent('upsampling')(util.get_upsample)
 
+@fig.AutoComponent('viz-criterion')
+class Viz_Criterion(nn.Module):
+	def __init__(self, criterion, arg_names=[], kwarg_names=[],
+	             allow_grads=False):
+		super().__init__()
+		
+		self.criterion = criterion
+		self.arg_names = arg_names
+		self.kwarg_names = kwarg_names
+		self.allow_grads = allow_grads
+
+	def forward(self, out):
+		
+		args = [out[key] for key in self.arg_names]
+		kwargs = {key:out[key] for key in self.kwarg_names}
+		
+		if self.allow_grads:
+			return self.criterion(*args, **kwargs)
+		
+		with torch.no_grad():
+			return self.criterion(*args, **kwargs)
 
 # @Component('stage') # TODO
 class Stage_Model(fm.Schedulable, fm.Trainable_Model):

@@ -3,18 +3,54 @@ from collections import deque
 import torch
 
 from torch.utils.data import DataLoader
-from .collectors import Batchable_Dataset, Device_Dataset
+# from .collectors import Batchable_Dataset, Device_Dataset # TODO: clean up import order
+
+from .. import util
+
+class Seedable(object):
+	def set_seed(self, seed=None):
+		return util.set_seed(seed)
 
 
-class BatchedDataLoader(object): # loads full batches at a time (dataset must be Batched
 
-	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False, auto_reset=False):
+class Featured_DataLoader(Seedable, DataLoader):
+	
+	def __init__(self, *args, device=None, **kwargs):
+
+		super().__init__(*args, **kwargs)
+
+		if device is None:
+			try:
+				device = self.dataset.device
+			except AttributeError:
+				device = 'cpu'
+		self.device = device
+	
+	def __iter__(self):
+		itr = super().__iter__()
+		
+		def _skip(num):
+			for _ in range(num):
+				itr._next_index()
+		itr.skip = _skip
+		
+		def _move_to():
+			batch = next(itr)
+			return util.to(batch, self.device)
+		itr.next_batch = _move_to
+		
+		return itr
+
+class BatchedDataLoader(Seedable): # loads full batches at a time (dataset must be Batched
+
+	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False,
+	             auto_reset=False, device=None):
 		self.dataset = dataset
 
 		assert len(self.dataset) > batch_size, 'dataset is not large enough for a single batch: {} vs {}'.format(len(dataset), batch_size)
 
-		if not isinstance(dataset, Batchable_Dataset):
-			assert dataset.allow_batched(), 'this dataset doesnt seem to be compatible with a BatchedDataLoader: {}'.format(dataset)
+		# if not isinstance(dataset, Batchable_Dataset):
+		# 	assert dataset.allow_batched(), 'this dataset doesnt seem to be compatible with a BatchedDataLoader: {}'.format(dataset)
 
 		self.batch_size = batch_size
 		self.shuffle = shuffle
@@ -24,8 +60,13 @@ class BatchedDataLoader(object): # loads full batches at a time (dataset must be
 		if self.num*batch_size != len(self.dataset) and not self.drop_last:
 			self.num += 1
 
-
-		self.device = dataset.device if isinstance(dataset, Device_Dataset) else 'cpu'
+		if device is None:
+			try:
+				device = dataset.device
+			except AttributeError:
+				device = 'cpu'
+		self.device = device
+		# self.device = dataset.device if isinstance(dataset, Device_Dataset) else 'cpu'
 
 	def __len__(self):
 		return self.num
@@ -36,7 +77,6 @@ class BatchedDataLoader(object): # loads full batches at a time (dataset must be
 class _BatchedDataLoaderIter(object):
 	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False, auto_reset=False, device=None):
 		self.dataset = dataset
-
 		self.batch_size = batch_size
 		self.shuffle = shuffle
 		self.drop_last = drop_last
@@ -75,6 +115,12 @@ class _BatchedDataLoaderIter(object):
 		self.batches = batches
 		self.idx = 0
 
+	def skip(self, num):
+		self.idx += num
+
+	# def next_batch(self):
+	# 	batch = next(self)
+	# 	return util.to(batch, self.device)
 
 	def __next__(self):
 		if self.idx >= len(self.batches):
@@ -86,8 +132,77 @@ class _BatchedDataLoaderIter(object):
 		batch = self.dataset[self.batches[self.idx]]
 		self.idx += 1
 
+		# return util.to(batch, self.device)
 		return batch
 
 	def __getitem__(self, item):
 		return self.dataset[self.batches[item]]
+
+
+def get_loaders(*datasets, batch_size=64, num_workers=0, shuffle=True, pin_memory=True,
+		   drop_last=False, worker_init_fn=None, allow_batched=True, device='cpu'):
+
+	if shuffle == 'all':
+		shuffles = [True]*3
+	elif shuffle:
+		shuffles = [True, False, False]
+	else:
+		shuffles = [False]*3
+
+	for ds in datasets:
+		if ds is not None:
+			break
+	if ds is None:
+		return datasets if len(datasets) > 1 else None # all are None
+
+	loader_cls = Featured_DataLoader
+	kwargs = {
+		'batch_size': batch_size,
+		'drop_last': drop_last,
+		'device': device,
+	}
+
+	if allow_batched:
+		try:
+			assert ds.allow_batched()
+		except (AttributeError, AssertionError):
+			pass
+		else:
+			print('Using batched data loader')
+			loader_cls = BatchedDataLoader
+	else:
+
+		try:
+			assert ds.get_device() == 'cpu'
+		except AttributeError:
+			pass
+		except AssertionError:
+			pin_memory = False
+
+		kwargs.update({
+			'pin_memory': pin_memory,
+			'worker_init_fn': worker_init_fn,
+			'num_workers': num_workers,
+		})
+
+
+	loaders = [(loader_cls(ds, shuffle=s, **kwargs) if ds is not None else None)
+	           for ds, s in zip(datasets, shuffles)]
+
+	# if not silent: # TODO: deprecated!
+	# 	trainloader = loaders[0]
+	# 	testloader = None if len(loaders) < 2 else loaders[-1]
+	# 	valloader = None if len(loaders) < 3 else loaders[1]
+	#
+	# 	print('traindata len={}, trainloader len={}'.format(len(datasets[0]), len(trainloader)))
+	# 	if valloader is not None:
+	# 		print('valdata len={}, valloader len={}'.format(len(datasets[1]), len(valloader)))
+	# 	if testloader is not None:
+	# 		print('testdata len={}, testloader len={}'.format(len(datasets[-1]), len(testloader)))
+	# 	print('Batch size: {} samples'.format(batch_size))
+
+	if len(loaders) == 1:
+		return loaders[0]
+	return loaders
+
 

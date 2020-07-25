@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import h5py as hf
 
+from .loaders import get_loaders
 from .. import util
 
 def simple_split_dataset(dataset, split, shuffle=True):
@@ -37,9 +38,13 @@ def split_dataset(dataset, split1, split2=None, shuffle=True):
 
 
 
-class DatasetWrapper(util.Simple_Child, Dataset):
+class DatasetWrapper(util.Proper_Child, Dataset):
 	def __init__(self, dataset):
-		super().__init__(_parent=dataset)
+		parent = dataset
+		if isinstance(dataset, util.Proper_Child):
+			parent = dataset._parent
+		
+		super().__init__(_parent=parent)
 		self.dataset = dataset
 
 
@@ -77,6 +82,17 @@ class Batchable_Dataset(Dataset): # you can select using a full batch
 	def allow_batched(self):
 		return True
 
+class Loadable_Dataset(Dataset):
+	
+	def to_loader(self, info):
+		num_workers = info.pull('num_workers', 0)
+		batch_size = info.pull('batch_size', 64)
+		shuffle = info.pull('shuffle', True)
+		drop_last = info.pull('drop_last', True)
+		device = info.pull('device', 'cpu')
+		return get_loaders(self, batch_size=batch_size, num_workers=num_workers,
+		                   shuffle=shuffle, drop_last=drop_last, device=device)
+
 
 class Splitable_Dataset(Dataset):
 	
@@ -93,7 +109,7 @@ class Splitable_Dataset(Dataset):
 		return simple_split_dataset(self, 1 - val_per, shuffle=shuffle_split)
 
 
-class Info_Dataset(Splitable_Dataset):
+class Info_Dataset(Loadable_Dataset, Splitable_Dataset):
 
 	'''
 	If possible, din and dout should already be set by the class, in which as they only have to be passed in to
@@ -109,6 +125,9 @@ class Info_Dataset(Splitable_Dataset):
 
 	def get_info(self):
 		return self.din, self.dout
+
+	def prep(self, model):
+		pass
 
 	def pre_epoch(self, mode, records): # TODO: integrate in train.running
 		pass

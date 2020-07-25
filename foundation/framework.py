@@ -89,6 +89,20 @@ class Invertible(object):
 	def inverse(self, *args, **kwargs):
 		raise NotImplementedError
 
+class Savable(Model):
+	
+	def save_checkpoint(self, *paths, **data):
+		data.update({
+			'model_str': str(self),
+			'model_state': self.state_dict(),
+		})
+		
+		self.save_data(*paths, data=data)
+		
+	def save_data(self, *paths, data={}):
+		for path in paths:
+			torch.save(data, path)
+
 class Recordable(Model):
 	def __init__(self, *args, stats=None, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -126,13 +140,12 @@ class Visualizable(Recordable):
 
 class Evaluatable(Recordable): # TODO: maybe not needed
 
-	def evaluate(self, info):
+	def evaluate(self, loader, A=None, run=None):
 		# self._eval_counter += 1
-		with torch.no_grad():
-			out = self._evaluate(info)
+		out = self._evaluate(loader, A=A, run=run)
 		return out
 
-	def _evaluate(self, info):
+	def _evaluate(self, loader, A=None, run=None):
 		pass # by default eval does nothing
 	# 	raise NotImplementedError
 
@@ -336,7 +349,7 @@ class Cacheable(Model):
 		return out
 
 
-class Trainable_Model(Optimizable, Model): # top level - must be implemented to train
+class Trainable_Model(Optimizable, Savable, Model): # top level - must be implemented to train
 	def step(self, batch):  # Override pre-processing mixins
 		return self._step(batch)
 
@@ -384,12 +397,12 @@ class Transition_Model(Model):
 		self.state_dim = state_dim
 		self.ctrl_dim = ctrl_dim
 
-		self.info = util.NS()
+		self.info = util.TreeSpace()
 
 	def sequence(self, state0, ctrls, ret_info=False, ret_all=True):
 
 		states = [state0]
-		dynamics = util.NS(**{k: [] for k in self.info})
+		dynamics = util.TreeSpace(**{k: [] for k in self.info})
 
 		for ctrl in ctrls:
 			states.append(self(states[-1], ctrl))

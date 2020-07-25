@@ -15,8 +15,6 @@ dataset:
 
     val_split: 0.166666
 
-    store_keys: ['din', 'dout']
-
 training:
     epochs: 5
 
@@ -25,26 +23,18 @@ model:
 
     nonlin: 'elu'
 
-    norm_type: 'l2'
-
-#    norm_type: '_x_'
+    norm: None
 
     net:
-        _type: 'double-enc'
+        _type: 'conv'
 
         channels: [32, 32, 32, 32]
+        strides: 1
 
-#        internal_channels: 128
-#        residual: True
-#        squeeze: True
+        fc_hidden: [64, 32]
 
-
-#        down_type: 'avg'
-
-
-        tail:
-            _type: 'mlp'
-            hidden_dims: [64, 32]
+        in_shape: '<>din'
+        latent_dim: '<>dout'
 
     optim_type: 'adam'
     lr: 1.e-3

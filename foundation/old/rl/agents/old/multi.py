@@ -70,7 +70,7 @@ class Global_Baseline_NPG(Multi_NPG): # requires all agents to receive the same 
 		# train baseline
 		baseline_stats = None
 		if self.baseline is not None:
-			baseline_stats = self.baseline.train_step(util.NS(observations=global_obs, returns=returns))
+			baseline_stats = self.baseline.train_step(util.TreeSpace(observations=global_obs, returns=returns))
 			
 		joined_stats = self._collect_stats(results)
 		

@@ -530,7 +530,7 @@ class _ConfigType(hp.Transactionable):
 
 
 
-class ConfigDict(_ConfigType, util.NS): # TODO: allow adding aliases
+class ConfigDict(_ConfigType, util.TreeSpace): # TODO: allow adding aliases
 	'''
 	Features:
 

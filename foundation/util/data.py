@@ -12,7 +12,7 @@ try:
 except:
 	pass
 
-from .misc import NS
+from .misc import TreeSpace
 import random
 import collections
 import itertools
@@ -281,7 +281,7 @@ def NS_make_collate(def_type=None, multi_agent=False):
 	def NS_list_type_collate(batch):
 		r"""Puts each data field into a tensor with outer dimension batch size"""
 
-		full = NS()
+		full = TreeSpace()
 
 		for key in batch[0].keys():
 			full[key] = []
@@ -304,7 +304,7 @@ def NS_make_collate(def_type=None, multi_agent=False):
 
 			num_agents = len(next(iter(batch[0].values())))
 
-			full = [NS() for _ in range(num_agents)]  # a separate batch of paths for each agent
+			full = [TreeSpace() for _ in range(num_agents)]  # a separate batch of paths for each agent
 
 			for i, f in enumerate(full):
 				for key in batch[0].keys():
@@ -338,7 +338,7 @@ def NS_multi_list_collate(batch):  # no default tensor type
 
 	num_agents = len(next(batch[0].values()))
 
-	full = [NS() for _ in range(num_agents)] # a separate batch of paths for each agent
+	full = [TreeSpace() for _ in range(num_agents)] # a separate batch of paths for each agent
 
 	for i, f in enumerate(full):
 		for key in batch[0].keys():
@@ -349,10 +349,10 @@ def NS_multi_list_collate(batch):  # no default tensor type
 def NS_list_collate(batch): # no default tensor type
 	r"""Puts each data field into a tensor with outer dimension batch size"""
 	
-	full = NS()
+	full = TreeSpace()
 	
 	if isinstance(batch, dict):
-		full = NS(**{k:NS_list_collate(batch[k]) for k in batch.keys()})
+		full = TreeSpace(**{k:NS_list_collate(batch[k]) for k in batch.keys()})
 		return full
 	
 	for key in batch[0].keys():
@@ -396,8 +396,8 @@ def NS_collate(batch):
 		return torch.DoubleTensor(batch)
 	elif isinstance(batch[0], string_classes):
 		return batch
-	elif isinstance(batch[0], NS):
-		return NS(**{key: NS_collate([d[key] for d in batch]) for key in batch[0]})
+	elif isinstance(batch[0], TreeSpace):
+		return TreeSpace(**{key: NS_collate([d[key] for d in batch]) for key in batch[0]})
 	elif isinstance(batch[0], collections.Mapping):
 		return {key: NS_collate([d[key] for d in batch]) for key in batch[0]}
 	elif isinstance(batch[0], torch.distributions.Distribution):

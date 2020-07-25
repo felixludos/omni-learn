@@ -1,3 +1,3 @@
 from .collectors import *
-from .loaders import DataLoader, BatchedDataLoader
+from .loaders import get_loaders, DataLoader, BatchedDataLoader
 # from .samplers import Generator

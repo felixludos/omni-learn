@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from collections import deque
 
-
+import omnifig as fig
 
 class StatsCollector(object):
 	def __init__(self, require_all_keys=True):
@@ -34,6 +34,10 @@ def set_default_tau(tau):
 	global _tau
 	_tau = tau
 
+# def override_all_stats_tau(tau): # TODO: track all stats objs and then update tau
+# 	pass
+
+@fig.AutoComponent('stats')
 class StatsMeter(object):
 	def __init__(self , *names, tau=None, **stats):
 		self._stats = {}

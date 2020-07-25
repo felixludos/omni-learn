@@ -2,6 +2,17 @@
 _meta:
   script_name: train
 
+#  script_name: eval
+
+#resume: test-pycharm_200707-021212
+#
+#override:
+#  eval:
+#    identifier: test
+#    overwrite: True
+#    use_testset: True
+
+#extend: 5000
 
 parents: ['test']
 
@@ -10,3 +21,10 @@ name: 'test-pycharm'
 inline: True
 
 dataset.name: mnist
+
+#output.save_freq: 800
+
+run:
+  _type: run
+  _mod: ['cls-run', 'timed-run']
+

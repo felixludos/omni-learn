@@ -7,7 +7,7 @@ from torch import nn
 
 import omnifig as fig
 
-from ..data import Info_Dataset, Subset_Dataset, simple_split_dataset, DataLoader, BatchedDataLoader
+from ..data import get_loaders, Info_Dataset, Subset_Dataset, simple_split_dataset, DataLoader, BatchedDataLoader
 from .. import util
 from .. import framework as fm
 
@@ -30,75 +30,74 @@ def Dataset(name):
 	return _reg_fn
 
 
-FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-DEFAULT_DATA_PATH = os.path.join(os.path.dirname(FD_PATH),'local_data')
+# FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 # print(FD_PATH)
 
 
-def get_loaders(*datasets, batch_size=64, num_workers=0, shuffle=True, pin_memory=True,
-		   drop_last=False, worker_init_fn=None, allow_batched=True):
-
-	if shuffle == 'all':
-		shuffles = [True]*3
-	elif shuffle:
-		shuffles = [True, False, False]
-	else:
-		shuffles = [False]*3
-
-	for ds in datasets:
-		if ds is not None:
-			break
-	if ds is None:
-		return datasets if len(datasets) > 1 else None # all are None
-
-	loader_cls = DataLoader
-	kwargs = {
-		'batch_size': batch_size,
-		'drop_last': drop_last,
-	}
-
-	if allow_batched:
-		try:
-			assert ds.allow_batched()
-		except (AttributeError, AssertionError):
-			pass
-		else:
-			print('Using batched data loader')
-			loader_cls = BatchedDataLoader
-	else:
-
-		try:
-			assert ds.get_device() == 'cpu'
-		except AttributeError:
-			pass
-		except AssertionError:
-			pin_memory = False
-
-		kwargs.update({
-			'pin_memory': pin_memory,
-			'worker_init_fn': worker_init_fn,
-			'num_workers': num_workers,
-		})
-
-
-	loaders = [(loader_cls(ds, shuffle=s, **kwargs) if ds is not None else None)
-	           for ds, s in zip(datasets, shuffles)]
-
-	# if not silent: # TODO: deprecated!
-	# 	trainloader = loaders[0]
-	# 	testloader = None if len(loaders) < 2 else loaders[-1]
-	# 	valloader = None if len(loaders) < 3 else loaders[1]
-	#
-	# 	print('traindata len={}, trainloader len={}'.format(len(datasets[0]), len(trainloader)))
-	# 	if valloader is not None:
-	# 		print('valdata len={}, valloader len={}'.format(len(datasets[1]), len(valloader)))
-	# 	if testloader is not None:
-	# 		print('testdata len={}, testloader len={}'.format(len(datasets[-1]), len(testloader)))
-	# 	print('Batch size: {} samples'.format(batch_size))
-
-	if len(loaders) == 1:
-		return loaders[0]
-	return loaders
+# def get_loaders(*datasets, batch_size=64, num_workers=0, shuffle=True, pin_memory=True,
+# 		   drop_last=False, worker_init_fn=None, allow_batched=True):
+#
+# 	if shuffle == 'all':
+# 		shuffles = [True]*3
+# 	elif shuffle:
+# 		shuffles = [True, False, False]
+# 	else:
+# 		shuffles = [False]*3
+#
+# 	for ds in datasets:
+# 		if ds is not None:
+# 			break
+# 	if ds is None:
+# 		return datasets if len(datasets) > 1 else None # all are None
+#
+# 	loader_cls = DataLoader
+# 	kwargs = {
+# 		'batch_size': batch_size,
+# 		'drop_last': drop_last,
+# 	}
+#
+# 	if allow_batched:
+# 		try:
+# 			assert ds.allow_batched()
+# 		except (AttributeError, AssertionError):
+# 			pass
+# 		else:
+# 			print('Using batched data loader')
+# 			loader_cls = BatchedDataLoader
+# 	else:
+#
+# 		try:
+# 			assert ds.get_device() == 'cpu'
+# 		except AttributeError:
+# 			pass
+# 		except AssertionError:
+# 			pin_memory = False
+#
+# 		kwargs.update({
+# 			'pin_memory': pin_memory,
+# 			'worker_init_fn': worker_init_fn,
+# 			'num_workers': num_workers,
+# 		})
+#
+#
+# 	loaders = [(loader_cls(ds, shuffle=s, **kwargs) if ds is not None else None)
+# 	           for ds, s in zip(datasets, shuffles)]
+#
+# 	# if not silent: # TODO: deprecated!
+# 	# 	trainloader = loaders[0]
+# 	# 	testloader = None if len(loaders) < 2 else loaders[-1]
+# 	# 	valloader = None if len(loaders) < 3 else loaders[1]
+# 	#
+# 	# 	print('traindata len={}, trainloader len={}'.format(len(datasets[0]), len(trainloader)))
+# 	# 	if valloader is not None:
+# 	# 		print('valdata len={}, valloader len={}'.format(len(datasets[1]), len(valloader)))
+# 	# 	if testloader is not None:
+# 	# 		print('testdata len={}, testloader len={}'.format(len(datasets[-1]), len(testloader)))
+# 	# 	print('Batch size: {} samples'.format(batch_size))
+#
+# 	if len(loaders) == 1:
+# 		return loaders[0]
+# 	return loaders
 
 
 
@@ -108,26 +107,32 @@ def load_data(A, mode=None):
 		name = A.pull('name')
 		
 		if name not in dataset_registry:
-			raise Exception(f'No datasets {name} is registered')
+			raise Exception(f'No datasets named "{name}" is registered')
 		
 		A.push('_type', dataset_registry[name])
 	
 	# dataroot = A.pull('dataset.dataroot', None)
+	
+	
 	if 'dataroot' not in A.dataset:
 		# assert 'FOUNDATION_DATA_DIR' in os.environ, 'Neither dataroot nor $FOUNDATION_DATA_DIR found'
 		# A.push('dataroot', os.environ['FOUNDATION_DATA_DIR'])
-		dataroot = DEFAULT_DATA_PATH
+		dataroot = util.DEFAULT_DATA_PATH
 		if 'FOUNDATION_DATA_DIR' in os.environ:
 			dataroot = os.environ['FOUNDATION_DATA_DIR']
 		else:
 			print(f'$FOUNDATION_DATA_DIR not set, using default: {dataroot}')
 		A.push('dataset.dataroot', dataroot)
 	
-	if mode is not None:
-		A.push('dataset.mode', mode)
-		A.push('dataset.train', mode == 'train')  # legacy
-	else:
+	use_default_dataroot = A.pull('use_default_dataroot', True)
+	A.push('dataroot', os.environ['FOUNDATION_DATA_DIR'] if 'FOUNDATION_DATA_DIR' in os.environ
+	                  else util.DEFAULT_DATA_PATH, overwrite=use_default_dataroot)
+	
+	mode_override = mode is not None
+	if mode is None:
 		mode = 'train'
+	mode = A.push('mode', mode, overwrite=mode_override)
+	A.push('train', mode == 'train')
 	
 	seed = A.pull('seed')
 	util.set_seed(seed)
@@ -147,13 +152,7 @@ def load_data(A, mode=None):
 	
 	if not isinstance(dataset, Info_Dataset):
 		print('WARNING: it is strongly recommended for all datasets to be subclasses '
-		      'of fd.data.collectors.Info_Dataset, this dataset is not.')
-	# 	dataset.pre_epoch = lambda x, y: 0
-	# 	dataset.post_epoch = lambda x, y, z: 0
-	# 	raise NotImplementedError
-	
-	# if mode == 'test':
-	# 	return dataset
+		      'of foundation.data.collectors.Info_Dataset, this dataset is not.')
 	
 	try:
 		A.push('din', dataset.din)
@@ -170,17 +169,28 @@ def load_data(A, mode=None):
 		except AttributeError as e:
 			raise e
 	
+	datasets = {mode: dataset}
+	
+	if mode == 'train':
+		datasets = standard_split(datasets, A)
+	return datasets
+
+
+def standard_split(datasets, A):
+	
 	test_split = A.pull('test_split', None)
 	if test_split is not None:
-		shuffle = A.pull('shuffle', True)
-		return simple_split_dataset(dataset, 1 - test_split, shuffle=shuffle)
+		shuffle = A.pull('test_shuffle', '<>shuffle', True)
+		datasets['train'], datasets['test'] = simple_split_dataset(datasets['train'], 1 - test_split, shuffle=shuffle)
 	
 	val_split = A.pull('val_split', None)
 	if val_split is not None:
-		shuffle = A.pull('shuffle', True)
-		return (*simple_split_dataset(dataset, 1 - val_split, shuffle=shuffle), None)
-
-	return dataset
+		shuffle = A.pull('val_shuffle', '<>shuffle', True)
+		datasets['train'], datasets['val'] = simple_split_dataset(datasets['train'], 1 - val_split, shuffle=shuffle)
+	else:
+		datasets['val'] = None
+	
+	return datasets
 
 
 @fig.Modification('subset')

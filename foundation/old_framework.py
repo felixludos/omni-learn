@@ -134,7 +134,7 @@ class Parallel_Agent(Agent):  # wrapper class for agents, executing train_step i
 		if 'advantages' not in paths:
 			paths.advantages = self.compute_advantages(paths.returns, paths.states)
 		
-		collated_paths = util.NS()
+		collated_paths = util.TreeSpace()
 		if isinstance(paths.returns, list):
 			collated_paths.returns = torch.cat(paths.returns)
 		if isinstance(paths.advantages, list):
@@ -387,12 +387,12 @@ class Transition_Model(Model):
 		self.state_dim = state_dim
 		self.ctrl_dim = ctrl_dim
 
-		self.info = util.NS()
+		self.info = util.TreeSpace()
 
 	def sequence(self, state0, ctrls, ret_info=False, ret_all=True):
 
 		states = [state0]
-		dynamics = util.NS(**{k:[] for k in self.info})
+		dynamics = util.TreeSpace(**{k:[] for k in self.info})
 
 		for ctrl in ctrls:
 			states.append( self( states[-1], ctrl) )

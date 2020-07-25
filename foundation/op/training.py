@@ -11,81 +11,80 @@ from ..framework import Recordable, Schedulable, Evaluatable, Visualizable
 
 from .. import util
 
-from .loading import load_config, load_records, setup_logging, setup_records, \
-	wrap_datasets, wrap_transaction, save_checkpoint
+# from .loading import load_config, load_records, setup_logging, setup_records, \
+# 	wrap_datasets, wrap_transaction, save_checkpoint
 from .model import load_model
 from .data import load_data
 from .evaluation import eval_model
 
 
 @fig.Script('train')
-def iterative_training(A, records=None, model=None, datasets=None):
+def iterative_training(A=None, run=None):
+	'''
+	This is the entry for the training script.
+	This function is basically just for startup (including loading the dataset and creation/loading the model)
+	This also sets a few more complicated defaults
 	
+	Then `run_continuous` is called, which actually does the iterative optimization
+	
+	:param A: config object
+	:param run: Run object
+	:return: Run object
+	'''
 	#####################
 	# region Loading
 	#####################
 	
-	if records is None or model is None or datasets is None:
-		A = load_config(A)
+	if run is None:
+		assert A is not None, 'either run or A must not be None'
+		A.push('run._type', 'run', overwrite=False)
+		run = A.pull('run')
 	
-	if records is None:
-		records = load_records(A)
+	A = run.get_config()
 	
-	if datasets is None:
-		datasets = wrap_transaction(load_data, A.dataset)
-		if not isinstance(datasets, tuple):
-			datasets = datasets, None
-	*trainsets, testset = datasets
+	datasets = run.get_datasets()
+	model = run.get_model()
 	
-	if model is None:
-		model = wrap_transaction(load_model, A.model)
+	logger = run.get_logger()
 	
-	model.prep(*trainsets)
+	run.prepare()
+	
+	loaders = run.get_loaders()
 	
 	# endregion
-	#####################
-	# region DataLoaders
-	#####################
+	#######################
+	# region Smart Defaults
+	#######################
 	
-	logger = setup_logging(A)
-	
-	A.info.date = A.pull('output._logged_date', None)
-	
-	loaders = wrap_datasets(*trainsets, A=A)
-	
-	if len(trainsets) > 1:
-		trainloader, *valloaders = loaders
+	key = 'train'
+	if key in datasets:
+		print(f'{key}data len={len(datasets[key])}, {key}loader len={len(loaders[key])}')
 	else:
-		trainloader = loaders
-		valloaders = []
-	assert len(valloaders) < 2, 'Multiple validation sets are not supported (yet)'
-	valloader = valloaders[0] if len(valloaders) else None
+		raise Exception(f'No training dataset found (how did this happen?)')
 	
-	print('traindata len={}, trainloader len={}'.format(len(trainsets[0]), len(trainloader)))
-	if valloader is not None:
-		print('valdata len={}, valloader len={}'.format(len(trainsets[1]), len(valloader)))
-	elif isinstance(model, Schedulable):
-		assert model.scheduler is None or not model.scheduler.req_loss, \
-			'no validation set, but lr scheduler requires loss'
-	if testset is not None:
-		print('testdata len={}'.format(len(testset[-1])))
-	else:
-		print('testdata not loaded yet')
-	# print('Batch size: {} samples'.format(A.dataset.batch_size))
+	key = 'val'
+	if key in datasets:
+		print(f'{key}data len={len(datasets[key])}, {key}loader len={len(loaders[key])}')
 	
-	tau = A.push('output.stats_decay', max(0.01, min(100 /len(trainloader), 0.1)), overwrite=False)
+	key = 'test'
+	if key in datasets:
+		print(f'{key}data len={len(datasets[key])}, {key}loader len={len(loaders[key])}')
+	
+	trainloader = loaders['train']
+	epoch_len = len(trainloader)
+	
+	tau = A.push('training.stats.tau', max(0.01, min(100/epoch_len, 0.1)), overwrite=False)
 	util.set_default_tau(tau)
 	if isinstance(model, Recordable):
 		model.stats.set_tau(tau)
-	A.push('output.print_freq', min(max(20, len(trainloader) // 40), 200))
-	# print(f'Print freq set to: {print_freq}')
+	A.push('output.print_freq', min(max(20, epoch_len // 40), 200))
 	
 	epochs = A.pull('training.epochs', 10)
-	step_limit = A.push('training.step_limit', epochs * len(trainloader))
+	step_limit = A.push('training.step_limit', epochs * epoch_len, overwrite=False)
 	
 	no_val = A.pull('training.no_val', False)
-	A.push('training.val_freq', None if no_val else len(trainloader), overwrite=False)
-	
+	A.push('training.val_freq', None if no_val else epoch_len, overwrite=False)
+
 	inline = A.pull('inline', False)
 	pbar = tqdm if inline else None
 	
@@ -104,15 +103,15 @@ def iterative_training(A, records=None, model=None, datasets=None):
 	
 	# endregion
 	#####################
-	# region Run Train/Val
+	# region Run Training
 	#####################
 	
-	remaining_steps = step_limit - records['total_steps']
+	remaining_steps = step_limit - run.get_total_steps()
 	
 	if remaining_steps > 0:
 		print(f'Training for {remaining_steps} steps')
-		run_continuous(A, records, model, trainloader, valloader=valloader,
-		                     logger=logger, pbar=pbar)
+		# run.prepare(model, trainloader)
+		run.continuous(pbar=pbar)
 		print('Training complete.')
 	
 	else:
@@ -123,15 +122,12 @@ def iterative_training(A, records=None, model=None, datasets=None):
 	# region Run Evaluation
 	#####################
 	
-	results = None
 	if isinstance(model, Evaluatable):
-		A, results, model, datasets = eval_model(A, model=model, datasets=datasets)
-	
+		eval_model(A, run=run)
+		
 	# endregion
 	
-	return A, model, datasets, loaders, records, results
-
-
+	return run
 
 
 def restart_loader(loader, records=None):
@@ -166,8 +162,20 @@ def restart_loader(loader, records=None):
 
 
 
-def run_continuous(A, records, model, trainloader, valloader=None,
-                   logger=None, stats=None, pbar=None):
+def run_continuous(run, pbar=None):
+	
+	A = run.get_config()
+	
+	model = run.get_config()
+	
+	(*trainloaders, _) = run.get_loaders()
+	if len(trainloaders) > 1:
+		trainloader, valloader = trainloaders
+	else:
+		trainloader = trainloaders[0]
+		valloader = None
+
+	stats = None
 
 	# region Limits/Freqs
 
@@ -179,6 +187,8 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 	if save_dir is None:
 		print('WARNING: No save_dir provided')
 		save_freq = None
+	else:
+		A.export(os.path.join(save_dir, 'config.yaml'))
 	if save_freq is not None and 0 < save_freq < len(trainloader):
 		print('WARNING: saving more than once per epoch: checkpoint every {} iterations'.format(save_freq))
 
@@ -257,6 +267,9 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 
 	keep_going = lambda: (sample_limit is None or records['total_samples']['train'] < sample_limit) \
 		and records['total_steps'] < step_limit
+
+	if run is not None:
+		run.starting(records)
 
 	time_limit = A.pull('training.time_limit', None)
 	if time_limit is not None:
@@ -346,8 +359,11 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 
 		# region Validation
 
-		if val_freq is not None and records['total_steps'] % val_freq == 0:
-
+		if val_freq is not None and (records['total_steps'] % val_freq == 0 or not keep_going()):
+			
+			if run is not None:
+				run.validating(records)
+			
 			model.eval()
 			val_stats = gen_stats()
 			if val_model_stats is not None:
@@ -385,7 +401,8 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 						if val_stats['loss'].count > 0 else ''
 					vloader.set_description('Val ep={} ckpt={}{}'.format(records['epoch']+1, records['checkpoint'], loss_info))
 
-			records['validations'] += 1
+			records['num_validations'] += 1
+			records['validation'] = records['total_steps']
 
 			if logger is not None:
 
@@ -393,7 +410,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 					if viz_criterion is not None:
 						val_stats.update('loss-viz', viz_criterion(*[out[n] for n in viz_criterion_args]).detach())
 
-					logger_id = '{}/val{}'.format('{}', records['validations']) if unique_tests else '{}/val'
+					logger_id = '{}/val{}'.format('{}', records['num_validations']) if unique_tests else '{}/val'
 					logger.set_tag_format(logger_id)
 
 					if isinstance(model, Visualizable):
@@ -426,7 +443,7 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 					else ', previous was: {:.3f} (ckpt={})'.format(records['best']['loss'],
 					                                               records['best']['checkpoint'])
 				best_info = f' which is a new best{prev}'
-				records['best']['loss'] = val_loss.avg
+				records['best']['loss'] = val_loss.avg.item()
 				records['best']['checkpoint'] = records['checkpoint']
 				is_best = True
 			loss_info = ' Loss: {:.3f}{}'.format(val_loss.avg.item(), best_info) \
@@ -449,13 +466,15 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 			# if pbar is not None:
 			# 	bar = pbar(total=step_limit, initial=records['total_steps'])
 
-			time_stats.update('eval', time.time() - start)
+			if run is not None:
+				run.validated(records, val_stats)
 
 		# endregion
 
 		# region Save
 
 		if save_freq > 0 and (records['total_steps'] % save_freq == 0 or not keep_going()):
+
 			start = time.time()
 			
 			records['checkpoint'] = records['total_steps']
@@ -474,6 +493,9 @@ def run_continuous(A, records, model, trainloader, valloader=None,
 				print()
 
 			print('[[ {}checkpoint {} saved to {} ]]'.format(best_info, records['checkpoint'], save_dir))
+
+			if run is not None:
+				run.checkpointing(records)
 
 			if time_limit is not None and ((time.time() - start_time) > time_limit):
 				print('*** Exiting for restart after checkpoint {}, time limit ({:2.2f} hr) has been reached'.format(

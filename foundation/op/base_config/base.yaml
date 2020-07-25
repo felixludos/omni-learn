@@ -17,17 +17,19 @@ output:
 #	criterion_args = ['pred', 'y']
 
 training:
-    start: 0
     epochs: 20
 
     track_best: true
 #	no_test = true
+
 
 dataset:
     batch_size: 128
 
     shuffle: true
     drop_last: false
+
+    store_keys: ['din', 'dout']
 
 model:
 
