@@ -1,9 +1,15 @@
 parents: ['base']
 
+run:
+  _type: run
+  _mod: ['cls-run', 'timed-run']
+
 name: 'test-cmd'
 
 output:
     save_freq: -1
+
+    tensorboard: True
 
 dataset:
     name: 'kmnist'
@@ -16,7 +22,7 @@ dataset:
     val_split: 0.166666
 
 training:
-    epochs: 5
+    epochs: 10
 
 model:
     _type: 'simple'

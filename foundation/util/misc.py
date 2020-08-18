@@ -6,9 +6,9 @@ import numpy as np
 #from itertools import imap
 from collections import deque, Mapping
 
-from omnibelt import Simple_Child, Proper_Child, get_now, create_dir, save_yaml, load_yaml
+from omnibelt import Simple_Child, Proper_Child, get_now, create_dir, save_yaml, load_yaml, Registry
 
-from humpack import tdict, tlist, tset, Table, TreeSpace
+from humpack import adict, tlist, tset, Table, TreeSpace
 
 import torch.nn as nn
 import torch.multiprocessing as mp

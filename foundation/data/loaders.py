@@ -3,6 +3,7 @@ from collections import deque
 import torch
 
 from torch.utils.data import DataLoader
+from torch.utils.data.dataloader import _SingleProcessDataLoaderIter, _MultiProcessingDataLoaderIter
 # from .collectors import Batchable_Dataset, Device_Dataset # TODO: clean up import order
 
 from .. import util
@@ -11,7 +12,24 @@ class Seedable(object):
 	def set_seed(self, seed=None):
 		return util.set_seed(seed)
 
+class Featured_DataLoaderIter:
+	
+	def __init__(self, loader):
+		super().__init__(loader)
+		self.device = loader
+		self.N = len(loader)
+	
+	def skip(self, num):
+		for _ in range(num):
+			self._next_index()
+	
+	def __next__(self):
+		return util.to(super().__next__(), self.device)
 
+class Featured_SingleProcessIter(Featured_DataLoaderIter, _SingleProcessDataLoaderIter):
+	pass
+class Featured_MultiProcessIter(Featured_DataLoaderIter, _MultiProcessingDataLoaderIter):
+	pass
 
 class Featured_DataLoader(Seedable, DataLoader):
 	
@@ -26,20 +44,26 @@ class Featured_DataLoader(Seedable, DataLoader):
 				device = 'cpu'
 		self.device = device
 	
+	# def __iter__(self):
+	# 	itr = super().__iter__()
+	#
+	# 	def _skip(num):
+	# 	itr.skip = _skip
+	#
+	# 	def _move_to():
+	# 		batch = next(itr)
+	# 		return util.to(batch, self.device)
+	# 	itr.__next__ = _move_to
+	#
+	# 	return itr
+	
 	def __iter__(self):
-		itr = super().__iter__()
-		
-		def _skip(num):
-			for _ in range(num):
-				itr._next_index()
-		itr.skip = _skip
-		
-		def _move_to():
-			batch = next(itr)
-			return util.to(batch, self.device)
-		itr.next_batch = _move_to
-		
-		return itr
+		if self.num_workers == 0:
+			return Featured_SingleProcessIter(self)
+		else:
+			return Featured_MultiProcessIter(self)
+
+
 
 class BatchedDataLoader(Seedable): # loads full batches at a time (dataset must be Batched
 
@@ -118,9 +142,15 @@ class _BatchedDataLoaderIter(object):
 	def skip(self, num):
 		self.idx += num
 
+	def __len__(self):
+		return len(self.batches) - self.idx
+
 	# def next_batch(self):
 	# 	batch = next(self)
 	# 	return util.to(batch, self.device)
+
+	def __iter__(self):
+		return self
 
 	def __next__(self):
 		if self.idx >= len(self.batches):
@@ -132,7 +162,7 @@ class _BatchedDataLoaderIter(object):
 		batch = self.dataset[self.batches[self.idx]]
 		self.idx += 1
 
-		# return util.to(batch, self.device)
+		return util.to(batch, self.device)
 		return batch
 
 	def __getitem__(self, item):

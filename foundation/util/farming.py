@@ -2,12 +2,7 @@
 import sys, os
 import torch
 import numpy as np
-#from itertools import imap
-from collections import deque, Mapping
-import torch.nn as nn
 import torch.multiprocessing as mp
-# from torch.utils.data.dataloader import ExceptionWrapper
-import random
 import itertools
 import traceback
 

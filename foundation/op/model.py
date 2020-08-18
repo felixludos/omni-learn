@@ -11,18 +11,22 @@ from .. import framework as fm
 def load_checkpoint(path):  # model parameters - TODO: maybe add more options
 	return torch.load(path)
 
-@fig.Script('load_model')
+@fig.Script('load_model', description='Creates/loads a model')
 def load_model(A):
+	'''
+	Creates the model and possibly loads existing model parameters
+	'''
 	
 	raw_type = A.pull('_type', silent=True)
 	if raw_type == 'model':
 		assert A.contains_no_default('model')
-		A = A.model
+		A = A.sub('model')
 	
 	seed = A.pull('seed')
 	util.set_seed(seed)
 	
-	model = fig.create_component(A)
+	# model = fig.create_component(A)
+	model = A.pull_self()
 	
 	if isinstance(model, fm.Optimizable):
 		model.set_optim(A)

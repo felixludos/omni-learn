@@ -39,15 +39,15 @@ def set_default_tau(tau):
 
 @fig.AutoComponent('stats')
 class StatsMeter(object):
-	def __init__(self , *names, tau=None, **stats):
+	def __init__(self , *names, tau=None, **_stats):
 		self._stats = {}
 		
 		self.tau = tau if tau is not None else _tau
 		
 		for name in names:
 			self.new(name)
-		if len(stats):
-			self.load(stats)
+		if len(_stats):
+			self.load(_stats)
 
 	def set_tau(self, tau):
 		self.tau = tau

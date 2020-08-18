@@ -17,8 +17,13 @@ from .model import load_model
 from .data import load_data
 
 
-@fig.Script('eval')
+@fig.Script('eval', description='Evaluate an existing model')
 def eval_model(A, run=None):
+	'''
+	Load and evaluate a model (by defaulting using the validation set)
+	
+	Use argument "use_testset" to evaluate on test set
+	'''
 	
 	if run is None:
 		assert A is not None, 'either run or A must not be None'

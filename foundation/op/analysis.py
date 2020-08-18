@@ -76,7 +76,7 @@ class Visualization(object): # wriapper
 
 
 
-class Run(util.tdict):
+class Run(util.adict):
 
 	def clear(self):
 		if 'state' in self:
@@ -87,7 +87,7 @@ class Run(util.tdict):
 		self.clear()
 
 		if state is None:
-			state = util.tdict()
+			state = util.adict()
 
 		if 'ckpt_path' not in state:
 			state.ckpt_path = self.ckpt_path
@@ -443,7 +443,7 @@ class Run_Manager(object):
 	def _parse_names(self, get_model=None, get_dataset=None, get_date=None, get_job=None, get_ckpt=None):
 		for run in self.active:
 
-			run.meta = util.tdict()
+			run.meta = util.adict()
 
 			try:
 				terms = run.name.split('_')

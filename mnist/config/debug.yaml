@@ -16,6 +16,8 @@ _meta:
 
 parents: ['test']
 
+
+
 name: 'test-pycharm'
 
 inline: True
@@ -24,7 +26,5 @@ dataset.name: mnist
 
 #output.save_freq: 800
 
-run:
-  _type: run
-  _mod: ['cls-run', 'timed-run']
+
 

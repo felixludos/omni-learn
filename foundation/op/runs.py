@@ -10,9 +10,23 @@ import omnifig as fig
 
 from omnibelt import load_yaml, save_yaml, get_now, create_dir
 # from .. import util
+# from .paths import
+
 
 FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH),'trained_nets')
+DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH), 'trained_nets')
+
+
+# def get_saveroot(A=None, silent=False, additional_keys=()):
+# 	root = None
+# 	if A is not None:
+# 		root = A.pull('saveroot', '<>save_path', *additional_keys, None, silent=silent)
+#
+# 	if root is None:
+# 		root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
+#
+# 	return root
+
 
 class NoConfigFoundError(Exception):
 	def __init__(self, msg):
@@ -122,9 +136,13 @@ class Checkpoint_Flag(Exception):
 class NoOverwriteError(Exception):
 	pass
 
-@fig.Script('load_run') # the script just loads a run
+@fig.Script('load_run', description='Load a new or existing run') # the script just loads a run
 @fig.Component('run')
 class Run:
+	'''
+	Holds all the data and functions to load, save, train, and evaluate runs.
+	Runs include the model, datasets, dataloaders, the logger, and stats
+	'''
 	def __init__(self, A, silent=False):
 		
 		self.records = A.pull('records', {})
@@ -137,11 +155,17 @@ class Run:
 		if not skip_load:
 			self.A = self._find_origin(self.A) # note that this uses the root
 			
-			self.name = self._setup_storage(A)
+			self.name = self._setup_storage(self.A)
 		elif not self.silent:
 			print('WARNING: did not check run origin')
 		
 		self.purge() # reset payload objs
+	
+	def __repr__(self):
+		return 'Run({})'.format(getattr(self, 'save_dir', ''))
+	
+	def __str__(self):
+		return 'Run({})'.format(getattr(self, 'save_dir', ''))
 	
 	def _increment_rng(self, seed):
 		self.rng.seed(seed)
@@ -156,7 +180,7 @@ class Run:
 		self.viz_criterion = None
 		
 		self.active_stage = None
-		self.train_state = hp.tdict()
+		self.train_state = hp.adict()
 		
 		self.results = {}
 	
@@ -164,10 +188,10 @@ class Run:
 		
 		last = A.pull('last', False)
 		
-		path = A.pull('load', '<>path', None)
+		path = A.pull('load', None)
 		novel = True
 		if path is None:
-			path = A.pull('resume', None)
+			path = A.pull('resume', '<>path', None)
 			if path is not None:
 				novel = False
 		
@@ -212,10 +236,10 @@ class Run:
 			'stats': {'train': [], 'val': []},
 			
 			'batch': 0,
-			'checkpoint': 0,
+			'checkpoint': None,
 			'val': 0,
 			
-			'epoch_seed': self._increment_rng(A.pull('seed')),
+			'epoch_seed': self._increment_rng(A.pull('seed', self.rng.getrandbits(32))),
 			
 			'history': A.pull('_history', [], silent=False),
 			'argv': sys.argv,
@@ -234,7 +258,7 @@ class Run:
 		
 	def _setup_storage(self, A):
 		
-		name = A.pull('name', None)
+		name = A.pull('run.name', '<>name', None)
 		if name is None:
 			name = self._gen_name(A)
 			A.push('name', name)
@@ -272,17 +296,20 @@ class Run:
 		
 	def _load_records(self, path=None, last=False):
 		
-		records_path = find_records(path, last=last)
-		with open(records_path, 'r') as f:
-			records = load_yaml(f)
-		
-		self.records.update(records)
+		try:
+			records_path = find_records(path, last=last)
+		except NoConfigFoundError:
+			pass
+		else:
+			records = load_yaml(records_path)
+			
+			self.records.update(records)
 
 	def _set_model_ckpt(self, path=None, last=False): # don't auto load yet (just prepare for loading)
 		
 		if path is not None:
 			ckpt_path = find_checkpoint(path, last=last)
-			self.A.push('model._load_params', ckpt_path, overwrite=True)
+			self.A.push('model._load_params', ckpt_path, overwrite=True, silent=self.silent)
 		
 	def _set_dataset_ckpt(self, path=None, last=False):
 		pass
@@ -336,11 +363,11 @@ class Run:
 		A.abort()
 		return logger
 		
-	def create_stats(self, *names, model_stats_fmt=None, include_loss=True):
+	def create_stats(self, *names, model_stats_fmt=None, include_loss=True, silent=False):
 		
 		A = self.get_config()
 		
-		stats = A.pull('training.stats')
+		stats = A.pull('training.stats', silent=silent)
 		
 		if include_loss:
 			stats.new('loss')
@@ -358,11 +385,11 @@ class Run:
 		return stats
 	
 	def create_model(self, **meta):
-		return wrap_script('load_model', self.A.model, **meta)
+		return wrap_script('load_model', self.A.sub('model'), **meta)
 	
 	def create_datasets(self, *names, **meta):
 		
-		A = self.get_config().dataset
+		A = self.get_config().sub('dataset')
 		
 		keep_going = True
 		name = None
@@ -412,7 +439,7 @@ class Run:
 		return self.logger
 	
 	def get_loaders(self, *dataset_names, **datasets):
-		A = self.get_config().dataset
+		A = self.get_config().sub('dataset')
 		single_dataset = len(dataset_names) == 1
 		
 		if len(datasets) == 0:
@@ -481,7 +508,7 @@ class Run:
 	
 	def save_time(self):
 		save_freq = self.train_state.save_freq
-		return save_freq is not None and save_freq > 0 and (self.get_total_steps() % save_freq == 0
+		return save_freq is not None and ((save_freq > 0 and self.get_total_steps() % save_freq == 0)
 		                                                    or not self.keep_going())
 	
 	# endregion
@@ -574,21 +601,25 @@ class Run:
 	def continuous(self, pbar=None):
 		
 		self.startup()
+		stats = self.train_state.train_stats
 		
 		self.new_epoch()
 		
-		current = self.get_total_steps()
-		pbar = pbar
-		
 		restart_pbar = lambda: None if pbar is None else pbar(total=self.train_state.step_limit,
-		                                     initial=current)
+		                                     initial=self.get_total_steps())
 		
 		
 		bar = restart_pbar()
 		
+		records = self.records
+		mode = 'train'
+		
 		while self.keep_going():
 		
-			self.train_step(force_step=True)
+			out = self.train_step(force_step=True)
+		
+			if self.print_time():
+				self.print_step(out, '{}/train', measure_time=False)
 		
 			if self.val_time():
 				if bar is not None:
@@ -596,7 +627,8 @@ class Run:
 					
 				self.validate('val', pbar=pbar)
 				
-				bar = restart_pbar()
+				if self.keep_going():
+					bar = restart_pbar()
 		
 			if self.save_time():
 				if bar is not None:
@@ -604,7 +636,17 @@ class Run:
 					
 				self.save_checkpoint()
 				
-				bar = restart_pbar()
+				if self.keep_going():
+					bar = restart_pbar()
+		
+			if bar is not None:
+				bar.update(1)
+				title = '{} ({})'.format(mode, records['total_epochs'][mode] + 1) \
+					if mode in records['total_epochs'] else mode
+				loss_info = 'Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
+				                                            stats['loss'].smooth.item()) \
+					if stats['loss'].count > 0 else ''
+				bar.set_description('{} ckpt={}{}'.format(title, records['checkpoint'], loss_info))
 		
 		self.exit_run('training complete')
 	
@@ -767,7 +809,7 @@ class Run:
 			self.records['batch'] = 0
 			
 			start = time.time()
-			batch = loader.next_batch()
+			batch = next(loader)
 		
 		time_stats.update('data', time.time() - start)
 		start = time.time()
@@ -784,6 +826,11 @@ class Run:
 		self.records['batch'] += 1
 		self.records['total_steps'] += 1
 	
+		if len(loader) == 0:
+			self.end_epoch('train', Q.train_stats)
+			self.records['batch'] = 0
+			Q.loader = None
+	
 		return out
 	
 	def validate(self, mode='val', pbar=None):
@@ -793,7 +840,15 @@ class Run:
 		records = self.records
 		model = self.get_model()
 		
-		stats = self.create_stats(model_stats_fmt=Q.model_val_stats_fmt)
+		train_model_stats = getattr(model, 'stats', None)
+		stats = self.create_stats(model_stats_fmt=None, silent=True)
+		
+		if stats is not None and train_model_stats is not None and Q.model_val_stats_fmt is not None:
+			
+			model.stats = model.stats.copy()
+			model.stats.reset()
+			
+			stats.shallow_join(model.stats, fmt=Q.model_val_stats_fmt)
 		
 		loader = self.new_epoch(mode)
 		
@@ -855,15 +910,15 @@ class Run:
 		total_steps = self.get_total_steps()
 		
 		if not self.silent:
-			print('[ {} ] {} Last={} Now={}/{}{}'.format(
+			print('[ {} ] {} Last={} Now={}/{}\n\t{}'.format(
 				time.strftime("%H:%M:%S"), mode, records['checkpoint'],
 				total_steps, Q.step_limit, loss_info))
 			
-		if mode in records['stats']:
-			records['stats'][mode].append(stats.export())
-		
 		self.end_epoch(mode, stats)
 		self.records[mode] = total_steps
+		
+		if train_model_stats is not None:
+			model.stats = train_model_stats
 	
 	def prep_eval(self):
 		

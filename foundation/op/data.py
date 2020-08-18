@@ -11,7 +11,7 @@ from ..data import get_loaders, Info_Dataset, Subset_Dataset, simple_split_datas
 from .. import util
 from .. import framework as fm
 
-dataset_registry = fig.Registry()
+dataset_registry = util.Registry()
 
 
 def register_dataset(name, dataset):
@@ -101,8 +101,12 @@ def Dataset(name):
 
 
 
-@fig.Script('load_data')
+@fig.Script('load_data', description='Load datasets')
 def load_data(A, mode=None):
+	'''
+	Loads datasets and optionally splits datasets into
+	training, validation, and testing sets.
+	'''
 	if '_type' not in A:
 		name = A.pull('name')
 		
@@ -113,16 +117,6 @@ def load_data(A, mode=None):
 	
 	# dataroot = A.pull('dataset.dataroot', None)
 	
-	
-	if 'dataroot' not in A.dataset:
-		# assert 'FOUNDATION_DATA_DIR' in os.environ, 'Neither dataroot nor $FOUNDATION_DATA_DIR found'
-		# A.push('dataroot', os.environ['FOUNDATION_DATA_DIR'])
-		dataroot = util.DEFAULT_DATA_PATH
-		if 'FOUNDATION_DATA_DIR' in os.environ:
-			dataroot = os.environ['FOUNDATION_DATA_DIR']
-		else:
-			print(f'$FOUNDATION_DATA_DIR not set, using default: {dataroot}')
-		A.push('dataset.dataroot', dataroot)
 	
 	use_default_dataroot = A.pull('use_default_dataroot', True)
 	A.push('dataroot', os.environ['FOUNDATION_DATA_DIR'] if 'FOUNDATION_DATA_DIR' in os.environ
@@ -137,7 +131,8 @@ def load_data(A, mode=None):
 	seed = A.pull('seed')
 	util.set_seed(seed)
 	
-	dataset = fig.create_component(A)
+	dataset = A.pull_self()
+	# dataset = fig.create_component(A)
 	
 	# TODO: all of the below should be done in the dataset contructor
 	# region Move into dataset constructor

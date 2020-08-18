@@ -721,6 +721,41 @@ def gnom2mat(gnom): # no 180 degree rotations
 	return quat2mat(torch.cat([w,gnom],-1))
 
 #####################
+# Points
+#####################
+
+def pairwise_displacements(a):
+	n = a.shape[0]
+	d = a.shape[1]
+	c = n * (n - 1) // 2
+	
+	out = np.zeros((c, d))
+	
+	l = 0
+	r = l + n - 1
+	for sl in range(1, n):  # no point1 - point1!
+		out[l:r] = a[:n - sl] - a[sl:]
+		l = r
+		r += n - (sl + 1)
+	return out
+
+
+def pairwise_displacements_2(a):
+	n = a.shape[0]
+	d = a.shape[1]
+	c = n * (n - 1) // 2
+	
+	out = []
+	
+	l = 0
+	r = l + n - 1
+	for sl in range(1, n):  # no point1 - point1!
+		out.append(a[:n - sl] - a[sl:])
+		l = r
+		r += n - (sl + 1)
+	return np.concatenate(out)
+
+#####################
 # Probabilities/Statistics
 #####################
 

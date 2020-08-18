@@ -31,7 +31,7 @@ def parse_jobexec(raw, info=None):
 	num = int(num[3:])
 	
 	if info is None:
-		info = util.tdict()
+		info = util.adict()
 	
 	info.jnum = num
 	# info.raw_date = date
@@ -50,7 +50,7 @@ def parse_remotehost(raw):
 
 def parse_job_status(raw):
 	
-	info = util.tdict()
+	info = util.adict()
 	
 	if 'ClusterId' in raw:
 		info.ID = int(raw.ClusterId)
@@ -87,7 +87,7 @@ def collect_q_cmd():
 	
 	# print(lines)
 	
-	active = util.Table(parse_job_status(util.tdict(zip(colattrs, line.split('\t')))) for line in lines if len(line))
+	active = util.Table(parse_job_status(util.adict(zip(colattrs, line.split('\t')))) for line in lines if len(line))
 	
 	return active
 
@@ -132,7 +132,7 @@ def load_registry(path, last=5, since=None):
 
 	jobs = util.Table()
 	for row in terms:
-		raw = util.tdict(zip(keys, row))
+		raw = util.adict(zip(keys, row))
 		info = jobs.new()
 
 		info.ID, info.proc = map(int, raw.JobID.split('.'))
@@ -512,7 +512,7 @@ def get_old_status(peek=None):
 
 def parse_run_name(raw, info=None):
 	if info is None:
-		info = util.tdict()
+		info = util.adict()
 	
 	name, job, date = raw.split('_')
 
@@ -539,7 +539,7 @@ def old_collect_runs(path, recursive=False, since=None, last=5):
 				child = collect_runs(rpath, recursive=recursive)
 				runs.extend(child)
 			else:
-				info = util.tdict(name=rname, path=rpath)
+				info = util.adict(name=rname, path=rpath)
 				
 				try:
 					parse_run_name(rname, info)
@@ -724,7 +724,7 @@ def check_runs(since=None, last=5, running=True,
 		print()
 		current = collect_q_cmd()
 		
-		active = util.tdict()
+		active = util.adict()
 		
 		if current is not None:
 			for info in current:
