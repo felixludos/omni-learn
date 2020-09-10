@@ -11,6 +11,8 @@ output:
 
     tensorboard: True
 
+    log_freq: 10
+
 dataset:
     name: 'mnist'
 
@@ -23,6 +25,7 @@ dataset:
 
 training:
     epochs: 10
+
 
 model:
     _type: 'simple'
