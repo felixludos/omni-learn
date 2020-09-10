@@ -1,4 +1,4 @@
-parents: ['base']
+parents: ['origin']
 
 run:
   _type: run
@@ -12,7 +12,7 @@ output:
     tensorboard: True
 
 dataset:
-    name: 'kmnist'
+    name: 'mnist'
 
     download: False
     labeled: True

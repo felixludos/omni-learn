@@ -1,6 +1,5 @@
 
-_meta:
-  script_name: train
+_meta.script_name: train
 
 #  script_name: eval
 
@@ -14,13 +13,13 @@ _meta:
 
 #extend: 5000
 
-parents: ['test']
+parents: ['demo']
 
 
 
 name: 'test-pycharm'
 
-inline: True
+#inline: True
 
 dataset.name: mnist
 

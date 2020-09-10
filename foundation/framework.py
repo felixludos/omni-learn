@@ -3,6 +3,9 @@ import numpy as np
 import torch
 import copy
 import torch.nn as nn
+
+import omnifig as fig
+
 from . import util
 import torch.multiprocessing as mp
 from itertools import chain
@@ -17,10 +20,15 @@ class Model(nn.Module):  # any vector function
 		self.savable_buffers = set()
 		
 		self.volatile = util.TensorDict()
+		self._saveable_attrs = set()
 
 	def register_buffer(self, name, tensor=None, save=True):
 		super().register_buffer(name, tensor)
 		self.savable_buffers.add(name)
+
+	def register_attr(self, name, data=None):
+		self._saveable_attrs.add(name)
+		self.__setattr__(name, data)
 
 	def cuda(self, device=None):
 		self.device = 'cuda' if device is None else device
@@ -46,12 +54,18 @@ class Model(nn.Module):  # any vector function
 		self.volatile = volatile
 		return {'parameters': out,
 		        'buffers': {name: getattr(self, name, None)
-		                    for name in self.savable_buffers}}
+		                    for name in self.savable_buffers},
+		        'attrs': {name: getattr(self, name, None)
+		                  for name in self._saveable_attrs}}
 	
 	def load_state_dict(self, state_dict, **kwargs):
-		for name, buffer in state_dict['buffers'].items():
+		for name, buffer in state_dict.get('buffers', {}).items():
 			self.register_buffer(name, buffer, save=True)
-		return super().load_state_dict(state_dict['parameters'], **kwargs)
+		for name, data in state_dict.get('attrs', {}):
+			self.register_attr(name, data)
+		return super().load_state_dict(state_dict['parameters']
+		                               if 'parameters' in state_dict
+		                               else state_dict, **kwargs)
 
 	def pre_epoch(self, mode, records): # called at the beginning of each epoch
 		pass
@@ -151,7 +165,7 @@ class Evaluatable(Recordable): # TODO: maybe not needed
 
 
 
-
+@fig.AutoModifier('optim')
 class Optimizable(Recordable):
 
 	def __init__(self, *args, **kwargs):
@@ -229,6 +243,7 @@ class Optimizable(Recordable):
 		return state_dict
 
 
+@fig.AutoModifier('schedulable')
 class Schedulable(Optimizable):
 	def __init__(self, *args, scheduler=None, **kwargs):
 		super().__init__(*args, **kwargs)

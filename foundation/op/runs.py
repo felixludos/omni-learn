@@ -496,11 +496,15 @@ class Run:
 		return (sample_limit is None
 		        or self.get_total_samples('train') < sample_limit) \
 			and self.records['total_steps'] < step_limit
-	
+
 	def print_time(self):
-		logger = self.get_logger()
 		print_freq = self.train_state.print_freq
-		return logger is not None and print_freq is not None and self.get_total_steps() % print_freq == 0
+		return print_freq is not None and self.get_total_steps() % print_freq == 0
+
+	def log_time(self):
+		logger = self.get_logger()
+		log_freq = self.train_state.log_freq
+		return logger is not None and log_freq is not None and self.get_total_steps() % log_freq == 0
 	
 	def val_time(self):
 		val_freq = self.train_state.val_freq
@@ -612,14 +616,15 @@ class Run:
 		bar = restart_pbar()
 		
 		records = self.records
+		step_limit = self.train_state.step_limit
 		mode = 'train'
 		
 		while self.keep_going():
 		
 			out = self.train_step(force_step=True)
 		
-			if self.print_time():
-				self.print_step(out, '{}/train', measure_time=False)
+			if self.log_time():
+				self.log_step(out, '{}/train', measure_time=False)
 		
 			if self.val_time():
 				if bar is not None:
@@ -647,7 +652,20 @@ class Run:
 				                                            stats['loss'].smooth.item()) \
 					if stats['loss'].count > 0 else ''
 				bar.set_description('{} ckpt={}{}'.format(title, records['checkpoint'], loss_info))
-		
+
+			elif self.print_time():
+
+				total_steps = self.get_total_steps()
+				title = '{} ({})'.format(mode, records['total_epochs'][mode] + 1) \
+					if mode in records['total_epochs'] else mode
+				loss_info = 'Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
+				                                            stats['loss'].smooth.item()) \
+					if stats['loss'].count > 0 else ''
+
+				tm = time.strftime("%H:%M:%S")
+				print(f'[ {tm} ] {title} {total_steps}/{step_limit} {loss_info}')
+
+
 		self.exit_run('training complete')
 	
 	
@@ -677,6 +695,7 @@ class Run:
 		
 		Q.save_freq = A.pull('output.save_freq', -1)
 		Q.print_freq = A.pull('output.print_freq', None)
+		Q.log_freq = A.pull('output.log_freq', None)
 		Q.unique_tests = A.pull('output.unique_tests', False)
 		Q.model_val_stats_fmt = A.pull('training.model_val_stats_fmt', '<>training.model_stats_fmt', '{}')
 		Q.display_samples = A.pull('output.display_samples', False)  # count in terms of samples instead of iterations
@@ -757,7 +776,7 @@ class Run:
 		self.records['total_epochs'][mode] += 1
 		self.records['stats'][mode].append(stats.export())
 	
-	def print_step(self, out, tag_fmt='{}/train', measure_time=True):
+	def log_step(self, out, tag_fmt='{}/train', measure_time=True):
 		Q = self.train_state
 		logger = self.get_logger()
 		train_stats = Q.train_stats
@@ -778,7 +797,7 @@ class Run:
 			self.get_model().visualize(out, logger)
 		except AttributeError:
 			pass
-		
+
 		if measure_time:
 			Q.time_stats.update('viz', time.time() - start)
 		
@@ -884,7 +903,7 @@ class Run:
 			Q.time_stats.update(mode, time.time() - start)
 		
 		if out is not None:
-			self.print_step(out, '{}/{}'.format('{}', mode), measure_time=False)
+			self.log_step(out, '{}/{}'.format('{}', mode), measure_time=False)
 		
 		if bar is not None:
 			bar.close()
