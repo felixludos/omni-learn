@@ -38,7 +38,7 @@ def collect_info(run):
 	
 
 
-@fig.Script('report', description='compile a report of past runs')
+# @fig.Script('report', description='compile a report of past runs')
 def get_report(A):
 	
 	root = A.pull('saveroot', '<>root', None)

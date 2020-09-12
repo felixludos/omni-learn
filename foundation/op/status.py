@@ -100,7 +100,7 @@ def collect_q_cmd():
 	return active
 
 
-@fig.Script('status', description='check the status of jobs submitted to the cluster')
+# @fig.Script('status', description='check the status of jobs submitted to the cluster')
 def get_status(A):
 	
 	collect_q_cmd()

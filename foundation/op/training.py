@@ -68,6 +68,7 @@ def iterative_training(A=None, run=None):
 	if isinstance(model, Recordable):
 		model.stats.set_tau(tau)
 	A.push('output.print_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
+	A.push('output.log_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
 	
 	epochs = A.pull('training.epochs', 10)
 	step_limit = A.push('training.step_limit', epochs * epoch_len, overwrite=False)
