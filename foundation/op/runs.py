@@ -625,6 +625,8 @@ class Run:
 		
 			if self.log_time():
 				self.log_step(out, '{}/train', measure_time=False)
+
+				sys.stdout.flush()
 		
 			if self.val_time():
 				if bar is not None:
@@ -634,6 +636,8 @@ class Run:
 				
 				if self.keep_going():
 					bar = restart_pbar()
+
+				sys.stdout.flush()
 		
 			if self.save_time():
 				if bar is not None:
@@ -664,6 +668,8 @@ class Run:
 
 				tm = time.strftime("%H:%M:%S")
 				print(f'[ {tm} ] {title} {total_steps}/{step_limit} {loss_info}')
+
+				sys.stdout.flush()
 
 
 		self.exit_run('training complete')
