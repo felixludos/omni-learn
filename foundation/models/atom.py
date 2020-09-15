@@ -12,7 +12,7 @@ from .. import util
 from . import layers as layerslib
 
 
-def make_MLP(input_dim, output_dim, hidden_dims=[],
+def make_MLP(input_dim, output_dim, hidden_dims=None,
              initializer=None,
              nonlin='prelu', output_nonlin=None,
              bias=True, output_bias=None):
@@ -24,6 +24,9 @@ def make_MLP(input_dim, output_dim, hidden_dims=[],
 	:param output_nonlin: str - nonlinearity to be applied after the last (output) layer
 	:return: an nn.Sequential instance with the corresponding layers
 	'''
+
+	if hidden_dims is None:
+		hidden_dims = []
 
 	if output_bias is None:
 		output_bias = bias

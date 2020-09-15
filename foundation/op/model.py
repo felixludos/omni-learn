@@ -67,8 +67,6 @@ def load_model(A):
 	
 	return model
 
-fig.Component('model')(load_model)
-
 fig.AutoComponent('criterion')(util.get_loss_type)
 fig.AutoComponent('nonlin')(util.get_nonlinearity)
 fig.AutoComponent('normalization')(util.get_normalization)

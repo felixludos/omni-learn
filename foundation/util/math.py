@@ -204,7 +204,6 @@ def get_normalization(norm, num, groups=8, **kwargs):
 		return Lp_Normalization(**kwargs)
 	if norm == 'group':
 		return nn.GroupNorm(groups, num, **kwargs)
-
 	raise Exception('unknown norm type: {}'.format(norm))
 
 def get_pooling(down_type, factor, chn=None):
