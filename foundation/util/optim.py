@@ -60,31 +60,52 @@ def default_create_scheduler(optimizer, info):
 
 	factor = info.pull('scheduler_decay', 0.1)
 	min_lr = info.pull('scheduler_min_lr', 0.)
+	last = info.pull('scheduler_last_epoch', -1)
+
+	cut_after = info.pull('scheduler_cut_after', None)
+
+	common = {
+		'cut_after': cut_after,
+	}
 
 	req_loss = False
 	if name == 'step':
 		step_size = info.pull('scheduler_step')
-		out = StepLR(optimizer, step_size=step_size, gamma=factor)
+		out = StepLR(optimizer, step_size=step_size, gamma=factor, last_epoch=last, **common)
 	elif name == 'plateau':
 		patience = info.pull('scheduler_patience', 10)
 		cooldown = info.pull('scheduler_cooldown', 0)
 
 		out = ReduceOnPlateau(optimizer, factor=factor, patience=patience, verbose=True,
-		                                       min_lr=min_lr, cooldown=cooldown)
+		                                       min_lr=min_lr, cooldown=cooldown, **common)
 		req_loss = True
 
 	elif name == 'cos':
 		step_size = info.pull('scheduler_max_steps')
 		eta_min = min_lr
 		
-		out = CosineAnnealing(optimizer, T_max=step_size, eta_min=eta_min)
+		out = CosineAnnealing(optimizer, T_max=step_size, eta_min=eta_min, last_epoch=last, **common)
+
+	else:
+		raise Exception(f'unknown name {name}')
 
 	out.req_loss = req_loss
 
 	return out
 
+class Base_Scheduler(O.lr_scheduler._LRScheduler):
 
-class StepLR(O.lr_scheduler.StepLR):
+	def __init__(self, *args, cut_after=None, **kwargs):
+
+		self.cut_after = cut_after
+		super().__init__(*args, **kwargs)
+
+	def step(self, *args, **kwargs):
+		if self.cut_after is not None and self._step_count > self.cut_after:
+			return
+		return super().step(*args, **kwargs)
+
+class StepLR(Base_Scheduler, O.lr_scheduler.StepLR):
 	def __str__(self):
 		return self.__repr__()
 
@@ -92,23 +113,21 @@ class StepLR(O.lr_scheduler.StepLR):
 		return 'StepLR(step={}, gamma={})'.format(self.step_size, self.gamma)
 
 
-class MultiStepLR(O.lr_scheduler.MultiStepLR):
+class MultiStepLR(Base_Scheduler, O.lr_scheduler.MultiStepLR):
 	def __str__(self):
 		return self.__repr__()
 
 	def __repr__(self):
 		return 'MultiStepLR(milestones={}, gamma={})'.format(self.milestones, self.gamma)
 
-class ReduceOnPlateau(O.lr_scheduler.ReduceLROnPlateau):
-
+class ReduceOnPlateau(Base_Scheduler, O.lr_scheduler.ReduceLROnPlateau):
 	def __str__(self):
 		return self.__repr__()
 
 	def __repr__(self):
 		return 'ReduceOnPlateau(factor={}, patience={}, cooldown={})'.format(self.factor, self.patience, self.cooldown)
 
-class CosineAnnealing(O.lr_scheduler.CosineAnnealingLR):
-	
+class CosineAnnealing(Base_Scheduler, O.lr_scheduler.CosineAnnealingLR):
 	def __str__(self):
 		return self.__repr__()
 	

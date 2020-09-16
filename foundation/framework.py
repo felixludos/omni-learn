@@ -213,9 +213,9 @@ class Optimizable(Recordable):
 				optim = next(iter(sub_optims.values()))
 			else:
 				if len(params):
-					if 'self' in sub_optims:
-						raise Exception('invalid names: {} already in {}'.format('self', sub_optims.keys()))
-					sub_optims['self'] = util.default_create_optim(params, optim_info)
+					if 'me' in sub_optims:
+						raise Exception('invalid names: {} already in {}'.format('me', sub_optims.keys()))
+					sub_optims['me'] = util.default_create_optim(params, optim_info)
 				optim = util.Complex_Optimizer(**sub_optims)
 		else:
 			optim = util.default_create_optim(self.parameters(), optim_info)
@@ -258,7 +258,7 @@ class Schedulable(Optimizable):
 		if isinstance(self.optim, util.Complex_Optimizer):
 			my_opt = None
 			for name, opt in self.optim.items():
-				if name == 'self':
+				if name == 'me':
 					my_opt = opt
 				else:
 					child = getattr(self, name)
@@ -266,10 +266,10 @@ class Schedulable(Optimizable):
 						schs[name] = child.scheduler
 		
 			if my_opt is not None:
-				schs['self'], req = util.default_create_scheduler(my_opt, info)
-				if schs['self'] is not None:
+				schs['me'], req = util.default_create_scheduler(my_opt, info)
+				if schs['me'] is not None:
 				
-					schs['self'].req_loss = req
+					schs['me'].req_loss = req
 		
 			sch = util.Complex_Scheduler(**schs)
 		
