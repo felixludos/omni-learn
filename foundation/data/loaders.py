@@ -71,7 +71,7 @@ class Featured_DataLoader(Seedable, DataLoader):
 
 
 
-class BatchedDataLoader(Seedable): # loads full batches at a time (dataset must be Batched
+class BatchedDataLoader(Featured_DataLoader, Seedable): # loads full batches at a time (dataset must be Batched
 
 	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False,
 	             auto_reset=False, device=None):
@@ -169,7 +169,7 @@ class _BatchedDataLoaderIter(object):
 		self.idx += 1
 
 		return util.to(batch, self.device)
-		return batch
+		# return batch
 
 	def __getitem__(self, item):
 		return self.dataset[self.batches[item]]

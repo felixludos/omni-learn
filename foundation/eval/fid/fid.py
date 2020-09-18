@@ -56,6 +56,14 @@ def compute_inception_stat(generate, inception=None, batch_size=50, n_samples=50
 		N = min(batch_size, n_samples - j)
 
 		samples = generate(N)
+		
+		N, C, H, W = samples.shape
+		if C == 1:
+			samples = torch.cat([samples]*3, dim=1)
+		if C > 3:
+			samples = samples[:,:3].contiguous()
+		
+		
 		with torch.no_grad():
 			pred = inception(samples)[0]
 

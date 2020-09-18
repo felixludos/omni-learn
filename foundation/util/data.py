@@ -20,10 +20,13 @@ import h5py as hf
 
 
 class make_infinite(DataLoader):
-	def __init__(self, loader):
+	def __init__(self, loader, extractor=None):
 		assert len(loader) >= 1, 'has no len'
 		self.loader = loader
 		self.itr = None
+		self.extractor = extractor
+		
+		self.cached = None
 	
 	def __len__(self):
 		return len(self.loader)
@@ -40,16 +43,23 @@ class make_infinite(DataLoader):
 		:return:
 		'''
 		
+		if extract is None:
+			extract = self.extractor
+		
 		missing = N
 		batches = []
 		
 		while missing > 0:
-			x = next(self)
-			if extract is None:# by default, assume batch is a tuple and pull first element
-				x = x[0]
+			if self.cached is None:
+				x = next(self)
+				# by default, assume batch is a tuple and pull first element
+				x = x[0] if extract is None else extract(x)
 			else:
-				x = extract(x)
+				x = self.cached
+				self.cached = None
+			
 			if len(x) > missing:
+				self.cached = x[missing:]
 				x = x[:missing]
 			missing -= len(x)
 			batches.append(x)

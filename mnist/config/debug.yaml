@@ -1,5 +1,21 @@
 
-_meta.script_name: train
+
+_meta.script_name: compute-fid
+
+
+dataset:
+  name: mnist
+
+  drop_last: False
+
+batch_size: 250
+
+pbar: True
+
+#fid-dim: 64
+#n-samples: 10
+
+#_meta.script_name: train
 
 #  script_name: eval
 
@@ -13,15 +29,15 @@ _meta.script_name: train
 
 #extend: 5000
 
-parents: ['demo']
+#parents: ['demo']
 
 
 
-name: 'test-pycharm'
+#name: 'test-pycharm'
 
 #inline: True
 
-dataset.name: mnist
+#dataset.name: mnist
 
 #output.save_freq: 800
 

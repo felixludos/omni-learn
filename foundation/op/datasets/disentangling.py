@@ -28,7 +28,7 @@ def _rec_decode(obj):
 		return obj.decode()
 	return obj
 
-@Dataset('dSprites')
+@Dataset('dsprites')
 class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 
 	din = (1, 64, 64)

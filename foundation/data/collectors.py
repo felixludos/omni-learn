@@ -88,7 +88,7 @@ class Loadable_Dataset(Dataset):
 		num_workers = info.pull('num_workers', 0)
 		batch_size = info.pull('batch_size', 64)
 		shuffle = info.pull('shuffle', True)
-		drop_last = info.pull('drop_last', True)
+		drop_last = info.pull('drop_last', False)
 		device = info.pull('device', 'cpu')
 		return get_loaders(self, batch_size=batch_size, num_workers=num_workers,
 		                   shuffle=shuffle, drop_last=drop_last, device=device)

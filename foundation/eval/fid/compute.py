@@ -2,6 +2,8 @@
 import sys, os  #, traceback, ipdb
 from tqdm import tqdm
 
+import h5py as hf
+
 import numpy as np
 
 from omnibelt import load_yaml, save_yaml
@@ -31,28 +33,22 @@ def compute_fid(A):
 	if out_path is None:
 		dataroot = A.pull('root', '<>dataset.dataroot', None)
 		name = A.pull('name', '<>dataset.name', dataset.__class__.__name__)
-		if 'yaml' not in name:
-			name = os.path.join(name, 'fid_stats.yaml')
+		if '.h5' not in name:
+			name = os.path.join(name, 'fid_stats.h5')
 		out_path = os.path.join(dataroot, name)
 
 	print(f'Will save to {out_path}')
-
-	if os.path.isfile(out_path):
-		print(f'Found existing stats in {out_path}')
-		old = load_yaml(out_path)
-	else:
-		old = []
-
-	stats = []
-	for stat in old:
-		if stat['mode'] == mode and stat['dim'] == fid_dim:
-			print(f'Found previously computed stats for {mode} with dim {fid_dim}')
-			overwrite = A.pull('overwrite', False)
-			if not overwrite:
-				print('Will not overwrite')
-				return np.array(stats['mu']), np.array(stats['sigma'])
-		else:
-			stats.append(stat)
+	
+	f = hf.File(out_path, 'r+') if os.path.isfile(out_path) else hf.File(out_path, 'w')
+	
+	key = f'{mode}_{fid_dim}'
+	
+	if f'{key}_mu' in f.keys():
+		print(f'Found previously computed stats for {mode} with dim {fid_dim}')
+		overwrite = A.pull('overwrite', False)
+		if not overwrite:
+			print('Will not overwrite')
+			return f[f'{key}_mu'][()], f[f'{key}_sigma'][()]
 
 	if len(dataset) < n_samples:
 		print(f'WARNING: dataset only contains {len(dataset)}, so that is set to n-samples')
@@ -64,8 +60,18 @@ def compute_fid(A):
 	inception_model = load_inception_model(dim=fid_dim, device=device)
 	print('done')
 
-	loader = dataset.to_loader(A)
-	true_loader = util.make_infinite(loader)
+	loader = dataset.to_loader(A.sub('dataset'))
+	
+	def _extract(batch):
+		if isinstance(batch, torch.Tensor):
+			return batch
+		elif isinstance(batch, (list, tuple)):
+			return batch[0]
+		elif isinstance(batch, dict):
+			return batch['x']
+		return batch
+	
+	true_loader = util.make_infinite(loader, extractor=_extract)
 	def true_fn(N):
 		return util.to(true_loader.demand(N), device)[0]
 
@@ -81,14 +87,19 @@ def compute_fid(A):
 
 	print('Dataset (gt) fid stats computed.')
 
-	stats.append({
-		'mu': m.tolist(),
-		'sigma': s.tolist(),
-		'mode': mode,
-		'dim': fid_dim,
-	})
+	mkey = f'{mode}_{fid_dim}_mu'
+	if mkey in f:
+		f[mkey][:] = m
+	else:
+		f.create_dataset(mkey, data=m)
 
-	save_yaml(stats, out_path)
+	skey = f'{mode}_{fid_dim}_sigma'
+	if skey in f:
+		f[skey][:] = s
+	else:
+		f.create_dataset(skey, data=s)
+
+	f.close()
 
 	return m, s
 
