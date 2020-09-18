@@ -56,7 +56,13 @@ class Featured_DataLoader(Seedable, DataLoader):
 	# 	itr.__next__ = _move_to
 	#
 	# 	return itr
-	
+
+	def get_dataset(self):
+		return self.dataset
+
+	def get_batch_size(self):
+		return self.batch_size
+
 	def __iter__(self):
 		if self.num_workers == 0:
 			return Featured_SingleProcessIter(self)

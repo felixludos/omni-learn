@@ -721,12 +721,15 @@ class Run:
 			if not self.silent:
 				print('WARNING: saving more than once per epoch: checkpoint every {} iterations'.format(save_freq))
 			
-			assert save_freq > 100, 'not allowed to save more often than once every 100 steps -- remember 55-8'
+			# assert save_freq > 100, 'not allowed to save more often than once every 100 steps -- remember 55-8'
 			
 			quick_save = A.pull('output.quick_save', False)  # force saving so frequently
-			
+
 			if not quick_save:
-				save_freq = len(trainloader)
+				raise Exception('not allowed to save more often than once every 100 steps')
+
+			# if not quick_save:
+			# 	save_freq = len(trainloader)
 		if not self.silent and (save_freq is not None and save_freq > 0):
 			print(f'Will save a checkpoint every {save_freq} steps')
 		Q.save_freq = save_freq
@@ -979,6 +982,7 @@ class Run:
 			raise NoOverwriteError
 		
 		self.eval_mode = 'test' if use_testset else 'val'
+		A.push('eval.mode', self.eval_mode, overwrite=False)
 		self.eval_dataloader = None
 		
 	def evaluate(self, mode=None, dataloader=None):
@@ -998,7 +1002,7 @@ class Run:
 		
 		loader = self.start_loader(mode, dataloader=dataloader)
 		
-		results = model.evaluate(loader, A=self.get_config().eval, run=self)
+		results = model.evaluate(loader, A=self.get_config().sub('eval'), run=self)
 		
 		return results
 		

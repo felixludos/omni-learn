@@ -129,7 +129,7 @@ class KMNIST(Torchvision_Toy_Dataset):
 
 		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
 
-@Dataset('data/fmnist')
+@Dataset('fmnist')
 class FashionMNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
 	dout = 10

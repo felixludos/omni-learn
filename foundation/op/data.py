@@ -9,7 +9,7 @@ import omnifig as fig
 
 from ..data import get_loaders, Info_Dataset, Subset_Dataset, simple_split_dataset, DataLoader, BatchedDataLoader
 from .. import util
-from .. import framework as fm
+from ..op.runs import wrap_script
 
 dataset_registry = util.Registry()
 
@@ -128,8 +128,9 @@ def load_data(A, mode=None):
 	mode = A.push('mode', mode, overwrite=mode_override)
 	A.push('train', mode == 'train')
 	
-	seed = A.pull('seed')
-	util.set_seed(seed)
+	seed = A.pull('seed', None)
+	if seed is not None:
+		util.set_seed(seed)
 	
 	dataset = A.pull_self()
 	# dataset = fig.create_component(A)
@@ -165,9 +166,18 @@ def load_data(A, mode=None):
 			raise e
 	
 	datasets = {mode: dataset}
-	
+
+	dataset_only = A.pull('dataset-only', True)
+
 	if mode == 'train':
 		datasets = standard_split(datasets, A)
+
+		if dataset_only and 'val' in datasets and datasets['val'] is None:
+			return datasets['train']
+
+	if len(datasets) == 1 and dataset_only:
+			return next(iter(datasets.values()))
+
 	return datasets
 
 

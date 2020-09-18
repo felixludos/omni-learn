@@ -114,8 +114,10 @@ def iterative_training(A=None, run=None):
 	#####################
 	# region Run Evaluation
 	#####################
-	
-	if isinstance(model, Evaluatable):
+
+	include_eval = A.pull('eval-after-training', True)
+
+	if include_eval and isinstance(model, Evaluatable):
 		eval_model(A, run=run)
 		
 	# endregion

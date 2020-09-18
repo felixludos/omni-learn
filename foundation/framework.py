@@ -61,7 +61,7 @@ class Model(nn.Module):  # any vector function
 	def load_state_dict(self, state_dict, **kwargs):
 		for name, buffer in state_dict.get('buffers', {}).items():
 			self.register_buffer(name, buffer, save=True)
-		for name, data in state_dict.get('attrs', {}):
+		for name, data in state_dict.get('attrs', {}).items():
 			self.register_attr(name, data)
 		return super().load_state_dict(state_dict['parameters']
 		                               if 'parameters' in state_dict
@@ -154,12 +154,11 @@ class Visualizable(Recordable):
 
 class Evaluatable(Recordable): # TODO: maybe not needed
 
-	def evaluate(self, loader, A=None, run=None):
+	def evaluate(self, loader, logger=None, A=None, run=None):
 		# self._eval_counter += 1
-		out = self._evaluate(loader, A=A, run=run)
-		return out
+		return self._evaluate(loader, logger=logger, A=A, run=run)
 
-	def _evaluate(self, loader, A=None, run=None):
+	def _evaluate(self, loader, logger=None, A=None, run=None):
 		pass # by default eval does nothing
 	# 	raise NotImplementedError
 
