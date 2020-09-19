@@ -1,6 +1,8 @@
 
 import os
 
+import h5py as hf
+
 import numpy as np
 import torch
 from torch.nn import functional as F
@@ -10,7 +12,7 @@ import torchvision
 from foundation import util
 from ..data import Dataset
 
-from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset
+from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
 
 from .transforms import Interpolated
 
@@ -23,7 +25,8 @@ def _get_common_args(A):
 	return dataroot, {'download': download, 'train': train}
 
 
-class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Batchable_Dataset, util.Simple_Child):
+class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Image_Dataset,
+                              Info_Dataset, Batchable_Dataset, util.Simple_Child):
 
 	# def __init__(self, dataset=None, dataroot=None, download=True, label=True, label_attr='targets',
 	#              train=True, din=(1,28,28), dout=10, resize=True,
@@ -32,7 +35,7 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 
 
 	def __init__(self, dataset, train=True, label_attr=None, din=None, dout=None,
-	             A=None, **unused):
+	             A=None, root=None, **unused):
 		'''
 		Requires dataset object to wrap it (since this is a `util.Simple_Child`).
 
@@ -43,6 +46,7 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 		:param label_attr: attr name used to access labels in `dataset`
 		:param din: optional (if it has to be overwritten)
 		:param dout: optional (if it has to be overwritten)
+		:param root: path to dataset files
 		'''
 
 		# dataroot = A.pull('dataroot', None)
@@ -64,10 +68,12 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Info_Dataset, Ba
 			dout = self.din if din is None else din
 
 
-		super().__init__(din=din, dout=dout, train=train, _parent='dataset')
+		super().__init__(din=din, dout=dout, root=root, train=train, _parent='dataset')
 
 		self.dataset = dataset
 		self.labeled = label_attr is not None
+
+		# self.root = root
 
 		images = self.dataset.data
 		if isinstance(images, np.ndarray):
@@ -109,11 +115,13 @@ class MNIST(Torchvision_Toy_Dataset):
 
 	def __init__(self, A):
 		dataroot, kwargs = _get_common_args(A)
-		dataset = torchvision.datasets.MNIST(os.path.join(dataroot, 'mnist'), **kwargs)
+		root = os.path.join(dataroot, 'mnist')
+		dataset = torchvision.datasets.MNIST(root, **kwargs)
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None,
+		                 root=root, **kwargs)
 
 @Dataset('kmnist')
 class KMNIST(Torchvision_Toy_Dataset):
@@ -123,11 +131,13 @@ class KMNIST(Torchvision_Toy_Dataset):
 	def __init__(self, A):
 
 		dataroot, kwargs = _get_common_args(A)
-		dataset = torchvision.datasets.KMNIST(os.path.join(dataroot, 'kmnist'), **kwargs)
+		root = os.path.join(dataroot, 'kmnist')
+		dataset = torchvision.datasets.KMNIST(root, **kwargs)
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None,
+		                 root=root, **kwargs)
 
 @Dataset('fmnist')
 class FashionMNIST(Torchvision_Toy_Dataset):
@@ -137,11 +147,13 @@ class FashionMNIST(Torchvision_Toy_Dataset):
 	def __init__(self, A):
 
 		dataroot, kwargs = _get_common_args(A)
-		dataset = torchvision.datasets.FashionMNIST(os.path.join(dataroot, 'fmnist'), **kwargs)
+		root = os.path.join(dataroot, 'fmnist')
+		dataset = torchvision.datasets.FashionMNIST(root, **kwargs)
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None,
+		                 root=root, **kwargs)
 
 @Dataset('emnist')
 class EMNIST(Torchvision_Toy_Dataset):
@@ -151,10 +163,11 @@ class EMNIST(Torchvision_Toy_Dataset):
 	def __init__(self, A):
 
 		dataroot, kwargs = _get_common_args(A)
+		root = os.path.join(dataroot, 'emnist')
 
 		split = A.pull('split', 'letters')
 
-		dataset = torchvision.datasets.EMNIST(os.path.join(dataroot, 'emnist'), split=split, **kwargs)
+		dataset = torchvision.datasets.EMNIST(root, split=split, **kwargs)
 
 		dataset.targets -= 1  # targets use 1-based indexing :(
 
@@ -166,7 +179,8 @@ class EMNIST(Torchvision_Toy_Dataset):
 				raise NotImplementedError
 			dout = 26
 
-		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, dout=dout, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None,
+		                 dout=dout, root=root, **kwargs)
 
 @Dataset('svhn')
 class SVHN(Torchvision_Toy_Dataset):
@@ -176,15 +190,17 @@ class SVHN(Torchvision_Toy_Dataset):
 	def __init__(self, A):
 
 		dataroot, kwargs = _get_common_args(A)
+		root = os.path.join(dataroot, 'svhn')
 
 		split = 'train' if kwargs['train'] else 'test'
 		del kwargs['train']
 
-		dataset = torchvision.datasets.SVHN(os.path.join(dataroot, 'svhn'), split=split, **kwargs)
+		dataset = torchvision.datasets.SVHN(root, split=split, **kwargs)
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, A=A, label_attr='labels' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='labels' if labeled else None,
+		                 root=root, **kwargs)
 
 @Dataset('cifar')
 class CIFAR(Torchvision_Toy_Dataset):
@@ -194,17 +210,19 @@ class CIFAR(Torchvision_Toy_Dataset):
 	def __init__(self, A):
 
 		dataroot, kwargs = _get_common_args(A)
+		root = os.path.join(dataroot, 'cifar')
 
 		classes = A.pull('classes', 10)
 
 		assert classes in {10, 100}, 'invalid number of classes for cifar: {}'.format(classes)
 
 		cls = torchvision.datasets.CIFAR10 if classes == 10 else torchvision.datasets.CIFAR100
-		dataset = cls(os.path.join(dataroot, 'cifar'), **kwargs)
+		dataset = cls(root, **kwargs)
 
 		labeled = A.pull('labeled', False)
 
-		super().__init__(dataset, A=A, label_attr='targets' if labeled else None, **kwargs)
+		super().__init__(dataset, A=A, label_attr='targets' if labeled else None,
+		                 root=root, **kwargs)
 
 		self.images = self.images.permute(0, 3, 1, 2).contiguous()
 

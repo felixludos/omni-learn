@@ -39,7 +39,7 @@ def eval_model(A, run=None):
 	except NoOverwriteError:
 		print('No overwrite, so will exit without doing anything now')
 		return 0
-	
+
 	model = run.get_model()
 	
 	print(model)
@@ -49,10 +49,6 @@ def eval_model(A, run=None):
 	print('Model has {} parameters'.format(util.count_parameters(model)))
 	
 	results = run.evaluate()
-	
-	if results is not None:
-		ident = run.eval_identifier
-		run.save_results(ident, results)
 	
 	return A, results, run
 

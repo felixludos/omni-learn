@@ -24,7 +24,23 @@ def load_inception_model(dim=2048, device='cuda'):
 	model._device = device
 	return model
 
+def apply_inception(samples, inception, include_grad=False):
+	N, C, H, W = samples.shape
+	if C == 1:
+		samples = torch.cat([samples] * 3, dim=1)
+	if C > 3:
+		samples = samples[:, :3].contiguous()
 
+	if include_grad:
+		pred = inception(samples)[0]
+	else:
+		with torch.no_grad():
+			pred = inception(samples)[0]
+
+	if pred.shape[2] != 1 or pred.shape[3] != 1:
+		pred = F.adaptive_avg_pool2d(pred, output_size=(1, 1))
+
+	return pred
 
 def compute_inception_stat(generate, inception=None, batch_size=50, n_samples=50000,
                      dim=2048, device='cuda', pbar=None):
@@ -56,19 +72,8 @@ def compute_inception_stat(generate, inception=None, batch_size=50, n_samples=50
 		N = min(batch_size, n_samples - j)
 
 		samples = generate(N)
-		
-		N, C, H, W = samples.shape
-		if C == 1:
-			samples = torch.cat([samples]*3, dim=1)
-		if C > 3:
-			samples = samples[:,:3].contiguous()
-		
-		
-		with torch.no_grad():
-			pred = inception(samples)[0]
 
-		if pred.shape[2] != 1 or pred.shape[3] != 1:
-			pred = F.adaptive_avg_pool2d(pred, output_size=(1, 1))
+		pred = apply_inception(samples, inception)
 
 		pred_arr[j:j+N] = pred.cpu().numpy().reshape(N, -1)
 

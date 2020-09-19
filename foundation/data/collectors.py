@@ -1,4 +1,5 @@
 
+import sys, os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -193,6 +194,26 @@ class Indexed_Dataset(Dataset):
 
 	def __getitem__(self, idx):
 		return idx, self.dataset[idx]
+
+class Image_Dataset(Dataset):
+
+	def __init__(self, *args, root=None, **other):
+		super().__init__(*args, **other)
+		self.root = root
+
+	def get_fid_stats(self, mode, dim):
+
+		path = os.path.join(self.root, 'fid_stats.h5')
+
+		if os.path.isfile(path):
+			with hf.File(path, 'r') as f:
+				key = f'{mode}_{dim}'
+				if f'{key}_mu' in f:
+					return f[f'{key}_mu'][()], f[f'{key}_sigma'][()]
+				else:
+					raise Exception(f'{key} not found: {str(f.keys())}')
+
+		raise Exception(f'no fid stats file found in: {self.root}')
 
 class Replay_Buffer(Dataset):
 	def __init__(self, buffer_size):

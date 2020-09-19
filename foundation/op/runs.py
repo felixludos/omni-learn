@@ -672,7 +672,7 @@ class Run:
 				sys.stdout.flush()
 
 
-		self.exit_run('training complete')
+		# self.exit_run('training complete')
 	
 	
 	def startup(self):
@@ -965,13 +965,12 @@ class Run:
 		
 		if not self.silent:
 			print(f'Loaded best model, trained for {total_steps} iterations')
-		
+
+		self.eval_identifier = A.push('eval.identifier', 'eval')
+
 		logger.set_step(total_steps)
 		logger.set_tag_format('{}/{}'.format(self.eval_identifier, '{}'))
-		
-		
-		self.eval_identifier = A.pull('eval.identifier', 'eval')
-		
+
 		root = self.get_save_path()
 		assert root is not None, 'Apparently no save_dir was found'
 		
@@ -980,30 +979,28 @@ class Run:
 		if not self.silent and os.path.isfile(self.results_path) and not overwrite:
 			print('WARNING: will not overwrite results, so skipping evaluation')
 			raise NoOverwriteError
-		
-		self.eval_mode = 'test' if use_testset else 'val'
-		A.push('eval.mode', self.eval_mode, overwrite=False)
-		self.eval_dataloader = None
+
+		self.eval_mode = A.push('eval.mode', 'test' if use_testset else 'val', overwrite=False)
+		# self.eval_dataloader = None
 		
 	def evaluate(self, mode=None, dataloader=None):
-		
-		if dataloader is None:
-			dataloader = self.eval_dataloader
+
 		if mode is None:
 			mode = self.eval_mode
-		
+		if dataloader is None:
+			dataloader = self.get_loaders(mode)
+
 		model = self.get_model()
-		
-		if mode is not None:
-			model.pre_epoch(mode, self.records)
-			self.get_datasets(mode).pre_epoch(mode, self.records)
-		
+
 		model.eval()
-		
-		loader = self.start_loader(mode, dataloader=dataloader)
-		
-		results = model.evaluate(loader, A=self.get_config().sub('eval'), run=self)
-		
+
+		results = model.evaluate(dataloader, logger=self.get_logger(),
+		                         A=self.get_config().sub('eval'), run=self)
+
+		if results is not None:
+			ident = self.eval_identifier
+			self.save_results(ident, results)
+
 		return results
 		
 	def exit_run(self, cause, code=0):

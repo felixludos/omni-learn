@@ -8,7 +8,7 @@ from torch.nn import functional as F
 
 from foundation import util
 from ..data import Dataset
-from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset
+from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
 
 from .transforms import Cropped
 
@@ -29,7 +29,7 @@ def _rec_decode(obj):
 	return obj
 
 @Dataset('dsprites')
-class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
+class dSprites(Device_Dataset, Info_Dataset, Image_Dataset, Batchable_Dataset):
 
 	din = (1, 64, 64)
 	dout = 5
@@ -37,6 +37,7 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 	def __init__(self, A):
 
 		dataroot = A.pull('dataroot', None)
+		root = None
 
 		label_type = A.pull('label_type', None)
 
@@ -54,8 +55,8 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 		super().__init__(din=din, dout=din if dout is None else dout)
 
 		if dataroot is not None:
-
-			path = os.path.join(dataroot, 'dsprites', filename)
+			root = os.path.join(dataroot, 'dsprites')
+			path = os.path.join(root, filename)
 			print('Loading dSprites dataset from disk: {}'.format(path))
 			data = np.load(path, allow_pickle=True, encoding='bytes')
 
@@ -73,6 +74,7 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 				self.register_buffer('labels', labels)
 
 		self.labeled = hasattr(self, 'labels')
+		self.root = root
 
 	def get_raw_data(self):
 		if self.labeled:
@@ -89,7 +91,7 @@ class dSprites(Device_Dataset, Info_Dataset, Batchable_Dataset):
 		return imgs,
 
 @Dataset('3dshapes')
-class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset):
+class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Image_Dataset, Testable_Dataset):
 
 	din = (3, 64, 64)
 	dout = 6
@@ -97,6 +99,7 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 	def __init__(self, A):
 
 		dataroot = A.pull('dataroot', None)
+		root = None
 
 		load_memory = A.pull('load_memory', True)
 		train = A.pull('train', True)
@@ -120,7 +123,9 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 				file_name = '3dshapes_train.h5'
 			else:
 				file_name = '3dshapes_test.h5'
-			with hf.File(os.path.join(dataroot, '3dshapes', file_name), 'r') as data:
+
+			root = os.path.join(dataroot, '3dshapes')
+			with hf.File(os.path.join(root, file_name), 'r') as data:
 
 				images = data['images']
 				images = torch.from_numpy(images[()]).permute(0,3,1,2)#.float().div(255)
@@ -132,16 +137,7 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Testable_Dataset
 
 				self.register_buffer('labels', labels)
 
-		myroot = os.path.join(dataroot, '3dshapes')
-		if '3dshapes_stats_fid.pkl' in os.listdir(myroot):
-			
-			p = pickle.load(open(os.path.join(myroot, '3dshapes_stats_fid.pkl'), 'rb'))
-			
-			self.fid_stats = p['m'], p['sigma']
-			
-			print('Found FID Stats')
-		else:
-			print('WARNING: Unable to load FID stats for this dataset')
+		self.root = root
 
 		# if noise is not None:
 		# 	print('Adding {} noise'.format(noise))
