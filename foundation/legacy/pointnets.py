@@ -16,22 +16,20 @@ from foundation import util
 
 
 @fig.Component('point-enc')
-class PointEncoder(fd.Encodable, fd.Visualizable, fd.Schedulable, fd.Model):
+class PointEncoder(fd.Encodable, fd.Visualizable, fd.Model):
 
 	def __init__(self, A):
 		in_shape = A.pull('in_shape', '<>din')
 		latent_dim = A.pull('latent_dim', '<>dout')
 
-		assert 'transform' in A, 'transofrm required to go from image to point cloud'
-		A.transform.in_shape = in_shape
+		A.push('in_shape', in_shape, overwrite=False, silent=True)
 
 		transform = A.pull('transform')  # converts the image into a point cloud
-
-		assert 'pointnet' in A, 'pointnet required for this encoder'
 		pout, N = transform.dout
 
-		A.pointnet.pin = pout
-		A.pointnet.n_points = N
+
+		A.push('pin', pout)
+		A.push('n_points', N)
 
 		pointnet = A.pull('pointnet')
 
@@ -40,17 +38,16 @@ class PointEncoder(fd.Encodable, fd.Visualizable, fd.Schedulable, fd.Model):
 		self.transform = transform
 		self.pointnet = pointnet
 
-	# self.set_optim(A)
-	# self.set_scheduler(A)
+	def visualize(self, info, logger):
+		if not self.training or self._viz_counter % 2 == 0:
+			super().visualize(info, logger)
+		else:
+			self._viz_counter += 1
 
 	def _visualize(self, out, logger):  # TODO
-
-		if self._viz_counter % 2 == 0:
-			for m in self.pointnet.tfms:
-				if isinstance(m, fd.Visualizable):
-					m.visualize(out, logger)
-
-		pass
+		for m in self.pointnet.tfms:
+			if isinstance(m, fd.Visualizable):
+				m._visualize(out, logger)
 
 	def forward(self, x):  # images
 
@@ -122,8 +119,10 @@ class Patch_Points(fd.Model):
 
 
 @fig.AutoComponent('1dconv-net')
-def make_pointnet(pin, pout, hidden=[],
+def make_pointnet(pin, pout, hidden=None,
                   nonlin='prelu', output_nonlin=None):
+	if hidden is None:
+		hidden = []
 	nonlins = [nonlin] * len(hidden) + [output_nonlin]
 	hidden = [pin] + list(hidden) + [pout]
 
@@ -154,10 +153,10 @@ class PointNet(fd.Trainable_Model):
 
 		modules = []
 
-		nxt = create_module.current()
-		assert nxt is not None, 'no point-net modules provided'
-		nxt.pin = pin
-		nxt.N = n_points
+		nxt = create_module.view()
+		# assert nxt is not None, 'no point-net modules provided'
+		nxt.push('pin', pin, silent=True)
+		nxt.push('N', n_points, silent=True)
 
 		for module in create_module:
 
@@ -165,35 +164,40 @@ class PointNet(fd.Trainable_Model):
 				n_points = module.nout
 
 			modules.append(module)
+			try:
+				nxt = create_module.view()
+			except StopIteration:
+				break
+			else:
+				nxt.push('pin', module.pout, silent=True)
+				nxt.push('pin1', module.pout1, silent=True)
+				nxt.push('pin2', module.pout2, silent=True)
+				nxt.push('N', n_points, silent=True)
 
-			nxt = create_module.current()
-			if nxt is not None:
-				nxt.pin = module.pout
-				nxt.pin1 = module.pout1
-				nxt.pin2 = module.pout2
-				nxt.N = n_points
-				if nxt._type == 'point-dual':
+				if nxt.pull('_type', None, silent=True) == 'point-dual':
 					if 'left' in nxt:
-						nxt.left.pin = module.pout1
+						nxt.push('left.pin', module.pout1, silent=True)
 					if 'right' in nxt:
-						nxt.right.pin = module.pout2
+						nxt.push('right.pin', module.pout2, silent=True)
 
 		pout = module.pout
 		assert pout is not None, f'last module must have a single output: {module}'
 
 		self.tfms = nn.Sequential(*modules)
 
-		if 'pool' in A and '_type' in A.pool:
-			A.pool.din = (pout, n_points)
+		pool_type = A.pull('pool._type', None, silent=True)
+		if pool_type is not None:
+			A.push('pool.din', (pout, n_points), silent=True)
 		# A.pool.pin = pout
 		# A.pool.N = n_points
 		self.pool = A.pull('pool', None)
 		if self.pool is not None:
 			pout = self.pool.dout
 
-		if 'final' in A:
-			A.final.din = pout
-			A.final.dout = dout
+		final_type = A.pull('final._type', None, silent=True)
+		if final_type is not None:
+			A.push('final.din', pout, silent=True)
+			A.push('final.dout', dout, silent=True)
 		final = A.pull('final', None)
 
 		if final is not None:  # make sure final will produce the right output
@@ -310,7 +314,7 @@ class PointTransformNet(PointTransform):
 
 @fig.AutoComponent('point-self')
 class PointSelfTransform(PointTransformNet):
-	def __init__(self, pin, pout, hidden=[], nonlin='prelu', output_nonlin=None):
+	def __init__(self, pin, pout, hidden=None, nonlin='prelu', output_nonlin=None):
 		super().__init__(make_pointnet(pin, pout, hidden=hidden, nonlin=nonlin,
 		                               output_nonlin=output_nonlin))
 

@@ -138,7 +138,7 @@ class Visualizable(Recordable):
 		super().__init__(*args, **kwargs)
 		self.reset_viz_counter()
 	def reset_viz_counter(self):
-		self._viz_counter = -1
+		self._viz_counter = 0
 	def visualize(self, info, logger): # records output directly to logger
 		self._viz_counter += 1
 		with torch.no_grad():

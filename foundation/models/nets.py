@@ -55,7 +55,7 @@ class Multihead(fm.Model): # currently, the input dim for each head must be the 
 		if merge != 'concat':
 			raise NotImplementedError
 		
-		A.heads.din = pin
+		A.push('heads.din', pin, silent=True)
 		create_head = A.pull('heads')
 		
 		head_douts = A.pull('head_douts', None)
@@ -68,14 +68,18 @@ class Multihead(fm.Model): # currently, the input dim for each head must be the 
 		
 		heads = []
 		
-		nxt = create_head.current()
+		nxt = create_head.view()
 		if head_douts is not None:
-			nxt.dout = next(idouts)
+			nxt.push('dout', next(idouts), silent=True)
 		for head in create_head:
 			heads.append(head)
-			nxt = create_head.current()
-			if nxt is not None and head_douts is not None:
-				nxt.dout = next(idouts)
+			try:
+				nxt = create_head.view()
+			except StopIteration:
+				break
+			else:
+				if head_douts is not None:
+					nxt.push('dout', next(idouts), silent=True)
 		
 		assert N == len(heads), f'{N} vs {len(heads)}'
 		
