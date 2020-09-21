@@ -219,12 +219,12 @@ class CIFAR(Torchvision_Toy_Dataset):
 		cls = torchvision.datasets.CIFAR10 if classes == 10 else torchvision.datasets.CIFAR100
 		dataset = cls(root, **kwargs)
 
+		dataset.data = dataset.data.transpose(0,3,1,2)
+
 		labeled = A.pull('labeled', False)
 
 		super().__init__(dataset, A=A, label_attr='targets' if labeled else None,
 		                 root=root, **kwargs)
-
-		self.images = self.images.permute(0, 3, 1, 2).contiguous()
 
 
 
