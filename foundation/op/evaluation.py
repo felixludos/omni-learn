@@ -24,8 +24,16 @@ def eval_model(A, run=None):
 	
 	Use argument "use_testset" to evaluate on test set
 	'''
-	
+
 	if run is None:
+
+		auto_override = A.pull('auto-override', True)
+
+		if auto_override:
+			other = A.copy()
+			other.push('_meta', '_x_', silent=True)
+			A.push('override', other.pull_self(), silent=True)
+
 		assert A is not None, 'either run or A must not be None'
 		A.push('run._type', 'run', overwrite=False)
 		run = A.pull('run')

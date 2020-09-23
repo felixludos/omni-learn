@@ -400,9 +400,14 @@ class Run:
 					A.begin()
 					A.push('mode', name, overwrite=True)
 					break
-			
-			datasets.update(wrap_script('load_data', A, **meta))
-			
+
+			result = wrap_script('load_data', A, **meta)
+
+			if isinstance(result, dict) and name in result:
+				datasets.update(result)
+			else:
+				datasets[name] = result
+
 			if name is not None and name not in datasets:
 				raise Exception(f'Failed to create dataset: {name}')
 			
