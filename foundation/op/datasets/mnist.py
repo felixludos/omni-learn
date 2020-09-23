@@ -12,7 +12,7 @@ import torchvision
 from foundation import util
 from ..data import Dataset
 
-from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
+from ...data import standard_split, Device_Dataset, Info_Dataset, Splitable_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
 
 from .transforms import Interpolated
 
@@ -20,7 +20,8 @@ def _get_common_args(A):
 	dataroot = A.pull('dataroot')
 
 	download = A.pull('download', False)
-	train = A.pull('train', True)
+	mode = A.pull('mode', 'train', silent=True)
+	train = A.pull('train', mode != 'test')
 
 	return dataroot, {'download': download, 'train': train}
 
@@ -107,6 +108,23 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Image_Dataset,
 		if self.labeled:
 			return img, self.labels[item]
 		return img
+
+	def split(self, A):
+		'''
+		Should split the dataset according to info.val_split, and
+		probably support shuffled splitting depending oninfo.shuffle_split
+		:param A: config
+		:return: tuple of "training" datasets
+		'''
+		mode = A.pull('mode', 'train', silent=True)
+		if mode != 'test':
+			mode = 'train'
+
+		datasets = {mode: self}
+
+		if mode == 'test':
+			return datasets
+		return standard_split(datasets, A)
 
 @Dataset('mnist')
 class MNIST(Torchvision_Toy_Dataset):

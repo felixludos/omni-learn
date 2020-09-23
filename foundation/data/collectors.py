@@ -38,6 +38,21 @@ def split_dataset(dataset, split1, split2=None, shuffle=True):
 	return p1, p2, p3
 
 
+def standard_split(datasets, A):
+	test_split = A.pull('test_split', None)
+	if test_split is not None:
+		shuffle = A.pull('test_shuffle', '<>shuffle', True)
+		datasets['train'], datasets['test'] = simple_split_dataset(datasets['train'], 1 - test_split, shuffle=shuffle)
+
+	val_split = A.pull('val_split', None)
+	if val_split is not None:
+		shuffle = A.pull('val_shuffle', '<>shuffle', True)
+		datasets['train'], datasets['val'] = simple_split_dataset(datasets['train'], 1 - val_split, shuffle=shuffle)
+	else:
+		datasets['val'] = None
+
+	return datasets
+
 
 class DatasetWrapper(util.Proper_Child, Dataset):
 	def __init__(self, dataset):
@@ -96,19 +111,21 @@ class Loadable_Dataset(Dataset):
 
 
 class Splitable_Dataset(Dataset):
-	
-	def split(self, info):
+
+	def split(self, A):
 		'''
 		Should split the dataset according to info.val_split, and
 		probably support shuffled splitting depending oninfo.shuffle_split
-		:param info: config
+		:param A: config
 		:return: tuple of "training" datasets
 		'''
-		val_per = info.pull('val_split', 0.1)
-		assert 0 < val_per < 1, f'invalid: {val_per}'
-		shuffle_split = info.pull('shuffle_split', True)
-		return simple_split_dataset(self, 1 - val_per, shuffle=shuffle_split)
+		mode = A.pull('mode', 'train', silent=True)
 
+		datasets = {mode: self}
+
+		if mode == 'test':
+			return datasets
+		return standard_split(datasets, A)
 
 class Info_Dataset(Loadable_Dataset, Splitable_Dataset):
 

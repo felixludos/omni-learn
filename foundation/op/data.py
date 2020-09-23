@@ -126,7 +126,6 @@ def load_data(A, mode=None):
 	if mode is None:
 		mode = 'train'
 	mode = A.push('mode', mode, overwrite=mode_override)
-	A.push('train', mode == 'train')
 	
 	seed = A.pull('seed', None)
 	if seed is not None:
@@ -140,11 +139,11 @@ def load_data(A, mode=None):
 	device = A.pull('device', 'cpu')
 	try:
 		dataset.to(device)
-		print('Dataset moved to {}'.format(device))
+		print(f'Dataset moved to {device}')
 	except AttributeError:
 		pass
 	except RuntimeError:
-		print('Not enough memory to move dataset to {}'.format(device))
+		print(f'Not enough memory to move dataset to {device}')
 	
 	if not isinstance(dataset, Info_Dataset):
 		print('WARNING: it is strongly recommended for all datasets to be subclasses '
@@ -158,43 +157,16 @@ def load_data(A, mode=None):
 		raise e
 	
 	# endregion
-	
-	if 'split' in A:
-		try:
-			return dataset.split(A)  # should check mode to to know to categorize
-		except AttributeError as e:
-			raise e
-	
-	datasets = {mode: dataset}
+
+	try:
+		datasets = dataset.split(A)  # should check mode to to know to categorize
+	except AttributeError:
+		datasets = {mode: dataset}
 
 	dataset_only = A.pull('dataset-only', True)
+	if dataset_only and len(datasets) == 1:
+		return datasets.get(mode, datasets)
 
-	if mode == 'train':
-		datasets = standard_split(datasets, A)
-
-		if dataset_only and 'val' in datasets and datasets['val'] is None:
-			return datasets['train']
-
-	if len(datasets) == 1 and dataset_only:
-			return next(iter(datasets.values()))
-
-	return datasets
-
-
-def standard_split(datasets, A):
-	
-	test_split = A.pull('test_split', None)
-	if test_split is not None:
-		shuffle = A.pull('test_shuffle', '<>shuffle', True)
-		datasets['train'], datasets['test'] = simple_split_dataset(datasets['train'], 1 - test_split, shuffle=shuffle)
-	
-	val_split = A.pull('val_split', None)
-	if val_split is not None:
-		shuffle = A.pull('val_shuffle', '<>shuffle', True)
-		datasets['train'], datasets['val'] = simple_split_dataset(datasets['train'], 1 - val_split, shuffle=shuffle)
-	else:
-		datasets['val'] = None
-	
 	return datasets
 
 
