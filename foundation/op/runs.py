@@ -986,6 +986,11 @@ class Run:
 			raise NoOverwriteError
 
 		self.eval_mode = A.push('eval.mode', 'test' if use_testset else 'val', overwrite=False)
+
+		self.get_datasets(self.eval_mode)
+		datasets = self.get_datasets()
+		self.get_model().prep(datasets)
+
 		# self.eval_dataloader = None
 		
 	def evaluate(self, mode=None, dataloader=None):
