@@ -305,6 +305,19 @@ class Run:
 			
 			self.records.update(records)
 
+	def _load_results(self, ident):
+		raise NotImplementedError # TODO: find results with ident, load, and return
+
+		available = set(os.listdir(self.save_path))
+
+		if ident in available:
+			self.results[fixed] = torch.load()
+
+		if ident in available:
+			pass
+
+		raise NotImplementedError
+
 	def _set_model_ckpt(self, path=None, last=False): # don't auto load yet (just prepare for loading)
 		
 		if path is not None:
@@ -460,12 +473,19 @@ class Run:
 			return self.loaders[next(iter(datasets.keys()))]
 		return {name:self.loaders[name] for name in datasets}
 		
-	def get_results(self, ident): # you must specify which results (ident used when results were created)
+	def get_results(self, ident, remove_ext=True): # you must specify which results (ident used when results were created)
 		
 		if ident in self.results:
 			return self.results[ident]
-		
-		raise NotImplementedError # TODO: find results with ident, load, and return
+
+		fixed = ident.split('.')[0] if remove_ext else ident
+
+		if fixed in self.results:
+			return self.results[fixed]
+
+		self.results[fixed] = self._load_results(ident)
+
+		return self.results[fixed]
 
 	def get_training_datasets(self):
 		return {name:dataset for name,dataset in self.get_datasets().items() if name != 'test'}
