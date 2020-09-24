@@ -416,7 +416,7 @@ class Run:
 
 			result = wrap_script('load_data', A, **meta)
 
-			if isinstance(result, dict) and name in result:
+			if isinstance(result, dict):
 				datasets.update(result)
 			else:
 				datasets[name] = result
@@ -488,7 +488,8 @@ class Run:
 		return self.results[fixed]
 
 	def get_training_datasets(self):
-		return {name:dataset for name,dataset in self.get_datasets().items() if name != 'test'}
+		datasets = self.get_datasets()
+		return {name:dataset for name,dataset in datasets.items() if name != 'test'}
 
 	def get_stats(self, *args, purge_old=False, **kwargs):
 		if self.stats is None or purge_old:
