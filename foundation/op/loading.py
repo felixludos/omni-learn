@@ -7,7 +7,30 @@ import yaml
 import omnifig as fig
 
 from .. import util
+from .runs import Run
 # from .data import get_loaders
+
+@fig.AutoModifier('torch')
+class Torch(Run):
+	def _load_results(self, ident):
+
+		root = self.save_path
+
+		available = set(os.listdir(self.save_path))
+
+		fixed = ident.split('.')[0]
+		fname = f'{ident}.pth.tar'
+
+		if ident in available:
+			return torch.load(os.path.join(root, ident))
+
+		if fixed in available:
+			return torch.load(os.path.join(root, fixed))
+
+		if fname in available:
+			return torch.load(os.path.join(root, fname))
+
+		raise FileNotFoundError(f'Unknown ident: {ident}')
 
 
 def save_checkpoint(root, model, records=None, steps=None, is_best=False):

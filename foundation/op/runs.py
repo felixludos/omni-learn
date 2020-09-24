@@ -137,6 +137,16 @@ class NoOverwriteError(Exception):
 	pass
 
 @fig.Script('load_run', description='Load a new or existing run') # the script just loads a run
+def load_run(A):
+	try:
+		A = A.sub('run')
+	except fig.MissingConfigError:
+		pass
+
+	A.push('_type', 'run', overwrite=False)
+
+	return A.pull_self()
+
 @fig.Component('run')
 class Run:
 	'''
@@ -307,16 +317,6 @@ class Run:
 
 	def _load_results(self, ident):
 		raise NotImplementedError # TODO: find results with ident, load, and return
-
-		available = set(os.listdir(self.save_path))
-
-		if ident in available:
-			self.results[fixed] = torch.load()
-
-		if ident in available:
-			pass
-
-		raise NotImplementedError
 
 	def _set_model_ckpt(self, path=None, last=False): # don't auto load yet (just prepare for loading)
 		
