@@ -1,12 +1,14 @@
 import torch
 from torch import nn
 
-from ..old import train as trn
+import omnifig as fig
+
+# from ..old import train as trn
 from .. import framework as fm
 from .. import models
 
 
-@trn.Component('adain')
+@fig.Component('adain')
 class AdaIN(fm.Model):
 	def __init__(self, A):
 
@@ -17,10 +19,12 @@ class AdaIN(fm.Model):
 
 		ndim = A.pull('noise_dim', cdim[0] if isinstance(cdim, (tuple, list)) and not pixelwise else cdim)
 
-		if 'net' in A:
-			A.net.din = qdim
-			A.net.dout = ndim
-			A.net.latent_dim = ndim
+		ntype = A.pull('net._type', None, silent=True)
+		if ntype is not None:
+			net_config = A['net']
+			net_config.push('din', qdim)
+			net_config.push('dout', ndim)
+			net_config.push('latent_dim', ndim)
 
 		net = A.pull('net', None)
 
@@ -65,12 +69,13 @@ class AdaIN(fm.Model):
 			x = self.include_noise(x, q)
 		return x
 
-@trn.Component('norm-ada-in')
+@fig.Component('norm-ada-in')
 class Norm_AdaIN(AdaIN):
 	def __init__(self, A):
-		assert 'net' in A
-		if '_mod' not in A.net or 'normal' not in A.net._mod: # TODO: make sure other mods dont get overwritten
-			A.net._mod = 'normal'
+		net = A['net']
+		ntype = net.pull('_type', None, silent=True)
+		if ntype is not None:
+			net.push('_mod', 'normal', silent=True)
 		super().__init__(A)
 
 	def include_noise(self, x, q):
@@ -85,7 +90,7 @@ class Norm_AdaIN(AdaIN):
 
 
 
-@trn.Component('adain-double-dec')
+@fig.Component('adain-double-dec')
 class AdaIn_Double_Decoder(models.Double_Decoder):
 
 	def __init__(self, A):
@@ -95,17 +100,17 @@ class AdaIn_Double_Decoder(models.Double_Decoder):
 
 		const_start = False
 		init_latent_dim = full_latent_dim - adain_latent_dim
-		assert init_latent_dim >= 0, 'invalid: {}'.format(A.latent_dim)
+		assert init_latent_dim >= 0, f'invalid: {full_latent_dim}'
 		if init_latent_dim == 0:
 			init_latent_dim = 1
 			const_start = True
-		A.latent_dim = init_latent_dim
-		A.full_latent_dim = full_latent_dim
-		A.adain_latent_dim = adain_latent_dim
+		A.push('latent_dim', init_latent_dim)
+		A.push('full_latent_dim', full_latent_dim)
+		A.push('adain_latent_dim', adain_latent_dim)
 
 		super().__init__(A)
 
-		A.latent_dim = full_latent_dim
+		A.push('latent_dim', full_latent_dim)
 
 		if adain_latent_dim is not None:
 			self.din = full_latent_dim

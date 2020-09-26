@@ -1,5 +1,6 @@
 # parents = [...]
 
+step_device: <>device
 device: 'cuda'
 num_workers: 0
 seed: 0

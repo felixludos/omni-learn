@@ -373,16 +373,19 @@ class Normal(Normal_Distrib_Model):
 			cut = dout
 			full_dout = dout*2
 
-		_dout, _latent_dim = A.dout, A.latent_dim
-		A.dout = full_dout
-		A.latent_dim = full_dout # temporarily change
+		_dout, _latent_dim = A.pull('dout', None, silent=True), A.pull('latent_dim', None, silent=True)
+		A.push('dout', full_dout, silent=True)
+		A.push('latent_dim', full_dout, silent=True) # temporarily change
 
 		min_log_std = A.pull('min_log_std', None)
 
 		super().__init__(A)
 
 		# reset config to correct terms
-		A.dout, A.latent_dim = _dout, _latent_dim
+		if _dout is not None:
+			A.push('dout', _dout, silent=True)
+		if _latent_dim is not None:
+			A.push('latent_dim', _latent_dim, silent=True)
 		self.latent_dim = dout
 		self.dout = dout
 

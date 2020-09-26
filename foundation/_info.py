@@ -3,7 +3,7 @@
 name = 'foundation'
 long_name = 'foundation'
 
-version = '0.2'
+version = '0.3'
 url = 'https://github.com/felixludos/foundation'
 
 description = 'Powerful machine learning utilities for python'

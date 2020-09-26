@@ -1,5 +1,5 @@
 
-from .base_config import register_config
+from . import base_config
 from .datasets import MNIST
 
 from .model import load_model
