@@ -58,47 +58,77 @@ def default_create_scheduler(optimizer, info):
 
 	name = info.pull('scheduler_type')
 
-	factor = info.pull('scheduler_decay', 0.1)
+	freq = info.pull('scheduler_freq', None)
+	# if freq is None:
+	# 	print('Scheduler will step at the end of each epoch')
+	# else:
+	# 	print(f'Scheduler will step every {freq} iterations')
+	cut_after = info.pull('scheduler_cut_after', None)
+
 	min_lr = info.pull('scheduler_min_lr', 0.)
 	last = info.pull('scheduler_last_epoch', -1)
 
-	cut_after = info.pull('scheduler_cut_after', None)
-
 	common = {
 		'cut_after': cut_after,
+		'freq': freq,
 	}
 
-	req_loss = False
 	if name == 'step':
+
+		factor = info.pull('scheduler_decay', 0.1)
+
 		step_size = info.pull('scheduler_step')
-		out = StepLR(optimizer, step_size=step_size, gamma=factor, last_epoch=last, **common)
+		out = StepLR(optimizer, step_size=step_size, gamma=factor, last_epoch=last,
+		             req_loss=False, **common)
 	elif name == 'plateau':
+
+		factor = info.pull('scheduler_decay', 0.1)
 		patience = info.pull('scheduler_patience', 10)
 		cooldown = info.pull('scheduler_cooldown', 0)
 
 		out = ReduceOnPlateau(optimizer, factor=factor, patience=patience, verbose=True,
-		                                       min_lr=min_lr, cooldown=cooldown, **common)
-		req_loss = True
+		                                       min_lr=min_lr, cooldown=cooldown,
+		                      req_loss=True, **common)
+
 
 	elif name == 'cos':
-		step_size = info.pull('scheduler_max_steps')
+		num_steps = info.pull('scheduler_total_steps', None) # num_steps
+		if num_steps is None:
+			if freq is None or freq <= 0:
+				raise Exception('cos scheduler needs to know the max number of steps')
+			num_steps = info.pull('scheduler_total_iterations', '<>training.step_limit') // freq \
+				- info.pull('scheduler_early_stop')
+
 		eta_min = min_lr
 		
-		out = CosineAnnealing(optimizer, T_max=step_size, eta_min=eta_min, last_epoch=last, **common)
+		out = CosineAnnealing(optimizer, T_max=num_steps, eta_min=eta_min, last_epoch=last,
+		                      req_loss=False, **common)
 
 	else:
 		raise Exception(f'unknown name {name}')
-
-	out.req_loss = req_loss
 
 	return out
 
 class Base_Scheduler(O.lr_scheduler._LRScheduler):
 
-	def __init__(self, *args, cut_after=None, **kwargs):
-
+	def __init__(self, *args, cut_after=None, freq=None, req_loss=None, **kwargs):
+		if freq <= 0:
+			freq = None
+		self.freq = freq
 		self.cut_after = cut_after
+		self.req_loss = req_loss
 		super().__init__(*args, **kwargs)
+
+	def requires_loss(self):
+		return self.req_loss
+
+	def epoch_end(self, *args, **kwargs):
+		if self.freq is None:
+			self.step(*args, **kwargs)
+
+	def maintain(self, step, *args, **kwargs):
+		if self.freq is not None and step % self.freq == 0:
+			self.step(*args, **kwargs)
 
 	def step(self, *args, **kwargs):
 		if self.cut_after is not None and self._step_count > self.cut_after:

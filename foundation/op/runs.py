@@ -398,7 +398,7 @@ class Run:
 		return stats
 	
 	def create_model(self, **meta):
-		return wrap_script('load_model', self.A.sub('model'), **meta)
+		return wrap_script('load-model', self.A.sub('model'), **meta)
 	
 	def create_datasets(self, *names, **meta):
 		
@@ -414,7 +414,7 @@ class Run:
 					A.push('mode', name, overwrite=True)
 					break
 
-			result = wrap_script('load_data', A, **meta)
+			result = wrap_script('load-data', A, **meta)
 
 			if isinstance(result, dict):
 				datasets.update(result)
@@ -648,7 +648,7 @@ class Run:
 		while self.keep_going():
 		
 			out = self.train_step(force_step=True)
-		
+
 			if self.log_time():
 				self.log_step(out, '{}/train', measure_time=False)
 
@@ -836,7 +836,7 @@ class Run:
 		if measure_time:
 			Q.time_stats.update('viz', time.time() - start)
 		
-	def train_step(self, force_step=False):
+	def train_step(self, force_step=False, maintenance=True):
 		
 		Q = self.train_state
 		time_stats = Q.time_stats
@@ -867,8 +867,9 @@ class Run:
 		
 		time_stats.update('data', time.time() - start)
 		start = time.time()
-		
-		out = self.get_model().step(batch)
+
+		model = self.get_model()
+		out = model.step(batch)
 		
 		if 'loss' in out:
 			Q.train_stats.update('loss', out['loss'].detach())
@@ -884,6 +885,9 @@ class Run:
 			self.end_epoch('train', Q.train_stats)
 			self.records['batch'] = 0
 			Q.loader = None
+
+		if maintenance:
+			model.maintenance(self.records, Q.train_stats)
 	
 		return out
 	

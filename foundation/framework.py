@@ -73,6 +73,9 @@ class Model(nn.Module):  # any vector function
 	def post_epoch(self, mode, records, stats=None): # called at the end of each epoch
 		pass
 
+	def maintenance(self, records, stats=None):
+		pass
+
 	def get_hparams(self):
 		return {}
 
@@ -128,10 +131,10 @@ class Recordable(Model):
 	def reset_stats(self):
 		self.stats.reset()
 
-	def pre_epoch(self, mode, epoch):
-		super().pre_epoch(mode, epoch)
-		if mode == 'val':
-			self.reset_stats()
+	# def pre_epoch(self, mode, epoch): # already done by Run
+	# 	super().pre_epoch(mode, epoch)
+	# 	if mode == 'val':
+	# 		self.reset_stats()
 
 class Visualizable(Recordable):
 	def __init__(self, *args, **kwargs):
@@ -148,9 +151,9 @@ class Visualizable(Recordable):
 		pass # by default nothing is visualized
 		# raise NotImplementedError
 
-	def pre_epoch(self, mode, epoch):
-		self.reset_viz_counter()
-		super().pre_epoch(mode, epoch)
+	# def pre_epoch(self, mode, epoch):
+	# 	self.reset_viz_counter()
+	# 	super().pre_epoch(mode, epoch)
 
 class Evaluatable(Recordable): # TODO: maybe not needed
 
@@ -288,21 +291,23 @@ class Schedulable(Optimizable):
 			state_dict['scheduler'] = self.scheduler.state_dict()
 		return state_dict
 
-	def scheduler_step(self, val=None):
-		print('LR Scheduler stepping')
-		if self.scheduler.req_loss:
-			self.scheduler.step(val)
-		else:
-			self.scheduler.step()
+	def maintenance(self, records, stats=None):
+		if self.scheduler is not None:
+			if self.scheduler.requires_loss():
+				assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
+				self.scheduler.maintain(records['total_steps'], stats['loss'].avg.item())
+			else:
+				self.scheduler.maintain(records['total_steps'])
+		super().maintenance(records, stats)
 
 	def post_epoch(self, mode, epoch, stats=None):
 		if self.scheduler is not None:
-			if self.scheduler.req_loss:
+			if self.scheduler.requires_loss():
 				if mode == 'val':
 					assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
-					self.scheduler_step(stats['loss'].avg.item())
+					self.scheduler.epoch_end(stats['loss'].avg.item())
 			elif mode == 'train':
-				self.scheduler_step()
+				self.self.scheduler.epoch_end()
 		super().post_epoch(mode, epoch, stats)
 
 class Regularizable(object):

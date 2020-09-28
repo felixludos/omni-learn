@@ -100,12 +100,18 @@ class Batchable_Dataset(Dataset): # you can select using a full batch
 
 class Loadable_Dataset(Dataset):
 	
-	def to_loader(self, info):
-		num_workers = info.pull('num_workers', 0)
-		batch_size = info.pull('batch_size', 64)
-		shuffle = info.pull('shuffle', True)
-		drop_last = info.pull('drop_last', False)
-		device = info.pull('step_device', '<>device', 'cpu')
+	def to_loader(self, info=None, batch_size=64, num_workers=0, shuffle=True, drop_last=False, device=None):
+		if info is not None:
+			num_workers = info.push('num_workers', num_workers, overwrite=False)
+			batch_size = info.push('batch_size', batch_size, overwrite=False)
+			shuffle = info.push('shuffle', shuffle, overwrite=False)
+			drop_last = info.push('drop_last', drop_last, overwrite=False)
+			device = info.pull('step_device', '<>device', device)
+		if device is None:
+			try:
+				device = self.get_device()
+			except AttributeError:
+				device = 'cpu'
 		return get_loaders(self, batch_size=batch_size, num_workers=num_workers,
 		                   shuffle=shuffle, drop_last=drop_last, device=device)
 
