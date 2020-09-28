@@ -16,7 +16,7 @@ class Featured_DataLoaderIter:
 	
 	def __init__(self, loader):
 		super().__init__(loader)
-		self.device = loader
+		self.device = loader.device
 		self.N = len(loader)
 	
 	def skip(self, num):

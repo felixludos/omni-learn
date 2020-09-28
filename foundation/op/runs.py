@@ -678,7 +678,7 @@ class Run:
 				bar.update(1)
 				title = '{} ({})'.format(mode, records['total_epochs'][mode] + 1) \
 					if mode in records['total_epochs'] else mode
-				loss_info = 'Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
+				loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
 				                                            stats['loss'].smooth.item()) \
 					if stats['loss'].count > 0 else ''
 				bar.set_description('{} ckpt={}{}'.format(title, records['checkpoint'], loss_info))
