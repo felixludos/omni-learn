@@ -136,7 +136,7 @@ class Checkpoint_Flag(Exception):
 class NoOverwriteError(Exception):
 	pass
 
-@fig.Script('load_run', description='Load a new or existing run') # the script just loads a run
+@fig.Script('load-run', description='Load a new or existing run') # the script just loads a run
 def load_run(A):
 	try:
 		A = A.sub('run')
@@ -398,7 +398,7 @@ class Run:
 		return stats
 	
 	def create_model(self, **meta):
-		return wrap_script('load_model', self.A.sub('model'), **meta)
+		return wrap_script('load-model', self.A.sub('model'), **meta)
 	
 	def create_datasets(self, *names, **meta):
 		
@@ -414,7 +414,7 @@ class Run:
 					A.push('mode', name, overwrite=True)
 					break
 
-			result = wrap_script('load_data', A, **meta)
+			result = wrap_script('load-data', A, **meta)
 
 			if isinstance(result, dict):
 				datasets.update(result)
@@ -648,7 +648,7 @@ class Run:
 		while self.keep_going():
 		
 			out = self.train_step(force_step=True)
-		
+
 			if self.log_time():
 				self.log_step(out, '{}/train', measure_time=False)
 
@@ -836,7 +836,7 @@ class Run:
 		if measure_time:
 			Q.time_stats.update('viz', time.time() - start)
 		
-	def train_step(self, force_step=False):
+	def train_step(self, force_step=False, maintenance=True):
 		
 		Q = self.train_state
 		time_stats = Q.time_stats
@@ -867,8 +867,9 @@ class Run:
 		
 		time_stats.update('data', time.time() - start)
 		start = time.time()
-		
-		out = self.get_model().step(batch)
+
+		model = self.get_model()
+		out = model.step(batch)
 		
 		if 'loss' in out:
 			Q.train_stats.update('loss', out['loss'].detach())
@@ -884,6 +885,9 @@ class Run:
 			self.end_epoch('train', Q.train_stats)
 			self.records['batch'] = 0
 			Q.loader = None
+
+		if maintenance:
+			model.maintenance(self.records, Q.train_stats)
 	
 		return out
 	
@@ -1043,43 +1047,6 @@ class Run:
 	
 	# endregion
 
-@fig.AutoModifier('cls-run')
-class OnCluster(Run):
-	
-	def startup(self):
-		
-		super().startup()
-		
-		save_dir = self.save_dir
-		
-		if save_dir is not None and 'JOBDIR' in os.environ:
-			jobdir = os.environ['JOBDIR']
-			cname = 'checkpoints{}.txt'.format(os.environ['PROCESS_ID'])
-			
-			if cname not in os.listdir(jobdir):
-				
-				# register job
-				if 'JOB_REGISTRY_PATH' in os.environ:
-					rpath = os.environ['JOB_REGISTRY_PATH']
-					reg = load_yaml(rpath) if os.path.isfile(rpath) else []
-					reg.append({
-						'timestamp': get_now(),
-						
-						'id': os.environ['JOB_ID'].split('#')[-1],
-						'num': int(os.environ['JOB_NUM']),
-						'proc': int(os.environ['PROCESS_ID']),
-						
-						'host': socket.gethostname(),
-						
-						'run': save_dir,
-						'job': jobdir,
-					})
-					save_yaml(reg, rpath)
-					
-				with open(os.path.join(jobdir, cname), 'w') as f:
-					f.write(os.path.basename(save_dir))
-				print('[Saved checkpoint dir for restarts]')
-		
 		
 @fig.AutoModifier('timed-run')
 class Timed(Run):

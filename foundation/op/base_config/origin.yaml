@@ -5,6 +5,10 @@ device: 'cuda'
 num_workers: 0
 seed: 0
 
+run:
+    _type: run
+    allow-missing-mods: True
+
 output:
 
     tblog: true

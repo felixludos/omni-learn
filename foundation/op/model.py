@@ -11,7 +11,7 @@ from .. import framework as fm
 def load_checkpoint(path):  # model parameters - TODO: maybe add more options
 	return torch.load(path)
 
-@fig.Script('load_model', description='Creates/loads a model')
+@fig.Script('load-model', description='Creates/loads a model')
 @fig.Component('model')
 def load_model(A):
 	'''
@@ -66,6 +66,8 @@ def load_model(A):
 		print(f'Loaded parameters from {path}')
 	
 	return model
+
+
 
 fig.AutoComponent('criterion')(util.get_loss_type)
 fig.AutoComponent('nonlin')(util.get_nonlinearity)

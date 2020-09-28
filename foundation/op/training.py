@@ -73,7 +73,7 @@ def iterative_training(A=None, run=None):
 	epochs = A.pull('training.epochs', 10)
 	step_limit = A.push('training.step_limit', epochs * epoch_len, overwrite=False)
 
-	# expected_epochs = A.push('expected_epochs', step_limit//epoch_len, overwrite=False)
+	expected_epochs = A.push('expected_epochs', step_limit//epoch_len, overwrite=False)
 
 	no_val = A.pull('training.no_val', False)
 	A.push('training.val_freq', None if no_val else epoch_len, overwrite=False)

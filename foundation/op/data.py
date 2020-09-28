@@ -101,7 +101,7 @@ def Dataset(name):
 
 
 
-@fig.Script('load_data', description='Load datasets')
+@fig.Script('load-data', description='Load datasets')
 def load_data(A, mode=None):
 	'''
 	Loads datasets and optionally splits datasets into
