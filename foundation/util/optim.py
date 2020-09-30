@@ -273,6 +273,19 @@ class Complex_Scheduler(object):
 	def state_dict(self):
 		return {name:sch.state_dict() for name, sch in self.sub.items()}
 
+	def requires_loss(self):
+		for sch in self.sub.values():
+			if sch.requires_loss():
+				return True
+		return False
+
+	def maintain(self, step, *args, **kwargs):
+		for sch in self.sub.values():
+			sch.maintain(step, *args, **kwargs)
+
+	def epoch_end(self, *args, **kwargs):
+		for sch in self.sub.values():
+			sch.epoch_end(*args, **kwargs)
 
 	def step(self, val=None): # can and perhaps should be overridden
 		for sch in self.sub.values():

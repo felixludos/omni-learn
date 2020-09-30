@@ -307,7 +307,7 @@ class Schedulable(Optimizable):
 					assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
 					self.scheduler.epoch_end(stats['loss'].avg.item())
 			elif mode == 'train':
-				self.self.scheduler.epoch_end()
+				self.scheduler.epoch_end()
 		super().post_epoch(mode, epoch, stats)
 
 class Regularizable(object):
