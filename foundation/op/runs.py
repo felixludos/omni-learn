@@ -1038,12 +1038,15 @@ class Run:
 
 		return results
 		
-	def exit_run(self, cause, code=0):
+	def exit_run(self, cause, code=None):
+		
+		cmsg = f' (code={code})'
 		
 		if not self.silent:
-			print(f'Exiting due to {cause} (code={code})')
+			print(f'Exiting due to {cause}{cmsg}')
 		
-		sys.exit(code)
+		if code is not None:
+			sys.exit(code)
 	
 	# endregion
 
