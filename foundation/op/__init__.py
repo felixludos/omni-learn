@@ -9,6 +9,7 @@ from .training import iterative_training
 from .report import get_report
 from .loading import Torch
 from .runs import Run
+from . import extensions
 from .report import get_report
 # from .status import get_status
 

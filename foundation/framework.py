@@ -268,10 +268,9 @@ class Schedulable(Optimizable):
 						schs[name] = child.scheduler
 		
 			if my_opt is not None:
-				schs['me'], req = util.default_create_scheduler(my_opt, info)
-				if schs['me'] is not None:
-				
-					schs['me'].req_loss = req
+				sch = util.default_create_scheduler(my_opt, info)
+				if sch is not None:
+					schs['me'] = sch
 		
 			sch = util.Complex_Scheduler(**schs)
 		
