@@ -97,7 +97,7 @@ def default_create_scheduler(optimizer, info):
 			if freq is None or freq <= 0:
 				raise Exception('cos scheduler needs to know the max number of steps')
 			num_steps = info.pull('scheduler_total_iterations', '<>training.step_limit') // freq \
-				- info.pull('scheduler_early_stop')
+				- info.pull('scheduler_early_stop', 0)
 
 		eta_min = min_lr
 		
