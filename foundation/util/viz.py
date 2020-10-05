@@ -7,6 +7,7 @@ try:
 	from matplotlib import animation
 	from matplotlib.path import Path
 	import matplotlib.patches as patches
+	from matplotlib.figure import figaspect
 except ImportError:
 	print('WARNING: matplotlib not found')
 try:
@@ -33,6 +34,7 @@ except ImportError:
 
 
 from .math import factors
+from .data import load_images
 
 def calc_tiling(N, H=None, W=None, prefer_tall=False):
 
@@ -258,42 +260,99 @@ def plot_parallel_coords(samples, categories=None, dim_names=None,
 	return fig, host
 	
 
-def show_imgs(imgs, titles=None, H=None, W=None, figsize=(6, 6),
-			  reverse_rows=False, grdlines=False, tight=False,
-			  border=0.02, between=0.01):
-	H,W = calc_tiling(imgs.size(0), H=H, W=W)
+def show_imgs(imgs, titles=None, H=None, W=None,
+              figsize=None, scale=1,
+			  reverse_rows=False, grdlines=False,
+			  channel_first=True,
+			  imgroot=None,
+              savepath=None, dpi=96, autoclose=True, savescale=1,
+			  adjust={}, border=0., between=0.01):
 
-	imgs = imgs.cpu().permute(0, 2, 3, 1).squeeze().numpy()
+	if isinstance(imgs, str):
+		imgs = [imgs]
+	if isinstance(imgs, (tuple, list)) and isinstance(imgs[0], str):
+		imgs = list(load_images(*imgs, root=imgroot, channel_first=False))
+		channel_first = False
 
-	fig, axes = plt.subplots(H, W, figsize=figsize)
+	if isinstance(imgs, torch.Tensor):
+		imgs = imgs.cpu().numpy().squeeze()
+	elif isinstance(imgs, (list, tuple)):
+		imgs = [img.cpu().numpy() if isinstance(img, torch.Tensor) else img for img in imgs]
 
+	if isinstance(imgs, np.ndarray):
+		shape = imgs.shape
+		
+		if len(shape) == 2 or (len(shape) == 3 and ((shape[0] in {1,3,4} and channel_first)
+		                          or (shape[-1] in {1,3,4} and not channel_first))):
+			imgs = [imgs]
+		elif len(shape) == 4:
+			if channel_first:
+				imgs = imgs.transpose(0,2,3,1)
+				channel_first = False
+		else:
+			raise Exception(f'unknown shape: {shape}')
+
+	imgs = [img.transpose(1,2,0) if channel_first and len(img.shape)==3 else img for img in imgs]
+	
+	iH, iW = imgs[0].shape[:2]
+	
+	H,W = calc_tiling(len(imgs), H=H, W=W)
+	
+	fH, fW = iH*H, iW*W
+	
+	aw = None
+	if figsize is None:
+		aw, ah = figaspect(fH / fW)
+		aw, ah = scale * aw, scale * ah
+		figsize = aw, ah
+
+	fg, axes = plt.subplots(H, W, figsize=figsize)
+	axes = [axes] if len(imgs) == 1 else axes.flat
+
+	hastitles = titles is not None and len(titles)
 	if titles is None:
-		titles = [None] * len(imgs)
+		titles = []
+	if len(titles) != len(imgs):
+		titles = titles + ([None] * (len(imgs) - len(titles)))
 
-	iH, iW = imgs.shape[1], imgs.shape[2]
-
-	for ax, img, title in zip(axes.flat, imgs, titles):
+	for ax, img, title in zip(axes, imgs, titles):
 		plt.sca(ax)
 		if reverse_rows:
 			img = img[::-1]
 		plt.imshow(img)
-		if grdlines:
+		if grdlines: # TODO: automate to allow more fine grain gridlines
 			plt.plot([0, iW], [iH / 2, iH / 2], c='r', lw=.5, ls='--')
 			plt.plot([iW / 2, iW / 2], [0, iH], c='r', lw=.5, ls='--')
 			plt.xlim(0, iW)
 			plt.ylim(0, iH)
+			
+		plt.axis('off')
 		if title is not None:
-			plt.xticks([])
-			plt.yticks([])
 			plt.title(title)
-		else:
-			plt.axis('off')
+			
+		# if title is not None:
+		# 	plt.xticks([])
+		# 	plt.yticks([])
+		# 	plt.title(title)
+		# else:
+		# 	plt.axis('off')
 
-	if tight:
-		plt.subplots_adjust(wspace=between, hspace=between,
+	if hastitles and not len(adjust):
+		plt.tight_layout()
+	elif adjust is not None:
+		
+		base = dict(wspace=between, hspace=between,
 							left=border, right=1 - border, bottom=border, top=1 - border)
-
-	return fig, axes
+		base.update(adjust)
+		plt.subplots_adjust(**base)
+	
+	if savepath is not None:
+		plt.savefig(savepath, dpi=savescale*(dpi if aw is None else fW/aw))
+		if autoclose:
+			plt.close()
+			return
+	
+	return fg, axes
 
 
 

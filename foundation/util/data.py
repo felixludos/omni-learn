@@ -1,4 +1,4 @@
-
+import os
 import numpy as np
 import cv2
 from io import BytesIO
@@ -153,6 +153,22 @@ def discretize(input, N, range=None):
 
 	return input.mul((N-1)/(range[1]-range[0])).round().long()
 
+## load image
+
+def load_images(*paths, root=None, channel_first=False, **flags):
+	for path in paths:
+		if root is not None:
+			path = os.path.join(root, path)
+		img = cv2.imread(path, **flags)
+		if channel_first:
+			img = img.transpose(2,0,1)
+		yield img
+
+def read_raw_bytes(path, root=None):
+	if root is not None:
+		path = os.path.join(root, path)
+	with open(path, 'rb') as f:
+		return f.read()
 
 
 #########################

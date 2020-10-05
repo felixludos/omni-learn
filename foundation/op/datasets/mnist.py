@@ -9,7 +9,7 @@ from torch.nn import functional as F
 import torchvision
 
 # from foundation.old.train.registry import create_component, Component
-from foundation import util
+from ... import util
 from ..data import Dataset
 
 from ...data import standard_split, Device_Dataset, Info_Dataset, Splitable_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
