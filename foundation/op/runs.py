@@ -207,7 +207,14 @@ class Run:
 		
 		raw_path = path
 		if path is not None:
-			path = find_config(path)
+			try:
+				path = find_config(path)
+			except NoConfigFoundError as e:
+				root = A.pull('saveroot', '<>root', None)
+				if root is None:
+					raise e
+				path = os.path.join(root, path)
+				path = find_config(path)
 		
 		novel = A.push('novel', novel, overwrite=False)
 		override = A.pull('override', {})

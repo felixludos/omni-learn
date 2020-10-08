@@ -155,11 +155,13 @@ def discretize(input, N, range=None):
 
 ## load image
 
-def load_images(*paths, root=None, channel_first=False, **flags):
+def load_images(*paths, root=None, channel_first=False, conv_brg=True, **flags):
 	for path in paths:
 		if root is not None:
 			path = os.path.join(root, path)
 		img = cv2.imread(path, **flags)
+		if conv_brg and len(img.shape) == 3 and img.shape[-1] in {3,4}:
+			img = img[..., ::-1]
 		if channel_first:
 			img = img.transpose(2,0,1)
 		yield img

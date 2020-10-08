@@ -263,7 +263,7 @@ def plot_parallel_coords(samples, categories=None, dim_names=None,
 def show_imgs(imgs, titles=None, H=None, W=None,
               figsize=None, scale=1,
 			  reverse_rows=False, grdlines=False,
-			  channel_first=True,
+			  channel_first=None,
 			  imgroot=None,
               savepath=None, dpi=96, autoclose=True, savescale=1,
 			  adjust={}, border=0., between=0.01):
@@ -275,12 +275,16 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 		channel_first = False
 
 	if isinstance(imgs, torch.Tensor):
-		imgs = imgs.cpu().numpy().squeeze()
+		imgs = imgs.detach().cpu().numpy().squeeze()
 	elif isinstance(imgs, (list, tuple)):
-		imgs = [img.cpu().numpy() if isinstance(img, torch.Tensor) else img for img in imgs]
+		imgs = [img.detach().cpu().numpy() if isinstance(img, torch.Tensor) else img for img in imgs]
 
 	if isinstance(imgs, np.ndarray):
 		shape = imgs.shape
+		
+		if channel_first is None \
+				and shape[0 if len(shape) == 3 else 1] in {1, 3, 4} and shape[-1] not in {1, 3, 4}:
+			channel_first = True
 		
 		if len(shape) == 2 or (len(shape) == 3 and ((shape[0] in {1,3,4} and channel_first)
 		                          or (shape[-1] in {1,3,4} and not channel_first))):
