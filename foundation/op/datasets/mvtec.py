@@ -2,7 +2,10 @@
 import sys, os
 
 from tqdm import tqdm
-import wget
+try:
+	import wget
+except ImportError:
+	print('WARNING: unable to import wget')
 import shutil
 import h5py as hf
 

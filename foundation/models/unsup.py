@@ -155,7 +155,7 @@ def grad_penalty(disc, real, fake):
 		grad, = autograd.grad(disc(combo).mean(), combo,
 		                     create_graph=True, retain_graph=True, only_inputs=True)
 
-	return (grad.view(B,-1).norm(2, dim=1) - 1).pow(2).mean()
+	return (grad.contiguous().view(B,-1).norm(2, dim=1) - 1).pow(2).mean()
 
 def judge(disc, real, fake, out=None, optim=None, disc_gp=None, disc_clip=None):
 	if out is None:
