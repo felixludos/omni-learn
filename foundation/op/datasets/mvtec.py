@@ -157,7 +157,7 @@ class MVTec_Anomaly_Detection(Info_Dataset):
 		if size is None:
 		
 	
-		pass
+			pass
 
 
 
