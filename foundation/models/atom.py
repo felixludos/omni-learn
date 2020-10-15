@@ -15,6 +15,7 @@ from . import layers as layerslib
 def make_MLP(input_dim, output_dim, hidden_dims=None,
              initializer=None,
              nonlin='prelu', output_nonlin=None,
+			 logify_in=False, unlogify_out=False,
              bias=True, output_bias=None):
 	'''
 	:param input_dim: int
@@ -22,6 +23,8 @@ def make_MLP(input_dim, output_dim, hidden_dims=None,
 	:param hidden_dims: ordered list of int - each element corresponds to a FC layer with that width (empty means network is not deep)
 	:param nonlin: str - choose from options found in get_nonlinearity(), applied after each intermediate layer
 	:param output_nonlin: str - nonlinearity to be applied after the last (output) layer
+	:param logify_in: convert input to logified space
+	:param unlogify_out: convert output back to linear space
 	:return: an nn.Sequential instance with the corresponding layers
 	'''
 
@@ -51,6 +54,9 @@ def make_MLP(input_dim, output_dim, hidden_dims=None,
 	layers = []
 	if flatten:
 		layers.append(nn.Flatten())
+
+	if logify_in:
+		layers.append(util.Logifier())
 	for in_dim, out_dim, nonlin, bias in zip(hidden_dims, hidden_dims[1:], nonlins, biases):
 		layer = nn.Linear(in_dim, out_dim, bias=bias)
 		if initializer is not None:
@@ -58,8 +64,12 @@ def make_MLP(input_dim, output_dim, hidden_dims=None,
 		layers.append(layer)
 		if nonlin is not None:
 			layers.append(util.get_nonlinearity(nonlin))
+
+	if unlogify_out:
+		layers.append(util.Unlogifier())
 	if reshape is not None:
 		layers.append(layerslib.Reshaper(reshape))
+
 
 	net = nn.Sequential(*layers)
 
