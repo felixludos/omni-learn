@@ -1,7 +1,7 @@
 import math
 import omnifig as fig
 
-from omnifig.config import Config_Iter, ConfigList
+from omnifig.config import ConfigList, ConfigIter
 
 
 @fig.Component('pull')
@@ -72,7 +72,7 @@ def _config_expression(A):  # TODO: boolean ops
 
 
 @fig.Component('repeat')
-class Repeat_Iter(Config_Iter):
+class Repeat_Iter(ConfigIter):
 	def __init__(self, A):
 		num = A.pull('_num', '<>_len')
 

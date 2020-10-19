@@ -44,7 +44,7 @@ def wrap_script(script_name, A, **kwargs):
 	for key in store_keys:
 		try:
 			val = A.pull(key, silent=True)
-		except fig.MissingConfigError:
+		except fig.MissingParameterError:
 			pass
 		else:
 			stored[key] = val
@@ -140,7 +140,7 @@ class NoOverwriteError(Exception):
 def load_run(A):
 	try:
 		A = A.sub('run')
-	except fig.MissingConfigError:
+	except fig.MissingParameterError:
 		pass
 
 	A.push('_type', 'run', overwrite=False)

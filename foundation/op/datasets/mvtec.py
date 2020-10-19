@@ -154,10 +154,12 @@ class MVTec_Anomaly_Detection(Info_Dataset):
 		self.files = [hf.File(os.path.join(droot, fname), 'r') for fname in fnames]
 		self.size = size
 	
+		self.images = None
+	
 		if size is None:
 		
-	
-		pass
+			
+			pass
 
 
 

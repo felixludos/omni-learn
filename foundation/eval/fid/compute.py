@@ -26,7 +26,7 @@ def compute_fid(A):
 
 	mode = A.push('mode', 'train', overwrite=False)
 
-	dataset = fig.run('load_data', A.sub('dataset'))
+	dataset = fig.run('load-data', A.sub('dataset'))
 
 	out_path = A.pull('save-path', '<>out-path', '<>out', None)
 
