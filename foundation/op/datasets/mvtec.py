@@ -157,8 +157,6 @@ class MVTec_Anomaly_Detection(Info_Dataset):
 		self.images = None
 	
 		if size is None:
-		
-			
 			pass
 
 

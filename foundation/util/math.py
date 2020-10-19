@@ -73,6 +73,35 @@ def MMD(p, q, C=None):
 # Neural Networks
 #####################
 
+
+def logify(x, eps=1e-15):
+	high = x > 1.
+	low = x < -1.
+	ok = ~ (high + low)
+
+	v = x.abs().add(eps).log().add(1)
+	return ok * x + high * v - low * v
+
+class Logifier(nn.Module):
+	def __init__(self, eps=1e-15):
+		super().__init__()
+		self.eps = eps
+	def forward(self, x):
+		return logify(x, eps=self.eps)
+
+def unlogify(x):
+	high = x > 1.
+	low = x < -1.
+	ok = ~ (high + low)
+
+	v = x.abs().sub(1).exp()
+	return ok * x + high * v - low * v
+
+class Unlogifier(nn.Module):
+	def forward(self, x):
+		return unlogify(x)
+
+
 class RMSELoss(nn.MSELoss):
 	def forward(self, *args, **kwargs):
 		loss = super().forward(*args, **kwargs)

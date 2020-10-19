@@ -834,11 +834,13 @@ class Run:
 		display = train_stats.smooths() if Q.display_smoothed else train_stats.avgs()
 		for k, v in display.items():
 			logger.add('scalar', k, v)
-		
+
 		try:
-			self.get_model().visualize(out, logger)
+			vfun = self.get_model().visualize
 		except AttributeError:
 			pass
+		else:
+			vfun(out, logger)
 
 		if measure_time:
 			Q.time_stats.update('viz', time.time() - start)
