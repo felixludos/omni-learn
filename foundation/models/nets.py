@@ -405,6 +405,7 @@ class Normal(Normal_Distrib_Model):
 
 		return NormalDistribution(loc=mu, scale=logsigma.exp())
 
+
 @fig.AutoComponent('conv')
 class Conv_Encoder(fm.Encodable, fm.Model):
 
@@ -497,85 +498,6 @@ class Conv_Decoder(fm.Decodable, fm.Model):
 	def decode(self, q):
 		return self(q)
 
-
-# TODO: update
-class Rec_Encoder(Conv_Encoder): # fc before and after recurrence
-	def __init__(self, in_shape, rec_dim,
-	             
-	             nonlin='prelu', before_fc=[], after_fc=[], out_dim=None,
-	             output_nonlin=None, latent_dim=None,
-	             
-	             rec_type='lstm', rec_layers=1, auto_reset=True,
-	             batch_first=False,
-	             
-	             **kwargs):
-		
-		super().__init__(in_shape, latent_dim=None, **kwargs)
-
-		
-		self.tfm = None
-		if latent_dim is None and len(before_fc):
-			latent_dim = before_fc[-1]
-			before_fc = before_fc[:-1]
-		if latent_dim is not None:
-			self.tfm = make_MLP(self.feature_dim, latent_dim, hidden_dims=before_fc,
-			                       nonlin=nonlin, output_nonlin=nonlin)
-		else:
-			latent_dim = self.conv_dim
-			
-		self.latent_dim = latent_dim # input to rec
-		
-		if out_dim is None:
-			if len(after_fc):
-				out_dim = after_fc[-1]
-				after_fc = after_fc[:-1]
-			else:
-				out_dim = rec_dim
-				rec_dim = None
-		if len(after_fc):
-			rec_out_dim = rec_dim
-			rec_hidden_dim = None
-		else:
-			rec_out_dim = out_dim
-			rec_hidden_dim = rec_dim
-			after_fc = None
-
-		self.rec = Recurrence(latent_dim, output_dim=rec_out_dim, hidden_dim=rec_hidden_dim,
-		                      auto_reset=auto_reset, batch_first=batch_first,
-		                      output_nonlin=(output_nonlin if after_fc is None else None),
-		                      rec_type=rec_type, num_layers=rec_layers)
-		
-		self.dec = None
-		if after_fc is not None:
-			self.dec = make_MLP(rec_out_dim, out_dim, hidden_dims=after_fc,
-			                    nonlin=nonlin, output_nonlin=output_nonlin)
-			
-		
-		self.dout = out_dim
-
-	def reset(self):
-		super().reset()
-		self.rec.reset()
-		
-	def forward(self, xs):
-		if xs.ndimension() == 4:
-			xs = xs.unsqueeze(int(self.rec.batch_first))
-			
-		K, B, C, H, W = xs.size()
-		xs = xs.view(K*B,C,H,W)
-		
-		cs = self.conv(xs)
-		
-		if self.tfm is not None:
-			cs = self.tfm(cs.view(K*B, self.conv_dim))
-			
-		qs = self.rec(cs.view(K,B,self.latent_dim))
-		
-		if self.dec is not None:
-			qs = self.dec(qs)
-			
-		return qs
-	
 
 
 

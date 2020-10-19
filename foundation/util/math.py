@@ -8,8 +8,10 @@ from torch.nn import functional as F
 import torch.distributions as distrib
 from torch.distributions.utils import lazy_property
 
+import omnifig as fig
+
 #####################
-# Simple math
+# region Simple math
 #####################
 
 def factors(n): # has duplicates, starts from the extremes and ends with the middle
@@ -69,8 +71,9 @@ def MMD(p, q, C=None):
 
 	return ps.mean() + qs.mean() - 2*pq.mean()
 
+# endregion
 #####################
-# Neural Networks
+# region Neural Networks
 #####################
 
 
@@ -82,6 +85,7 @@ def logify(x, eps=1e-15):
 	v = x.abs().add(eps).log().add(1)
 	return ok * x + high * v - low * v
 
+@fig.Component('logifier')
 class Logifier(nn.Module):
 	def __init__(self, eps=1e-15):
 		super().__init__()
@@ -97,6 +101,7 @@ def unlogify(x):
 	v = x.abs().sub(1).exp()
 	return ok * x + high * v - low * v
 
+@fig.Component('unlogifier')
 class Unlogifier(nn.Module):
 	def forward(self, x):
 		return unlogify(x)
@@ -107,33 +112,55 @@ class RMSELoss(nn.MSELoss):
 		loss = super().forward(*args, **kwargs)
 		return loss.sqrt()
 
-def get_loss_type(name, **kwargs):
+@fig.AutoComponent('loss')
+def get_loss_type(ident, **kwargs):
 
-	if not isinstance(name, str):
-		return name
+	if not isinstance(ident, str):
+		return ident
 
-	if name == 'mse':
+	if ident == 'mse':
 		return nn.MSELoss(**kwargs)
-	elif name == 'rmse':
+	elif ident == 'rmse':
 		return RMSELoss(**kwargs)
-	elif name == 'l1':
+	elif ident == 'l1':
 		return nn.L1Loss(**kwargs)
-	elif name == 'huber':
+	elif ident == 'huber':
 		return nn.SmoothL1Loss(**kwargs)
-	elif name == 'nll':
+	elif ident == 'nll':
 		print('WARNING: should probably use cross-entropy')
 		return nn.NLLLoss(**kwargs)
-	elif name == 'cross-entropy':
+	elif ident == 'cross-entropy':
 		return nn.CrossEntropyLoss(**kwargs)
-	elif name == 'kl-div':
+	elif ident == 'kl-div':
 		return nn.KLDivLoss(**kwargs)
-	elif name == 'bce':
+	elif ident == 'bce':
 		#print('WARNING: should probably use bce-log')
 		return nn.BCELoss(**kwargs)
-	elif name == 'bce-log':
+	elif ident == 'bce-log':
 		return nn.BCEWithLogitsLoss(**kwargs)
 	else:
-		assert False, "Unknown loss type: " + name
+		assert False, "Unknown loss type: " + ident
+
+
+@fig.AutoComponent('regularization')
+def get_regularization(ident, p=2, dim=1, reduction='mean'):
+
+	if not isinstance(ident, str):
+		return ident
+
+	if ident == 'L2' or ident == 'l2':
+		return Lp_Norm(p=2, dim=dim, reduction=reduction)
+	elif ident == 'L1' or ident == 'l1':
+		return Lp_Norm(p=1, dim=dim, reduction=reduction)
+	elif ident == 'Lp':
+		return Lp_Norm(p=p, dim=dim, reduction=reduction)
+	elif ident == 'pow2':
+		return lambda q: q.pow(2).sum()
+	else:
+		print(f'Unknown reg: {ident}')
+		# raise Exception(f'unknown: {name}')
+
+
 
 class Mish(nn.Module):
 	def forward(self, x):
@@ -143,41 +170,42 @@ class Swish(nn.Module):
 		return x * torch.sigmoid(x)
 
 # Choose non-linearities
-def get_nonlinearity(nonlinearity, dim=1, inplace=True):
+@fig.AutoComponent('nonlin')
+def get_nonlinearity(ident, dim=1, inplace=True, **kwargs):
 
-	if nonlinearity is None:
+	if ident is None:
 		return None
-	if not isinstance(nonlinearity, str):
-		return nonlinearity
+	if not isinstance(ident, str):
+		return ident
 
-	if nonlinearity == 'prelu':
-		return nn.PReLU()
-	elif nonlinearity == 'lrelu':
-		return nn.LeakyReLU()
-	elif nonlinearity == 'relu':
+	if ident == 'prelu':
+		return nn.PReLU(**kwargs)
+	elif ident == 'lrelu':
+		return nn.LeakyReLU(**kwargs)
+	elif ident == 'relu':
 		return nn.ReLU(inplace=inplace)
-	elif nonlinearity == 'tanh':
+	elif ident == 'tanh':
 		return nn.Tanh()
-	elif nonlinearity == 'log-softmax':
+	elif ident == 'log-softmax':
 		return nn.LogSoftmax(dim=dim)
-	elif nonlinearity == 'softmax':
+	elif ident == 'softmax':
 		return nn.Softmax(dim=dim)
-	elif nonlinearity == 'softmax2d':
+	elif ident == 'softmax2d':
 		return nn.Softmax2d()
-	elif nonlinearity == 'softplus':
-		return nn.Softplus()
-	elif nonlinearity == 'sigmoid':
+	elif ident == 'softplus':
+		return nn.Softplus(**kwargs)
+	elif ident == 'sigmoid':
 		return nn.Sigmoid()
-	elif nonlinearity == 'elu':
-		return nn.ELU(inplace=inplace)
+	elif ident == 'elu':
+		return nn.ELU(inplace=inplace, **kwargs)
 
-	elif nonlinearity == 'mish':
+	elif ident == 'mish':
 		return Mish()
-	elif nonlinearity == 'swish':
+	elif ident == 'swish':
 		return Swish()
 
 	else:
-		assert False, "Unknown nonlin type: " + nonlinearity
+		assert False, "Unknown nonlin type: " + ident
 
 class Lp_Normalization(nn.Module):
 	def __init__(self, p=2, dim=1, eps=1e-8):
@@ -216,58 +244,62 @@ class Lp_Norm(nn.Module):
 		else:
 			return mag
 
-def get_normalization(norm, num, groups=8, **kwargs):
+@fig.AutoComponent('normalization')
+def get_normalization(ident, num, groups=8, **kwargs):
 
-	if not isinstance(norm, str):
-		return norm
+	if not isinstance(ident, str):
+		return ident
 
-	if norm == 'batch':
+	if ident == 'batch':
 		return nn.BatchNorm2d(num, **kwargs)
-	if norm == 'instance':
+	if ident == 'instance':
 		return nn.InstanceNorm2d(num, **kwargs)
-	if norm == 'l1':
+	if ident == 'l1':
 		return Lp_Normalization(1)
-	if norm == 'l2':
+	if ident == 'l2':
 		return Lp_Normalization(2)
-	if norm == 'lp':
+	if ident == 'lp':
 		return Lp_Normalization(**kwargs)
-	if norm == 'group':
+	if ident == 'group':
 		return nn.GroupNorm(groups, num, **kwargs)
-	raise Exception('unknown norm type: {}'.format(norm))
+	raise Exception(f'unknown norm type: {ident}')
 
-def get_pooling(down_type, factor, chn=None):
-	if not isinstance(down_type, str):
-		return down_type
+@fig.AutoComponent('down-pooling')
+def get_pooling(ident, factor, chn=None):
+	if not isinstance(ident, str):
+		return ident
 
 	if factor == 1:
 		return None
 
-	if down_type == 'conv':
+	if ident == 'conv':
 		assert chn is not None
 		return nn.Conv2d(chn, chn, kernel_size=factor, padding=0, stride=factor)
-	elif down_type == 'max':
+	elif ident == 'max':
 		return nn.MaxPool2d(factor, factor)
-	elif down_type == 'avg':
+	elif ident == 'avg':
 		return nn.AvgPool2d(factor, factor)
 
-	raise Exception('unknown pool type: {}'.format(down_type))
+	raise Exception(f'unknown pool type: {ident}')
 
-def get_upsample(up_type, factor, chn=None):
-	if not isinstance(up_type, str):
-		return up_type
+@fig.AutoComponent('up-pooling')
+def get_upsample(ident, factor, chn=None):
+	if not isinstance(ident, str):
+		return ident
 
 	if factor == 1:
 		return None
 
-	if up_type == 'conv':
+	if ident == 'conv':
 		assert chn is not None
 		return nn.ConvTranspose2d(chn, chn, kernel_size=factor, stride=factor)
 	else:
-		return nn.Upsample(scale_factor=2, mode=up_type)
+		return nn.Upsample(scale_factor=2, mode=ident)
 
 
+# endregion
 #####################
-# Randomness and Noise
+# region Randomness and Noise
 #####################
 
 def set_seed(seed=None):
@@ -402,8 +434,9 @@ def shuffle_dim(M, dim=-1): # reshuffle with replacement
 	
 	return M[row, col]
 
+# endregion
 #####################
-# Linear Systems
+# region Linear Systems
 #####################
 
 def mat_sum(mats):
@@ -469,8 +502,9 @@ def solve(A, b, out=None, bias=True, reg=0):
 # 	R = A.t() @ A
 
 
+# endregion
 #####################
-# Affine transformations/conversions
+# region Affine transformations/conversions
 #####################
 
 def aff_transform(points, transforms):
@@ -556,8 +590,11 @@ def se3_quat2Rt(se3quats): # qw, qx, qy, qz, x, y, z
 
 	return torch.cat([rots,trans],-1)
 
+
+
+# endregion
 #####################
-# Angles/Spheres
+# region Angles/Spheres
 #####################
 
 def cart2angl(pts):
@@ -748,8 +785,10 @@ def gnom2mat(gnom): # no 180 degree rotations
 	w = torch.ones(gnom.shape[:-1]).type_as(gnom).unsqueeze(-1)
 	return quat2mat(torch.cat([w,gnom],-1))
 
+
+# endregion
 #####################
-# Points
+# region Points
 #####################
 
 def pairwise_displacements(a):
@@ -783,8 +822,10 @@ def pairwise_displacements_2(a):
 		r += n - (sl + 1)
 	return np.concatenate(out)
 
+
+# endregion
 #####################
-# Probabilities/Statistics
+# region Probabilities/Statistics
 #####################
 
 class Joint_Distribution(distrib.Distribution):
@@ -961,3 +1002,6 @@ def MLE(q):
 	elif isinstance(q, distrib.Categorical):
 		return q.logits.max(dim=-1)[1]
 	return q.mle
+
+# endregion
+#####################

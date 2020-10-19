@@ -1,13 +1,13 @@
 import torch
 from torch import nn
 
-from omnifig import AutoComponent
+import omnifig as fig
 
 from .. import framework as fm
 from .. import util
-# from foundation.old.train import AutoComponent
 
-@AutoComponent('multigroup-cls')
+
+@fig.AutoComponent('multigroup-cls')
 class MultiGroupClassification(fm.Model):
 	def __init__(self, group_sizes, group_weights=None):
 		super().__init__(sum(group_sizes), 1)
@@ -49,6 +49,7 @@ class MultiGroupClassification(fm.Model):
 	
 	def get_picks(self, pred):
 		return torch.stack(self._get_info(pred)[1], dim=1)
+
 
 class Feature_Match(nn.Module):
 

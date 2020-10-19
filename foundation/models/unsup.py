@@ -9,16 +9,18 @@ import torch.distributions as distrib
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
+import omnifig as fig
 
 from . import nets
 from .. import framework as fm
+from .. import util
 from .atom import *
 
-
+@fig.AutoComponent('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Visualizable, fm.Trainable_Model):
-	def __init__(self, encoder, decoder, beta=None, criterion=None):
+	def __init__(self, encoder, decoder, reg='L2', reg_wt=0, criterion=None, viz_latent=True, viz_rec=True):
 
-		super().__init__(encoder.din, encoder.dout)
+		super().__init__(encoder.din, decoder.dout)
 
 		self.enc = encoder
 		self.dec = decoder
@@ -27,12 +29,61 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Visualizable,
 			criterion = nn.MSELoss()
 		self.criterion = util.get_loss_type(criterion)
 
-		self.beta = beta
-		if self.beta is not None:
+		self.reg_wt = reg_wt
+		self.reg_fn = util.get_regularization(reg, reduction='sum')
+
+		if self.reg_wt > 0:
 			self.stats.new('reg')
+		self.stats.new('rec_loss')
+
+		self.register_buffer('_q', None, save=True)
+		self.register_cache('_real', None)
+		self.register_cache('_rec', None)
 
 		self.latent_dim = self.dec.din
-
+		
+		self.viz_latent = viz_latent
+		self.viz_rec = viz_rec
+		
+	def _visualize(self, info, logger):
+		
+		if isinstance(self.enc, fm.Visualizable):
+			self.enc.visualize(info, logger)
+		if isinstance(self.dec, fm.Visualizable):
+			self.dec.visualize(info, logger)
+		
+		q = None
+		if self.viz_latent and 'latent' in info and info.latent is not None:
+			q = info.latent.loc if isinstance(info.latent, distrib.Distribution) else info.latent
+			
+			shape = q.size()
+			if len(shape) > 1 and np.product(shape) > 0:
+				try:
+					logger.add('histogram', 'latent-norm', q.norm(p=2, dim=-1))
+					logger.add('histogram', 'latent-std', q.std(dim=0))
+					if isinstance(info.latent, distrib.Distribution):
+						logger.add('histogram', 'logstd-hist', info.latent.scale.add(1e-5).log().mean(dim=0))
+				except ValueError:
+					print('\n\n\nWARNING: histogram just failed\n')
+					print(q.shape, q.norm(p=2, dim=-1).shape)
+		
+		B, C, H, W = info.original.shape
+		N = min(B, 8)
+		
+		if self.viz_rec:
+			if 'reconstruction' in info:
+				viz_x, viz_rec = info.original[:N], info.reconstruction[:N]
+				
+				recs = torch.cat([viz_x, viz_rec], 0)
+				logger.add('images', 'rec', util.image_size_limiter(recs))
+			elif self._rec is not None:
+				viz_x, viz_rec = self._real[:N], self._rec[:N]
+				
+				recs = torch.cat([viz_x, viz_rec], 0)
+				logger.add('images', 'rec', util.image_size_limiter(recs))
+		
+		logger.flush()
+	
 	def forward(self, x, ret_q=False):
 
 		q = self.encode(x)
@@ -45,64 +96,47 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Visualizable,
 	def encode(self, x):
 		return self.enc.encode(x)
 
+	def regularize(self, q, p=None):
+		B = q.size(0)
+		mag = self.reg_fn(q)
+		return mag / B
+
 	def decode(self, q):
 		return self.dec.decode(q)
-
-	# def _visualize(self, info, logger):
-	# 	if self._viz_counter % 5 == 0:
-	# 		# logger.add('histogram', 'latent-norm', info.latent.norm(p=2, dim=-1))
-	#
-	# 		B, C, H, W = info.original.shape
-	# 		N = min(B, 8)
-	#
-	# 		viz_x, viz_rec = info.original[:N], info.reconstruction[:N]
-	#
-	# 		recs = torch.cat([viz_x, viz_rec], 0)
-	# 		logger.add('images', 'rec', recs)
-	#
-	# 		# show latent space
-	# 		if self.latent_dim >= 2:
-	# 			if self.latent_dim > 2:
-	# 				x = PCA(n_components=2, copy=False).fit_transform(info.latent.cpu().numpy())
-	# 			else:
-	# 				x = info.latent.cpu().numpy()
-	#
-	# 			fig = plt.figure(figsize=(3, 3))
-	# 			plt.gca().set_aspect('equal')
-	# 			plt.scatter(*x.T, marker='.', s=4, edgecolors='none', alpha=.7)
-	# 			# plt.show()
-	# 			logger.add('figure', 'latent-space', fig, close=True)
-	#
-	# 	if 'reg' in info:
-	# 		self.stats.update('reg', info.reg)
 
 	def _step(self, batch, out=None):
 		if out is None:
 			out = util.TensorDict()
 
-		x, y = batch
+		x = batch[0]
+		B = x.size(0)
 
-		pred, q = self(x, ret_q=True)
+		out.original = x
 
-		loss = self.criterion(pred, x)
+		rec, q = self(x, ret_q=True)
+		out.latent = q
+		out.reconstruction = rec
+		
+		self._rec, self._real = rec.detach(), x.detach()
 
-		total = loss
+		loss = self.criterion(rec, x) / B
+		out.rec_loss = loss
+		self.stats.update('rec_loss', loss)
 
-		if self.beta is not None:
-			reg = self.regularize(q)
-			out.reg = reg
-			self.stats.update('reg', reg.detach())
-			total += self.beta * reg
+		if self.reg_wt > 0:
+			reg_loss = self.regularize(q)
+			self.stats.update('reg', reg_loss)
+			out.reg_loss = reg_loss
+			loss += self.reg_wt * reg_loss
 
-		out.total = total
+		out.loss = loss
 
 		if self.train_me():
-			self.optim_step(total)
+			self._q = q.loc.detach() if isinstance(q, distrib.Normal) else q.detach()
 
-		out.reconstruction = pred
-		out.original = x
-		out.loss = loss
-		out.latent = q
+			self.optim.zero_grad()
+			loss.backward()
+			self.optim.step()
 
 		return out
 
@@ -182,80 +216,6 @@ def judge(disc, real, fake, out=None, optim=None, disc_gp=None, disc_clip=None):
 			param.data.clamp_(-disc_clip, disc_clip)
 
 	return out
-
-
-class Generative_Adversarial_Network(fm.Regularizable, fm.Generative, fm.Visualizable, fm.Trainable_Model):
-
-	def __init__(self, generator, discriminator, disc_steps=1, disc_clip=None, disc_gp=None):
-		super().__init__(generator.din, generator.dout)
-
-		self.gen = generator
-		self.disc = discriminator
-
-		self.disc_steps = disc_steps
-		assert self.disc_steps >= 1, 'must train discriminator'
-		self.disc_clip = disc_clip
-		self.disc_gp = disc_gp
-		assert self.disc_gp is None or self.disc_clip is None, 'cant regularize with both'
-
-		if self.disc_gp is not None:
-			self.stats.new('reg')
-
-		self.step_counter = 0
-
-		self.stats.new('wasserstein')
-
-	def forward(self, N=1):
-		return self.generate(N)
-
-	# def _visualize(self, info, logger):
-	# 	pass
-
-	def _step(self, batch, out=None):
-		self.step_counter += 1
-
-		if out is None:
-			out = super()._step(batch, out)
-
-		real = batch[0]
-		fake = self.generate(real.size(0))
-
-		out.real = real
-		out.fake = fake
-
-		# train discriminator
-		out = judge(self.disc, real, fake, out=out,
-		            optim=self.optim.disc if self.train_me() else None,
-		            disc_gp=self.disc_gp, disc_clip=self.disc_clip)
-
-		self.stats.update('wasserstein', out.distance.detach())
-		if 'disc_gp' in out:
-			self.stats.update('reg', out.disc_gp.detach())
-
-		out.gen = fake
-		out.loss = out.distance # wasserstein distance (neg loss)
-
-		# train generator
-		if self.disc_steps is None or self.step_counter % self.disc_steps == 0:
-			gen = self.generate(real.size(0))
-			pretend = self.disc(gen)
-
-			if self.train_me():
-				self.optim.gen.zero_grad()
-				(-pretend).mean().backward()
-				self.optim.gen.step()
-
-			out.gen = gen
-			out.pretend = pretend
-
-		return out
-
-
-	def generate(self, N=1):
-		device = next(iter(self.parameters())).device
-		q = torch.randn(N, self.gen.din).to(device)
-		return self.gen(q)
-
 
 
 

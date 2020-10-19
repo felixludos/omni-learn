@@ -32,6 +32,7 @@ try:
 except ImportError:
 	print('WARNING: seaborn not found')
 
+from torch.nn import functional as F
 
 from .math import factors
 from .data import load_images
@@ -643,6 +644,17 @@ class Pretty_Formatter(object):
 
 pretty_format = Pretty_Formatter()
 
+
+def image_size_limiter(imgs, size=(128,128)):
+	H, W = imgs.shape[-2:]
+	
+	mH, mW = size
+	
+	if H <= mH and W <= mW:  # allows upto around 128x128
+		return imgs
+	
+	imgs = F.interpolate(imgs, size=(128, 128))
+	return imgs
 
 
 ###################
