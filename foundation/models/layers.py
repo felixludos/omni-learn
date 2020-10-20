@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+from torch.nn.utils import spectral_norm
 
 import omnifig as fig
 
@@ -39,19 +40,34 @@ def batched_grouped_linear(points, weights, masks, biases=None): # equivalent to
 
 	return out
 
+fig.AutoComponent('flatten')(nn.Flatten)
+
+@fig.AutoComponent('reshaper')
 class Reshaper(nn.Module): # by default flattens
 
-	def __init__(self, out_shape=(-1,)):
+	def __init__(self, dout=(-1,)):
 		super().__init__()
 
-		self.out_shape = out_shape
+		self.dout = dout
 
 	def extra_repr(self):
-		return 'out={}'.format(self.out_shape)
+		return f'out={self.dout}'
 
 	def forward(self, x):
 		B = x.size(0)
-		return x.view(B, *self.out_shape)
+		return x.view(B, *self.dout)
+
+@fig.Modification('spec-norm')
+def spec_norm_layer(layer, config):
+	
+	kwargs = dict(
+		name = config.pull('weight_name', 'weight'),
+		n_power_iterations = config.pull('n_power_iterations', 1),
+		eps = config.pull('eps', 1e-12),
+		dim = config.pull('dim', None),
+	)
+	
+	return spectral_norm(layer, **kwargs)
 
 # endregion
 #################
@@ -171,7 +187,7 @@ class ConvLayer(fm.Model):
 	             din=None,
 
 	             down_type='stride', norm=None, pool='max',
-	             nonlin='elu',
+	             nonlin='elu', spec_norm=False,
 	             residual=False, **conv_kwargs):
 		assert out_channels is not None, 'must specify an output channel size'
 		assert in_channels is not None or din is not None, 'no input size info'
@@ -215,6 +231,9 @@ class ConvLayer(fm.Model):
 
 		self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding,
 		                      stride=stride, dilation=dilation, **conv_kwargs)
+		if spec_norm:
+			self.conv = spectral_norm(self.conv)
+		self.spec_norm = spec_norm
 
 		self.pool = util.get_pooling(pool, factor=factor) if down_type == 'pool' \
 		                                                     and (factor[0] > 1 or factor[1] > 1) else None
@@ -229,7 +248,7 @@ class ConvLayer(fm.Model):
 		# assert not self.res or in_channels == out_channels, 'residual connections not possible'
 
 	def extra_repr(self):
-		return f'residual={self.res}'
+		return f'residual={self.res}, spec-norm={self.spec_norm}'
 
 	def forward(self, x):
 		c = self.conv(x)
@@ -265,6 +284,7 @@ class DeconvLayer(fm.Model):
 	             din=None, dout=None,
 
 	             up_type='deconv', norm=None,
+	             spec_norm=False,
 	             nonlin='elu', output_nonlin='_unused',
 	             residual=False, **conv_kwargs):
 
@@ -347,6 +367,9 @@ class DeconvLayer(fm.Model):
 			self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
 			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
 		
+		if spec_norm:
+			self.deconv = spectral_norm(self.deconv)
+		self.spec_norm = spec_norm
 		
 		self.norm = util.get_normalization(norm, out_channels)
 		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
@@ -359,7 +382,7 @@ class DeconvLayer(fm.Model):
 		# assert not self.res or in_channels == out_channels, 'residual connections not possible'
 
 	def extra_repr(self):
-		return f'residual={self.res}'
+		return f'residual={self.res}, spec-norm={self.spec_norm}'
 
 	def forward(self, x):
 		if self.up is not None:

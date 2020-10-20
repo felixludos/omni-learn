@@ -265,7 +265,7 @@ def show_imgs(imgs, titles=None, H=None, W=None,
               figsize=None, scale=1,
 			  reverse_rows=False, grdlines=False,
 			  channel_first=None,
-			  imgroot=None,
+			  imgroot=None, params={},
               savepath=None, dpi=96, autoclose=True, savescale=1,
 			  adjust={}, border=0., between=0.01):
 
@@ -297,7 +297,7 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 		else:
 			raise Exception(f'unknown shape: {shape}')
 
-	imgs = [img.transpose(1,2,0) if channel_first and len(img.shape)==3 else img for img in imgs]
+	imgs = [img.transpose(1,2,0).squeeze() if channel_first and len(img.shape)==3 else img.squeeze() for img in imgs]
 	
 	iH, iW = imgs[0].shape[:2]
 	
@@ -324,7 +324,7 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 		plt.sca(ax)
 		if reverse_rows:
 			img = img[::-1]
-		plt.imshow(img)
+		plt.imshow(img, **params)
 		if grdlines: # TODO: automate to allow more fine grain gridlines
 			plt.plot([0, iW], [iH / 2, iH / 2], c='r', lw=.5, ls='--')
 			plt.plot([iW / 2, iW / 2], [0, iH], c='r', lw=.5, ls='--')

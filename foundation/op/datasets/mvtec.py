@@ -30,7 +30,7 @@ def get_images(root, size=None, is_mask=False):
 	
 	images = []
 	for data in raw:
-		image = util.str_to_byte_img(data) if is_mask else util.str_to_rgb(data)
+		image = util.str_to_byte_img(data) if is_mask else util.str_to_rgb(data)[..., ::-1]
 		image = cv2.resize(image, (size,size))
 		images.append(image)
 	return images

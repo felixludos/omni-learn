@@ -1,0 +1,19 @@
+
+
+
+_meta.script_name: compute-fid
+
+
+dataset:
+  name: mnist
+
+  drop_last: False
+
+batch_size: 250
+
+pbar: True
+
+fid-dim: 64
+n-samples: 10
+
+

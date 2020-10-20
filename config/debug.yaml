@@ -1,3 +1,7 @@
 
 
-_meta.script_name: report
+#_meta.script_name: report
+
+_meta.script_name: download-mvtec
+
+size: 32

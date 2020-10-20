@@ -207,6 +207,7 @@ def get_nonlinearity(ident, dim=1, inplace=True, **kwargs):
 	else:
 		assert False, "Unknown nonlin type: " + ident
 
+@fig.AutoComponent('lp-norm')
 class Lp_Normalization(nn.Module):
 	def __init__(self, p=2, dim=1, eps=1e-8):
 		super().__init__()
@@ -245,7 +246,7 @@ class Lp_Norm(nn.Module):
 			return mag
 
 @fig.AutoComponent('normalization')
-def get_normalization(ident, num, groups=8, **kwargs):
+def get_normalization(ident, num, groups=8, p=2, **kwargs):
 
 	if not isinstance(ident, str):
 		return ident
@@ -259,7 +260,7 @@ def get_normalization(ident, num, groups=8, **kwargs):
 	if ident == 'l2':
 		return Lp_Normalization(2)
 	if ident == 'lp':
-		return Lp_Normalization(**kwargs)
+		return Lp_Normalization(p=p, **kwargs)
 	if ident == 'group':
 		return nn.GroupNorm(groups, num, **kwargs)
 	raise Exception(f'unknown norm type: {ident}')

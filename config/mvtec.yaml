@@ -1,0 +1,98 @@
+
+
+
+transforms:
+  bottle:
+    - rot-10
+    - offset-x
+    - offset-y
+    - flip-h
+    - flip-v
+
+  cable:
+    - rot-10
+    - offset-x
+    - offset-y
+    - flip-h
+    - flip-v
+
+  capsule:
+    - offset-x
+    - offset-y
+#    - flip-v
+
+  carpet:
+    - offset-x
+    - offset-y
+    - rot-90
+    - flip-h
+    - flip-v
+
+  grid: # greyscale
+    - rot-10
+    - offset-x
+    - offset-y
+    - flip-h
+    - flip-v
+
+  hazelnut:
+    - rot-10
+    - offset-x
+    - offset-y
+    - flip-h
+    - flip-v
+
+  leather:
+    - rot-10
+    - offset-x
+    - offset-y
+    - flip-h
+    - flip-v
+
+  metal_nut:
+    - rot-10
+    - offset-x
+    - offset-y
+    - flip-h
+    - flip-v
+
+  pill:
+    - offset-x
+    - offset-y
+
+  screw: # greyscale
+    - rot-10
+    - offset-x
+    - offset-y
+    - flip-h
+    - flip-v
+
+  tile:
+    - rot-10
+    - flip-h
+    - flip-v
+
+  toothbrush:
+    - flip-h
+    - offset-x
+    - offset-y
+
+  transistor:
+    - offset-x
+    - offset-y
+    - flip-h
+
+  wood:
+    - offset-x
+    - offset-y
+    - rot-10
+    - flip-h
+    - flip-v
+
+  zipper:
+    - offset-x
+    - offset-y
+    - flip-v
+    - flip-h
+    - rot-180
+

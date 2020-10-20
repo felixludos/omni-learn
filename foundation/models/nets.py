@@ -5,6 +5,7 @@ import torch.nn as nn
 from itertools import zip_longest
 import torch.nn.functional as F
 from torch.distributions import Normal as NormalDistribution
+from torch.nn.utils import spectral_norm
 from .. import framework as fm
 
 import omnifig as fig
@@ -162,7 +163,7 @@ class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
 		elif latent_dim != dout:
 			set_nonlin = True
 			assert len(dout) == 3, 'Must specify image size to transform to {}'.format(latent_dim)
-			tail = make_MLP(input_dim=dout, output_dim=latent_dim, output_nonlin=output_nonlin)
+			tail = make_MLP(din=dout, dout=latent_dim, output_nonlin=output_nonlin)
 		else:
 			set_nonlin = False
 			tail = None
@@ -284,7 +285,7 @@ class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
 			head = A.pull('head')
 		elif latent_dim != dout:
 			assert len(dout) == 3, 'Must specify image size to transform to {}'.format(latent_dim)
-			head = make_MLP(input_dim=latent_dim, output_dim=din, output_nonlin=nonlin)
+			head = make_MLP(din=latent_dim, dout=din, output_nonlin=nonlin)
 		else:
 			head = None
 
@@ -412,16 +413,17 @@ class Conv_Encoder(fm.Encodable, fm.Model):
 	def __init__(self, in_shape, latent_dim=None, feature_dim=None,
 				 nonlin='prelu', output_nonlin=None, residual=False,
 				 channels=[], kernels=3, strides=1, factors=2, down='max',
-				 norm='instance', output_norm=None,
+				 norm='instance', output_norm=None, spec_norm=False,
 				 fc_hidden=[]):
 		
 		self.in_shape = in_shape
 
-		cshapes, csets = plan_conv(self.in_shape, channels=channels, kernels=kernels, factors=factors, strides=strides)
+		cshapes, csets = plan_conv(self.in_shape, channels=channels, kernels=kernels,
+		                           factors=factors, strides=strides)
 
 		conv_layers = build_conv_layers(csets, factors=factors, pool_type=down, norm_type=norm,
 										out_norm_type=(output_norm if latent_dim is None else norm),
-										nonlin=nonlin, residual=residual,
+										nonlin=nonlin, residual=residual, spec_norm=spec_norm,
 										out_nonlin=(output_nonlin if latent_dim is None else nonlin))
 
 		out_shape = cshapes[-1]
@@ -440,8 +442,8 @@ class Conv_Encoder(fm.Encodable, fm.Model):
 		self.fc = None
 		if latent_dim is not None:
 			self.fc = make_MLP(self.feature_dim, self.latent_dim,
-							   hidden_dims=fc_hidden, nonlin=nonlin,
-							   output_nonlin=output_nonlin)
+			                   hidden=fc_hidden, nonlin=nonlin,
+			                   output_nonlin=output_nonlin)
 
 	def transform_conv_features(self, c):
 		if self.fc is None:
@@ -460,7 +462,7 @@ class Conv_Decoder(fm.Decodable, fm.Model):
 	
 	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,
 	             channels=[], kernels=[], factors=[], strides=[], up='deconv',
-	             norm='instance', output_norm=None, residual=False,
+	             norm='instance', output_norm=None, residual=False, spec_norm=False,
 	             fc_hidden=[]):
 		
 		self.out_shape = out_shape
@@ -472,7 +474,7 @@ class Conv_Decoder(fm.Decodable, fm.Model):
 		
 		deconv_layers = build_deconv_layers(dsets, sizes=dshapes[1:], nonlin=nonlin, out_nonlin=output_nonlin,
 		                                    up_type=up, norm_type=norm, factors=factors, residual=residual,
-		                                    out_norm_type=output_norm)
+		                                    spec_norm=spec_norm, out_norm_type=output_norm)
 		
 		super().__init__(dshapes[0] if latent_dim is None else latent_dim, out_shape)
 		
@@ -482,7 +484,7 @@ class Conv_Decoder(fm.Decodable, fm.Model):
 		self.fc = None
 		if latent_dim is not None:
 			self.fc = make_MLP(self.latent_dim, self.deconv_shape,
-			                   hidden_dims=fc_hidden, nonlin=nonlin, output_nonlin=nonlin)
+			                   hidden=fc_hidden, nonlin=nonlin, output_nonlin=nonlin)
 		
 		self.deconv = nn.Sequential(*deconv_layers)
 	

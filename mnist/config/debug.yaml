@@ -1,23 +1,8 @@
 
 
-_meta.script_name: compute-fid
+_meta.script_name: train
 
-
-dataset:
-  name: mnist
-
-  drop_last: False
-
-batch_size: 250
-
-pbar: True
-
-#fid-dim: 64
-#n-samples: 10
-
-#_meta.script_name: train
-
-#  script_name: eval
+#parents: [cmd]
 
 #resume: test-pycharm_200707-021212
 #
@@ -29,15 +14,28 @@ pbar: True
 
 #extend: 5000
 
-#parents: ['demo']
+parents: [demo]
 
+model.net.factors: 1
 
+model:
+  spec_norm: True
 
-#name: 'test-pycharm'
+#  down: stride
 
-#inline: True
+  down: None
+#  norm: batch
+#  nonlin: mish
 
-#dataset.name: mnist
+  net:
+    strides: 2
+#    factors: 1
+
+name: test-pycharm
+
+inline: True
+
+dataset.name: mnist
 
 #output.save_freq: 800
 

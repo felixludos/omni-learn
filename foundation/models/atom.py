@@ -5,22 +5,24 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import torch.multiprocessing as mp
-from .. import util
+
+import omnifig as fig
 
 from .. import framework as fm
 from .. import util
 from . import layers as layerslib
 
 
-def make_MLP(input_dim, output_dim, hidden_dims=None,
+@fig.Component('mlp')
+def make_MLP(din, dout, hidden=None,
              initializer=None,
              nonlin='prelu', output_nonlin=None,
-			 logify_in=False, unlogify_out=False,
+             logify_in=False, unlogify_out=False,
              bias=True, output_bias=None):
 	'''
-	:param input_dim: int
-	:param output_dim: int
-	:param hidden_dims: ordered list of int - each element corresponds to a FC layer with that width (empty means network is not deep)
+	:param din: int
+	:param dout: int
+	:param hidden: ordered list of int - each element corresponds to a FC layer with that width (empty means network is not deep)
 	:param nonlin: str - choose from options found in get_nonlinearity(), applied after each intermediate layer
 	:param output_nonlin: str - nonlinearity to be applied after the last (output) layer
 	:param logify_in: convert input to logified space
@@ -28,8 +30,8 @@ def make_MLP(input_dim, output_dim, hidden_dims=None,
 	:return: an nn.Sequential instance with the corresponding layers
 	'''
 
-	if hidden_dims is None:
-		hidden_dims = []
+	if hidden is None:
+		hidden = []
 
 	if output_bias is None:
 		output_bias = bias
@@ -37,19 +39,19 @@ def make_MLP(input_dim, output_dim, hidden_dims=None,
 	flatten = False
 	reshape = None
 
-	din = input_dim
-	dout = output_dim
+	din = din
+	dout = dout
 
-	if isinstance(input_dim, (tuple, list)):
+	if isinstance(din, (tuple, list)):
 		flatten = True
-		input_dim = int(np.product(input_dim))
-	if isinstance(output_dim, (tuple, list)):
-		reshape = output_dim
-		output_dim = int(np.product(output_dim))
+		din = int(np.product(din))
+	if isinstance(dout, (tuple, list)):
+		reshape = dout
+		dout = int(np.product(dout))
 
-	nonlins = [nonlin] * len(hidden_dims) + [output_nonlin]
-	biases = [bias] * len(hidden_dims) + [output_bias]
-	hidden_dims = input_dim, *hidden_dims, output_dim
+	nonlins = [nonlin] * len(hidden) + [output_nonlin]
+	biases = [bias] * len(hidden) + [output_bias]
+	hidden = din, *hidden, dout
 
 	layers = []
 	if flatten:
@@ -57,7 +59,7 @@ def make_MLP(input_dim, output_dim, hidden_dims=None,
 
 	if logify_in:
 		layers.append(util.Logifier())
-	for in_dim, out_dim, nonlin, bias in zip(hidden_dims, hidden_dims[1:], nonlins, biases):
+	for in_dim, out_dim, nonlin, bias in zip(hidden, hidden[1:], nonlins, biases):
 		layer = nn.Linear(in_dim, out_dim, bias=bias)
 		if initializer is not None:
 			layer = initializer(layer, nonlin)
@@ -81,6 +83,8 @@ def make_MLP(input_dim, output_dim, hidden_dims=None,
 def plan_conv(in_shape, channels, kernels=3, factors=1, strides=1, padding=None, dilations=1):
 	assert len(channels) > 0
 	L = len(channels)
+
+	# region list args
 
 	try:
 		assert len(kernels) == L
@@ -118,6 +122,8 @@ def plan_conv(in_shape, channels, kernels=3, factors=1, strides=1, padding=None,
 
 	padding = [((k[0] - 1) // 2, (k[1] - 1) // 2) if p is None else p for k, p in zip(kernels, padding)]
 
+	# endregion
+
 	channels = [in_shape[0]] + list(channels)
 
 	C, H, W = in_shape
@@ -151,7 +157,8 @@ def plan_conv(in_shape, channels, kernels=3, factors=1, strides=1, padding=None,
 
 def build_conv_layers(settings, factors=1, pool_type='max',
 					  norm_type='batch', out_norm_type=None,
-					  nonlin='elu', out_nonlin=None, residual=False):
+					  nonlin='elu', spec_norm=False,
+					  out_nonlin=None, residual=False):
 	# assert not residual
 
 	L = len(settings)  # number of layers
@@ -168,7 +175,7 @@ def build_conv_layers(settings, factors=1, pool_type='max',
 	layers = []
 	for params, f, bn, n in zip(settings, factors, bns, nonlins):
 		layers.append(layerslib.ConvLayer(norm=bn, nonlin=n, factor=f,
-								pool=pool_type, residual=residual,
+								pool=pool_type, residual=residual, spec_norm=spec_norm,
 								down_type='stride' if f == 1 else 'pool',
 								**params))
 
@@ -248,7 +255,8 @@ def plan_deconv(out_shape, channels, kernels=2, factors=1, strides=1, padding=No
 
 def build_deconv_layers(settings, sizes=None, up_type='deconv',
 						norm_type='batch', out_norm_type=None, factors=None,
-						nonlin='elu', out_nonlin=None, residual=False):
+						nonlin='elu', spec_norm=False,
+						out_nonlin=None, residual=False):
 	# assert not residual
 
 	L = len(settings)  # number of layers
@@ -269,7 +277,7 @@ def build_deconv_layers(settings, sizes=None, up_type='deconv',
 	layers = []
 	for params, f, sz, bn, n in zip(settings, factors, sizes, bns, nonlins):
 		layers.append(layerslib.DeconvLayer(norm=bn, nonlin=n, up_type=up_type, size=sz[-2:],
-		                                    residual=residual, factor=f,
+		                                    residual=residual, factor=f, spec_norm=spec_norm,
 								  **params))
 
 	return layers  # can be used as sequential or module list
