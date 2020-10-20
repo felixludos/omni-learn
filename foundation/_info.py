@@ -15,7 +15,7 @@ license = 'MIT'
 
 readme = 'README.md'
 
-packages = ['foundation']
+installable_packages = ['foundation']
 
 import os
 try:

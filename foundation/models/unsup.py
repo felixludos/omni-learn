@@ -179,7 +179,9 @@ class Variational_Autoencoder(fm.Generative, Autoencoder):
 # class Wasserstein_Autoencoder(Autoencoder):
 # 	pass
 
-def grad_penalty(disc, real, fake):
+def grad_penalty(disc, real, fake): # for wgans
+	# from "Improved Training of Wasserstein GANs" by Gulrajani et al. (1704.00028)
+
 	B = real.size(0)
 	eps = torch.rand(B, *[1 for _ in range(real.ndimension()-1)], device=real.device)
 
@@ -190,6 +192,27 @@ def grad_penalty(disc, real, fake):
 		                     create_graph=True, retain_graph=True, only_inputs=True)
 
 	return (grad.contiguous().view(B,-1).norm(2, dim=1) - 1).pow(2).mean()
+
+def grad_penalty_sj(disc, real, fake): # for shannon jensen gans
+	# from "Stabilizing Training of GANs through Regularization" by Roth et al. (1705.09367)
+
+	B = real.size(0)
+
+	fake, real = fake.clone().detach(), real.clone().detach()
+	fake.requires_grad, real.requires_grad = True, True
+
+	with torch.enable_grad():
+		vfake, vreal = disc(fake), disc(real)
+		gfake, greal = autograd.grad(vfake.mean() + vreal.mean(),
+		                             (fake, real),
+		                     create_graph=True, retain_graph=True, only_inputs=True)
+
+	nfake = gfake.view(B,-1).pow(2).sum(-1, keepdim=True)
+	nreal = greal.view(B,-1).pow(2).sum(-1, keepdim=True)
+
+	return (vfake.sigmoid().pow(2)*nfake).mean() + ((-vreal).sigmoid().pow(2)*nreal).mean()
+
+
 
 def judge(disc, real, fake, out=None, optim=None, disc_gp=None, disc_clip=None):
 	if out is None:
