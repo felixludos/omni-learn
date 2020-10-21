@@ -22,7 +22,8 @@ from .farming import make_ghost
 
 FD_PATH = os.path.dirname(os.path.dirname(__file__))
 
-fig.register_config_dir(os.path.join(os.path.dirname(FD_PATH), 'config'))
+# fig.register_config_dir(os.path.join(os.path.dirname(FD_PATH), 'config'))
+fig.register_config('origin', os.path.join(os.path.dirname(FD_PATH), 'config', 'origin.yaml'))
 
 DEFAULT_DATA_PATH = os.path.join(os.path.dirname(FD_PATH),'local_data')
 DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH),'trained_nets')
