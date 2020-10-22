@@ -17,7 +17,7 @@ from .. import util
 from .atom import *
 
 @fig.AutoComponent('ae')
-class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Visualizable, fm.Trainable_Model):
+class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 	def __init__(self, encoder, decoder, reg='L2', reg_wt=0, criterion=None, viz_latent=True, viz_rec=True):
 
 		super().__init__(encoder.din, decoder.dout)
@@ -30,9 +30,10 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Visualizable,
 		self.criterion = util.get_loss_type(criterion)
 
 		self.reg_wt = reg_wt
-		self.reg_fn = util.get_regularization(reg, reduction='sum')
+		self.reg_fn = util.get_regularization(reg, reduction='sum') \
+			if reg_wt is not None and reg_wt > 0 else None
 
-		if self.reg_wt > 0:
+		if self.reg_wt is not None and self.reg_wt > 0:
 			self.stats.new('reg')
 		self.stats.new('rec_loss')
 
