@@ -8,7 +8,7 @@ from bisect import bisect_right
 
 from ... import util
 
-from omnifig import AutoModifier
+from omnifig import AutoModifier, Modification
 
 from ..data import Dataset
 from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset
@@ -160,5 +160,104 @@ class Resamplable(Info_Dataset):
 		if self.budget is not None:
 			item = self.inds[item]
 		return super().__getitem__(item)
+
+@AutoModifier('blurred')
+class Blurred(Info_Dataset):
+
+	def __init__(self, config):
+
+		prepend = config.pull('prepend-tfm', False)
+		if prepend:
+			raise NotImplementedError
+
+		level = config.pull('blur-level', 5)
+		assert level % 2 == 1, f'bad blur level: {level}'
+		blur_type = config.pull('blur-type', 'uniform')
+
+		assert blur_type == 'uniform', f'not implemented: {blur_type}'
+
+		pad_type = config.pull('pad-type', 'reflect')
+		padding = (level-1)//2
+
+		super().__init__(config)
+
+		self.prepend = prepend
+
+		C = self.din[0]
+
+		self.pad_type = pad_type
+		self.padding = padding
+
+		self.blur = nn.Conv2d(C, 1, groups=C, bias=False, kernel_size=level,
+		                      padding=padding, padding_mode=pad_type)
+		self.blur.weight.requires_grad = False
+		self.blur.weight.copy_(1).div_(level**2)
+
+		self.done = False
+		if isinstance(self, Device_Dataset):
+
+			self.blur.to(self.device)
+
+			key = config.pull('data_key', 'images')
+			full = getattr(self, key)
+
+			with torch.no_grad():
+				full = self.blur(full).detach()
+
+			setattr(self, key, full)
+
+			self.done = True
+
+
+
+	def __getitem__(self, item):
+
+		if self.done:
+			return item
+
+		raise NotImplementedError
+
+		x, *other = item
+
+
+
+
+
+		pass
+
+
+@Modification('blurred')
+def blurred(dataset, config):
+
+	if not isinstance(dataset, Device_Dataset):
+		raise NotImplementedError
+
+	level = config.pull('blur-level', 5)
+	assert level % 2 == 1, f'bad blur level: {level}'
+	blur_type = config.pull('blur-type', 'uniform')
+
+	assert blur_type == 'uniform', f'not implemented: {blur_type}'
+
+	pad_type = config.pull('pad-type', 'reflect')
+	padding = (level-1)//2
+
+	C = dataset.din[0]
+
+	blur = nn.Conv2d(C, 1, groups=C, bias=False, kernel_size=level,
+	                      padding=padding, padding_mode=pad_type)
+	blur.weight.requires_grad = False
+	blur.weight.copy_(torch.ones_like(blur.weight)).div_(level**2)
+
+	blur.to(dataset.device)
+
+	key = config.pull('data_key', 'images')
+	full = getattr(dataset, key)
+
+	with torch.no_grad():
+		full = blur(full).detach()
+
+	setattr(dataset, key, full)
+
+	return dataset
 
 

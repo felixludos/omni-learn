@@ -99,20 +99,25 @@ def Dataset(name):
 # 	return loaders
 
 
-
+@fig.Component('dataset')
 @fig.Script('load-data', description='Load datasets')
 def load_data(A, mode=None):
 	'''
 	Loads datasets and optionally splits datasets into
 	training, validation, and testing sets.
 	'''
-	if '_type' not in A:
+
+	_type = A.pull('_type', None, silent=True)
+	if _type is None or _type == 'dataset':
 		name = A.pull('name')
 		
 		if name not in dataset_registry:
 			raise Exception(f'No datasets named "{name}" is registered')
 		
 		A.push('_type', dataset_registry[name])
+
+		mods = A.pull('_dataset_mod', None, silent=True)
+		A.push('_mod', mods, silent=True)
 	
 	# dataroot = A.pull('dataset.dataroot', None)
 	
