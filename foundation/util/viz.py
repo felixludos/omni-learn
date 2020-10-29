@@ -276,7 +276,7 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 		channel_first = False
 
 	if isinstance(imgs, torch.Tensor):
-		imgs = imgs.detach().cpu().numpy().squeeze()
+		imgs = imgs.detach().cpu().squeeze(0).numpy()
 	elif isinstance(imgs, (list, tuple)):
 		imgs = [img.detach().cpu().numpy() if isinstance(img, torch.Tensor) else img for img in imgs]
 
@@ -286,6 +286,8 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 		if channel_first is None \
 				and shape[0 if len(shape) == 3 else 1] in {1, 3, 4} and shape[-1] not in {1, 3, 4}:
 			channel_first = True
+		
+		print(channel_first, shape)
 		
 		if len(shape) == 2 or (len(shape) == 3 and ((shape[0] in {1,3,4} and channel_first)
 		                          or (shape[-1] in {1,3,4} and not channel_first))):

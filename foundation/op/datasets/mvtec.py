@@ -1,5 +1,8 @@
 
 import sys, os
+from pathlib import Path
+
+import random
 
 from tqdm import tqdm
 try:
@@ -123,43 +126,109 @@ def download_mvtec(A):
 	return path
 
 @Dataset('mvtec')
-class MVTec_Anomaly_Detection(Info_Dataset):
+class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 	
 	def __init__(self, A):
 	
-		dataroot = A.pull('dataroot')
+		dataroot = Path(A.pull('dataroot')) / 'mvtec'
 		
 		size = A.pull('size', None)
 		
 		dirname = 'full' if size is None else f'size{size}'
-		droot = os.path.join(dataroot, dirname)
+		droot = dataroot / dirname
 		
-		if not os.path.isdir(dataroot) or not os.path.isdir(droot):
+		if not dataroot.is_dir() or not droot.is_dir():
 			download = A.pull('download', False)
 			if not download:
-				raise Exception('This dataset hasnt been downloaded and setup yet '
+				raise Exception(f'This dataset ({dirname}) hasnt been downloaded and setup yet '
 				                '(set the "download" argument to do so automatically)')
 		
 			print(f'Downloading/Formatting MVTec dataset: {dirname}')
-			droot = fig.quick_run('download-mvtec', root=dataroot, size=size)
+			droot = fig.quick_run('download-mvtec', root=str(dataroot), size=size)
+			droot = Path(droot)
 		
-		cats = A.pull('cats', None)
+		cat = A.pull('cat', 'random')
+		
+		paths = [c for c in droot.glob('*.h5') if cat == 'random' or cat == c.stem]
+		path = random.choice(paths)
+		
+		include_class = A.pull('include-class', '<>include_class', True)
+		include_mask = A.pull('include-masks', '<>include_masks', False)
+		
+		cut = A.pull('cut', 'normal')
+		assert cut in {'normal', 'anomalies', 'all'}, f'unknown: {cut}'
 		
 		din = (3, 1024, 1024) if size is None else (3, size, size)
 		dout = din
 		super().__init__(din, dout)
 		
-		fnames = [c for c in os.listdir(droot) if '.h5' in c and (cats is None or c.split('.')[0] in cats)]
+		raw = hf.File(path, 'r')
 		
-		self.files = [hf.File(os.path.join(droot, fname), 'r') for fname in fnames]
+		# print(raw.keys())
+		
+		uses = [key for key in raw.keys() if 'mask_' not in key and (cut == 'all'
+		                                                             or (cut == 'normal' and 'train_' in key)
+					or (cut == 'anomalies' and 'test_' in key))]
+		C, H, W = din
+		
+		images = []
+		masks = [] if include_mask else None
+		labels = [] if include_class else None
+		for key in uses:
+			imgs = raw[key][()]
+			images.extend(imgs)
+			if labels is not None:
+				labels.extend([1 if 'test_' in key else 0]*len(imgs))
+			ident = key.split('_')[1]
+			if masks is not None:
+				if 'test_' in key and ident != 'good':
+					ident = f'mask_{ident}'
+					masks.extend(raw[ident][()])
+				else:
+					masks.extend([np.zeros((H,W))]*len(imgs))
+		
+		if masks is not None and not len(masks):
+			masks = None
+		if labels is not None:
+			labels = torch.tensor(labels).long()
+		
+		if size is not None:
+			# print([m.shape for m in images])
+			images = torch.from_numpy(np.stack(images)).permute(0,3,1,2).float().div(255)
+			if masks is not None and len(masks):
+				# print([m.shape for m in masks])
+				masks = torch.from_numpy(np.stack(masks)).unsqueeze(1).bool()
+
+		raw.close()
+		# self.raw = raw
+		
 		self.size = size
-	
-		self.images = None
-	
-		if size is None:
-			pass
+		
+		self.images = images
+		self.masks = masks
+		self.labels = labels
 
+	
+	def __len__(self):
+		return len(self.images)
+	
+	def __getitem__(self, item):
+		
+		if self.size is not None:
+			out = [self.images[item]]
+			
+			
+			if self.masks is not None:
+				out.append(self.masks[item])
+				
+				if self.labels is not None:
+					out.append(self.labels[item])
+			elif self.labels is not None:
+				out.append(self.labels[item])
 
+			return out
+		
+		raise NotImplementedError
 
 
 

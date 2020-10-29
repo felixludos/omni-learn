@@ -183,7 +183,9 @@ class EMNIST(Torchvision_Toy_Dataset):
 		dataroot, kwargs = _get_common_args(A)
 		root = os.path.join(dataroot, 'emnist')
 
-		split = A.pull('split', 'letters')
+		split = A.pull('group', 'letters')
+		# if split != 'letters':
+		# 	raise NotImplementedError
 
 		dataset = torchvision.datasets.EMNIST(root, split=split, **kwargs)
 
@@ -191,14 +193,24 @@ class EMNIST(Torchvision_Toy_Dataset):
 
 		labeled = A.pull('labeled', False)
 
+		limit_classes = A.pull('limit-classes', None)
+		num_classes = 26 if split == 'letters' else 10
+
 		dout = None
 		if labeled:
-			if split != 'letters':
-				raise NotImplementedError
-			dout = 26
+			
+			dout = num_classes
 
 		super().__init__(dataset, A=A, label_attr='targets' if labeled else None,
 		                 dout=dout, root=root, **kwargs)
+		
+		if labeled and limit_classes is not None and limit_classes < num_classes:
+			
+			pass
+		
+		self.images = self.images.permute(0,1,3,2)
+			
+		
 
 @Dataset('svhn')
 class SVHN(Torchvision_Toy_Dataset):
