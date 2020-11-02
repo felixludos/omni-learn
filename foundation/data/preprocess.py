@@ -169,7 +169,7 @@ class Image_Transform(nn.Module):
 			if self.contin:
 
 				if self.src_bg:
-					alpha = torch.ones(B, 1, H, W)
+					alpha = torch.ones(B, 1, H, W, device=x.device)
 					x = torch.cat([x, alpha], 1)
 					initial = x
 
