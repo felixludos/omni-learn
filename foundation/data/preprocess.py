@@ -155,10 +155,10 @@ class Image_Transform(nn.Module):
 	def __len__(self):
 		return self.num
 
-	def gen_vals(self, mag, N):
+	def gen_vals(self, mag, N, device='cpu'):
 		if mag is None or mag <= 0:
-			return torch.ones(N)
-		return torch.rand(N)*2*mag + 1 - mag
+			return torch.ones(N, device=device)
+		return torch.rand(N, device=device)*2*mag + 1 - mag
 
 	def forward(self, x):
 
@@ -204,12 +204,12 @@ class Image_Transform(nn.Module):
 					x = x.flip(-1 if self.flip_h else -2)
 
 			if self.contrast is not None and self.contrast > 0:
-				contrast = self.gen_vals(self.contrast, B).view(B,1,1,1)
+				contrast = self.gen_vals(self.contrast, B, device=x.device).view(B,1,1,1)
 
 				x = contrast * x + (1 - contrast) * x.mean(1, keepdim=True)
 
 			if self.brightness is not None and self.brightness > 0:
-				brightness = self.gen_vals(self.brightness, B).view(B,1,1,1)
+				brightness = self.gen_vals(self.brightness, B, device=x.device).view(B,1,1,1)
 
 				x = brightness * x
 
