@@ -508,6 +508,26 @@ def solve(A, b, out=None, bias=True, reg=0):
 # region Affine transformations/conversions
 #####################
 
+def rots_2d(thetas):
+	thetas = thetas.view(-1)
+
+	sin = torch.sin(thetas)
+	cos = torch.cos(thetas)
+
+	return torch.stack([
+		torch.stack([cos, -sin], -1),
+		torch.stack([sin, cos], -1)
+	], -2)
+
+
+def se2_tfm(R, t=None):
+	if t is None:
+		shape = R.shape[:-1]
+		t = torch.zeros(*shape, 1, device=R.device)
+	return torch.cat([R, t], -1)
+
+
+
 def aff_transform(points, transforms):
 
 	D = transforms.shape[-1] - 1

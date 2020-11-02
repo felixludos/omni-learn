@@ -248,69 +248,6 @@ def str_to_jpeg(s, ret_PIL=False):
 # 		kwargs['batch_size'] = len(dataset)
 # 	return DataLoader(dataset, **kwargs)
 
-@fig.AutoComponent('flip')
-class RandomFlip(nn.Module):
-	
-	def __init__(self, horizontal=None, vertical=None):
-		super().__init__()
-		
-		self.horizontal = horizontal
-		assert horizontal is None or 0 <= horizontal <= 1
-		self.vertical = vertical
-		assert vertical is None or 0 <= vertical <= 1
-	
-	def forward(self, imgs):
-		
-		if self.horizontal is not None and self.horizontal > 0 and np.random.rand() < self.horizontal:
-			# print('h')
-			imgs = imgs.flip(-1)
-
-		if self.vertical is not None and self.vertical > 0 and np.random.rand() < self.vertical:
-			# print('v')
-			imgs = imgs.flip(-2)
-
-		return imgs
-
-
-@fig.AutoComponent('random-orientation')
-class RandomOrientation(nn.Module):
-	
-	# def __init__(self):
-	# 	super().__init__()
-	
-	def forward(self, imgs, x=None):
-		
-		if x is None:
-			x = np.random.randint(8)
-		
-		if x < 4:
-			print('h')
-			imgs = imgs.flip(-1) # horizontal pos
-			if x < 2:
-				print('t')
-				imgs = imgs.transpose(-1, -2)
-				if x < 1:
-					print('h')
-					imgs = imgs.flip(-1)  # horizontal pos
-			elif x < 3:
-				print('v')
-				imgs = imgs.flip(-2)  # vertical pos
-				
-		elif x < 6:
-			print('v')
-			imgs = imgs.flip(-2)  # vertical pos
-			if x < 5:
-				print('t')
-				imgs = imgs.transpose(-1, -2)
-				
-		elif x < 7:
-			print('t')
-			imgs = imgs.transpose(-1, -2)
-		
-		else:
-			print('i')
-		
-		return imgs
 
 ### old
 

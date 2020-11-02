@@ -127,7 +127,11 @@ def download_mvtec(A):
 
 @Dataset('mvtec')
 class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
-	
+
+	CATEGORIES = {'bottle', 'carpet', 'leather', 'screw', 'transistor', 'cable', 'grid',
+        'metal_nut', 'tile', 'wood', 'capsule', 'hazelnut', 'pill','toothbrush', 'zipper'}
+	GREYSCALES = {'screw', 'grid', 'zipper'}
+
 	def __init__(self, A):
 	
 		dataroot = Path(A.pull('dataroot')) / 'mvtec'
@@ -148,17 +152,28 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 			droot = Path(droot)
 		
 		cat = A.pull('cat', 'random')
-		
-		paths = [c for c in droot.glob('*.h5') if cat == 'random' or cat == c.stem]
-		path = random.choice(paths)
+		if cat == 'random':
+			cat = random.choice(self.CATEGORIES)
+
+
+
+		path = [c for c in droot.glob('*.h5') if cat == c.stem][0]
 		
 		include_class = A.pull('include-class', '<>include_class', True)
 		include_mask = A.pull('include-masks', '<>include_masks', False)
 		
 		cut = A.pull('cut', 'normal')
 		assert cut in {'normal', 'anomalies', 'all'}, f'unknown: {cut}'
-		
-		din = (3, 1024, 1024) if size is None else (3, size, size)
+
+		tfms = A.pull('transforms', None)
+		if tfms is not None:
+			tfms = tfms.get(cat, None)
+
+		if tfms is not None:
+			A.push('augmentations', tfms, force_root=True)
+
+		C = 1 if cat in self.GREYSCALES else 3
+		din = (C, 1024, 1024) if size is None else (C, size, size)
 		dout = din
 		super().__init__(din, dout)
 		
@@ -176,10 +191,11 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		labels = [] if include_class else None
 		for key in uses:
 			imgs = raw[key][()]
+			# print(key, imgs.shape)
 			images.extend(imgs)
 			if labels is not None:
 				labels.extend([1 if 'test_' in key else 0]*len(imgs))
-			ident = key.split('_')[1]
+			ident = '_'.join(key.split('_')[1:])
 			if masks is not None:
 				if 'test_' in key and ident != 'good':
 					ident = f'mask_{ident}'
@@ -194,13 +210,17 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		
 		if size is not None:
 			# print([m.shape for m in images])
-			images = torch.from_numpy(np.stack(images)).permute(0,3,1,2).float().div(255)
+			images = torch.from_numpy(np.stack(images))
+			images = images.unsqueeze(1) if C == 1 else images.permute(0,3,1,2)
+			images = images.float().div(255)
 			if masks is not None and len(masks):
 				# print([m.shape for m in masks])
 				masks = torch.from_numpy(np.stack(masks)).unsqueeze(1).bool()
 
 		raw.close()
 		# self.raw = raw
+
+		self.transforms = tfms
 		
 		self.size = size
 		
@@ -208,6 +228,8 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		self.masks = masks
 		self.labels = labels
 
+	def get_transforms(self):
+		return self.transforms
 	
 	def __len__(self):
 		return len(self.images)

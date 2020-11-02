@@ -474,7 +474,7 @@ class Run:
 		
 		for name, dataset in datasets.items():
 			if name not in self.loaders:
-				self.loaders[name] = dataset.to_loader(A)
+				self.loaders[name] = None if dataset is None else dataset.to_loader(A)
 		
 		if single_dataset:
 			return self.loaders[next(iter(datasets.keys()))]
@@ -633,7 +633,8 @@ class Run:
 		
 		model.prep(trainsets)
 		for dataset in trainsets.values():
-			dataset.prep(model)
+			if dataset is not None:
+				dataset.prep(model)
 	
 	def continuous(self, pbar=None):
 		
@@ -722,6 +723,10 @@ class Run:
 		Q.sample_limit = A.pull('training.sample_limit', None)
 		assert Q.step_limit is not None or Q.sample_limit is not None, 'No limit provided'
 		Q.val_freq = A.pull('training.val_freq', None)
+
+		Q.fast_val = A.pull('training.fast_val', False)
+		Q.val_mode = 'val'
+
 		Q.skip_prev_batches = A.pull('training.skip_prev_batches', False)
 
 		self.viz_criterion = A.pull('training.viz-criterion', None)
@@ -742,12 +747,16 @@ class Run:
 		time_stats_fmt = A.pull('output.time_stats_fmt', 'time-{}')
 		if time_stats_fmt is not None:
 			Q.train_stats.shallow_join(Q.time_stats, fmt=time_stats_fmt)
-		
+
 		trainloader = self.get_loaders('train')
 		
 		valloader = self.get_loaders('val')
 		if valloader is None:
-			Q.val_freq = None
+			if Q.fast_val:
+				Q.val_mode = 'train'
+			else:
+				Q.val_freq = None
+
 		
 		save_freq = Q.get('save_freq', -1)
 		if save_freq is not None and 0 < save_freq < len(trainloader):
@@ -916,8 +925,8 @@ class Run:
 			model.stats.reset()
 			
 			stats.shallow_join(model.stats, fmt=Q.model_val_stats_fmt)
-		
-		loader = self.new_epoch(mode)
+
+		loader = self.new_epoch(Q.val_mode)
 		
 		bar = None
 		if pbar is not None:
@@ -946,6 +955,9 @@ class Run:
 				                                            stats['loss'].smooth.item()) \
 					if stats['loss'].count > 0 else ''
 				bar.set_description('{} ckpt={}{}'.format(title, records['checkpoint'], loss_info))
+
+			if Q.fast_val:
+				break
 
 		if mode in Q.time_stats:
 			Q.time_stats.update(mode, time.time() - start)
@@ -1033,6 +1045,8 @@ class Run:
 			mode = self.eval_mode
 		if dataloader is None:
 			dataloader = self.get_loaders(mode)
+		if dataloader is None:
+			dataloader = self.get_loaders('train')
 
 		model = self.get_model()
 

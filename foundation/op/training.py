@@ -58,7 +58,10 @@ def iterative_training(A=None, run=None):
 		
 	for key in ['train', 'val', 'test']:
 		if key in datasets:
-			print(f'{key}data len={len(datasets[key])}, {key}loader len={len(loaders[key])}')
+			if datasets[key] is None:
+				print(f'{key} is None')
+			else:
+				print(f'{key}data len={len(datasets[key])}, {key}loader len={len(loaders[key])}')
 	
 	trainloader = loaders['train']
 	epoch_len = len(trainloader)

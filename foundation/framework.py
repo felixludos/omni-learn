@@ -143,9 +143,9 @@ class Visualizable(Recordable):
 	def reset_viz_counter(self):
 		self._viz_counter = 0
 	def visualize(self, info, logger): # records output directly to logger
-		self._viz_counter += 1
 		with torch.no_grad():
 			self._visualize(info, logger)
+		self._viz_counter += 1
 			
 	def _visualize(self, info, logger):
 		pass # by default nothing is visualized
