@@ -105,12 +105,17 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 	def decode(self, q):
 		return self.dec.decode(q)
 
+	def preprocess(self, x):
+		return x
+
 	def _step(self, batch, out=None):
 		if out is None:
 			out = util.TensorDict()
 
 		x = batch[0]
 		B = x.size(0)
+
+		x = self.preprocess(x)
 
 		out.original = x
 

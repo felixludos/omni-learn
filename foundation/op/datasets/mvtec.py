@@ -165,12 +165,24 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		cut = A.pull('cut', 'normal')
 		assert cut in {'normal', 'anomalies', 'all'}, f'unknown: {cut}'
 
-		tfms = A.pull('transforms', None)
+		tfms = A.pull('transforms', None, silent=True)
 		if tfms is not None:
 			tfms = tfms.get(cat, None)
 
+		augmenter = None
+		augment_factor = 1
 		if tfms is not None:
-			A.push('augmentations', tfms, force_root=True)
+			augment_here = A.pull('augment_factor', None)
+
+			if augment_here is not None:
+				A.push('augmenter', tfms)
+				A.push('augmenter._type', 'image-transform', overwrite=False)
+				augmenter = A.pull('augmenter', None)
+				augment_factor = augment_here
+			else:
+				A.push('augmentations', tfms, force_root=True)
+
+
 
 		C = 1 if cat in self.GREYSCALES else 3
 		din = (C, 1024, 1024) if size is None else (C, size, size)
@@ -228,25 +240,35 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		self.masks = masks
 		self.labels = labels
 
+		self.augmenter = augmenter
+		self.augment_factor = augment_factor
+
 	def get_transforms(self):
 		return self.transforms
 	
 	def __len__(self):
-		return len(self.images)
+		return len(self.images)#*self.augment_factor
 	
 	def __getitem__(self, item):
+
+		# item %= len(self.images)
 		
 		if self.size is not None:
 			out = [self.images[item]]
-			
-			
+
 			if self.masks is not None:
 				out.append(self.masks[item])
-				
+
+				if self.augmenter is not None:
+					full = self.augmenter(torch.cat(out, 1))
+					out = [full[:, :-1].contiguous(), full[:, -1:].contiguous()]
+
 				if self.labels is not None:
 					out.append(self.labels[item])
 			elif self.labels is not None:
 				out.append(self.labels[item])
+			elif self.augmenter is not None:
+				out = [self.augmenter(out[0])]
 
 			return out
 		
