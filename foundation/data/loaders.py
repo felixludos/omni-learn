@@ -77,7 +77,11 @@ class BatchedDataLoader(Featured_DataLoader, Seedable): # loads full batches at 
 	             auto_reset=False, device=None):
 		self.dataset = dataset
 
-		assert len(self.dataset) > batch_size, 'dataset is not large enough for a single batch: {} vs {}'.format(len(dataset), batch_size)
+		if len(self.dataset) < batch_size:
+			print(f'WARNING: batchsize changed from {batch_size} to {len(self.dataset)}')
+			batch_size = len(self.dataset)
+
+		# assert len(self.dataset) > batch_size, 'dataset is not large enough for a single batch: {} vs {}'.format(len(dataset), batch_size)
 
 		# if not isinstance(dataset, Batchable_Dataset):
 		# 	assert dataset.allow_batched(), 'this dataset doesnt seem to be compatible with a BatchedDataLoader: {}'.format(dataset)
