@@ -92,8 +92,13 @@ class CompositeModel(Model): # TODO integrate with component based models
 
 @fig.AutoModifier('generative')
 class Generative(object):
-	def generate(self, N=1):
+	def sample_prior(self, N=1):
 		raise NotImplementedError
+
+	def generate(self, N=1, q=None):
+		if q is None:
+			q = self.sample_prior(N)
+		return self(q)
 
 @fig.AutoModifier('encodable')
 class Encodable(object):

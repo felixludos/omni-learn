@@ -14,32 +14,37 @@ import omnifig as fig
 from . import nets
 from .. import framework as fm
 from .. import util
-from .atom import *
 
-@fig.AutoComponent('ae')
+@fig.Component('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
-	def __init__(self, encoder, decoder, reg='L2', reg_wt=0, criterion=None, viz_latent=True, viz_rec=True):
+	# def __init__(self, encoder, decoder, reg='L2', reg_wt=0, criterion=None,
+	#              viz_latent=True, viz_rec=True):
+	def __init__(self, A):
+
+		encoder = A.pull('encoder')
+		decoder = A.pull('decoder')
+
+		reg_wt = A.pull('reg_wt', None)
+		reg = A.pull('reg', 'L2' if reg_wt is not None and reg_wt > 0 else None)
+
+		criterion = A.pull('criterion', 'mse')
+
+		viz_latent = A.pull('viz-latent', True)
+		viz_rec = A.pull('viz-rec', True)
 
 		super().__init__(encoder.din, decoder.dout)
 
 		self.enc = encoder
 		self.dec = decoder
 
-		if criterion is None:
-			criterion = nn.MSELoss()
 		self.criterion = util.get_loss_type(criterion)
 
 		self.reg_wt = reg_wt
-		self.reg_fn = util.get_regularization(reg, reduction='sum') \
-			if reg_wt is not None and reg_wt > 0 else None
+		self.reg_fn = util.get_regularization(reg, reduction='sum')
 
 		if self.reg_wt is not None and self.reg_wt > 0:
-			self.stats.new('reg')
-		self.stats.new('rec_loss')
-
-		self.register_buffer('_q', None, save=True)
-		self.register_cache('_real', None)
-		self.register_cache('_rec', None)
+			self.stats.new('reg-loss')
+		self.stats.new('rec-loss')
 
 		self.latent_dim = self.dec.din
 		
@@ -52,8 +57,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 			self.enc.visualize(info, logger)
 		if isinstance(self.dec, fm.Visualizable):
 			self.dec.visualize(info, logger)
-		
-		q = None
+
 		if self.viz_latent and 'latent' in info and info.latent is not None:
 			q = info.latent.loc if isinstance(info.latent, distrib.Distribution) else info.latent
 			
@@ -67,22 +71,18 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 				except ValueError:
 					print('\n\n\nWARNING: histogram just failed\n')
 					print(q.shape, q.norm(p=2, dim=-1).shape)
-		
-		B, C, H, W = info.original.shape
-		N = min(B, 8)
-		
-		if self.viz_rec:
-			if 'reconstruction' in info:
-				viz_x, viz_rec = info.original[:N], info.reconstruction[:N]
-				
-				recs = torch.cat([viz_x, viz_rec], 0)
-				logger.add('images', 'rec', util.image_size_limiter(recs))
-			elif self._rec is not None:
-				viz_x, viz_rec = self._real[:N], self._rec[:N]
-				
-				recs = torch.cat([viz_x, viz_rec], 0)
-				logger.add('images', 'rec', util.image_size_limiter(recs))
-		
+
+		X = info.original
+		if X.ndim == 4 and self.viz_rec and 'reconstruction' in info:
+			B, C, H, W = info.original.shape
+			N = min(B, 8)
+
+			R = info.reconstruction
+			viz_x, viz_rec = X[:N], R[:N]
+
+			recs = torch.cat([viz_x, viz_rec], 0)
+			logger.add('images', 'rec', util.image_size_limiter(recs))
+
 		logger.flush()
 	
 	def forward(self, x, ret_q=False):
@@ -108,6 +108,29 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 	def preprocess(self, x):
 		return x
 
+	def _rec_step(self, out):
+
+		x = out.original
+
+		B = x.size(0)
+
+		rec, q = self(x, ret_q=True)
+		out.latent = q
+		out.reconstruction = rec
+
+		loss = self.criterion(rec, x) / B
+		out.rec_loss = loss
+		self.stats.update('rec-loss', loss)
+
+	def _reg_step(self, out):
+
+		q = out.latent
+
+		reg_loss = self.regularize(q)
+		self.stats.update('reg-loss', reg_loss)
+		out.reg_loss = reg_loss
+		return self.reg_wt * reg_loss
+
 	def _step(self, batch, out=None):
 		if out is None:
 			out = util.TensorDict()
@@ -121,77 +144,79 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		else:
 			raise NotImplementedError
 
-		B = x.size(0)
+		out.batch = batch
 
 		x = self.preprocess(x)
-
 		out.original = x
 
-		rec, q = self(x, ret_q=True)
-		out.latent = q
-		out.reconstruction = rec
-		
-		self._rec, self._real = rec.detach(), x.detach()
-
-		loss = self.criterion(rec, x) / B
-		out.rec_loss = loss
-		self.stats.update('rec_loss', loss)
+		loss = self._rec_step(out)
 
 		if self.reg_wt > 0:
-			reg_loss = self.regularize(q)
-			self.stats.update('reg', reg_loss)
-			out.reg_loss = reg_loss
-			loss += self.reg_wt * reg_loss
+			loss += self._reg_step(out)
 
 		out.loss = loss
 
 		if self.train_me():
-			self._q = q.loc.detach() if isinstance(q, distrib.Normal) else q.detach()
-
 			self.optim.zero_grad()
 			loss.backward()
 			self.optim.step()
 
 		return out
 
+class Generative_AE(fm.Generative, Autoencoder):
 
-class Variational_Autoencoder(fm.Generative, Autoencoder):
+	def sample_prior(self, N=1):
+		return torch.randn(N, self.latent_dim).to(self.device)
 
-	def __init__(self, *args, min_log_std=None, **kwargs):
-		super().__init__(*args, **kwargs)
+	def generate(self, N=1, q=None):
+		if q is None:
+			q = self.sample_prior(N)
+		return self.decode(q)
 
-		assert self.enc.dout//2 == self.dec.din, 'enc/dec not compatible: {} vs {}'.format(self.enc.dout, self.dec.din)
 
-		self.min_log_std = min_log_std
+@fig.Component('vae')
+class Variational_Autoencoder(Generative_AE):
+
+	def __init__(self, A):
+
+		mod_check = A.pull('mod_check', True) # make sure encoder outputs a normal distribution
+		if mod_check:
+			mods = A.pull('encoder._mod', None, silent=True)
+			if isinstance(mods, (list, tuple, dict)):
+				if 'normal' not in mods:
+					mods = [*mods, 'normal'] if isinstance(mods, (tuple, list)) else {**mods, 'normal':10},
+					A.push('encoder._mod', mods, silent=True)
+			else:
+				A.push('encoder._mod.normal', 1)
+
+		A.push('reg', None) # already taken care of
+		wt = A.pull('reg-wt', None, silent=True)
+		if wt is None or wt <= 0:
+			print('WARNING: VAEs must have a reg_wt (beta), setting to 1')
+			A.push('reg-wt', 1)
+
+		super().__init__(A)
 
 	def decode(self, q):
 		if isinstance(q, distrib.Distribution):
 			q = q.rsample()
 		return super().decode(q)
 
-	def encode(self, x):
-		q = super().encode(x)
-
-		mu = q.narrow(-1, 0, self.latent_dim)
-		logsigma = q.narrow(-1, self.latent_dim, self.latent_dim)
-		if self.min_log_std is not None:
-			logsigma = logsigma.clamp(min=self.min_log_std)
-		sigma = logsigma.exp()
-
-		return distrib.Normal(loc=mu, scale=sigma)
-
-	# def _visualize(self, info, logger):
-	# 	pass
-
 	def regularize(self, q):
 		return util.standard_kl(q).sum()
 
-	def generate(self, N=1):
-		q = torch.randn(N, self.latent_dim).to(self.device)
-		return self.decode(q)
 
-# class Wasserstein_Autoencoder(Autoencoder):
-# 	pass
+@fig.Component('wae')
+class Wasserstein_Autoencoder(Generative_AE): # MMD
+	def __init__(self, A):
+		A.push('reg', None)  # already taken care of
+		super().__init__(A)
+
+	def regularize(self, q, p=None):
+		if p is None:
+			p = self.sample_prior(q.size(0))
+		return util.MMD(p, q).sum()
+
 
 def grad_penalty(disc, real, fake): # for wgans
 	# from "Improved Training of Wasserstein GANs" by Gulrajani et al. (1704.00028)
@@ -225,7 +250,6 @@ def grad_penalty_sj(disc, real, fake): # for shannon jensen gans
 	nreal = greal.view(B,-1).pow(2).sum(-1, keepdim=True)
 
 	return (vfake.sigmoid().pow(2)*nfake).mean() + ((-vreal).sigmoid().pow(2)*nreal).mean()
-
 
 
 def judge(disc, real, fake, out=None, optim=None, disc_gp=None, disc_clip=None):

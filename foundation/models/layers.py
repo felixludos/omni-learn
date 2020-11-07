@@ -8,12 +8,75 @@ import omnifig as fig
 
 from .. import framework as fm
 from .. import util
-from . import atom
 
 
 #################
 # region Functions
 #################
+
+def make_MLP(din, dout, hidden=None,
+             initializer=None,
+             nonlin='elu', output_nonlin=None,
+             logify_in=False, unlogify_out=False,
+             bias=True, output_bias=None):
+	'''
+	:param din: int
+	:param dout: int
+	:param hidden: ordered list of int - each element corresponds to a FC layer with that width (empty means network is not deep)
+	:param nonlin: str - choose from options found in get_nonlinearity(), applied after each intermediate layer
+	:param output_nonlin: str - nonlinearity to be applied after the last (output) layer
+	:param logify_in: convert input to logified space
+	:param unlogify_out: convert output back to linear space
+	:return: an nn.Sequential instance with the corresponding layers
+	'''
+
+	if hidden is None:
+		hidden = []
+
+	if output_bias is None:
+		output_bias = bias
+
+	flatten = False
+	reshape = None
+
+	din = din
+	dout = dout
+
+	if isinstance(din, (tuple, list)):
+		flatten = True
+		din = int(np.product(din))
+	if isinstance(dout, (tuple, list)):
+		reshape = dout
+		dout = int(np.product(dout))
+
+	nonlins = [nonlin] * len(hidden) + [output_nonlin]
+	biases = [bias] * len(hidden) + [output_bias]
+	hidden = din, *hidden, dout
+
+	layers = []
+	if flatten:
+		layers.append(nn.Flatten())
+
+	if logify_in:
+		layers.append(util.Logifier())
+	for in_dim, out_dim, nonlin, bias in zip(hidden, hidden[1:], nonlins, biases):
+		layer = nn.Linear(in_dim, out_dim, bias=bias)
+		if initializer is not None:
+			layer = initializer(layer, nonlin)
+		layers.append(layer)
+		if nonlin is not None:
+			layers.append(util.get_nonlinearity(nonlin))
+
+	if unlogify_out:
+		layers.append(util.Unlogifier())
+	if reshape is not None:
+		layers.append(Reshaper(reshape))
+
+
+	net = nn.Sequential(*layers)
+
+	net.din, net.dout = din, dout
+	return net
 
 def batched_grouped_linear(points, weights, masks, biases=None): # equivalent to Ntfm
 	'''
@@ -72,9 +135,6 @@ def spec_norm_layer(layer, config):
 
 # endregion
 #################
-
-
-#################
 # region Layers
 #################
 
@@ -104,7 +164,7 @@ class Recurrence(fm.Model):
 		self.out_layer = None
 		self.out_nonlin = None
 		if hidden_dim is not None:
-			self.out_layer = atom.make_MLP(self.rec_dim, dout, output_nonlin=output_nonlin)
+			self.out_layer = make_MLP(self.rec_dim, dout, output_nonlin=output_nonlin)
 
 		self.auto_reset = auto_reset
 		self.reset()
@@ -157,8 +217,6 @@ class Fourier_Layer(fm.Model): # TODO: generalize period to multiple din
 	def get_period(self):
 		return 2 * np.pi / self.w
 
-
-
 class PowerLinear(fm.Model):  # includes powers of input as features
 	def __init__(self):
 		raise NotImplementedError
@@ -191,242 +249,8 @@ class DenseLayer(fm.Model):
 	def forward(self, x):
 		return self.layer(x)
 
-
-# @fig.AutoComponent('conv-layer')
-class OldConvLayer(fm.Model):
-
-	def __init__(self, in_channels=None, out_channels=None, factor=2,
-
-	             kernel_size=3, padding=None, dilation=1, stride=None,
-
-	             din=None,
-
-	             down_type='stride', norm=None, pool='max',
-	             nonlin='elu', spec_norm=False,
-	             residual=False, **conv_kwargs):
-		assert out_channels is not None, 'must specify an output channel size'
-		assert in_channels is not None or din is not None, 'no input size info'
-
-		if isinstance(kernel_size, int):
-			kernel_size = kernel_size, kernel_size
-		if isinstance(dilation, int):
-			dilation = dilation, dilation
-		if isinstance(stride, int):
-			stride = stride, stride
-		if padding is None:
-			padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
-		elif isinstance(padding, int):
-			padding = padding, padding
-
-		assert down_type in {'stride', 'pool'}
-
-		if stride is None:
-			if down_type == 'stride':
-				stride = factor, factor
-			else:
-				stride = 1, 1
-
-		# assert 'stride' not in conv_kwargs, 'stride is set automatically using factor'
-
-
-		if din is not None:
-
-			C, H, W = din
-
-			H = (H + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
-			W = (W + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
-
-			dout = out_channels, H, W
-
-		else:
-			din = in_channels
-			dout = out_channels
-
-		super().__init__(din, dout)
-
-		self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding,
-		                      stride=stride, dilation=dilation, **conv_kwargs)
-		if spec_norm:
-			self.conv = spectral_norm(self.conv)
-		self.spec_norm = spec_norm
-
-		self.pool = util.get_pooling(pool, down=factor) if down_type == 'pool' \
-		                                                   and (factor[0] > 1 or factor[1] > 1) else None
-		self.norm = util.get_normalization(norm, out_channels)
-		self.nonlin = util.get_nonlinearity(nonlin) #if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
-		
-		self.res = residual
-		if self.res and (in_channels != out_channels):
-			print('WARNING: residual connections will be partial, because channels dont match')
-			# print('WARNING: removing residual connections because channels dont match')
-			# self.res = False
-		# assert not self.res or in_channels == out_channels, 'residual connections not possible'
-
-	def extra_repr(self):
-		return f'residual={self.res}, spec-norm={self.spec_norm}'
-
-	def forward(self, x):
-		c = self.conv(x)
-		if self.res:
-			din, dout = x.size(1), c.size(1)
-			if din > dout:
-				x = c + x.narrow(1, 0, dout)
-			else:
-				if din < dout:
-					B, _, H, W = x.size()
-					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
-				
-				x = c+x
-		else:
-			x = c
-		# x = c + x if self.res else c
-
-		if self.pool is not None:
-			x = self.pool(x)
-		if self.norm is not None:
-			x = self.norm(x)
-		if self.nonlin is not None:
-			x = self.nonlin(x)
-		return x
-
-# @fig.AutoComponent('deconv-layer')
-class OldDeconvLayer(fm.Model):
-	def __init__(self, in_channels, out_channels, factor=2, size=None,
-
-	             kernel_size=None, stride=1, padding=1, dilation=1,
-				 output_padding=0,
-
-	             din=None, dout=None,
-
-	             up_type='deconv', norm=None,
-	             spec_norm=False,
-	             nonlin='elu', output_nonlin='_unused',
-	             residual=False, **conv_kwargs):
-
-		if isinstance(kernel_size, int):
-			kernel_size = kernel_size, kernel_size
-		if isinstance(dilation, int):
-			dilation = dilation, dilation
-		if isinstance(stride, int):
-			stride = stride, stride
-		# if padding is None:
-		# 	padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
-		if isinstance(padding, int):
-			padding = padding, padding
-		if isinstance(output_padding, int):
-			output_padding = output_padding, output_padding
-			
-		try:
-			len(factor)
-		except TypeError:
-			pass
-		else:
-			assert factor[0] == factor[1], f'{factor}'
-			factor = factor[0]
-		if size is not None and factor == 1:
-			size = None
-
-		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
-
-		if up_type == 'deconv':
-			if factor is None:
-				factor = stride[0]
-			stride = factor, factor
-			if kernel_size is None:
-				kernel_size = 4, 4
-			assert kernel_size[0] % 2 == 0 and kernel_size[1] % 2 == 0, 'kernel_size should be even for deconvs (eg. 4)'
-		else:
-			stride = 1, 1
-			if kernel_size is None:
-				kernel_size = 3, 3
-
-		if din is not None:
-			C, H, W = din
-
-			if factor == 1:
-				H = (H + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
-				W = (W + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
-			elif up_type != 'deconv':
-				H, W = H*factor, W*factor
-				if size is None:
-					size = H, W
-			else:
-				H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
-				W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
-			
-			C = out_channels
-
-			if dout is not None:
-				print(f'WARNING: ignoring given dout {dout}, using: {(C,H,W)}')
-			dout = C, H, W
-		elif dout is not None:
-			raise NotImplementedError
-
-		super().__init__(din, dout)
-		
-		# if factor == 1:
-		# 	self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
-		# 	                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
-		self.up = None
-		if size is not None and up_type != 'deconv':
-			self.up = nn.Upsample(size=size, mode=up_type)
-		
-		if up_type == 'deconv':
-			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size,
-			                                 stride=stride, padding=padding, dilation=dilation,
-			                                 output_padding=output_padding, **conv_kwargs)
-			if factor != 1:
-				assert not residual, 'cant use residual when the size changes'
-		else:
-			# assert size is not None, 'must specify an explicit output size'
-			self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
-			                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
-		
-		if spec_norm:
-			self.deconv = spectral_norm(self.deconv)
-		self.spec_norm = spec_norm
-		
-		self.norm = util.get_normalization(norm, out_channels)
-		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
-
-		self.res = residual
-		if self.res and (in_channels != out_channels):
-			print('WARNING: residual connections will be partial, because channels dont match')
-			# print('WARNING: removing residual connections because channels dont match')
-			# self.res = False
-		# assert not self.res or in_channels == out_channels, 'residual connections not possible'
-
-	def extra_repr(self):
-		return f'residual={self.res}, spec-norm={self.spec_norm}'
-
-	def forward(self, x):
-		if self.up is not None:
-			x = self.up(x)
-		c = self.deconv(x)
-		if self.res:
-			din, dout = x.size(1), c.size(1)
-			if din > dout:
-				x = c + x.narrow(1, 0, dout)
-			else:
-				if din < dout:
-					B, _, H, W = x.size()
-					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
-				x = c+x
-		else:
-			x = c
-		# x = c+x if self.res else c
-
-		if self.norm is not None:
-			x = self.norm(x)
-		if self.nonlin is not None:
-			x = self.nonlin(x)
-		return x
-
-
-
-
 @fig.Component('conv-layer')
-class ImageLayer(fm.Model):
+class ConvLayer(fm.Model):
 
 	def __init__(self, A):
 		# in_shape=None, out_shape=None, channels=None,
@@ -619,257 +443,6 @@ class ImageLayer(fm.Model):
 		return x
 
 
-
-# @fig.AutoComponent('conv-layer')
-class ConvLayer(fm.Model):
-
-	def __init__(self, in_shape=None, out_shape=None, channels=None,
-
-	             factor=1, kernel_size=3, stride=None, padding=None, dilation=None,
-
-	             resize=None, norm=None, nonlin='elu',
-
-	             residual=False, force_res=False, **conv_kwargs):
-
-		assert in_shape is not None or out_shape is not None, 'no input info'
-
-		if factor is None:
-			assert in_shape is not None and out_shape is not None, 'not enough info'
-
-			Cin, Hin, Win = in_shape
-			Cout, Hout, Wout = out_shape
-
-			assert Hin % Hout == 0, f'{Hin} vs {Hout}'
-			factor = Hin // Hout
-
-			dilation = None
-			padding = None
-
-		down = util.get_pooling(down)
-		norm = util.get_normalization(norm, channels)
-		nonlin = util.get_nonlinearity(nonlin)
-
-		if isinstance(kernel_size, int):
-			kernel_size = kernel_size, kernel_size
-		if dilation is None:
-			dilation = 1
-		if isinstance(dilation, int):
-			dilation = dilation, dilation
-		if stride is None:
-			stride = factor if down is None else 1
-		if isinstance(stride, int):
-			stride = stride, stride
-		if padding is None:
-			padding = (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2
-		elif isinstance(padding, int):
-			padding = padding, padding
-
-		if in_shape is None:
-			Cout, Hout, Wout = out_shape
-			if channels is None:
-				channels = Cout
-
-			raise NotImplementedError
-			Cin, Hin, Win = channels, Hout*factor, Wout*factor
-
-		if out_shape is None:
-			Cin, Hin, Win = in_shape
-			if channels is None:
-				channels = Cin
-
-			Cout = channels
-			Hout = (Hin + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
-			Wout = (Win + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
-			if down is not None:
-				Hout = Hout//factor
-				Wout = Wout//factor
-
-		super().__init__((Cin, Hin, Win), (Cout, Hout, Wout))
-
-		self.conv = nn.Conv2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
-		                      stride=stride, dilation=dilation, **conv_kwargs)
-
-		self.pool = pool
-		self.norm = norm
-		self.nonlin = nonlin
-
-		self.res = force_res or (residual and Cin == Cout)
-		if self.res and (Cin != Cout):
-			print('WARNING: residual connections will be partial, because channels dont match')
-
-	# print('WARNING: removing residual connections because channels dont match')
-	# self.res = False
-	# assert not self.res or in_channels == out_channels, 'residual connections not possible'
-
-	def extra_repr(self):
-		return f'residual={self.res}'
-
-	def forward(self, x):
-		c = self.conv(x)
-		if self.res:
-			din, dout = x.size(1), c.size(1)
-			if din > dout:
-				x = c + x.narrow(1, 0, dout)
-			else:
-				if din < dout:
-					B, _, H, W = x.size()
-					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
-
-				x = c + x
-		else:
-			x = c
-		# x = c + x if self.res else c
-
-		if self.pool is not None:
-			x = self.pool(x)
-		if self.norm is not None:
-			x = self.norm(x)
-		if self.nonlin is not None:
-			x = self.nonlin(x)
-		return x
-
-# @fig.AutoComponent('deconv-layer')
-class NewDeconvLayer(fm.Model):
-	def __init__(self, in_channels=None, out_channels=None, factor=2, size=None,
-
-	             kernel_size=None, stride=1, padding=1, dilation=1,
-	             output_padding=0,
-
-	             din=None, dout=None, channels=None,
-
-	             up_type='deconv', norm=None,
-	             spec_norm=False,
-	             nonlin='elu', output_nonlin='_unused',
-	             residual=False, **conv_kwargs):
-
-		if din is None and in_channels is None:
-			in_channels = channels
-		if dout is None and out_channels is None:
-			out_channels = channels
-
-		if isinstance(kernel_size, int):
-			kernel_size = kernel_size, kernel_size
-		if isinstance(dilation, int):
-			dilation = dilation, dilation
-		if isinstance(stride, int):
-			stride = stride, stride
-		# if padding is None:
-		# 	padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
-		if isinstance(padding, int):
-			padding = padding, padding
-		if isinstance(output_padding, int):
-			output_padding = output_padding, output_padding
-
-		try:
-			len(factor)
-		except TypeError:
-			pass
-		else:
-			assert factor[0] == factor[1], f'{factor}'
-			factor = factor[0]
-		if size is not None and factor == 1:
-			size = None
-
-		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
-
-		if up_type == 'deconv':
-			if factor is None:
-				factor = stride[0]
-			stride = factor, factor
-			if kernel_size is None:
-				kernel_size = 4, 4
-			assert kernel_size[0] % 2 == 0 and kernel_size[1] % 2 == 0, 'kernel_size should be even for deconvs (eg. 4)'
-		else:
-			stride = 1, 1
-			if kernel_size is None:
-				kernel_size = 3, 3
-
-		if din is not None:
-			C, H, W = din
-
-			if factor == 1:
-				H = (H + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
-				W = (W + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
-			elif up_type != 'deconv':
-				H, W = H * factor, W * factor
-				if size is None:
-					size = H, W
-			else:
-				H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
-				W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
-
-			C = out_channels
-
-			if dout is not None:
-				print(f'WARNING: ignoring given dout {dout}, using: {(C, H, W)}')
-			dout = C, H, W
-		elif dout is not None:
-			raise NotImplementedError
-
-		super().__init__(din, dout)
-
-		# if factor == 1:
-		# 	self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
-		# 	                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
-		self.up = None
-		if size is not None and up_type != 'deconv':
-			self.up = nn.Upsample(size=size, mode=up_type)
-
-		if up_type == 'deconv':
-			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size,
-			                                 stride=stride, padding=padding, dilation=dilation,
-			                                 output_padding=output_padding, **conv_kwargs)
-			if factor != 1:
-				assert not residual, 'cant use residual when the size changes'
-		else:
-			# assert size is not None, 'must specify an explicit output size'
-			self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
-			                        stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
-
-		if spec_norm:
-			self.deconv = spectral_norm(self.deconv)
-		self.spec_norm = spec_norm
-
-		self.norm = util.get_normalization(norm, out_channels)
-		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(
-			output_nonlin)
-
-		self.res = residual
-		if self.res and (in_channels != out_channels):
-			print('WARNING: residual connections will be partial, because channels dont match')
-
-	# print('WARNING: removing residual connections because channels dont match')
-	# self.res = False
-	# assert not self.res or in_channels == out_channels, 'residual connections not possible'
-
-	def extra_repr(self):
-		return f'residual={self.res}, spec-norm={self.spec_norm}'
-
-	def forward(self, x):
-		if self.up is not None:
-			x = self.up(x)
-		c = self.deconv(x)
-		if self.res:
-			din, dout = x.size(1), c.size(1)
-			if din > dout:
-				x = c + x.narrow(1, 0, dout)
-			else:
-				if din < dout:
-					B, _, H, W = x.size()
-					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
-				x = c + x
-		else:
-			x = c
-		# x = c+x if self.res else c
-
-		if self.norm is not None:
-			x = self.norm(x)
-		if self.nonlin is not None:
-			x = self.nonlin(x)
-		return x
-
-
-
 @fig.AutoComponent('layer-norm')
 class LayerNorm(fm.Model):
 	def __init__(self, din, eps=1e-5, elementwise_affine=True):
@@ -905,187 +478,6 @@ class Interpolate(fm.Model):
 		return F.interpolate(x, size=self.size, scale_factor=self.scale_factor,
 		                     mode=self.mode, align_corners=self.align_corners,
 		                     recompute_scale_factor=self.recompute_scale_factor)
-
-
-@fig.AutoComponent('double-conv-layer')
-class DoubleConvLayer(fm.Model):
-
-	def __init__(self, in_channels, out_channels, factor=2,
-
-	             internal_channels=None, squeeze=False, residual=False,
-
-	             din=None,
-
-	             down_type='pool', norm=None, pool='max',
-	             nonlin='elu', output_nonlin=None, **conv_kwargs):
-
-		assert factor in {1, 2}, 'factor {} not supported'.format(factor)
-		assert nonlin is not None, 'not deep'
-
-		if down_type == 'max':
-			down_type = 'pool'
-
-		assert down_type in {'conv', 'pool'}
-
-		assert 'stride' not in conv_kwargs, 'stride is set automatically using factor'
-
-		if din is not None:
-
-			C, H, W = din
-
-			assert H%2==0 and W%2==0, f'invalid shape for double conv: {(C,H,W)}'
-
-			H = H//factor
-			W = W//factor
-
-			dout = out_channels, H, W
-		else:
-			dout = None
-
-		super().__init__(din, dout)
-
-		if internal_channels is None:
-			internal_channels = out_channels
-
-		self.conv = nn.Conv2d(in_channels, internal_channels, kernel_size=2, padding=1, stride=1)
-		self.nonlin = util.get_nonlinearity(nonlin)
-
-		self.squeeze = None
-		if squeeze:
-			self.squeeze = nn.Conv2d(internal_channels, out_channels, kernel_size=1, padding=0, stride=1)
-			self.nonlin_squeeze = util.get_nonlinearity(nonlin)
-			internal_channels = out_channels
-
-		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
-
-		self.nonlin_down = util.get_nonlinearity(nonlin) if down_type == 'conv' else None
-		self.down = util.get_pooling(pool, factor, chn=out_channels)
-
-		self.norm = util.get_normalization(norm, out_channels)
-		if 'default' == output_nonlin:
-			output_nonlin = nonlin
-		self.out_nonlin = util.get_nonlinearity(output_nonlin)
-
-
-		residual = residual and in_channels == out_channels
-		self.res = residual
-		# if self.res:
-		# 	assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
-
-	def extra_repr(self):
-		return 'residual={}'.format(self.res)
-
-	def forward(self, x):
-
-		c = self.nonlin(self.conv(x))
-		if self.squeeze is not None:
-			c = self.nonlin_squeeze(self.squeeze(c))
-		c = self.conv2(c)
-
-		x = c+x if self.res else c
-
-		if self.down is not None:
-			if self.nonlin_down is not None:
-				x = self.nonlin_down(x)
-			x = self.down(x)
-		if self.norm is not None:
-			x = self.norm(x)
-		if self.out_nonlin is not None:
-			x = self.out_nonlin(x)
-		return x
-
-@fig.AutoComponent('double-deconv-layer')
-class DoubleDeconvLayer(fm.Cacheable, fm.Model):
-	def __init__(self, in_channels, out_channels, factor=1, up_type='conv',
-
-	             din=None,
-
-	             norm=None, nonlin='elu', output_nonlin='default',
-
-	             internal_channels=None, squeeze=False, residual=False,
-	             ):
-
-		if din is not None:
-
-			C, H, W = din
-
-			assert H%2==0 and W%2==0, f'invalid shape for double conv: {(C,H,W)}'
-
-			H = H*factor
-			W = W*factor
-
-			dout = out_channels, H, W
-		else:
-			dout = None
-
-		super().__init__(din, dout)
-
-		assert factor in {1, 2}, 'factor {} not supported'.format(factor)
-		assert nonlin is not None, 'not deep'
-		# assert factor == 1 or not residual, 'residual requires same size after conv2'
-
-		if internal_channels is None:
-			internal_channels = out_channels
-
-		self.up = util.get_upsample(up_type, factor, chn=in_channels)
-		self.nonlin_up = util.get_nonlinearity(nonlin) if up_type == 'conv' else None
-
-		self.conv = nn.Conv2d(in_channels, internal_channels, kernel_size=2, padding=1, stride=1)
-		self.nonlin = util.get_nonlinearity(nonlin)
-
-		self.squeeze = None
-		if squeeze:
-			self.squeeze = nn.Conv2d(internal_channels, out_channels, kernel_size=1, padding=0, stride=1)
-			self.nonlin_squeeze = util.get_nonlinearity(nonlin)
-			internal_channels = out_channels
-
-		self.conv2 = nn.Conv2d(internal_channels, out_channels, kernel_size=2, padding=0, stride=1)
-
-		residual = residual and in_channels == out_channels
-		# assert not residual or not squeeze or in_channels == internal_channels, 'residual wont work: {} vs {}'.format(
-		# 	in_channels, internal_channels)
-
-		self.norm = util.get_normalization(norm, out_channels)
-		if 'default' == output_nonlin:
-			output_nonlin = nonlin
-		self.out_nonlin = util.get_nonlinearity(output_nonlin)
-
-		self.res = residual
-		# if self.res:
-		# 	assert in_channels == out_channels, f'invalid channels: {in_channels}, {out_channels}'
-
-		self.register_cache('_skipadd')
-
-	def extra_repr(self):
-		return 'residual={}'.format(self.res)
-
-	def set_skipadd(self, y):
-		self._skipadd = y
-
-	def forward(self, x, y=None):
-		if y is None and self._skipadd is not None:
-			y = self._skipadd
-			self._skipadd = None
-
-		if self.up is not None:
-			x = self.up(x)
-			if self.nonlin_up is not None:
-				x = self.nonlin_up(x)
-
-		c = self.nonlin(self.conv(x))
-		if self.squeeze is not None:
-			c = self.nonlin_squeeze(self.squeeze(c))
-		c = self.conv2(c)
-
-		x = c + x if self.res else c
-		if y is not None:
-			x += y
-
-		if self.norm is not None:
-			x = self.norm(x)
-		if self.out_nonlin is not None:
-			x = self.out_nonlin(x)
-		return x
 
 
 @fig.AutoComponent('conv-lstm')

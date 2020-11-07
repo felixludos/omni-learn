@@ -11,8 +11,13 @@ from .. import framework as fm
 
 import omnifig as fig
 
-from .atom import *
-from .layers import *
+from .. import util
+from .layers import make_MLP
+
+#################
+# region General
+#################
+
 
 @fig.Component('mlp')
 class MLP(fm.Model):
@@ -21,12 +26,16 @@ class MLP(fm.Model):
 			'din': A.pull('input_dim', '<>din'),
 			'dout': A.pull('output_dim', '<>dout'),
 			'hidden': A.pull('hidden_dims', '<>hidden_fc', '<>hidden', []),
-			'nonlin': A.pull('nonlin', 'prelu'),
-			'output_nonlin': A.pull('output_nonlin', None),
+			'nonlin': A.pull('nonlin', 'elu'),
+			'output_nonlin': A.pull('output_nonlin', '<>out_nonlin', None),
+			'logify_in': A.pull('logify', False),
+			'unlogify_out': A.pull('unlogify', False),
+			'bias': A.pull('bias', True),
+			'output_bias': A.pull('output_bias', '<>out_bias', None),
 		}
 
 		net = make_MLP(**kwargs)
-		super().__init__(kwargs['din'], kwargs['dout'])
+		super().__init__(net.din, net.dout)
 
 		self.net = net
 
@@ -104,9 +113,7 @@ class Multihead(fm.Model): # currently, the input dim for each head must be the 
 		
 		return torch.cat(ys, dim=1)
 
-
-
-@fig.Component('multilayer')
+@fig.Component('multilayer') # used for CNNs
 class MultiLayer(fm.Model):
 
 	def __init__(self, A=None, layers=None):
@@ -178,261 +185,13 @@ class MultiLayer(fm.Model):
 			x = layer(x)
 		return x
 
-
-@fig.Component('double-enc')
-class Double_Encoder(fm.Encodable, fm.Schedulable, fm.Model):
-	def __init__(self, A):
-		
-		in_shape = A.pull('in_shape', '<>din')
-		# latent_dim = A.pull('latent_dim', '<>dout')
-		
-		channels = A.pull('channels')
-		assert isinstance(in_shape, tuple), 'input must be an image'
-
-		factors = A.pull('factors', 2)
-		try:
-			len(factors)
-		except TypeError:
-			factors = [factors]
-		if len(factors) != len(channels):
-			factors = factors*len(channels)
-		total_factor = int(np.product(factors))
-
-		internal_channels = A.pull('internal_channels', [None] * len(channels))
-		try:
-			len(internal_channels)
-		except TypeError:
-			internal_channels = [internal_channels]
-		if len(internal_channels) != len(channels):
-			internal_channels = internal_channels * len(channels)
-
-		squeeze = A.pull('squeeze', [False] * len(channels))
-		try:
-			len(squeeze)
-		except TypeError:
-			squeeze = [squeeze]
-		if len(squeeze) != len(channels):
-			squeeze = squeeze * len(channels)
-
-		output_nonlin = A.pull('output_nonlin', None)
-
-		din = in_shape
-		in_chn, *in_size = in_shape
-		out_chn = channels[-1]
-		if len(in_size):
-			in_H, in_W = in_size
-			out_H, out_W = in_H//total_factor, in_W//total_factor
-			assert out_H > 0 and out_W > 0, 'out image not large enough: {} {}'.format(out_H, out_W)
-			dout = out_chn, out_H, out_W
-		else:
-			dout = out_chn,
-
-		latent_dim = A.pull('latent_dim', '<>dout')
-		if 'tail' in A:
-			set_nonlin = True
-			A.tail.din = dout
-			A.tail.dout = latent_dim
-			tail = A.pull('tail')
-			assert tail.dout == latent_dim, \
-				'Tail not producing the right output: {} vs {}'.format(tail.dout, latent_dim)
-		elif latent_dim != dout:
-			set_nonlin = True
-			assert len(dout) == 3, 'Must specify image size to transform to {}'.format(latent_dim)
-			tail = make_MLP(din=dout, dout=latent_dim, output_nonlin=output_nonlin)
-		else:
-			set_nonlin = False
-			tail = None
-
-		dout = latent_dim
-
-		chns = (in_chn,) + channels
-		layers = self._create_layers(chns, iter(factors), iter(internal_channels), iter(squeeze), A, set_nonlin)
-
-		super().__init__(din, dout)
-
-		self.layers = layers
-
-		self.tail = tail
-
-		# self.set_optim(A)
-		# self.set_scheduler(A)
-
-	def _create_layers(self, chns, factors, internal_channels, squeeze, A, set_nonlin):
-
-		nonlin = A.pull('nonlin', 'elu')
-		output_nonlin = A.pull('output_nonlin', None)
-		output_norm_type = A.pull('output_norm', None)
-
-		down_type = A.pull('down', 'max')
-		norm_type = A.pull('norm', None)
-		residual = A.pull('residual', False)
-
-		last_chn = chns[-2:]
-		chns = chns[:-1]
-
-		layers = []
-		for ichn, ochn in zip(chns, chns[1:]):
-			layers.append(
-				layerslib.DoubleConvLayer(in_channels=ichn, out_channels=ochn, factor=next(factors),
-				                          down_type=down_type, norm_type=norm_type,
-				                          nonlin=nonlin, output_nonlin=nonlin,
-				                          internal_channels=next(internal_channels), squeeze=next(squeeze),
-				                          residual=residual,
-				                          )
-			)
-		layers.append(
-			layerslib.DoubleConvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(factors),
-			                          down_type=down_type, norm_type=norm_type if set_nonlin else output_norm_type,
-			                          nonlin=nonlin, output_nonlin=nonlin if set_nonlin else output_nonlin,
-			                          internal_channels=next(internal_channels), squeeze=next(squeeze),
-			                          residual=residual,
-			                          )
-		)
-		return nn.ModuleList(layers)
-
-	def encode(self, x):
-		return self(x)
-	
-	def forward(self, x):
-
-		q = x
-		for l in self.layers:
-			q = l(q)
-
-		if self.tail is not None:
-			q = self.tail(q)
-
-		return q
-
-@fig.Component('double-dec')
-class Double_Decoder(fm.Decodable, fm.Schedulable, fm.Model):
-	def __init__(self, A):
-
-		out_shape = A.pull('out_shape', '<>dout')
-		# latent_dim = A.pull('latent_dim', '<>dout')
-
-		channels = A.pull('channels')
-		assert isinstance(out_shape, tuple), 'input must be an image'
-
-		factors = A.pull('factors', 2)
-		try:
-			len(factors)
-		except TypeError:
-			factors = [factors]
-		if len(factors) != len(channels):
-			factors = factors * len(channels)
-		total_factor = int(np.product(factors))
-
-		internal_channels = A.pull('internal_channels', [None] * len(channels))
-		try:
-			len(internal_channels)
-		except TypeError:
-			internal_channels = [internal_channels]
-		if len(internal_channels) != len(channels):
-			internal_channels = internal_channels * len(channels)
-
-		squeeze = A.pull('squeeze', [False] * len(channels))
-		try:
-			len(squeeze)
-		except TypeError:
-			squeeze = [squeeze]
-		if len(squeeze) != len(channels):
-			squeeze = squeeze * len(channels)
-
-		nonlin = A.pull('nonlin', 'elu')
-
-		dout = out_shape
-		out_chn, *out_size = out_shape
-		in_chn = channels[0]
-		if len(out_size):
-			out_H, out_W = out_size
-			in_H, in_W = out_H // total_factor, out_W // total_factor
-			assert in_H > 0 and in_W > 0, 'out image not large enough: {} {}'.format(in_H, in_W)
-			din = in_chn, in_H, in_W
-		else:
-			din = in_chn,
-
-		latent_dim = A.pull('latent_dim', '<>din')
-		if 'head' in A:
-			A.head.din = latent_dim
-			A.head.dout = din
-			A.head.output_nonlin = nonlin
-			head = A.pull('head')
-		elif latent_dim != dout:
-			assert len(dout) == 3, 'Must specify image size to transform to {}'.format(latent_dim)
-			head = make_MLP(din=latent_dim, dout=din, output_nonlin=nonlin)
-		else:
-			head = None
-
-		din = latent_dim
-
-		chns = channels + (out_chn,)
-		layers = self._create_layers(chns, iter(factors), iter(internal_channels), iter(squeeze), A)
-
-		super().__init__(din, dout)
-
-		self.head = head
-		self.layers = layers
-
-		# self.set_optim(A)
-		# self.set_scheduler(A)
-
-	def _create_layers(self, chns, factors, internal_channels, squeeze, A):
-
-		nonlin = A.pull('nonlin', 'elu')
-		output_nonlin = A.pull('output_nonlin', None)
-		output_norm_type = A.pull('output_norm', None)
-
-		up_type = A.pull('up', 'bilinear')
-		norm_type = A.pull('norm', None)
-		residual = A.pull('residual', False)
-
-		last_chn = chns[-2:]
-		chns = chns[:-1]
-
-		layers = []
-
-		# i_factors, i_internal_channels, i_squeeze =
-		for ichn, ochn in zip(chns, chns[1:]):
-			layers.append(
-				layerslib.DoubleDeconvLayer(in_channels=ichn, out_channels=ochn, factor=next(factors),
-				                            up_type=up_type, norm=norm_type,
-				                            nonlin=nonlin, output_nonlin=nonlin,
-				                            internal_channels=next(internal_channels), squeeze=next(squeeze),
-				                            residual=residual,
-				                            )
-			)
-		layers.append(
-			layerslib.DoubleDeconvLayer(in_channels=last_chn[0], out_channels=last_chn[1], factor=next(factors),
-			                            up_type=up_type, norm=output_norm_type,
-			                            nonlin=nonlin, output_nonlin=output_nonlin,
-			                            internal_channels=next(internal_channels), squeeze=next(squeeze),
-			                            residual=residual,
-			                            )
-		)
-
-		return nn.ModuleList(layers)
-
-	def decode(self, q):
-		return self(q)
-
-	def forward(self, q):
-
-		x = q
-
-		if self.head is not None:
-			x = self.head(x)
-
-		for l in self.layers:
-			x = l(x)
-
-		return x
-
-class Normal_Distrib_Model(fm.Model): # means calling forward() will output a normal distribution
-	pass
+# endregion
+#################
+# region Behavior
+#################
 
 @fig.AutoModifier('normal')
-class Normal(Normal_Distrib_Model):
+class Normal(fm.Model):
 	'''
 	This is a modifier (basically mixin) to turn the parent's output of forward() to a normal distribution.
 
@@ -481,103 +240,8 @@ class Normal(Normal_Distrib_Model):
 
 		return NormalDistribution(loc=mu, scale=logsigma.exp())
 
-
-@fig.AutoComponent('conv')
-class Conv_Encoder(fm.Encodable, fm.Model):
-
-	def __init__(self, in_shape, latent_dim=None, feature_dim=None,
-				 nonlin='prelu', output_nonlin=None, residual=False,
-				 channels=[], kernels=3, strides=1, factors=2, down='max',
-				 norm='instance', output_norm=None, spec_norm=False,
-				 fc_hidden=[]):
-		
-		self.in_shape = in_shape
-
-		cshapes, csets = plan_conv(self.in_shape, channels=channels, kernels=kernels,
-		                           factors=factors, strides=strides)
-
-		conv_layers = build_conv_layers(csets, factors=factors, pool_type=down, norm_type=norm,
-										out_norm_type=(output_norm if latent_dim is None else norm),
-										nonlin=nonlin, residual=residual, spec_norm=spec_norm,
-										out_nonlin=(output_nonlin if latent_dim is None else nonlin))
-
-		out_shape = cshapes[-1]
-
-		super().__init__(in_shape, out_shape if latent_dim is None else latent_dim)
-
-		self.conv = nn.Sequential(*conv_layers)
-		self._conv_shapes = cshapes
-
-		self.conv_shape = out_shape
-		if feature_dim is None:
-			feature_dim = self.conv_shape
-		self.feature_dim = feature_dim
-		self.latent_dim = latent_dim if latent_dim is not None else self.feature_dim
-
-		self.fc = None
-		if latent_dim is not None:
-			self.fc = make_MLP(self.feature_dim, self.latent_dim,
-			                   hidden=fc_hidden, nonlin=nonlin,
-			                   output_nonlin=output_nonlin)
-
-	def transform_conv_features(self, c):
-		if self.fc is None:
-			return c
-		return self.fc(c)
-
-	def encode(self, x):
-		return self(x)
-
-	def forward(self, x):
-		c = self.conv(x)
-		return self.transform_conv_features(c)
-
-@fig.AutoComponent('deconv')
-class Conv_Decoder(fm.Decodable, fm.Model):
-	
-	def __init__(self, out_shape, latent_dim=None, nonlin='prelu', output_nonlin=None,
-	             channels=[], kernels=[], factors=[], strides=[], up='deconv',
-	             norm='instance', output_norm=None, residual=False, spec_norm=False,
-	             fc_hidden=[]):
-		
-		self.out_shape = out_shape
-		
-		dshapes, dsets = plan_deconv(self.out_shape, channels=channels, kernels=kernels, factors=factors,
-		                             strides=strides if up == 'deconv' else 1)
-		
-		# dsizes = [(s if s[-2:] != ps[-2:] else None) for ps, s in zip(dshapes, dshapes[1:])]
-		
-		deconv_layers = build_deconv_layers(dsets, sizes=dshapes[1:], nonlin=nonlin, out_nonlin=output_nonlin,
-		                                    up_type=up, norm_type=norm, factors=factors, residual=residual,
-		                                    spec_norm=spec_norm, out_norm_type=output_norm)
-		
-		super().__init__(dshapes[0] if latent_dim is None else latent_dim, out_shape)
-		
-		self.deconv_shape = dshapes[0]
-		self.latent_dim = latent_dim if latent_dim is not None else int(np.product(self.deconv_shape))
-		
-		self.fc = None
-		if latent_dim is not None:
-			self.fc = make_MLP(self.latent_dim, self.deconv_shape,
-			                   hidden=fc_hidden, nonlin=nonlin, output_nonlin=nonlin)
-		
-		self.deconv = nn.Sequential(*deconv_layers)
-	
-	def forward(self, q):
-		c = self.extract_conv_features(q)
-		return self.deconv(c)
-	
-	def extract_conv_features(self, q):
-		if self.fc is not None:
-			return self.fc(q)
-		return q
-		
-	def decode(self, q):
-		return self(q)
-
-
-
-
+# endregion
+#################
 
 
 
