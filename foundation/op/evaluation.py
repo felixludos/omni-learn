@@ -41,15 +41,24 @@ def eval_model(A, run=None):
 	A = run.get_config()
 	
 	results = None
-	
+
 	try:
 		run.prep_eval()
 	except NoOverwriteError:
 		print('No overwrite, so will exit without doing anything now')
 		return 0
 
+
+	safe_config = A.pull('safe_config', False)
+
+	if safe_config:
+		A.begin()
+
 	model = run.get_model()
-	
+
+	if safe_config:
+		A.abort()
+
 	print(model)
 	print(model.optim)
 	if hasattr(model, 'scheduler'):

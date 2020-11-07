@@ -174,10 +174,10 @@ def build_conv_layers(settings, factors=1, pool_type='max',
 
 	layers = []
 	for params, f, bn, n in zip(settings, factors, bns, nonlins):
-		layers.append(layerslib.ConvLayer(norm=bn, nonlin=n, factor=f,
-								pool=pool_type, residual=residual, spec_norm=spec_norm,
-								down_type='stride' if f == 1 else 'pool',
-								**params))
+		layers.append(layerslib.OldConvLayer(norm=bn, nonlin=n, factor=f,
+		                                     pool=pool_type, residual=residual, spec_norm=spec_norm,
+		                                     down_type='stride' if f == 1 else 'pool',
+		                                     **params))
 
 	return layers  # can be used as sequential or module list
 
@@ -276,9 +276,9 @@ def build_deconv_layers(settings, sizes=None, up_type='deconv',
 
 	layers = []
 	for params, f, sz, bn, n in zip(settings, factors, sizes, bns, nonlins):
-		layers.append(layerslib.DeconvLayer(norm=bn, nonlin=n, up_type=up_type, size=sz[-2:],
-		                                    residual=residual, factor=f, spec_norm=spec_norm,
-								  **params))
+		layers.append(layerslib.OldDeconvLayer(norm=bn, nonlin=n, up_type=up_type, size=sz[-2:],
+		                                       residual=residual, factor=f, spec_norm=spec_norm,
+		                                       **params))
 
 	return layers  # can be used as sequential or module list
 

@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+from torch.nn import functional as F
 from torch.nn.utils import spectral_norm
 
 import omnifig as fig
@@ -167,18 +168,32 @@ class PowerLinear(fm.Model):  # includes powers of input as features
 class DenseLayer(fm.Model):
 	def __init__(self, din, dout, bias=True, nonlin='elu'):
 		super().__init__(din, dout)
-		self.layer = nn.Linear(din, dout, bias=bias)
-		self.nonlin = util.get_nonlinearity(nonlin)
+
+		seq = []
+
+		if isinstance(din, (tuple, list)):
+			seq.append(nn.Flatten())
+			din = int(np.product(din))
+
+		_dout = int(np.product(dout)) if isinstance(dout, (tuple, list)) else dout
+
+		seq.append(nn.Linear(din, _dout, bias=bias))
+
+		nonlin = util.get_nonlinearity(nonlin)
+		if nonlin is not None:
+			seq.append(nonlin)
+
+		if isinstance(dout, (tuple, list)):
+			seq.append(Reshaper(dout))
+
+		self.layer = nn.Sequential(*seq) if len(seq) > 1 else seq[0]
 
 	def forward(self, x):
-		x = self.layer(x)
-		if self.nonlin is not None:
-			x = self.nonlin(x)
-		return x
+		return self.layer(x)
 
 
-@fig.AutoComponent('conv-layer')
-class ConvLayer(fm.Model):
+# @fig.AutoComponent('conv-layer')
+class OldConvLayer(fm.Model):
 
 	def __init__(self, in_channels=None, out_channels=None, factor=2,
 
@@ -235,8 +250,8 @@ class ConvLayer(fm.Model):
 			self.conv = spectral_norm(self.conv)
 		self.spec_norm = spec_norm
 
-		self.pool = util.get_pooling(pool, factor=factor) if down_type == 'pool' \
-		                                                     and (factor[0] > 1 or factor[1] > 1) else None
+		self.pool = util.get_pooling(pool, down=factor) if down_type == 'pool' \
+		                                                   and (factor[0] > 1 or factor[1] > 1) else None
 		self.norm = util.get_normalization(norm, out_channels)
 		self.nonlin = util.get_nonlinearity(nonlin) #if output_nonlin == '_unused' else util.get_nonlinearity(output_nonlin)
 		
@@ -274,8 +289,8 @@ class ConvLayer(fm.Model):
 			x = self.nonlin(x)
 		return x
 
-@fig.AutoComponent('deconv-layer')
-class DeconvLayer(fm.Model):
+# @fig.AutoComponent('deconv-layer')
+class OldDeconvLayer(fm.Model):
 	def __init__(self, in_channels, out_channels, factor=2, size=None,
 
 	             kernel_size=None, stride=1, padding=1, dilation=1,
@@ -407,6 +422,489 @@ class DeconvLayer(fm.Model):
 			x = self.nonlin(x)
 		return x
 
+
+
+
+@fig.Component('conv-layer')
+class ImageLayer(fm.Model):
+
+	def __init__(self, A):
+		# in_shape=None, out_shape=None, channels=None,
+		#
+		# factor=1,
+		#
+		# kernel_size=3, stride=None, padding=None, dilation=None,
+		#
+		# resize=None, norm=None, nonlin='elu', #dropout=None,
+		#
+		# residual=False, force_res=False, **conv_kwargs
+
+		din = A.pull('in_shape', '<>din', None)
+		channels = A.pull('channels', None)
+		dout = None
+		# if channels is not None:
+		# 	size = A.pull('out_size', '<>size', None)
+		# 	if size is not None:
+		# 		dout = (channels, *size)
+		dout = A.pull('out_shape', '<>dout', dout)
+
+		assert din is not None or dout is not None, 'no input info'
+
+		down = A.pull('down', None)
+		if isinstance(down, int):
+			down = down, down
+		assert down is None or (down[0] >= 1 and down[1] >= 1), f'{down}'
+		pool = None if down is None or (down[0] == 1 and down[1] == 1) else util.get_pooling(A.pull('pool', None), down)
+		up = A.pull('up', None) if down is None else None
+		if isinstance(up, int):
+			up = up, up
+		assert up is None or (up[0] >= 1 and up[1] >= 1), f'{up}'
+		unpool = None
+		size = None
+		if down is None and up is None:
+			size = A.pull('size', None)
+			if size is not None:
+				unpool = util.get_upsample(A.pull('unpool', None), size=size)
+			else:
+				down = (1,1)
+		elif up is not None:
+			unpool = util.get_upsample(A.pull('unpool', None), up=up)
+
+		is_deconv = down is None and size is None and unpool is None
+
+		kernel_size = A.pull('kernel_size', '<>kernel', (4,4) if is_deconv else (3,3))
+		if isinstance(kernel_size, int):
+			kernel_size = kernel_size, kernel_size
+		padding = A.pull('padding', (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2)
+		if isinstance(padding, int):
+			padding = padding, padding
+		dilation = A.pull('dilation', (1,1))
+		if isinstance(dilation, int):
+			dilation = dilation, dilation
+		output_padding = A.pull('output_padding', (0,0)) if is_deconv else None
+		if isinstance(output_padding, int):
+			output_padding = output_padding, output_padding
+
+		if is_deconv:
+			stride = up
+		elif down is not None and pool is None:
+			stride = down
+		else:
+			stride = (1,1)
+
+		stride = A.pull('stride', stride)
+		if isinstance(stride, int):
+			stride = stride, stride
+
+		if din is None:
+			Cout, Hout, Wout = dout
+			if channels is None:
+				channels = Cout
+
+			Cin = channels
+
+			H, W = Hout, Wout
+
+			if down is not None and pool is not None:
+				H, W = H*down[0], W*down[1]
+
+			if is_deconv:
+				if output_padding is not None:
+					H, W = H - output_padding[0], W - output_padding[1]
+				H, W = util.conv_size_change(H, W, kernel_size, padding, stride, dilation)
+			else:
+				H, W = util.deconv_size_change(H, W, kernel_size, padding, stride, dilation)
+
+			if up is not None and unpool is not None:
+				H, W = H//up[0], W//up[1]
+
+			if size is not None:
+				assert size == (H, W), f'{size} vs {(H, W)}'
+				H, W = None, None
+				raise NotImplementedError
+
+			Hin, Win = H, W
+
+		if dout is None:
+			Cin, Hin, Win = din
+			if channels is None:
+				channels = Cin
+
+			H, W = Hin, Win
+
+			if size is not None:
+				H, W = size
+
+			if up is not None and unpool is not None:
+				H, W = H*up[0], W*up[1]
+
+			Cout = channels
+
+			if is_deconv:
+				H, W = util.deconv_size_change(H, W, kernel_size, padding, stride, dilation,
+				                                     output_padding)
+			else:
+				H, W = util.conv_size_change(H, W, kernel_size, padding, stride, dilation)
+
+			if down is not None and pool is not None:
+				H, W = H//down[0], W//down[1]
+
+			Hout, Wout = H, W
+
+		A.push('channels', channels, silent=True)
+		norm = util.get_normalization(A.pull('norm', None), channels)
+
+		nonlin = util.get_nonlinearity(A.pull('nonlin', 'elu'))
+
+		conv_kwargs = A.pull('conv_kwargs', {})
+
+		residual = A.pull('residual', False)
+		force_res = A.pull('force_res', False)
+
+		print_dims = A.pull('print_dims', False)
+		din, dout = (Cin, Hin, Win), (Cout, Hout, Wout)
+
+		super().__init__(din, dout)
+
+		self.unpool = unpool
+
+		if is_deconv:
+			self.conv = nn.ConvTranspose2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
+		                      stride=stride, dilation=dilation, output_padding=output_padding,
+		                                   **conv_kwargs)
+		else:
+			self.conv = nn.Conv2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
+			                      stride=stride, dilation=dilation, **conv_kwargs)
+
+		self.pool = pool
+		self.norm = norm
+		self.nonlin = nonlin
+
+		self.res = force_res or (residual and Cin == Cout)
+		if self.res and (Cin != Cout):
+			print('WARNING: residual connections will be partial, because channels dont match')
+
+		self.print_dims = print_dims
+
+	def extra_repr(self):
+		msg = ''
+		if self.print_dims:
+			msg += f'{self.din} -> {self.dout}\n'
+		msg += f'residual={self.res}'
+		return msg
+
+	def forward(self, x):
+		if self.unpool is not None:
+			x = self.unpool(x)
+		c = self.conv(x)
+		if self.res:
+			din, dout = x.size(1), c.size(1)
+			if din > dout:
+				x = c + x.narrow(1, 0, dout)
+			else:
+				if din < dout:
+					B, _, H, W = x.size()
+					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
+
+				x = c + x
+		else:
+			x = c
+
+		if self.pool is not None:
+			x = self.pool(x)
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.nonlin is not None:
+			x = self.nonlin(x)
+		return x
+
+
+
+# @fig.AutoComponent('conv-layer')
+class ConvLayer(fm.Model):
+
+	def __init__(self, in_shape=None, out_shape=None, channels=None,
+
+	             factor=1, kernel_size=3, stride=None, padding=None, dilation=None,
+
+	             resize=None, norm=None, nonlin='elu',
+
+	             residual=False, force_res=False, **conv_kwargs):
+
+		assert in_shape is not None or out_shape is not None, 'no input info'
+
+		if factor is None:
+			assert in_shape is not None and out_shape is not None, 'not enough info'
+
+			Cin, Hin, Win = in_shape
+			Cout, Hout, Wout = out_shape
+
+			assert Hin % Hout == 0, f'{Hin} vs {Hout}'
+			factor = Hin // Hout
+
+			dilation = None
+			padding = None
+
+		down = util.get_pooling(down)
+		norm = util.get_normalization(norm, channels)
+		nonlin = util.get_nonlinearity(nonlin)
+
+		if isinstance(kernel_size, int):
+			kernel_size = kernel_size, kernel_size
+		if dilation is None:
+			dilation = 1
+		if isinstance(dilation, int):
+			dilation = dilation, dilation
+		if stride is None:
+			stride = factor if down is None else 1
+		if isinstance(stride, int):
+			stride = stride, stride
+		if padding is None:
+			padding = (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2
+		elif isinstance(padding, int):
+			padding = padding, padding
+
+		if in_shape is None:
+			Cout, Hout, Wout = out_shape
+			if channels is None:
+				channels = Cout
+
+			raise NotImplementedError
+			Cin, Hin, Win = channels, Hout*factor, Wout*factor
+
+		if out_shape is None:
+			Cin, Hin, Win = in_shape
+			if channels is None:
+				channels = Cin
+
+			Cout = channels
+			Hout = (Hin + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
+			Wout = (Win + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
+			if down is not None:
+				Hout = Hout//factor
+				Wout = Wout//factor
+
+		super().__init__((Cin, Hin, Win), (Cout, Hout, Wout))
+
+		self.conv = nn.Conv2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
+		                      stride=stride, dilation=dilation, **conv_kwargs)
+
+		self.pool = pool
+		self.norm = norm
+		self.nonlin = nonlin
+
+		self.res = force_res or (residual and Cin == Cout)
+		if self.res and (Cin != Cout):
+			print('WARNING: residual connections will be partial, because channels dont match')
+
+	# print('WARNING: removing residual connections because channels dont match')
+	# self.res = False
+	# assert not self.res or in_channels == out_channels, 'residual connections not possible'
+
+	def extra_repr(self):
+		return f'residual={self.res}'
+
+	def forward(self, x):
+		c = self.conv(x)
+		if self.res:
+			din, dout = x.size(1), c.size(1)
+			if din > dout:
+				x = c + x.narrow(1, 0, dout)
+			else:
+				if din < dout:
+					B, _, H, W = x.size()
+					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
+
+				x = c + x
+		else:
+			x = c
+		# x = c + x if self.res else c
+
+		if self.pool is not None:
+			x = self.pool(x)
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.nonlin is not None:
+			x = self.nonlin(x)
+		return x
+
+# @fig.AutoComponent('deconv-layer')
+class NewDeconvLayer(fm.Model):
+	def __init__(self, in_channels=None, out_channels=None, factor=2, size=None,
+
+	             kernel_size=None, stride=1, padding=1, dilation=1,
+	             output_padding=0,
+
+	             din=None, dout=None, channels=None,
+
+	             up_type='deconv', norm=None,
+	             spec_norm=False,
+	             nonlin='elu', output_nonlin='_unused',
+	             residual=False, **conv_kwargs):
+
+		if din is None and in_channels is None:
+			in_channels = channels
+		if dout is None and out_channels is None:
+			out_channels = channels
+
+		if isinstance(kernel_size, int):
+			kernel_size = kernel_size, kernel_size
+		if isinstance(dilation, int):
+			dilation = dilation, dilation
+		if isinstance(stride, int):
+			stride = stride, stride
+		# if padding is None:
+		# 	padding = (kernel_size[0]-1)//2, (kernel_size[1]-1)//2
+		if isinstance(padding, int):
+			padding = padding, padding
+		if isinstance(output_padding, int):
+			output_padding = output_padding, output_padding
+
+		try:
+			len(factor)
+		except TypeError:
+			pass
+		else:
+			assert factor[0] == factor[1], f'{factor}'
+			factor = factor[0]
+		if size is not None and factor == 1:
+			size = None
+
+		assert up_type in {'deconv', 'nearest', 'bilinear'}, f'invalid {up_type}'
+
+		if up_type == 'deconv':
+			if factor is None:
+				factor = stride[0]
+			stride = factor, factor
+			if kernel_size is None:
+				kernel_size = 4, 4
+			assert kernel_size[0] % 2 == 0 and kernel_size[1] % 2 == 0, 'kernel_size should be even for deconvs (eg. 4)'
+		else:
+			stride = 1, 1
+			if kernel_size is None:
+				kernel_size = 3, 3
+
+		if din is not None:
+			C, H, W = din
+
+			if factor == 1:
+				H = (H + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
+				W = (W + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
+			elif up_type != 'deconv':
+				H, W = H * factor, W * factor
+				if size is None:
+					size = H, W
+			else:
+				H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
+				W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
+
+			C = out_channels
+
+			if dout is not None:
+				print(f'WARNING: ignoring given dout {dout}, using: {(C, H, W)}')
+			dout = C, H, W
+		elif dout is not None:
+			raise NotImplementedError
+
+		super().__init__(din, dout)
+
+		# if factor == 1:
+		# 	self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
+		# 	                                 stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
+		self.up = None
+		if size is not None and up_type != 'deconv':
+			self.up = nn.Upsample(size=size, mode=up_type)
+
+		if up_type == 'deconv':
+			self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size,
+			                                 stride=stride, padding=padding, dilation=dilation,
+			                                 output_padding=output_padding, **conv_kwargs)
+			if factor != 1:
+				assert not residual, 'cant use residual when the size changes'
+		else:
+			# assert size is not None, 'must specify an explicit output size'
+			self.deconv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
+			                        stride=stride, padding=padding, dilation=dilation, **conv_kwargs)
+
+		if spec_norm:
+			self.deconv = spectral_norm(self.deconv)
+		self.spec_norm = spec_norm
+
+		self.norm = util.get_normalization(norm, out_channels)
+		self.nonlin = util.get_nonlinearity(nonlin) if output_nonlin == '_unused' else util.get_nonlinearity(
+			output_nonlin)
+
+		self.res = residual
+		if self.res and (in_channels != out_channels):
+			print('WARNING: residual connections will be partial, because channels dont match')
+
+	# print('WARNING: removing residual connections because channels dont match')
+	# self.res = False
+	# assert not self.res or in_channels == out_channels, 'residual connections not possible'
+
+	def extra_repr(self):
+		return f'residual={self.res}, spec-norm={self.spec_norm}'
+
+	def forward(self, x):
+		if self.up is not None:
+			x = self.up(x)
+		c = self.deconv(x)
+		if self.res:
+			din, dout = x.size(1), c.size(1)
+			if din > dout:
+				x = c + x.narrow(1, 0, dout)
+			else:
+				if din < dout:
+					B, _, H, W = x.size()
+					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
+				x = c + x
+		else:
+			x = c
+		# x = c+x if self.res else c
+
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.nonlin is not None:
+			x = self.nonlin(x)
+		return x
+
+
+
+@fig.AutoComponent('layer-norm')
+class LayerNorm(fm.Model):
+	def __init__(self, din, eps=1e-5, elementwise_affine=True):
+		super().__init__(din, din)
+		self.norm = nn.LayerNorm(din, eps=eps,
+		        elementwise_affine=elementwise_affine)
+
+	def forward(self, x):
+		return self.norm(x)
+
+@fig.AutoComponent('interpolate')
+class Interpolate(fm.Model):
+	def __init__(self, din=None, size=None, scale_factor=None, mode='nearest',
+	             align_corners=None, recompute_scale_factor=None):
+		assert size is not None or (din is not None and scale_factor is not None)
+
+		Cin = None
+		if din is not None:
+			Cin, Hin, Win = din
+
+			if size is None:
+				size = int(scale_factor*Hin), int(scale_factor*Win)
+
+		super().__init__(din, (Cin, *size))
+
+		self.size = size
+		self.scale_factor = scale_factor
+		self.mode = mode
+		self.align_corners = align_corners
+		self.recompute_scale_factor = recompute_scale_factor
+
+	def forward(self, x):
+		return F.interpolate(x, size=self.size, scale_factor=self.scale_factor,
+		                     mode=self.mode, align_corners=self.align_corners,
+		                     recompute_scale_factor=self.recompute_scale_factor)
 
 
 @fig.AutoComponent('double-conv-layer')

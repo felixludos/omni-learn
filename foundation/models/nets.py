@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from itertools import zip_longest
+from copy import deepcopy
 import torch.nn.functional as F
 from torch.distributions import Normal as NormalDistribution
 from torch.nn.utils import spectral_norm
@@ -17,15 +18,15 @@ from .layers import *
 class MLP(fm.Model):
 	def __init__(self, A):
 		kwargs = {
-			'input_dim': A.pull('input_dim', '<>din'),
-			'output_dim': A.pull('output_dim', '<>dout'),
-			'hidden_dims': A.pull('hidden_dims', '<>hidden_fc', []),
+			'din': A.pull('input_dim', '<>din'),
+			'dout': A.pull('output_dim', '<>dout'),
+			'hidden': A.pull('hidden_dims', '<>hidden_fc', '<>hidden', []),
 			'nonlin': A.pull('nonlin', 'prelu'),
 			'output_nonlin': A.pull('output_nonlin', None),
 		}
 
 		net = make_MLP(**kwargs)
-		super().__init__(kwargs['input_dim'], kwargs['output_dim'])
+		super().__init__(kwargs['din'], kwargs['dout'])
 
 		self.net = net
 
@@ -102,6 +103,80 @@ class Multihead(fm.Model): # currently, the input dim for each head must be the 
 		ys = [head(x) for head, x in zip(self.heads, xs)]
 		
 		return torch.cat(ys, dim=1)
+
+
+
+@fig.Component('multilayer')
+class MultiLayer(fm.Model):
+
+	def __init__(self, A=None, layers=None):
+
+		super().__init__(None, None)
+
+		if layers is None:
+			layers = self._create_layers(A)
+
+		self.din, self.dout = layers[0].din, layers[-1].dout
+
+		self.layers = nn.ModuleList(layers)
+
+	def _create_layers(self, A):
+
+		din = A.pull('final_din', '<>din', None)
+		dout = A.pull('final_dout', '<>dout', None)
+
+		assert din is not None or dout is not None, 'need some input info'
+
+		in_order = A.pull('in_order', din is not None)
+		force_iter = A.pull('force_iter', True)
+
+		create_layers = A.pull('layers', as_iter=force_iter)
+		# create_layers = deepcopy(create_layers)
+		create_layers.set_auto_pull(False)
+
+		self._current = din if in_order else dout
+		self._req_key = 'din' if in_order else 'dout'
+		self._find_key = 'dout' if in_order else 'din'
+		end = dout if in_order else din
+
+		pre, post = ('first', 'last') if in_order else ('last', 'first')
+
+		pre_layer = self._create_layer(A.sub(pre)) if pre in A else None
+
+		mid = [self._create_layer(layer) for layer in create_layers]
+
+		post_layer = None
+		if end is not None or post in A:
+			if post not in A:
+				A.push('output_nonlin', None)
+			mytype = A.push((post, '_type'), 'dense-layer', silent=True, overwrite=False)
+			if end is not None:
+				A.push((post, self._find_key), end, silent=True)
+			if mytype == 'dense-layer' and in_order:
+				A.push((post, 'nonlin'), '<>output_nonlin', silent=False, overwrite=False)
+			post_layer = self._create_layer(A.sub(post), empty_find=end is None)
+
+		layers = []
+		if pre_layer is not None:
+			layers.append(pre_layer)
+		layers.extend(mid)
+		if post_layer is not None:
+			layers.append(post_layer)
+		return layers if in_order else layers[::-1]
+
+	def _create_layer(self, info, empty_find=True):
+		info.push(self._req_key, self._current, silent=True, overwrite=True)
+		if empty_find:
+			info.push(self._find_key, None, silent=True, overwrite=True)
+		layer = info.pull_self()
+		# c, n = self._current, getattr(layer, self._find_key)
+		self._current = getattr(layer, self._find_key)
+		return layer
+
+	def forward(self, x):
+		for layer in self.layers:
+			x = layer(x)
+		return x
 
 
 @fig.Component('double-enc')

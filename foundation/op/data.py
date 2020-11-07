@@ -167,6 +167,9 @@ def load_data(A, mode=None):
 	except AttributeError:
 		datasets = {mode: dataset}
 
+	if datasets is None:
+		datasets = {mode: dataset}
+
 	dataset_only = A.pull('dataset-only', True)
 	if dataset_only and len(datasets) == 1:
 		return datasets.get(mode, datasets)

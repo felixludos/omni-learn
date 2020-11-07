@@ -246,15 +246,15 @@ class Lp_Norm(nn.Module):
 			return mag
 
 @fig.AutoComponent('normalization')
-def get_normalization(ident, num, groups=8, p=2, **kwargs):
+def get_normalization(ident, channels, groups=8, p=2, **kwargs):
 
 	if not isinstance(ident, str):
 		return ident
 
 	if ident == 'batch':
-		return nn.BatchNorm2d(num, **kwargs)
+		return nn.BatchNorm2d(channels, **kwargs)
 	if ident == 'instance':
-		return nn.InstanceNorm2d(num, **kwargs)
+		return nn.InstanceNorm2d(channels, **kwargs)
 	if ident == 'l1':
 		return Lp_Normalization(1)
 	if ident == 'l2':
@@ -262,41 +262,54 @@ def get_normalization(ident, num, groups=8, p=2, **kwargs):
 	if ident == 'lp':
 		return Lp_Normalization(p=p, **kwargs)
 	if ident == 'group':
-		return nn.GroupNorm(groups, num, **kwargs)
+		return nn.GroupNorm(groups, channels, **kwargs)
 	raise Exception(f'unknown norm type: {ident}')
 
 @fig.AutoComponent('down-pooling')
-def get_pooling(ident, factor, chn=None):
+def get_pooling(ident, down, chn=None):
 	if not isinstance(ident, str):
 		return ident
 
-	if factor == 1:
+	if down == 1:
 		return None
 
 	if ident == 'conv':
 		assert chn is not None
-		return nn.Conv2d(chn, chn, kernel_size=factor, padding=0, stride=factor)
+		return nn.Conv2d(chn, chn, kernel_size=down, padding=0, stride=down)
 	elif ident == 'max':
-		return nn.MaxPool2d(factor, factor)
+		return nn.MaxPool2d(down, down)
 	elif ident == 'avg':
-		return nn.AvgPool2d(factor, factor)
+		return nn.AvgPool2d(down, down)
 
 	raise Exception(f'unknown pool type: {ident}')
 
 @fig.AutoComponent('up-pooling')
-def get_upsample(ident, factor, chn=None):
+def get_upsample(ident, up=2, size=None, channels=None):
 	if not isinstance(ident, str):
 		return ident
 
-	if factor == 1:
+	if up == 1:
 		return None
 
 	if ident == 'conv':
 		assert chn is not None
-		return nn.ConvTranspose2d(chn, chn, kernel_size=factor, stride=factor)
+		return nn.ConvTranspose2d(chn, chn, kernel_size=up, stride=up)
 	else:
-		return nn.Upsample(scale_factor=2, mode=ident)
+		assert up is not None or size is not None
+		if size is not None:
+			return nn.Upsample(size=size, mode=ident)
+		return nn.Upsample(scale_factor=up, mode=ident)
 
+
+def conv_size_change(H, W, kernel_size=(3,3), padding=(1,1), stride=(1,1), dilation=(1,1)):
+	H = (H + 2 * padding[0] - dilation[0] * (kernel_size[0] - 1) - 1) // stride[0] + 1
+	W = (W + 2 * padding[1] - dilation[1] * (kernel_size[1] - 1) - 1) // stride[1] + 1
+	return H, W
+
+def deconv_size_change(H, W, kernel_size=(4,4), padding=(1,1), stride=(1,1), dilation=(1,1), output_padding=(0,0)):
+	H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
+	W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
+	return H, W
 
 # endregion
 #####################

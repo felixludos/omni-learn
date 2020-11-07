@@ -112,7 +112,15 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		if out is None:
 			out = util.TensorDict()
 
-		x = batch[0]
+		if isinstance(batch, torch.Tensor):
+			x = batch
+		elif isinstance(batch, (tuple, list)):
+			x = batch[0]
+		elif isinstance(batch, dict):
+			x = batch['x']
+		else:
+			raise NotImplementedError
+
 		B = x.size(0)
 
 		x = self.preprocess(x)

@@ -38,10 +38,18 @@ def iterative_training(A=None, run=None):
 		run = A.pull('run')
 	
 	A = run.get_config()
+
+	safe_config = A.pull('safe_config', False)
+
+	if safe_config:
+		A.begin()
 	
 	datasets = run.get_datasets()
 	model = run.get_model()
-	
+
+	if safe_config:
+		A.abort()
+
 	logger = run.get_logger()
 	
 	run.prepare()

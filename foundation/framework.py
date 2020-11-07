@@ -90,18 +90,22 @@ class CompositeModel(Model): # TODO integrate with component based models
 		return x
 
 
+@fig.AutoModifier('generative')
 class Generative(object):
 	def generate(self, N=1):
 		raise NotImplementedError
 
+@fig.AutoModifier('encodable')
 class Encodable(object):
 	def encode(self, x): # by default this is just forward pass
 		return self(x)
 
+@fig.AutoModifier('decodable')
 class Decodable(object): # by default this is just the forward pass
 	def decode(self, q):
 		return self(q)
 
+@fig.AutoModifier('invertible')
 class Invertible(object):
 	def inverse(self, *args, **kwargs):
 		raise NotImplementedError

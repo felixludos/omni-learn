@@ -7,51 +7,83 @@ run:
 name: 'test-cmd'
 
 output:
-    save_freq: -1
+  save_freq: -1
 
-    tensorboard: True
+  tensorboard: True
 
-    log_freq: 10
+  log_freq: 10
 
 dataset:
-    name: 'mnist'
+  name: 'mnist'
 
-    download: False
-    labeled: True
+  download: False
+  labeled: True
 
-    batch_size: 128
+  batch_size: 128
 
-    val_split: 0.166666
+  val_split: 0.166666
 
 training:
-    epochs: 10
+  epochs: 10
 
 
 model:
-    _type: 'simple'
+  _type: 'simple'
 
-    nonlin: 'elu'
+  nonlin: 'elu'
 
-    norm: None
+  norm: None
 
-    net:
-        _type: 'conv'
+  net:
+    _type: multilayer
 
-        channels: [32, 32, 32, 32]
-        strides: 1
 
-        fc_hidden: [64, 32]
+    pool: max
+    unpool: bilinear
 
-        in_shape: '<>din'
-        latent_dim: '<>dout'
+    nonlin: elu
 
-    optim_type: 'adam'
-    lr: 1.e-3
-    weight_decay: 1.e-4
-#    momentum: 0.9
+    layer_type: image-layer
+    num_channels: 32
 
-#    scheduler_type: step
-#    scheduler_step: 2
-#    scheduler_decay: 0.4
+    layers:
+      - _type: <>layer_type
+        channels: <>num_channels
+        down: 2
+
+      - _type: <>layer_type
+        channels: <>num_channels
+        down: 2
+
+      - _type: <>layer_type
+        channels: <>num_channels
+        down: 2
+
+      - _type: <>layer_type
+        channels: <>num_channels
+        down: 2
+
+    last_layer:
+      _type: mlp
+      hidden: [64, 32]
+
+#    _type: 'conv'
+#
+#    channels: [32, 32, 32, 32]
+#    strides: 1
+#
+#    fc_hidden: [64, 32]
+#
+#    in_shape: '<>din'
+#    latent_dim: '<>dout'
+
+  optim_type: 'adam'
+  lr: 1.e-3
+  weight_decay: 1.e-4
+#  momentum: 0.9
+#
+#  scheduler_type: step
+#  scheduler_step: 2
+#  scheduler_decay: 0.4
 
 

@@ -75,10 +75,11 @@ def _config_expression(A):  # TODO: boolean ops
 class Repeat_Iter(ConfigIter):
 	def __init__(self, A):
 		num = A.pull('_num', '<>_len')
+		unpack = A.pull('_unpack', False)
 
 		element = A['_element']
 
-		A['_elements'] = ConfigList(num*[element])
+		A['_elements'] = ConfigList(data=num*[*element] if unpack else num*[element], parent=A)
 
 		super().__init__(A)
 
