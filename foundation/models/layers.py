@@ -274,25 +274,47 @@ class ConvLayer(fm.Model):
 
 		assert din is not None or dout is not None, 'no input info'
 
-		down = A.pull('down', None)
-		if isinstance(down, int):
-			down = down, down
-		assert down is None or (down[0] >= 1 and down[1] >= 1), f'{down}'
-		pool = None if down is None or (down[0] == 1 and down[1] == 1) else util.get_pooling(A.pull('pool', None), down)
-		up = A.pull('up', None) if down is None else None
-		if isinstance(up, int):
-			up = up, up
-		assert up is None or (up[0] >= 1 and up[1] >= 1), f'{up}'
-		unpool = None
+		down, up = None, None
 		size = None
-		if down is None and up is None:
-			size = A.pull('size', None)
-			if size is not None:
-				unpool = util.get_upsample(A.pull('unpool', None), size=size)
-			else:
-				down = (1,1)
-		elif up is not None:
-			unpool = util.get_upsample(A.pull('unpool', None), up=up)
+		if din is not None and dout is not None:
+
+			Cin, Hin, Win = din
+			Cout, Hout, Wout = dout
+
+			if channels is None:
+				channels = Cout
+
+			if Hin != Hout or Win != Wout:
+				H, W = Hout/Hin, Wout/Win
+
+				val = None
+				is_down = not ((H >= 1 and W >= 1) or (H < 1 and W > 1) or (H > 1 and W < 1))
+				if is_down:
+					H, W = 1/H, 1/W
+				if int(H) == H and int(W) == W:
+					val = int(H), int(W)
+				else:
+					size = Hout, Wout
+				down = val if is_down else None
+				up = None if is_down else val
+		else:
+			down = A.pull('down', down)
+			if isinstance(down, int):
+				down = down, down
+			assert down is None or (down[0] >= 1 and down[1] >= 1), f'{down}'
+			up = A.pull('up', up) if down is None else None
+			if isinstance(up, int):
+				up = up, up
+			assert up is None or (up[0] >= 1 and up[1] >= 1), f'{up}'
+			if down is None and up is None:
+				size = A.pull('size', None)
+				if size is None:
+					down = (1,1)
+
+		pool = None if down is None or (down[0] == 1 and down[1] == 1) \
+			else util.get_pooling(A.pull('pool', None), down)
+		unpool = util.get_upsample(A.pull('unpool', None), size=size) if size is not None \
+			else (util.get_upsample(A.pull('unpool', None), up=up) if up is not None else None)
 
 		is_deconv = down is None and size is None and unpool is None
 

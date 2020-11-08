@@ -84,6 +84,19 @@ class Repeat_Iter(ConfigIter):
 		super().__init__(A)
 
 
+@fig.Component('copy')
+def copy_config(A):
 
+	src = A.pull('_src', None)
+
+	if src is not None:
+		src = A.pull(src, raw=True)
+
+		A.push('_type', '_x_', silent=True)
+		A.push('_src', '_x_', silent=True)
+
+		A.update(src)
+
+	return A.pull_self()
 
 

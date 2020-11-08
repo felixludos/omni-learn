@@ -19,10 +19,12 @@ from .. import util
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 	# def __init__(self, encoder, decoder, reg='L2', reg_wt=0, criterion=None,
 	#              viz_latent=True, viz_rec=True):
-	def __init__(self, A):
+	def __init__(self, A, encoder=None, decoder=None, **other):
 
-		encoder = A.pull('encoder')
-		decoder = A.pull('decoder')
+		if encoder is None:
+			encoder = A.pull('encoder')
+		if decoder is None:
+			decoder = A.pull('decoder')
 
 		reg_wt = A.pull('reg_wt', None)
 		reg = A.pull('reg', 'L2' if reg_wt is not None and reg_wt > 0 else None)
@@ -32,10 +34,13 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		viz_latent = A.pull('viz-latent', True)
 		viz_rec = A.pull('viz-rec', True)
 
-		super().__init__(encoder.din, decoder.dout)
+		if len(other):
+			super().__init__(**other)
+		else:
+			super().__init__(encoder.din, decoder.dout)
 
-		self.enc = encoder
-		self.dec = decoder
+		self.encoder = encoder
+		self.decoder = decoder
 
 		self.criterion = util.get_loss_type(criterion)
 
@@ -46,17 +51,17 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 			self.stats.new('reg-loss')
 		self.stats.new('rec-loss')
 
-		self.latent_dim = self.dec.din
+		self.latent_dim = self.decoder.din
 		
 		self.viz_latent = viz_latent
 		self.viz_rec = viz_rec
 		
 	def _visualize(self, info, logger):
 		
-		if isinstance(self.enc, fm.Visualizable):
-			self.enc.visualize(info, logger)
-		if isinstance(self.dec, fm.Visualizable):
-			self.dec.visualize(info, logger)
+		if isinstance(self.encoder, fm.Visualizable):
+			self.encoder.visualize(info, logger)
+		if isinstance(self.decoder, fm.Visualizable):
+			self.decoder.visualize(info, logger)
 
 		if self.viz_latent and 'latent' in info and info.latent is not None:
 			q = info.latent.loc if isinstance(info.latent, distrib.Distribution) else info.latent
@@ -95,7 +100,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		return x
 
 	def encode(self, x):
-		return self.enc.encode(x)
+		return self.encoder.encode(x)
 
 	def regularize(self, q, p=None):
 		B = q.size(0)
@@ -103,7 +108,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		return mag / B
 
 	def decode(self, q):
-		return self.dec.decode(q)
+		return self.decoder.decode(q)
 
 	def preprocess(self, x):
 		return x
@@ -114,15 +119,26 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 
 		B = x.size(0)
 
-		rec, q = self(x, ret_q=True)
-		out.latent = q
-		out.reconstruction = rec
+		if 'reconstruction' not in out:
+
+			rec, q = self(x, ret_q=True)
+
+			if 'latent' not in q:
+				out.latent = q
+			out.reconstruction = rec
+
+		rec = out.reconstruction
 
 		loss = self.criterion(rec, x) / B
 		out.rec_loss = loss
 		self.stats.update('rec-loss', loss)
 
+		return loss
+
 	def _reg_step(self, out):
+
+		if 'latent' not in out:
+			out.latent = self.encode(out.original)
 
 		q = out.latent
 
@@ -151,7 +167,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 
 		loss = self._rec_step(out)
 
-		if self.reg_wt > 0:
+		if self.reg_wt is not None and self.reg_wt > 0:
 			loss += self._reg_step(out)
 
 		out.loss = loss

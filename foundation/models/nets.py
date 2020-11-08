@@ -20,7 +20,7 @@ from .layers import make_MLP
 
 
 @fig.Component('mlp')
-class MLP(fm.Model):
+class MLP(nn.Sequential, fm.Model):
 	def __init__(self, A):
 		kwargs = {
 			'din': A.pull('input_dim', '<>din'),
@@ -35,21 +35,8 @@ class MLP(fm.Model):
 		}
 
 		net = make_MLP(**kwargs)
-		super().__init__(net.din, net.dout)
-
-		self.net = net
-
-	def __iter__(self):
-		return iter(self.net)
-
-	def __len__(self):
-		return len(self.net)
-
-	def __getitem__(self, item):
-		return self.net[item]
-
-	def forward(self, x):
-		return self.net(x)
+		super().__init__(*net)
+		self.din, self.dout = net.din, net.dout
 
 @fig.Component('multihead')
 class Multihead(fm.Model): # currently, the input dim for each head must be the same (but output can be different) TODO: generalize
@@ -172,7 +159,8 @@ class MultiLayer(fm.Model):
 		return layers if in_order else layers[::-1]
 
 	def _create_layer(self, info, empty_find=True):
-		info.push(self._req_key, self._current, silent=True, overwrite=True)
+		current = self._current
+		info.push(self._req_key, current, silent=True, overwrite=True)
 		if empty_find:
 			info.push(self._find_key, None, silent=True, overwrite=True)
 		layer = info.pull_self()

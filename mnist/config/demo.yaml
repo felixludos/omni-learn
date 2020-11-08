@@ -28,54 +28,34 @@ training:
 
 
 model:
-  _type: 'simple'
+  _type: model
+  _model_type: simple
 
-  nonlin: 'elu'
+  nonlin: elu
 
   norm: None
 
   net:
     _type: multilayer
 
-
-    pool: max
-    unpool: bilinear
+#    pool: max
 
     nonlin: elu
 
-    layer_type: image-layer
-    num_channels: 32
+    layer_type: conv-layer
+    channels: 32
+    down: 2
 
     layers:
       - _type: <>layer_type
-        channels: <>num_channels
-        down: 2
-
       - _type: <>layer_type
-        channels: <>num_channels
-        down: 2
-
       - _type: <>layer_type
-        channels: <>num_channels
-        down: 2
-
       - _type: <>layer_type
-        channels: <>num_channels
-        down: 2
 
-    last_layer:
+    last:
       _type: mlp
       hidden: [64, 32]
 
-#    _type: 'conv'
-#
-#    channels: [32, 32, 32, 32]
-#    strides: 1
-#
-#    fc_hidden: [64, 32]
-#
-#    in_shape: '<>din'
-#    latent_dim: '<>dout'
 
   optim_type: 'adam'
   lr: 1.e-3

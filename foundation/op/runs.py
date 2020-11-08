@@ -423,10 +423,13 @@ class Run:
 
 			result = wrap_script('load-data', A, **meta)
 
-			if isinstance(result, dict):
+			if type(result) == dict:
 				datasets.update(result)
-			else:
+			elif name is not None:
 				datasets[name] = result
+			else:
+				datasets['train'] = result
+				datasets['val'] = None
 
 			if name is not None and name not in datasets:
 				raise Exception(f'Failed to create dataset: {name}')
@@ -765,10 +768,10 @@ class Run:
 			
 			# assert save_freq > 100, 'not allowed to save more often than once every 100 steps -- remember 55-8'
 			
-			quick_save = A.pull('output.quick_save', False)  # force saving so frequently
-
-			if not quick_save:
-				raise Exception('not allowed to save more often than once every 100 steps')
+			# quick_save = A.pull('output.quick_save', False)  # force saving so frequently
+			#
+			# if not quick_save:
+			# 	raise Exception('not allowed to save more often than once every 100 steps')
 
 			# if not quick_save:
 			# 	save_freq = len(trainloader)
