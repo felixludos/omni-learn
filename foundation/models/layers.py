@@ -313,8 +313,9 @@ class ConvLayer(fm.Model):
 
 		pool = None if down is None or (down[0] == 1 and down[1] == 1) \
 			else util.get_pooling(A.pull('pool', None), down)
+		A.push('channels', channels, silent=True)
 		unpool = util.get_upsample(A.pull('unpool', None), size=size) if size is not None \
-			else (util.get_upsample(A.pull('unpool', None), up=up) if up is not None else None)
+			else (util.get_upsample(A.pull('unpool', None), up=up, channels=channels) if up is not None else None)
 
 		is_deconv = down is None and size is None and unpool is None
 

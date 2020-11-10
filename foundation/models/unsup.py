@@ -26,13 +26,15 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		if decoder is None:
 			decoder = A.pull('decoder')
 
-		reg_wt = A.pull('reg_wt', None)
+		reg_wt = A.pull('reg-wt', None)
 		reg = A.pull('reg', 'L2' if reg_wt is not None and reg_wt > 0 else None)
 
 		criterion = A.pull('criterion', 'mse')
 
 		viz_latent = A.pull('viz-latent', True)
 		viz_rec = A.pull('viz-rec', True)
+		viz_enc = A.pull('viz-enc', True)
+		viz_dec = A.pull('viz-dec', True)
 
 		if len(other):
 			super().__init__(**other)
@@ -55,38 +57,44 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		
 		self.viz_latent = viz_latent
 		self.viz_rec = viz_rec
+		self.viz_enc = viz_enc
+		self.viz_dec = viz_dec
 		
 	def _visualize(self, info, logger):
 		
-		if isinstance(self.encoder, fm.Visualizable):
+		if self.viz_enc and isinstance(self.encoder, fm.Visualizable):
 			self.encoder.visualize(info, logger)
-		if isinstance(self.decoder, fm.Visualizable):
+		if self.viz_dec and isinstance(self.decoder, fm.Visualizable):
 			self.decoder.visualize(info, logger)
 
-		if self.viz_latent and 'latent' in info and info.latent is not None:
-			q = info.latent.loc if isinstance(info.latent, distrib.Distribution) else info.latent
-			
-			shape = q.size()
-			if len(shape) > 1 and np.product(shape) > 0:
-				try:
-					logger.add('histogram', 'latent-norm', q.norm(p=2, dim=-1))
-					logger.add('histogram', 'latent-std', q.std(dim=0))
-					if isinstance(info.latent, distrib.Distribution):
-						logger.add('histogram', 'logstd-hist', info.latent.scale.add(1e-5).log().mean(dim=0))
-				except ValueError:
-					print('\n\n\nWARNING: histogram just failed\n')
-					print(q.shape, q.norm(p=2, dim=-1).shape)
+		if 'latent' in info:
+			q = info.latent
+			if self.viz_latent and q is not None:
+				if isinstance(info.latent, distrib.Distribution):
+					q = q.loc
 
-		X = info.original
-		if X.ndim == 4 and self.viz_rec and 'reconstruction' in info:
-			B, C, H, W = info.original.shape
-			N = min(B, 8)
+				shape = q.size()
+				if len(shape) > 1 and np.product(shape) > 0:
+					try:
+						logger.add('histogram', 'latent-norm', q.norm(p=2, dim=-1))
+						logger.add('histogram', 'latent-std', q.std(dim=0))
+						if isinstance(info.latent, distrib.Distribution):
+							logger.add('histogram', 'logstd-hist', info.latent.scale.add(1e-5).log().mean(dim=0))
+					except ValueError:
+						print('\n\n\nWARNING: histogram just failed\n')
+						print(q.shape, q.norm(p=2, dim=-1).shape)
 
-			R = info.reconstruction
-			viz_x, viz_rec = X[:N], R[:N]
+		if 'original' in info:
+			X = info.original
+			if X.ndim == 4 and self.viz_rec and 'reconstruction' in info:
+				B, C, H, W = info.original.shape
+				N = min(B, 8)
 
-			recs = torch.cat([viz_x, viz_rec], 0)
-			logger.add('images', 'rec', util.image_size_limiter(recs))
+				R = info.reconstruction
+				viz_x, viz_rec = X[:N], R[:N]
+
+				recs = torch.cat([viz_x, viz_rec], 0)
+				logger.add('images', 'rec', util.image_size_limiter(recs))
 
 		logger.flush()
 	
@@ -100,7 +108,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		return x
 
 	def encode(self, x):
-		return self.encoder.encode(x)
+		return self.encoder.encode(x) if isinstance(self.encoder, fm.Encodable) else self.encoder(x)
 
 	def regularize(self, q, p=None):
 		B = q.size(0)
@@ -108,7 +116,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		return mag / B
 
 	def decode(self, q):
-		return self.decoder.decode(q)
+		return self.decoder.decode(q) if isinstance(self.decoder, fm.Decodable) else self.decoder(q)
 
 	def preprocess(self, x):
 		return x
@@ -123,7 +131,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 
 			rec, q = self(x, ret_q=True)
 
-			if 'latent' not in q:
+			if 'latent' not in out:
 				out.latent = q
 			out.reconstruction = rec
 
@@ -147,7 +155,8 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		out.reg_loss = reg_loss
 		return self.reg_wt * reg_loss
 
-	def _step(self, batch, out=None):
+
+	def _process_batch(self, batch, out=None):
 		if out is None:
 			out = util.TensorDict()
 
@@ -160,10 +169,16 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		else:
 			raise NotImplementedError
 
+		x = self.preprocess(x)
+
+		out.original = x
 		out.batch = batch
 
-		x = self.preprocess(x)
-		out.original = x
+		return out
+
+	def _step(self, batch, out=None):
+
+		out = self._process_batch(batch, out)
 
 		loss = self._rec_step(out)
 

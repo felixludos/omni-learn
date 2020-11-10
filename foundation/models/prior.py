@@ -128,10 +128,10 @@ class StyleModel(MultiLayer, StorablePrior):
 		bdims = [branch.get_style_dim() for branch in branches]
 
 		if split_style:
+			style_dim = sum(bdims)
+		else:
 			style_dim = bdims[0]
 			assert all(b == style_dim for b in bdims)
-		else:
-			style_dim = sum(bdims)
 
 		self.split_style = split_style
 		self.branches = branches

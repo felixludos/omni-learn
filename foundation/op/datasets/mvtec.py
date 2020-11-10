@@ -267,8 +267,8 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 					out.append(self.labels[item])
 			elif self.labels is not None:
 				out.append(self.labels[item])
-			elif self.augmenter is not None:
-				out = [self.augmenter(out[0])]
+			if self.augmenter is not None:
+				out[0] = self.augmenter(out[0])
 
 			return out
 		

@@ -227,7 +227,7 @@ class Complex_Optimizer(Optimizer):
 	def __getitem__(self, item):
 		return self.optims[item]
 	def __setitem__(self, key, value):
-		raise NotImplementedError
+		# raise NotImplementedError
 		self.optims[key] = value
 	def __delitem__(self, key):
 		del self.optims[key]
@@ -240,7 +240,7 @@ class Complex_Optimizer(Optimizer):
 	def __setattr__(self, key, value):
 		# raise NotImplementedError
 		if isinstance(value, Optimizer):
-			raise NotImplementedError
+			# raise NotImplementedError
 			self.__setitem__(key, value)
 		else:
 			super().__setattr__(key, value)

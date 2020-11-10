@@ -180,6 +180,62 @@ class MultiLayer(fm.Model):
 
 @fig.AutoModifier('normal')
 class Normal(fm.Model):
+	def __init__(self, A):
+		super().__init__(A)
+
+		dout = self.dout
+		self.full_dout = dout
+
+		split = A.pull('split-out', True)
+
+		out = None
+		if split:
+
+			if isinstance(dout, int):
+				assert dout % 2 == 0
+				chn = dout // 2
+				dout = chn
+
+			else:
+				chn = dout[0]
+				assert chn % 2 == 0
+				chn = chn // 2
+				dout = (chn, *dout[1:])
+
+		else:
+
+			if isinstance(dout, int):
+				chn = dout
+
+				out = nn.Linear(chn, chn*2)
+
+				# A.push('out-layer._type', 'dense-layer', silent=True)
+				# A.push('')
+
+			else:
+				chn = dout[0]
+
+				out = nn.Conv2d(chn, chn*2, kernel_size=1)
+
+				# A.push('out-layer._type', 'conv-layer', silent=True)
+
+		self.normal_layer = out
+		self.width = chn
+		self.dout = dout
+
+	def forward(self, *args, **kwargs):
+
+		x = super().forward(*args, **kwargs)
+
+		if self.normal_layer is not None:
+			x = self.normal_layer(x)
+
+		mu, sigma = x.narrow(1, 0, self.width), x.narrow(1, self.width, self.width).exp()
+
+		return NormalDistribution(mu, sigma)
+
+
+class OldNormal(fm.Model):
 	'''
 	This is a modifier (basically mixin) to turn the parent's output of forward() to a normal distribution.
 

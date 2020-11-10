@@ -292,8 +292,8 @@ def get_upsample(ident, up=2, size=None, channels=None):
 		return None
 
 	if ident == 'conv':
-		assert chn is not None
-		return nn.ConvTranspose2d(chn, chn, kernel_size=up, stride=up)
+		assert channels is not None
+		return nn.ConvTranspose2d(channels, channels, kernel_size=up, stride=up)
 	else:
 		assert up is not None or size is not None
 		if size is not None:

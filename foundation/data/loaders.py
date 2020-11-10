@@ -124,36 +124,42 @@ class _BatchedDataLoaderIter(object):
 
 	def reset(self):
 
-		order = torch.randperm(len(self.dataset), device=self.device) if self.shuffle else torch.arange(0, len(self.dataset), device=self.device)
+		if len(self.dataset) < 1e7:
 
-		history = None
-		if self.remainder is not None:
-			pull = self.batch_size - len(self.remainder)
-			history = torch.cat([self.remainder, order[:pull]])
-			order = order[pull:]
+			order = torch.randperm(len(self.dataset), device=self.device) if self.shuffle else torch.arange(0, len(self.dataset), device=self.device)
 
-			self.remainder = None
+			history = None
+			if self.remainder is not None:
+				pull = self.batch_size - len(self.remainder)
+				history = torch.cat([self.remainder, order[:pull]])
+				order = order[pull:]
 
-		batches = list(torch.split(order, self.batch_size))
+				self.remainder = None
 
-		if history is not None:
-			batches.insert(0,history)
+			batches = list(torch.split(order, self.batch_size))
 
-		last = batches[-1]
-		if len(last) < self.batch_size:
-			if self.drop_last or self.auto_reset:
-				batches.pop()
-				if self.auto_reset:
-					self.remainder = last
+			if history is not None:
+				batches.insert(0,history)
 
-		self.batches = batches
+			last = batches[-1]
+			if len(last) < self.batch_size:
+				if self.drop_last or self.auto_reset:
+					batches.pop()
+					if self.auto_reset:
+						self.remainder = last
+
+			self.batches = batches
+
+		else:
+			self.batches = None
 		self.idx = 0
+
 
 	def skip(self, num):
 		self.idx += num
 
 	def __len__(self):
-		return len(self.batches) - self.idx
+		return len(self.dataset)//self.batch_size if self.batches is None else len(self.batches) - self.idx
 
 	# def next_batch(self):
 	# 	batch = next(self)
@@ -163,14 +169,22 @@ class _BatchedDataLoaderIter(object):
 		return self
 
 	def __next__(self):
-		if self.idx >= len(self.batches):
-			if self.auto_reset:
-				self.reset()
-			else:
-				raise StopIteration
 
-		batch = self.dataset[self.batches[self.idx]]
-		self.idx += 1
+		if self.batches is None:
+
+			idx = torch.randint(len(self.dataset), size=(self.batch_size,))
+			batch = self.dataset[idx]
+
+		else:
+
+			if self.idx >= len(self.batches):
+				if self.auto_reset:
+					self.reset()
+				else:
+					raise StopIteration
+
+			batch = self.dataset[self.batches[self.idx]]
+			self.idx += 1
 
 		return util.to(batch, self.device)
 		# return batch
