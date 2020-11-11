@@ -313,10 +313,11 @@ class ConvLayer(fm.Model):
 
 		pool = None if down is None or (down[0] == 1 and down[1] == 1) \
 			else util.get_pooling(A.pull('pool', None), down)
+		A.begin()
 		A.push('channels', channels, silent=True)
 		unpool = util.get_upsample(A.pull('unpool', None), size=size) if size is not None \
 			else (util.get_upsample(A.pull('unpool', None), up=up, channels=channels) if up is not None else None)
-
+		A.abort()
 		is_deconv = down is None and size is None and unpool is None
 
 		kernel_size = A.pull('kernel_size', '<>kernel', (4,4) if is_deconv else (3,3))
@@ -407,8 +408,10 @@ class ConvLayer(fm.Model):
 
 			Hout, Wout = H, W
 
-		A.push('channels', channels, silent=True)
-		norm = util.get_normalization(A.pull('norm', None), channels)
+		A.begin()
+		A.push('channels', Cout, silent=True)
+		norm = util.get_normalization(A.pull('norm', None), Cout)
+		A.abort()
 
 		nonlin = util.get_nonlinearity(A.pull('nonlin', 'elu'))
 

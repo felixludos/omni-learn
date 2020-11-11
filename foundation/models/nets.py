@@ -169,7 +169,7 @@ class MultiLayer(fm.Model):
 		return layer
 
 	def forward(self, x):
-		for layer in self.layers:
+		for i, layer in enumerate(self.layers):
 			x = layer(x)
 		return x
 
