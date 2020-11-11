@@ -98,7 +98,10 @@ def copy_config(A):
 		A.push('_src', '_x_', silent=True)
 		A.push('_src_mod', '_x_', silent=True)
 
+		updates = A.pull_self(raw=True)
+
 		A.update(src)
+		A.update(updates)
 
 		if mods is not None:
 			A.push('_mod', mods)

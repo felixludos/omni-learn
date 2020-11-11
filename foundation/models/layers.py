@@ -320,12 +320,18 @@ class ConvLayer(fm.Model):
 		is_deconv = down is None and size is None and unpool is None
 
 		kernel_size = A.pull('kernel_size', '<>kernel', (4,4) if is_deconv else (3,3))
+		if kernel_size is None:
+			kernel_size = (4,4) if is_deconv else (3,3)
 		if isinstance(kernel_size, int):
 			kernel_size = kernel_size, kernel_size
 		padding = A.pull('padding', (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2)
+		if padding is None:
+			padding = (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2
 		if isinstance(padding, int):
 			padding = padding, padding
 		dilation = A.pull('dilation', (1,1))
+		if dilation is None:
+			dilation = (1,1)
 		if isinstance(dilation, int):
 			dilation = dilation, dilation
 		output_padding = A.pull('output_padding', (0,0)) if is_deconv else None
@@ -339,7 +345,10 @@ class ConvLayer(fm.Model):
 		else:
 			stride = (1,1)
 
+		_stride = stride
 		stride = A.pull('stride', stride)
+		if stride is None:
+			stride = _stride
 		if isinstance(stride, int):
 			stride = stride, stride
 
