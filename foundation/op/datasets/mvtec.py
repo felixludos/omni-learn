@@ -239,6 +239,7 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		self.images = images
 		self.masks = masks
 		self.labels = labels
+		self.uses = uses
 
 		self.augmenter = augmenter
 		self.augment_factor = augment_factor
