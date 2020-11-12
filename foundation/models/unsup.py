@@ -180,6 +180,9 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 
 		out = self._process_batch(batch, out)
 
+		if self.train_me():
+			self.optim.zero_grad()
+
 		loss = self._rec_step(out)
 
 		if self.reg_wt is not None and self.reg_wt > 0:
@@ -188,7 +191,6 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		out.loss = loss
 
 		if self.train_me():
-			self.optim.zero_grad()
 			loss.backward()
 			self.optim.step()
 
