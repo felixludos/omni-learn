@@ -162,8 +162,8 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		include_class = A.pull('include-class', '<>include_class', True)
 		include_mask = A.pull('include-masks', '<>include_masks', False)
 		
-		cut = A.pull('cut', 'normal')
-		assert cut in {'normal', 'anomalies', 'all'}, f'unknown: {cut}'
+		cut = A.pull('cut', 'train')
+		assert cut in {None, 'normal', 'anomalies', 'all', 'train', 'test'}, f'unknown: {cut}'
 
 		tfms = A.pull('transforms', None, silent=True)
 		if tfms is not None:
@@ -192,10 +192,17 @@ class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
 		raw = hf.File(path, 'r')
 		
 		# print(raw.keys())
-		
-		uses = [key for key in raw.keys() if 'mask_' not in key and (cut == 'all'
-		                                                             or (cut == 'normal' and 'train_' in key)
-					or (cut == 'anomalies' and 'test_' in key))]
+
+		uses = [key for key in raw.keys() if 'mask_' not in key]
+		if cut == 'train':
+			uses = [key for key in uses if 'train_' in key]
+		elif cut == 'test':
+			uses = [key for key in uses if 'test_' in key]
+		elif cut == 'normal':
+			uses = [key for key in uses if 'train_' in key or key == 'test_good']
+		elif cut == 'anomalies':
+			uses = [key for key in uses if 'test_' in key and key != 'test_good']
+
 		C, H, W = din
 		
 		images = []
