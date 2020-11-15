@@ -5,4 +5,4 @@ from .criterion import MultiGroupClassification, Feature_Match
 from .prior import PriorTfm, StorablePrior, AdaIN, StyleModel
 from . import curriculum
 from .unsup import Autoencoder, Variational_Autoencoder, Wasserstein_Autoencoder, \
-	grad_penalty, judge
+	grad_penalty, WGAN, ShannonJensen_GAN

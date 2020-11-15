@@ -1,4 +1,3 @@
-
 import sys, os, time
 import numpy as np
 import torch
@@ -11,9 +10,10 @@ import matplotlib.pyplot as plt
 
 import omnifig as fig
 
-from . import nets
-from .. import framework as fm
-from .. import util
+from .. import nets
+from ... import framework as fm
+from ... import util
+
 
 @fig.Component('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
@@ -54,14 +54,14 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		self.stats.new('rec-loss')
 
 		self.latent_dim = self.decoder.din
-		
+
 		self.viz_latent = viz_latent
 		self.viz_rec = viz_rec
 		self.viz_enc = viz_enc
 		self.viz_dec = viz_dec
-		
+
 	def _visualize(self, info, logger):
-		
+
 		if self.viz_enc and isinstance(self.encoder, fm.Visualizable):
 			self.encoder.visualize(info, logger)
 		if self.viz_dec and isinstance(self.decoder, fm.Visualizable):
@@ -97,7 +97,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 				logger.add('images', 'rec', util.image_size_limiter(recs))
 
 		logger.flush()
-	
+
 	def forward(self, x, ret_q=False):
 
 		q = self.encode(x)
@@ -155,7 +155,6 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 		out.reg_loss = reg_loss
 		return self.reg_wt * reg_loss
 
-
 	def _process_batch(self, batch, out=None):
 		if out is None:
 			out = util.TensorDict()
@@ -196,6 +195,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 
 		return out
 
+
 class Generative_AE(fm.Generative, Autoencoder):
 
 	def sample_prior(self, N=1):
@@ -212,17 +212,17 @@ class Variational_Autoencoder(Generative_AE):
 
 	def __init__(self, A):
 
-		mod_check = A.pull('mod_check', True) # make sure encoder outputs a normal distribution
+		mod_check = A.pull('mod_check', True)  # make sure encoder outputs a normal distribution
 		if mod_check:
 			mods = A.pull('encoder._mod', None, silent=True)
 			if isinstance(mods, (list, tuple, dict)):
 				if 'normal' not in mods:
-					mods = [*mods, 'normal'] if isinstance(mods, (tuple, list)) else {**mods, 'normal':10},
+					mods = [*mods, 'normal'] if isinstance(mods, (tuple, list)) else {**mods, 'normal': 10},
 					A.push('encoder._mod', mods, silent=True)
 			else:
 				A.push('encoder._mod.normal', 1)
 
-		A.push('reg', None) # already taken care of
+		A.push('reg', None)  # already taken care of
 		wt = A.pull('reg-wt', None, silent=True)
 		if wt is None or wt <= 0:
 			print('WARNING: VAEs must have a reg_wt (beta), setting to 1')
@@ -240,7 +240,7 @@ class Variational_Autoencoder(Generative_AE):
 
 
 @fig.Component('wae')
-class Wasserstein_Autoencoder(Generative_AE): # MMD
+class Wasserstein_Autoencoder(Generative_AE):  # MMD
 	def __init__(self, A):
 		A.push('reg', None)  # already taken care of
 		super().__init__(A)
@@ -249,67 +249,6 @@ class Wasserstein_Autoencoder(Generative_AE): # MMD
 		if p is None:
 			p = self.sample_prior(q.size(0))
 		return util.MMD(p, q).sum()
-
-
-def grad_penalty(disc, real, fake): # for wgans
-	# from "Improved Training of Wasserstein GANs" by Gulrajani et al. (1704.00028)
-
-	B = real.size(0)
-	eps = torch.rand(B, *[1 for _ in range(real.ndimension()-1)], device=real.device)
-
-	combo = eps*real.detach() + (1-eps)*fake.detach()
-	combo.requires_grad = True
-	with torch.enable_grad():
-		grad, = autograd.grad(disc(combo).mean(), combo,
-		                     create_graph=True, retain_graph=True, only_inputs=True)
-
-	return (grad.contiguous().view(B,-1).norm(2, dim=1) - 1).pow(2).mean()
-
-def grad_penalty_sj(disc, real, fake): # for shannon jensen gans
-	# from "Stabilizing Training of GANs through Regularization" by Roth et al. (1705.09367)
-
-	B = real.size(0)
-
-	fake, real = fake.clone().detach(), real.clone().detach()
-	fake.requires_grad, real.requires_grad = True, True
-
-	with torch.enable_grad():
-		vfake, vreal = disc(fake), disc(real)
-		gfake, greal = autograd.grad(vfake.mean() + vreal.mean(),
-		                             (fake, real),
-		                     create_graph=True, retain_graph=True, only_inputs=True)
-
-	nfake = gfake.view(B,-1).pow(2).sum(-1, keepdim=True)
-	nreal = greal.view(B,-1).pow(2).sum(-1, keepdim=True)
-
-	return (vfake.sigmoid().pow(2)*nfake).mean() + ((-vreal).sigmoid().pow(2)*nreal).mean()
-
-
-def judge(disc, real, fake, out=None, optim=None, disc_gp=None, disc_clip=None):
-	if out is None:
-		out = util.TensorDict()
-
-	out.verdict_r = disc(real)
-	out.verdict_f = disc(fake)
-	out.distance = out.verdict_r.mean() - out.verdict_f.mean()
-
-	out.total = -out.distance # disc objective - max distance
-
-	if disc_gp is not None:
-		out.disc_gp = grad_penalty(disc, real, fake)
-		out.total += disc_gp * out.disc_gp
-
-	if optim is not None:
-		optim.zero_grad()
-		out.total.backward()
-		optim.step()
-
-	# clip discriminator
-	if disc_clip is not None:
-		for param in disc.parameters():
-			param.data.clamp_(-disc_clip, disc_clip)
-
-	return out
 
 
 
