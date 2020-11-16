@@ -60,7 +60,7 @@ class WGAN(fm.Generative, fm.Decodable, fm.Full_Model):
 		self.metric_name = metric_name
 		self._fancy_viz_freq = fancy_viz_freq
 
-		self.stats.new(self.metric_name, 'gen-score')
+		self.stats.new(self.metric_name, 'gen-loss')
 
 		self.register_attr('total_gen_steps', 0)
 		self.register_attr('total_disc_steps', 0)
@@ -88,14 +88,6 @@ class WGAN(fm.Generative, fm.Decodable, fm.Full_Model):
 			self.volatile.fid_stats = fid_stats
 
 		return super().prep(datasets)
-
-	# def _image_size_limiter(self, imgs):
-	#     H, W = imgs.shape[-2:]
-	#
-	#     if H * W < 128*128:
-	#         return imgs
-	#
-	#     return F.interpolate(imgs, size=(128, 128))
 
 	def sample_prior(self, N=1):
 		return torch.randn(N, self.latent_dim).to(self.device)
@@ -197,7 +189,7 @@ class WGAN(fm.Generative, fm.Decodable, fm.Full_Model):
 	def _visualize(self, info, logger):
 
 		if self.viz_gen and isinstance(self.generator, fm.Visualizable):
-			self.generator.vizualize(info, logger)
+			self.generator.visualize(info, logger)
 		if self.viz_disc and isinstance(self.discriminator, fm.Visualizable):
 			self.discriminator.visualize(info, logger)
 
@@ -354,7 +346,7 @@ class WGAN(fm.Generative, fm.Decodable, fm.Full_Model):
 		out = self._process_batch(batch, out)
 
 		if self.train_me():
-			self.optim.zero_grad()
+			self.optim.discriminator.zero_grad()
 
 		self._disc_step(out)
 
@@ -370,32 +362,13 @@ class WGAN(fm.Generative, fm.Decodable, fm.Full_Model):
 	def _take_gen_step(self):
 		return True  # by default always take gen step
 
-	def _verdict_metric(self, vfake, vreal=None):
-
-		if vreal is not None:
-			return vreal.mean() - vfake.mean()
-
-		return vfake  # wasserstein metric
-
-	def _disc_loss(self, out):
-
-		vreal = self._verdict_metric(out.vreal)
-		vfake = self._verdict_metric(out.vfake)
-
-		diff = self._verdict_metric(vfake, vreal)
-		out.loss = diff
-
-		self.stats.update(self.metric_name, diff.detach())
-
-		return -diff  # discriminator should maximize the difference
-
 	def _disc_step(self, out):
 
 		real = out.real
 
 		if 'fake' not in out:
 			out.fake = self.generate(real.size(0))
-		fake = out.fake
+		fake = out.fake.detach()
 
 		self.volatile.real = real
 		self.volatile.fake = fake
@@ -415,16 +388,16 @@ class WGAN(fm.Generative, fm.Decodable, fm.Full_Model):
 			self.optim.discriminator.step()
 			self.total_disc_steps += 1
 
-	def _gen_loss(self, out):
+	def _disc_loss(self, out):
+		vreal = out.vreal
+		vfake = out.vfake
 
-		vgen = self._verdict_metric(out.vgen)
+		diff = self._verdict_metric(vfake, vreal)
+		out.loss = diff
 
-		gen_score = vgen.mean()
-		out.gen_raw_score = gen_score
+		self.stats.update(self.metric_name, diff.detach())
 
-		self.stats.update('gen-score', gen_score)
-
-		return -gen_score
+		return diff  # discriminator should maximize the difference
 
 	def _gen_step(self, out):
 
@@ -446,17 +419,33 @@ class WGAN(fm.Generative, fm.Decodable, fm.Full_Model):
 			# self.optim.generator.zero_grad()
 			gen_loss.backward(retain_graph=self.retain_graph)
 			self.optim.generator.step()
-
 			self.total_gen_steps += 1
+
+	def _gen_loss(self, out):
+		
+		gen_loss = self._verdict_metric(out.vgen)
+		out.gen_raw_loss = gen_loss
+
+		self.stats.update('gen-loss', gen_loss)
+
+		return gen_loss
+
+	def _verdict_metric(self, vfake, vreal=None):
+		if vreal is None:
+			return -vfake.mean()  # wasserstein metric
+		return vfake.mean() - vreal.mean()
+		
 
 @fig.Component('gan')
 class ShannonJensen_GAN(WGAN):
+	def __init__(self, config, **other):
+		config.push('metric-name', 'sj-div', silent=True, overwrite=False)
+		super().__init__(config, **other)
+		
 	def _verdict_metric(self, vfake, vreal=None):
-		if vreal is not None:
-			return self._verdict_metric(-vfake).mean() + self._verdict_metric(
-				vreal).mean()
-		return F.sigmoid(vfake).log()  # how real is it?
-
+		if vreal is None:
+			return -F.sigmoid(vfake).log().mean() # how real is it
+		return (self._verdict_metric(-vfake) + self._verdict_metric(vreal)) / 2
 
 
 @fig.AutoModifier('skip-gen')

@@ -542,6 +542,12 @@ class Run:
 		log_freq = self.train_state.log_freq
 		return logger is not None and log_freq is not None and self.get_total_steps() % log_freq == 0
 	
+	def viz_time(self):
+		logger = self.get_logger()
+		viz_freq = self.train_state.viz_freq
+		steps = self.get_total_steps()
+		return logger is not None and viz_freq is not None and steps > 0 and steps % viz_freq == 0
+	
 	def val_time(self):
 		val_freq = self.train_state.val_freq
 		return val_freq is not None and (self.get_total_steps() % val_freq == 0 or not self.keep_going())
@@ -661,9 +667,12 @@ class Run:
 			out = self.train_step(force_step=True)
 
 			if self.log_time():
-				self.log_step(out, '{}/train', measure_time=False)
+				self.log_step(out, '{}/train')
 
 				sys.stdout.flush()
+		
+			if self.viz_time():
+				self.viz_step(out, measure_time=True)
 		
 			if self.val_time():
 				if bar is not None:
@@ -743,6 +752,7 @@ class Run:
 		Q.save_freq = A.pull('output.save_freq', -1)
 		Q.print_freq = A.pull('output.print_freq', None)
 		Q.log_freq = A.pull('output.log_freq', None)
+		Q.viz_freq = A.pull('output.viz_freq', 1)
 		Q.unique_tests = A.pull('output.unique_tests', False)
 		Q.model_val_stats_fmt = A.pull('training.model_val_stats_fmt', '<>training.model_stats_fmt', '{}')
 		Q.display_samples = A.pull('output.display_samples', False)  # count in terms of samples instead of iterations
@@ -835,8 +845,6 @@ class Run:
 		logger = self.get_logger()
 		train_stats = Q.train_stats
 		
-		start = time.time()
-		
 		if self.viz_criterion is not None:
 			train_stats.update('loss-viz', self.viz_criterion(out).detach())
 		
@@ -846,14 +854,20 @@ class Run:
 		display = train_stats.smooths() if Q.display_smoothed else train_stats.avgs()
 		for k, v in display.items():
 			logger.add('scalar', k, v)
-
+		
+	def viz_step(self, out, measure_time=True):
+		Q = self.train_state
+		logger = self.get_logger()
+		
+		start = time.time()
+		
 		try:
 			vfun = self.get_model().visualize
 		except AttributeError:
 			pass
 		else:
 			vfun(out, logger)
-
+		
 		if measure_time:
 			Q.time_stats.update('viz', time.time() - start)
 		
