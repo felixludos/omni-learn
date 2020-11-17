@@ -2,15 +2,14 @@ import sys, os, time
 import numpy as np
 import torch
 from torch import autograd
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+from torch.nn import functional as F
 import torch.distributions as distrib
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
+# from sklearn.decomposition import PCA
+# import matplotlib.pyplot as plt
 
 import omnifig as fig
 
-from .. import nets
 from ... import framework as fm
 from ... import util
 

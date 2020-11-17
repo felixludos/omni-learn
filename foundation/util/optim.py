@@ -90,6 +90,11 @@ def default_create_scheduler(optimizer, info):
 		                                       min_lr=min_lr, cooldown=cooldown,
 		                      req_loss=True, **common)
 
+	elif name == 'lambda':
+		
+		func = info.pull('scheduler_lambda')
+		
+		out = LambdaLR(optimizer, lr_lambda=func, last_epoch=last,)
 
 	elif name == 'cos':
 		num_steps = info.pull('scheduler_total_steps', None) # num_steps
@@ -142,6 +147,13 @@ class StepLR(Base_Scheduler, O.lr_scheduler.StepLR):
 	def __repr__(self):
 		return 'StepLR(step={}, gamma={})'.format(self.step_size, self.gamma)
 
+class LambdaLR(Base_Scheduler, O.lr_scheduler.LambdaLR):
+	
+	def __str__(self):
+		return self.__repr__()
+	
+	def __repr__(self):
+		return f'LambdaLR(lambda={self.lr_lambdas[0]})'
 
 class MultiStepLR(Base_Scheduler, O.lr_scheduler.MultiStepLR):
 	def __str__(self):
