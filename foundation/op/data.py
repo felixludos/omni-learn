@@ -109,7 +109,7 @@ def load_data(A, mode=None):
 
 	_type = A.pull('_type', None, silent=True)
 	if _type is None or _type == 'dataset':
-		name = A.pull('name')
+		name = A.pull('_dataset_type', '<>name')
 		
 		if name not in dataset_registry:
 			raise Exception(f'No datasets named "{name}" is registered')

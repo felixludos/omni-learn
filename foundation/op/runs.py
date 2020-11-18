@@ -7,6 +7,7 @@ import random
 import humpack as hp
 
 import omnifig as fig
+from omnifig.errors import MissingParameterError
 
 from omnibelt import load_yaml, save_yaml, get_now, create_dir
 # from .. import util
@@ -44,7 +45,7 @@ def wrap_script(script_name, A, **kwargs):
 	for key in store_keys:
 		try:
 			val = A.pull(key, silent=True)
-		except fig.MissingParameterError:
+		except MissingParameterError:
 			pass
 		else:
 			stored[key] = val

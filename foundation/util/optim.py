@@ -94,7 +94,7 @@ def default_create_scheduler(optimizer, info):
 		
 		func = info.pull('scheduler_lambda')
 		
-		out = LambdaLR(optimizer, lr_lambda=func, last_epoch=last,)
+		out = LambdaLR(optimizer, lr_lambda=func, last_epoch=last, **common)
 
 	elif name == 'cos':
 		num_steps = info.pull('scheduler_total_steps', None) # num_steps
@@ -117,7 +117,7 @@ def default_create_scheduler(optimizer, info):
 class Base_Scheduler(O.lr_scheduler._LRScheduler):
 
 	def __init__(self, *args, cut_after=None, freq=None, req_loss=None, **kwargs):
-		if freq <= 0:
+		if freq is not None and freq <= 0:
 			freq = None
 		self.freq = freq
 		self.cut_after = cut_after
@@ -276,7 +276,7 @@ class Complex_Optimizer(Optimizer):
 class Complex_Scheduler(object):
 	def __init__(self, **subs):
 		self.sub = subs
-		self.req_loss = bool(sum([sch.req_loss for sch in self.sub.values()]))
+		self.req_loss = bool(sum([bool(sch.req_loss) for sch in self.sub.values()]))
 
 	def load_state_dict(self, state_dict):
 		for name, sch in self.sub.items():
