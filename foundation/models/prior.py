@@ -96,6 +96,9 @@ class AdaIN(StorablePrior, fm.Model):
 
 		self.normalize = nn.InstanceNorm2d(channels, affine=False) if norm else None
 
+	# def extra_repr(self):
+	# 	return f'style={self.get_style_dim()}, normalize={self.normalize is not None}'
+
 	def process_prior(self, p):
 		return self.net(p)
 
