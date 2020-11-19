@@ -239,7 +239,9 @@ class Run:
 			self.records.update(self._initialize_records(A))
 		
 		if path is not None:
-			self._load_records(path, last=last)
+			print('WARNING: not loading previous records due to performance issue')
+			# self._load_records(path, last=last)
+			self.records.update(self._initialize_records(A))
 			self._set_model_ckpt(path, last=last)
 		
 		return A
@@ -753,7 +755,7 @@ class Run:
 		Q.save_freq = A.pull('output.save_freq', -1)
 		Q.print_freq = A.pull('output.print_freq', None)
 		Q.log_freq = A.pull('output.log_freq', None)
-		Q.viz_freq = A.pull('output.viz_freq', 1)
+		Q.viz_freq = A.pull('output.viz_freq', Q.log_freq)
 		Q.unique_tests = A.pull('output.unique_tests', False)
 		Q.model_val_stats_fmt = A.pull('training.model_val_stats_fmt', '<>training.model_stats_fmt', '{}')
 		Q.display_samples = A.pull('output.display_samples', False)  # count in terms of samples instead of iterations

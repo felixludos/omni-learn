@@ -9,7 +9,11 @@ from .. import framework as fm
 
 
 def load_checkpoint(path):  # model parameters - TODO: maybe add more options
-	return torch.load(path)
+	try:
+		return torch.load(path)
+	except RuntimeError:
+		return torch.load(path, map_location = "cpu")
+
 
 @fig.Script('load-model', description='Creates/loads a model')
 @fig.Component('model')
@@ -41,6 +45,8 @@ def load_model(A):
 		model.set_scheduler(A)
 	
 	device = A.pull('device', 'cpu')
+	if not torch.cuda.is_available():
+		device = 'cpu'
 	model.to(device)
 	
 	path = A.pull('_load_params', None)
