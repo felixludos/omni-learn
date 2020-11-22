@@ -7,7 +7,7 @@ import numpy as np
 #from itertools import imap
 from collections import deque, Mapping
 
-from omnibelt import Simple_Child, Proper_Child, get_now, create_dir, save_yaml, load_yaml, Registry
+from omnibelt import Simple_Child, Proper_Child, get_now, create_dir, save_yaml, load_yaml, Registry, Singleton
 
 import omnifig as fig
 
@@ -43,5 +43,7 @@ def create_param(*sizes, requires_grad=True):
 	t = torch.empty(*sizes)
 	nn.init.xavier_normal_(t)
 	return nn.Parameter(t, requires_grad=requires_grad)
+
+
 
 

@@ -1,5 +1,6 @@
 
 import sys, os
+from pathlib import Path
 import time
 import socket
 import random
@@ -29,9 +30,9 @@ DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH), 'trained_nets')
 # 	return root
 
 
-class NoConfigFoundError(Exception):
-	def __init__(self, msg):
-		super().__init__(msg)
+class RunNotFoundError(Exception):
+	def __init__(self, name):
+		super().__init__(f'Run not found: {name}')
 
 
 def wrap_script(script_name, A, **kwargs):
@@ -74,7 +75,7 @@ def find_config(ident, check_root=True):
 	
 	if check_root:
 		return find_config(os.path.join(root, ident), check_root=False)
-	raise NoConfigFoundError(f'no config found: {ident}')
+	raise RunNotFoundError(f'no config found: {ident}')
 
 
 def _get_ckpt_num(ident):
@@ -117,7 +118,7 @@ def _find_ckpt_with(ident, last=False, req='model', check_root=True):
 	
 	if check_root:
 		return _find_ckpt_with(os.path.join(root, ident), last=last, req=req, check_root=False)
-	raise NoConfigFoundError(f'no checkpoint found: {ident}')
+	raise RunNotFoundError(f'no checkpoint found: {ident}')
 
 
 def find_checkpoint(ident, last=False):
@@ -155,20 +156,19 @@ class Run:
 	Runs include the model, datasets, dataloaders, the logger, and stats
 	'''
 	def __init__(self, A, silent=False):
-		
-		self.records = A.pull('records', {})
 		self.silent = A.pull('silent', silent)
-		self.rng = random.Random()
-		
-		skip_load = A.pull('skip_run_load', False)
 		
 		self.A = A.get_root()
+		self.A = self._find_origin(self.A)
+		
+		self._prep(A)
+		
+		skip_load = A.pull('skip_run_load', False)
 		if not skip_load:
-			self.A = self._find_origin(self.A) # note that this uses the root
-			
 			self.name = self._setup_storage(self.A)
 		elif not self.silent:
 			print('WARNING: did not check run origin')
+		
 		
 		self.purge() # reset payload objs
 	
@@ -176,18 +176,33 @@ class Run:
 		return 'Run({})'.format(getattr(self, 'save_dir', ''))
 	
 	def __str__(self):
-		return 'Run({})'.format(getattr(self, 'save_dir', ''))
+		return repr(self)
 	
-	def _increment_rng(self, seed):
-		self.rng.seed(seed)
-		return self.rng.getrandbits(32)
+	def _prep(self, A):
+		
+		if 'clock' not in A:
+			A.push('clock._type', 'clock', overwrite=False, silent=True)
+		self.clock = A.pull('clock')
+		
+		if 'records' not in A:
+			A.push('records._type', 'records', silent=True)
+		self.records = A.pull('records')
+		
+		if 'stats' not in A:
+			A.push('stats._type', 'stats', silent=True)
+		self.stats = A.pull('stats')
+		
+		name = A.pull('run.name', '<>name', None)
+		if name is None:
+			name = self._gen_name(A)
+			A.push('name', name)
+		self.name = name
 	
 	def purge(self): # remove any potentially large objects to free memory
 		self.model = None
 		self.datasets = {}
 		self.loaders = {}
 		self.logger = None
-		self.stats = None
 		self.viz_criterion = None
 		
 		self.active_stage = None
@@ -195,22 +210,45 @@ class Run:
 		
 		self.results = {}
 	
+	
 	def _find_origin(self, A):
 		
 		last = A.pull('last', False)
 		
-		path = A.pull('load', None)
-		novel = True
-		if path is None:
-			path = A.pull('resume', '<>path', None)
-			if path is not None:
-				novel = False
+		path = A.pull('path', '<>resume', '<>load', None)
+		novel = A.push('novel', path is None, overwrite=False)
+		override = A.pull('override', {})
+		
+		if path is not None:
+			path = Path(path)
+			
+			if not path.is_dir():
+				root = A.pull('saveroot', '<>root', os.environ.get('FOUNDATION_SAVE_DIR', None))
+				if root is None:
+					raise RunNotFoundError(path)
+				path = root / path
+				if not path.is_dir():
+					raise RunNotFoundError(path)
+			
+			config_path = path / 'config.yaml'
+			
+			if not self.silent:
+				print(f'Loading Config: {config_path}')
+			
+			load_A = fig.get_config(path)
+			if novel:
+				load_A.update(A)
+			A.clear()
+			A.update(load_A)
+			A.update(override)
+		
+		return A
 		
 		raw_path = path
 		if path is not None:
 			try:
 				path = find_config(path)
-			except NoConfigFoundError as e:
+			except RunNotFoundError as e:
 				root = A.pull('saveroot', '<>root', None)
 				if root is None:
 					raise e
@@ -245,36 +283,6 @@ class Run:
 			self._set_model_ckpt(path, last=last)
 		
 		return A
-		
-	def _initialize_records(self, A):
-		
-		records = {
-			'total_steps': 0,
-			
-			'total_samples': {'train': 0, 'val': 0},
-			'total_epochs': {'train': 0, 'val': 0},
-			'stats': {'train': [], 'val': []},
-			
-			'batch': 0,
-			'checkpoint': None,
-			'val': 0,
-			
-			'epoch_seed': self._increment_rng(A.pull('seed', self.rng.getrandbits(32))),
-			
-			'history': A.pull('_history', [], silent=False),
-			'argv': sys.argv,
-			'timestamp': get_now(),
-		}
-		
-		track_best = A.pull('training.track_best', False)
-		
-		if track_best:
-			records['best'] = {'loss': None, 'checkpoint': None}
-		
-		# tau = info.pull('stats_decay', 0.001)
-		# util.set_default_tau(tau)
-		
-		return records
 		
 	def _setup_storage(self, A):
 		
@@ -318,7 +326,7 @@ class Run:
 		
 		try:
 			records_path = find_records(path, last=last)
-		except NoConfigFoundError:
+		except RunNotFoundError:
 			pass
 		else:
 			records = load_yaml(records_path)
