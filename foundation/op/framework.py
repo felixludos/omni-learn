@@ -6,7 +6,7 @@ import torch.nn as nn
 
 import omnifig as fig
 
-from . import util
+from .. import util
 import torch.multiprocessing as mp
 from itertools import chain
 
@@ -73,9 +73,6 @@ class Model(nn.Module):  # any vector function
 	def post_epoch(self, mode, records, stats=None): # called at the end of each epoch
 		pass
 
-	def maintenance(self, records, stats=None):
-		pass
-
 	def get_hparams(self):
 		return {}
 
@@ -89,6 +86,13 @@ class CompositeModel(Model): # TODO integrate with component based models
 			x = m(x)
 		return x
 
+class ModedModel(util.Mode, Model):
+	def switch_mode(self, mode):
+		super().switch_mode(mode)
+		if mode == 'train':
+			self.train()
+		else:
+			self.eval()
 
 @fig.AutoModifier('generative')
 class Generative(object):
@@ -129,21 +133,15 @@ class Savable(Model):
 		for path in paths:
 			torch.save(data, path)
 
-class Recordable(Model):
-	def __init__(self, *args, stats=None, **kwargs):
-		super().__init__(*args, **kwargs)
+class Recordable(util.StatsContainer, Model):
+	pass
 
-		if stats is None:
-			stats = util.StatsMeter()
-		self.stats = stats
+class Maintained(Model):
 
-	def reset_stats(self):
-		self.stats.reset()
+	def maintenance(self, tick, info=None):
+		pass
 
-	# def pre_epoch(self, mode, epoch): # already done by Run
-	# 	super().pre_epoch(mode, epoch)
-	# 	if mode == 'val':
-	# 		self.reset_stats()
+	
 
 class Visualizable(Recordable):
 	def __init__(self, *args, **kwargs):
@@ -183,26 +181,7 @@ class Optimizable(Recordable):
 		super().__init__(*args, **kwargs)
 		self.optim = None
 
-	def record_lr(self):
-		if self.optim is not None:
-			if isinstance(self.optim, util.Complex_Optimizer):
-				for name, optim in self.optim.items():
-					name = 'z-lr-{}'.format(name)
-					if name not in self.stats:
-						self.stats.new(name)
-					lr = optim.param_groups[0]['lr']
-					self.stats.update(name, lr)
-			else:
-				if 'z-lr' not in self.stats:
-					self.stats.new('z-lr')
-				lr = self.optim.param_groups[0]['lr']
-				self.stats.update('z-lr', lr)
-
-	def pre_epoch(self, mode, epoch):
-		super().pre_epoch(mode, epoch)
-		self.record_lr()
-
-	def set_optim(self, optim_info=None):
+	def set_optim(self, A=None):
 		
 		if self.optim is not None:
 			return
@@ -226,14 +205,20 @@ class Optimizable(Recordable):
 				if len(params):
 					if 'me' in sub_optims:
 						raise Exception('invalid names: {} already in {}'.format('me', sub_optims.keys()))
-					sub_optims['me'] = util.default_create_optim(params, optim_info)
+					# sub_optims['me'] = util.default_create_optim(params, optim_info)
+					sub_optims['me'] = A.pull('optim')
+					sub_optims['me'].prep(params)
 				optim = util.Complex_Optimizer(**sub_optims)
 		else:
-			optim = util.default_create_optim(self.parameters(), optim_info)
+			optim = A.pull('optim')
+			optim.prep(self.parameters())
+			# optim = util.default_create_optim(self.parameters(), optim_info)
 			
 		self.optim = optim
+		
+		return optim
 
-	def optim_step(self, loss): # should only be called during training
+	def _optim_step(self, loss): # should only be called during training
 		if self.optim is None:
 			raise Exception('Optimizer not set')
 		self.optim.zero_grad()
@@ -253,70 +238,6 @@ class Optimizable(Recordable):
 			state_dict['optim'] = self.optim.state_dict()
 		return state_dict
 
-
-@fig.AutoModifier('schedulable')
-class Schedulable(Optimizable):
-	def __init__(self, *args, scheduler=None, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.scheduler = scheduler
-
-	def set_scheduler(self, info=None):
-		if self.optim is None:
-			return
-		
-		schs = {}
-		
-		if isinstance(self.optim, util.Complex_Optimizer):
-			my_opt = None
-			for name, opt in self.optim.items():
-				if name == 'me':
-					my_opt = opt
-				else:
-					child = getattr(self, name)
-					if isinstance(child, Schedulable) and child.scheduler is not None:
-						schs[name] = child.scheduler
-		
-			if my_opt is not None:
-				sch = util.default_create_scheduler(my_opt, info)
-				if sch is not None:
-					schs['me'] = sch
-		
-			sch = util.Complex_Scheduler(**schs)
-		
-		else:
-			sch = util.default_create_scheduler(self.optim, info)
-			
-		self.scheduler = sch
-		
-	def load_state_dict(self, state_dict, strict=True):
-		if self.scheduler is not None and 'scheduler' in state_dict:
-			self.scheduler.load_state_dict(state_dict['scheduler'])
-		super().load_state_dict(state_dict, strict=strict)
-
-	def state_dict(self, *args, **kwargs):
-		state_dict = super().state_dict(*args, **kwargs)
-		if self.scheduler is not None:
-			state_dict['scheduler'] = self.scheduler.state_dict()
-		return state_dict
-
-	def maintenance(self, records, stats=None):
-		if self.scheduler is not None:
-			if self.scheduler.requires_loss():
-				assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
-				self.scheduler.maintain(records['total_steps'], stats['loss'].avg.item())
-			else:
-				self.scheduler.maintain(records['total_steps'])
-		super().maintenance(records, stats)
-
-	def post_epoch(self, mode, epoch, stats=None):
-		if self.scheduler is not None:
-			if self.scheduler.requires_loss():
-				if mode == 'val':
-					assert 'loss' in stats and stats['loss'].count > 0, 'no metric to check'
-					self.scheduler.epoch_end(stats['loss'].avg.item())
-			elif mode == 'train':
-				self.scheduler.epoch_end()
-		super().post_epoch(mode, epoch, stats)
 
 class Regularizable(object):
 	def regularize(self, q):
@@ -401,7 +322,7 @@ class Trainable_Model(Optimizable, Savable, Model): # top level - must be implem
 
 
 
-class Full_Model(Cacheable, Visualizable, Evaluatable, Schedulable, Trainable_Model): # simple shortcut for subclassing
+class Full_Model(Cacheable, Visualizable, Evaluatable, Trainable_Model): # simple shortcut for subclassing
 	pass
 
 

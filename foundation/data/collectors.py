@@ -2,11 +2,15 @@
 import sys, os
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset as PytorchDataset
 import h5py as hf
 
 from .loaders import get_loaders
 from .. import util
+
+class Dataset(PytorchDataset):
+	def __init__(self, *args, **kwargs):
+		super().__init__()
 
 def simple_split_dataset(dataset, split, shuffle=True):
 	'''
@@ -99,21 +103,38 @@ class Batchable_Dataset(Dataset): # you can select using a full batch
 		return True
 
 class Loadable_Dataset(Dataset):
+	def __init__(self, A):
+		super().__init__(A)
+		num_workers = A.pull('num_workers', 0)
+		batch_size = A.pull('batch_size', 64)
+		shuffle = A.pull('shuffle', True)
+		drop_last = A.pull('drop_last', False)
+		loader_device = A.pull('step_device', '<>device', 'cuda' if torch.cuda.is_available() else 'cpu')
+		infinite = A.pull('infinite', False)
+		extractor = A.pull('extractor', None)
+		
+		self._loader_settings = {
+			'num_workers': num_workers,
+			'batch_size': batch_size,
+			'shuffle': shuffle,
+			'drop_last': drop_last,
+			'device': loader_device,
+		}
+		self._infinite_loader = infinite
+		self._loader_extractor = extractor
 	
-	def to_loader(self, info=None, batch_size=64, num_workers=0, shuffle=True, drop_last=False, device=None):
-		if info is not None:
-			num_workers = info.push('num_workers', num_workers, overwrite=False)
-			batch_size = info.push('batch_size', batch_size, overwrite=False)
-			shuffle = info.push('shuffle', shuffle, overwrite=False)
-			drop_last = info.push('drop_last', drop_last, overwrite=False)
-			device = info.pull('step_device', '<>device', device)
-		if device is None:
-			try:
-				device = self.get_device()
-			except AttributeError:
-				device = 'cpu'
-		return get_loaders(self, batch_size=batch_size, num_workers=num_workers,
-		                   shuffle=shuffle, drop_last=drop_last, device=device)
+	def to_loader(self, infinite=None, extractor=None, **updates):
+		settings = self._loader_settings.copy()
+		settings.update(updates)
+		loader = get_loaders(self, **settings)
+
+		if infinite is None:
+			infinite = self._infinite_loader
+		if extractor is None:
+			extractor = self._loader_extractor
+		if infinite:
+			return util.make_infinite(loader, extractor=extractor)
+		return loader
 
 
 class Splitable_Dataset(Dataset):
@@ -153,12 +174,7 @@ class Info_Dataset(Loadable_Dataset, Splitable_Dataset):
 	def prep(self, model):
 		pass
 
-	def pre_epoch(self, mode, records): # TODO: integrate in train.running
-		pass
-
-	def post_epoch(self, mode, records, stats=None):
-		pass
-
+	
 
 # class Resizeable_Dataset(Dataset):
 # 	def __init__(self, *args, size=None, **kwargs):

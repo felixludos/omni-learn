@@ -37,6 +37,37 @@ def set_default_tau(tau):
 # def override_all_stats_tau(tau): # TODO: track all stats objs and then update tau
 # 	pass
 
+class StatsContainer:
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		
+		self._init_stats()
+	
+	def _init_stats(self):
+		self.stats = StatsMeter()
+		
+	def get_stats(self):
+		return self.stats
+
+@fig.AutoModifier('reg-stats')
+class RegStats(StatsContainer):
+	def __init__(self, A, **kwargs):
+		
+		super().__init__(A, **kwargs)
+		
+		self._init_stats(A)
+		
+	def _init_stats(self, A=None):
+		if A is not None:
+			A.push('stats._type', 'stats', overwrite=False, silent=True)
+			self.stats = A.pull('stats')
+			
+			if A.pull('_reg_stats', True):
+				records = A.pull('records', None, ref=True)
+				if records is not None:
+					stats_fmt = A.pull('_stats_fmt', None)
+					records.register_stats_client(self, fmt=stats_fmt)
+
 @fig.AutoComponent('stats')
 class StatsMeter(object):
 	def __init__(self , *names, tau=None, **_stats):
@@ -60,7 +91,7 @@ class StatsMeter(object):
 	
 	def copy(self):
 		'''returns deepcopy of self'''
-		new = StatsMeter(tau=self.tau)
+		new = self.__class__(tau=self.tau)
 		for name, meter in self._stats.items():
 			new._stats[name] = meter.copy()
 		return new
@@ -161,6 +192,44 @@ class StatsMeter(object):
 		
 	def __str__(self):
 		return 'StatsMeter({})'.format(', '.join(['{}:{:.4f}'.format(k,v.val.item()) for k,v in self._stats.items()]))
+
+
+@fig.AutoComponent('stats-manager')
+class StatsManager(StatsMeter):
+	
+	def __init__(self, *names, tau=None, **_stats):
+		super().__init__(*names, tau=tau, **_stats)
+		self._clients = []
+		self._client_fmts = []
+	
+	def register_client(self, client, fmt=None):
+		self._clients.append(client)
+		
+		stats_keys = {}
+		
+		for name, meter in client.items():
+			key = name if fmt is None else fmt.format(name)
+			stats_keys[key] = name
+			self._stats[key] = meter
+		
+		self._client_keys.append(stats_keys)
+	
+	def pull_clients(self):
+		for client, keys in zip(self._clients, self._client_keys):
+			for key, name in keys.items():
+				self._stats[key] = client._stats[name]
+	
+	def push_clients(self):
+		for client, keys in zip(self._clients, self._client_keys):
+			for key, name in keys.items():
+				if key in self._stats:
+					client._stats[name] = self._stats[key]
+	
+	def copy(self):
+		new = super().copy()
+		new._clients = self._clients.copy()
+		new._client_keys = self._client_keys.copy()
+
 
 ### Computes sum/avg stats
 class AverageMeter(object):

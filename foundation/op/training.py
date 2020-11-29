@@ -7,7 +7,7 @@ import torch
 
 import omnifig as fig
 
-from ..framework import Recordable, Schedulable, Evaluatable, Visualizable
+from .framework import Recordable, Evaluatable, Visualizable
 
 from .. import util
 
@@ -17,6 +17,76 @@ from .loading import respect_config
 from .model import load_model
 from .data import load_data
 from .evaluation import eval_model
+from .clock import Alert, Freq, Reg
+
+@fig.Component('run/epoch')
+class CompleteEpoch(Reg, Freq):
+	def __init__(self, A, **kwargs):
+		epoch_limit = A.pull('epoch-limit', None)
+		pbar = A.pull('pbar', None)
+		super().__init__(A, **kwargs)
+	
+		self.epoch_limit = epoch_limit
+		
+		self.pbar = pbar
+		
+	def check(self, tick, info=None):
+		return self.freq is not None and super().check(tick, info=info)
+	
+	def get_mode(self):
+		return self.get_name()
+	
+	@classmethod
+	def epoch_step(cls, mode, batch, model, records):
+		
+		B = batch.size(0)
+		if mode in records['total_samples']:
+			records['total_samples'][mode] += B
+		
+		out = model.test(batch)
+		if 'loss' in out:
+			records.stats.update('loss', out.loss.detach())
+			
+		return out
+
+	@classmethod
+	def run_epoch(cls, mode, loader, model, records=None, logger=None, step_fn=None):
+		
+		if step_fn is None:
+			step_fn = cls.epoch_step
+		
+		out = None
+		for batch in loader:
+			out = step_fn(mode, batch, model, records)
+		
+		if out is not None and logger is not None:
+			logger.step(records, fmt='{}/{}'.format('{}', mode))
+			if isinstance(model, Visualizable):
+				model.visualize(out, logger)
+	
+	def activate(self, tick, info=None):
+		
+		assert info is not None
+		
+		mode = self.get_mode()
+		
+		dataset = info.get_dataset(mode)
+		if dataset is None:
+			return
+		
+		model = info.get_model()
+		model.switch_mode(mode)
+		
+		records = info.get_records()
+		records.switch_mode(mode)
+		
+		loader = dataset.to_loader(infinite=False)
+		
+		logger = info.get_logger()
+		
+		self.run_epoch(mode, loader, model, records=records, logger=logger)
+	
+	
 
 
 @fig.Script('train', description='Train new/existing models')

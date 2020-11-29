@@ -511,6 +511,25 @@ def solve(A, b, out=None, bias=True, reg=0):
 
 	return out
 
+def orthogonalize(M): # gram schmidt process
+	def projection(u, v):
+		return (v * u).sum() / (u * u).sum() * u
+
+	nk = M.size(0)
+	uu = torch.zeros_like(M, device=M.device)
+	uu[:, 0] = M[:, 0].clone()
+	for k in range(1, nk):
+		vk = M[k].clone()
+		uk = 0
+		for j in range(0, k):
+			uj = uu[:, j].clone()
+			uk = uk + projection(uj, vk)
+		uu[:, k] = vk - uk
+	for k in range(nk):
+		uk = uu[:, k].clone()
+		uu[:, k] = uk / uk.norm()
+	return uu
+
 # def solve_reg(A, b, out=None, bias=True, l2_reg=0):
 #
 # 	R = A.t() @ A

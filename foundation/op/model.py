@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 from .. import util
+from .clock import CustomAlert
 from .. import framework as fm
 
 
@@ -38,11 +39,7 @@ def load_model(A):
 	# model = fig.create_component(A)
 	model = A.pull_self()
 	
-	if isinstance(model, fm.Optimizable):
-		model.set_optim(A)
-	
-	if isinstance(model, fm.Schedulable):
-		model.set_scheduler(A)
+	optim = model.set_optim(A) if isinstance(model, fm.Optimizable) else None
 	
 	device = A.pull('device', 'cpu')
 	if not torch.cuda.is_available():
@@ -60,16 +57,33 @@ def load_model(A):
 			if not load_optim:
 				del params['optim']
 	
-		if 'scheduler' in params:
-			load_scheduler = A.pull('load_scheduler_params', True)
-			if not load_scheduler:
-				del params['scheduler']
+			elif 'scheduler' in params['optim']:
+				load_scheduler = A.pull('load_scheduler_params', True)
+				if not load_scheduler:
+					del params['optim']['scheduler']
 				
 		strict_load_state = A.pull('strict_load_state', True)
 		
 		model.load_state_dict(params, strict=strict_load_state)
 		
 		print(f'Loaded parameters from {path}')
+	
+	origin_name = A.pull('__origin_key', None, silent=True)
+	
+	records = A.pull('records', None, ref=True)
+	if records is not None:
+		if isinstance(model, fm.Recordable):
+			stats_fmt = A.pull('stats-fmt', None)
+			records.register_stats_client(model.get_stats(), fmt=stats_fmt)
+
+	clock = A.pull('clock', None, ref=True)
+	if clock is not None:
+		if isinstance(model, fm.Maintained):
+			clock.register_alert(origin_name, CustomAlert(model.maintenance))
+	
+		if isinstance(optim, util.Schedulable) and optim.scheduler is not None:
+			name = f'lr-{origin_name}' if origin_name is not None and origin_name != 'model' else 'lr'
+			clock.register_alert(name, optim.scheduler)
 	
 	return model
 

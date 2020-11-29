@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import torch
 from torch import nn
@@ -15,10 +16,10 @@ from .. import util
 #################
 
 def make_MLP(din, dout, hidden=None,
-             initializer=None,
-             nonlin='elu', output_nonlin=None,
-             logify_in=False, unlogify_out=False,
-             bias=True, output_bias=None):
+			 initializer=None,
+			 nonlin='elu', output_nonlin=None,
+			 logify_in=False, unlogify_out=False,
+			 bias=True, output_bias=None):
 	'''
 	:param din: int
 	:param dout: int
@@ -141,7 +142,7 @@ def spec_norm_layer(layer, config):
 @fig.AutoComponent('recurrence')
 class Recurrence(fm.Model):
 	def __init__(self, din, dout, hidden_dim=None, num_layers=1, output_nonlin=None,
-	             rec_type='gru', dropout=0., batch_first=False, bidirectional=False, auto_reset=True):
+				 rec_type='gru', dropout=0., batch_first=False, bidirectional=False, auto_reset=True):
 		super().__init__(din, dout)
 
 		assert rec_type in {'gru', 'lstm', 'rnn'}
@@ -189,7 +190,7 @@ class Recurrence(fm.Model):
 		return out
 
 @fig.AutoComponent('fourier-layer')
-class Fourier_Layer(fm.Model): # TODO: generalize period to multiple din
+class FourierLayer(fm.Model): # TODO: generalize period to multiple din
 	def __init__(self, din=1, dout=1, order=100, periods=None):
 		super().__init__(din, dout)
 
@@ -216,6 +217,77 @@ class Fourier_Layer(fm.Model): # TODO: generalize period to multiple din
 
 	def get_period(self):
 		return 2 * np.pi / self.w
+
+
+class Invertible(fm.Model):
+	def __init__(self, features, bias=True):
+		super().__init__(features, features)
+		
+		self.features = features
+		
+		self.wU = nn.Parameter(torch.Tensor(features, features))
+		self.wV = nn.Parameter(torch.Tensor(features, features))
+		self.log_S = nn.Parameter(torch.Tensor(features))
+		
+		if bias:
+			self.bias = nn.Parameter(torch.Tensor(features))
+		else:
+			self.register_parameter('bias', None)
+		self.reset_parameters()
+	
+	def reset_parameters(self):
+		nn.init.kaiming_uniform_(self.wU, a=math.sqrt(5))
+		nn.init.kaiming_uniform_(self.wV, a=math.sqrt(5))
+		
+		fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.wV)
+		bound = 1 / math.sqrt(fan_in)
+		nn.init.uniform_(self.log_S, -bound, bound)
+		
+		if self.bias is not None:
+			nn.init.uniform_(self.bias, -bound, bound)
+		
+	def _svd(self, inverse=False):
+		U = util.orthogonalize(self.wU)
+		V = util.orthogonalize(self.wV)
+		log_S = self.log_S
+		
+		if inverse:
+			V, U = U.t(), V.t()
+			log_S = -log_S
+			
+		return U, log_S.exp(), V
+		
+	def _mat(self, inverse=False):
+		U, S, V = self._svd(inverse=inverse)
+		return (U * S.unsqueeze(0)) @ V
+		
+		
+	def forward(self, input):
+		return F.linear(input, self._mat(), self.bias)
+		
+	def inverse(self, input):
+		if self.bias is not None:
+			input = input - self.bias.unsqueeze(0)
+		return F.linear(input, self._mat(True))
+	
+	def extra_repr(self):
+		return f'features={self.features}, bias={self.bias is not None}'
+
+@fig.AutoComponent('inv-layer')
+class InvertibleLayer(Invertible):
+	def __init__(self, A):
+		dim = A.pull('dim', '<>features', None)
+		if dim is None:
+			dim = A.pull('din', None)
+		if dim is None:
+			dim = A.pull('dout', None)
+		if dim is None:
+			raise Exception('unknown size')
+		
+		bias = A.pull('bias', True)
+		
+		super().__init__(dim, bias=bias)
+
 
 class PowerLinear(fm.Model):  # includes powers of input as features
 	def __init__(self):
@@ -399,7 +471,7 @@ class ConvLayer(fm.Model):
 
 			if is_deconv:
 				H, W = util.deconv_size_change(H, W, kernel_size, padding, stride, dilation,
-				                                     output_padding)
+													 output_padding)
 			else:
 				H, W = util.conv_size_change(H, W, kernel_size, padding, stride, dilation)
 
@@ -429,11 +501,11 @@ class ConvLayer(fm.Model):
 
 		if is_deconv:
 			self.conv = nn.ConvTranspose2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
-		                      stride=stride, dilation=dilation, output_padding=output_padding,
-		                                   **conv_kwargs)
+							  stride=stride, dilation=dilation, output_padding=output_padding,
+										   **conv_kwargs)
 		else:
 			self.conv = nn.Conv2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
-			                      stride=stride, dilation=dilation, **conv_kwargs)
+								  stride=stride, dilation=dilation, **conv_kwargs)
 
 		self.pool = pool
 		self.norm = norm
@@ -483,7 +555,7 @@ class LayerNorm(fm.Model):
 	def __init__(self, din, eps=1e-5, elementwise_affine=True):
 		super().__init__(din, din)
 		self.norm = nn.LayerNorm(din, eps=eps,
-		        elementwise_affine=elementwise_affine)
+				elementwise_affine=elementwise_affine)
 
 	def forward(self, x):
 		return self.norm(x)
@@ -491,7 +563,7 @@ class LayerNorm(fm.Model):
 @fig.AutoComponent('interpolate')
 class Interpolate(fm.Model):
 	def __init__(self, din=None, size=None, scale_factor=None, mode='nearest',
-	             align_corners=None, recompute_scale_factor=None):
+				 align_corners=None, recompute_scale_factor=None):
 		assert size is not None or (din is not None and scale_factor is not None)
 
 		Cin = None
@@ -511,8 +583,8 @@ class Interpolate(fm.Model):
 
 	def forward(self, x):
 		return F.interpolate(x, size=self.size, scale_factor=self.scale_factor,
-		                     mode=self.mode, align_corners=self.align_corners,
-		                     recompute_scale_factor=self.recompute_scale_factor)
+							 mode=self.mode, align_corners=self.align_corners,
+							 recompute_scale_factor=self.recompute_scale_factor)
 
 
 @fig.AutoComponent('conv-lstm')

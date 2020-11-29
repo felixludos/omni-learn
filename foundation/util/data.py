@@ -39,6 +39,10 @@ class make_infinite(DataLoader):
 	
 	def end(self):
 		self.itr = None
+		self.empty()
+	
+	def empty(self):
+		self.cached = None
 	
 	def demand(self, N, extract=None, merge=None):
 		'''

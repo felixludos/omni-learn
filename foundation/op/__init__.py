@@ -11,5 +11,7 @@ from .loading import Torch
 from .runs import Run
 from . import extensions
 from .report import get_report
+from .framework import Model, Trainable_Model, Full_Model, Encodable, Decodable, Generative, Recordable, \
+	Evaluatable, Visualizable
 # from .status import get_status
 

@@ -1,32 +1,154 @@
-
+import math
 import torch
 
 import omnifig as fig
 
-from .. import framework as fm
+from ..op import framework as fm
+
+from ..op.clock import Freq
+
+class Scheduler(Freq):
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
+		self.start = A.pull('start', 0)
+		self.stop = A.pull('stop', None)
+	
+		self.min_lr = A.pull('min_lr', None)
+	
+		self.optimizer = None
+	
+	def extra_repr(self):
+		return {'min': self.min_lr}
+		
+	def __repr__(self):
+		extra = [f'    {k}: {v},' for k,v in self.extra_repr().items() if v is not None]
+		
+		return '{}[{}:{}:{}]({})'.format(self.__class__.__name__, '' if self.start is None else self.start,
+		                             '' if self.stop is None else self.stop, '' if self.freq is None else self.freq,
+		                                 ('\n    '+'\n'.join(extra)+'\n') if len(extra) else '')
+	
+	def prep(self, optim):
+		self.optimizer = optim
+		self._initial_lrs = [param_group['lr'] for param_group in self.optimizer.param_groups]
+	
+	def check(self, tick, info=None):
+		return super().check(tick, info=info) \
+		        and (self.start is None or tick >= self.start) \
+		        and (self.stop is None or tick < self.stop)
+	
+	def activate(self, tick, info=None):
+		lr = None
+		for param_group, lr0 in zip(self.optimizer.param_groups, self._initial_lrs):
+			lr = param_group['lr']
+			lr = self.compute_lr(lr, lr0, tick, info=info)
+			if self.min_lr is not None:
+				lr = max(self.min_lr, lr)
+			param_group['lr'] = lr
+		
+		return lr
+		
+	def state_dict(self):
+		return {'min_lr':self.min_lr, 'start':self.start, 'stop':self.stop}
+	
+	def load_state_dict(self, data):
+		if data is not None:
+			for k, v in data.items():
+				setattr(self, k, v)
+		
+	def compute_lr(self, lr, lr0, tick, info=None):
+		raise NotImplementedError
 
 
-class Signal:
-	def __init__(self, name=None):
+@fig.Component('scheduler/step')
+class StepScheduler(Scheduler):
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
+		
+		self.factor = A.pull('factor', '<>gamma')
+		
+	def state_dict(self):
+		data = super().state_dict()
+		data['factor'] = self.factor
+		return data
+		
+	def compute_lr(self, lr, lr0, tick, info=None):
+		return self.factor * lr
 
-		self.name = name
 
-		self.meter = None
+@fig.Component('scheduler/multi-step')
+class MultiStepScheduler(StepScheduler):
+	def __init__(self, A, **kwargs):
+		
+		super().__init__(A, **kwargs)
+		
+		self.freq = None
+		
+		num = A.pull('num-steps', 1)
+		limit = self.stop
+		if limit is None:
+			limit = A.pull('limit')
+		
+		size = limit // num
+		self.steps = set([size*step for step in range(1,num)])
+	
+	def state_dict(self):
+		data = super().state_dict()
+		data['steps'] = self.steps
+		return data
+		
+	def check(self, tick, info=None):
+		return super().check(tick, info=info) and tick in self.steps
 
-	def add_to_stats(self, stats):
-		if self.name is None:
-			raise Exception(f'signal {self} doesnt have a name for stats')
-		stats.new(self.name)
-		self.meter = stats
 
-	def step(self):
-		val = self._step()
+class FunctionScheduler(Scheduler):
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
+		
+		assert self.min_lr is not None, 'must have a min for exponential scheduler'
+		
+		self.limit = A.pull('limit', '<>stop')
 
-		return val
+		self.power = A.pull('power', 1)
+		self.constrain_progress = A.pull('constrain-progress', False)
+		
 
-	def _step(self):
-		pass
+	def state_dict(self):
+		data = super().state_dict()
+		data.update({'limit':self.limit, 'power':self.power,
+		             'constrain_progress':self.constrain_progress})
+		return data
 
+	def compute_lr(self, lr, lr0, tick, info=None):
+		progress = (tick/self.limit) ** self.power
+		if self.constrain_progress:
+			progress = max(0.,min(progress,1.))
+		return self._func(progress, lr0)
+
+	def _func(self, progress, lr0):
+		raise NotImplementedError
+
+
+@fig.Component('scheduler/cos')
+class CosScheduler(FunctionScheduler):
+	def _func(self, progress, lr0):
+		return (lr0-self.min_lr) * (math.cos(math.pi * progress) + 1) / 2 + self.min_lr
+
+
+@fig.Component('scheduler/exp')
+class ExpScheduler(FunctionScheduler):
+	def _func(self, progress, lr0):
+		return lr0 * (self.min_lr/lr0) ** progress
+
+
+@fig.Component('scheduler/lin')
+class LinScheduler(FunctionScheduler):
+	def _func(self, progress, lr0):
+		return lr0 - (lr0-self.min_lr) * progress
+
+
+
+
+## region old
 
 class RunningNormalization(fm.Model):
 	def __init__(self, dim, cmin=-5, cmax=5):
@@ -57,3 +179,4 @@ class RunningNormalization(fm.Model):
 			self.update(x)
 		return ((x - self.mu) / self.sigma).clamp(self.cmin, self.cmax)
 
+# endregion

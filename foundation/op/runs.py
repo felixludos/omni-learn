@@ -1,4 +1,3 @@
-
 import sys, os
 from pathlib import Path
 import time
@@ -11,8 +10,7 @@ import omnifig as fig
 from omnifig.errors import MissingParameterError
 
 from omnibelt import load_yaml, save_yaml, get_now, create_dir
-# from .. import util
-# from .paths import
+
 
 
 FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -58,75 +56,75 @@ def wrap_script(script_name, A, **kwargs):
 	
 	return obj
 
-
-def find_config(ident, check_root=True):
-	path = ident
-	if os.path.isfile(ident):
-		if 'config.yaml' in ident:
-			return ident
-		path = os.path.dirname(ident)
-	
-	if os.path.isdir(path):
-		for fname in os.listdir(path):
-			if fname == 'config.yaml':
-				return os.path.join(path, fname)
-	
-	root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
-	
-	if check_root:
-		return find_config(os.path.join(root, ident), check_root=False)
-	raise RunNotFoundError(f'no config found: {ident}')
-
-
-def _get_ckpt_num(ident):
-	ident = os.path.basename(ident)
-	
-	val = ident.split('.')[0].split('_')[-1]
-	try:
-		return int(val)
-	except ValueError:
-		pass
-	
-	return None
-
-
-def _find_ckpt_with(ident, last=False, req='model', check_root=True):
-	# valid = lambda n: ((last and 'ckpt' in n and 'best' not in n)
-	#                    or (not last and 'best' in n)) and req in n
-	valid = lambda n: f'ckpt-{req}' in n
-	
-	path = ident
-	
-	if os.path.isfile(ident):
-		if valid(ident):
-			return ident
-		path = os.path.dirname(ident)
-	
-	if os.path.isdir(path):
-		names = [fname for fname in os.listdir(path) if valid(fname)]
-		
-		if len(names) == 1:
-			return os.path.join(path, names[0])
-		elif len(names) > 1:
-			nums = [_get_ckpt_num(fname) for fname in names]
-			
-			name = max(zip(names, nums), key=lambda x: x[1] if x[1] is not None else -1)[0]
-			return os.path.join(path, name)
-	
-	root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
-	# return _find_ckpt_with(os.path.join(root, ident), last=last, req=req)
-	
-	if check_root:
-		return _find_ckpt_with(os.path.join(root, ident), last=last, req=req, check_root=False)
-	raise RunNotFoundError(f'no checkpoint found: {ident}')
+#
+# def find_config(ident, check_root=True):
+# 	path = ident
+# 	if os.path.isfile(ident):
+# 		if 'config.yaml' in ident:
+# 			return ident
+# 		path = os.path.dirname(ident)
+#
+# 	if os.path.isdir(path):
+# 		for fname in os.listdir(path):
+# 			if fname == 'config.yaml':
+# 				return os.path.join(path, fname)
+#
+# 	root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
+#
+# 	if check_root:
+# 		return find_config(os.path.join(root, ident), check_root=False)
+# 	raise RunNotFoundError(f'no config found: {ident}')
+#
+#
+# def _get_ckpt_num(ident):
+# 	ident = os.path.basename(ident)
+#
+# 	val = ident.split('.')[0].split('_')[-1]
+# 	try:
+# 		return int(val)
+# 	except ValueError:
+# 		pass
+#
+# 	return None
 
 
-def find_checkpoint(ident, last=False):
-	return _find_ckpt_with(ident, last=last, req='model')
-
-
-def find_records(ident, last=False):
-	return _find_ckpt_with(ident, last=last, req='records')
+# def _find_ckpt_with(ident, last=False, req='model', check_root=True):
+# 	# valid = lambda n: ((last and 'ckpt' in n and 'best' not in n)
+# 	#                    or (not last and 'best' in n)) and req in n
+# 	valid = lambda n: f'ckpt-{req}' in n
+#
+# 	path = ident
+#
+# 	if os.path.isfile(ident):
+# 		if valid(ident):
+# 			return ident
+# 		path = os.path.dirname(ident)
+#
+# 	if os.path.isdir(path):
+# 		names = [fname for fname in os.listdir(path) if valid(fname)]
+#
+# 		if len(names) == 1:
+# 			return os.path.join(path, names[0])
+# 		elif len(names) > 1:
+# 			nums = [_get_ckpt_num(fname) for fname in names]
+#
+# 			name = max(zip(names, nums), key=lambda x: x[1] if x[1] is not None else -1)[0]
+# 			return os.path.join(path, name)
+#
+# 	root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
+# 	# return _find_ckpt_with(os.path.join(root, ident), last=last, req=req)
+#
+# 	if check_root:
+# 		return _find_ckpt_with(os.path.join(root, ident), last=last, req=req, check_root=False)
+# 	raise RunNotFoundError(f'no checkpoint found: {ident}')
+#
+#
+# def find_checkpoint(ident, last=False):
+# 	return _find_ckpt_with(ident, last=last, req='model')
+#
+#
+# def find_records(ident, last=False):
+# 	return _find_ckpt_with(ident, last=last, req='records')
 
 
 class Validation_Flag(Exception):
@@ -149,6 +147,9 @@ def load_run(A):
 
 	return A.pull_self()
 
+
+	
+
 @fig.Component('run')
 class Run:
 	'''
@@ -158,45 +159,36 @@ class Run:
 	def __init__(self, A, silent=False):
 		self.silent = A.pull('silent', silent)
 		
-		self.A = A.get_root()
-		self.A = self._find_origin(self.A)
+		skip_load = A.pull('skip_run_load', False)
+		
+		A = A.get_root()
+		A = self._find_origin(A)
+		self.A = A
 		
 		self._prep(A)
 		
-		skip_load = A.pull('skip_run_load', False)
-		if not skip_load:
-			self.name = self._setup_storage(self.A)
-		elif not self.silent:
-			print('WARNING: did not check run origin')
-		
+		if skip_load:
+			self._setup_storage(A)
 		
 		self.purge() # reset payload objs
 	
+	# region Setup
+	
 	def __repr__(self):
-		return 'Run({})'.format(getattr(self, 'save_dir', ''))
+		return f'Run({self.name})'
 	
 	def __str__(self):
 		return repr(self)
 	
 	def _prep(self, A):
 		
+		if 'records' not in A:
+			A.push('records._type', 'records', overwrite=False, silent=True)
+		self.records = A.pull('records')
+		
 		if 'clock' not in A:
 			A.push('clock._type', 'clock', overwrite=False, silent=True)
 		self.clock = A.pull('clock')
-		
-		if 'records' not in A:
-			A.push('records._type', 'records', silent=True)
-		self.records = A.pull('records')
-		
-		if 'stats' not in A:
-			A.push('stats._type', 'stats', silent=True)
-		self.stats = A.pull('stats')
-		
-		name = A.pull('run.name', '<>name', None)
-		if name is None:
-			name = self._gen_name(A)
-			A.push('name', name)
-		self.name = name
 	
 	def purge(self): # remove any potentially large objects to free memory
 		self.model = None
@@ -210,10 +202,7 @@ class Run:
 		
 		self.results = {}
 	
-	
 	def _find_origin(self, A):
-		
-		last = A.pull('last', False)
 		
 		path = A.pull('path', '<>resume', '<>load', None)
 		novel = A.push('novel', path is None, overwrite=False)
@@ -242,109 +231,68 @@ class Run:
 			A.update(load_A)
 			A.update(override)
 		
-		return A
-		
-		raw_path = path
-		if path is not None:
-			try:
-				path = find_config(path)
-			except RunNotFoundError as e:
-				root = A.pull('saveroot', '<>root', None)
-				if root is None:
-					raise e
-				path = os.path.join(root, path)
-				path = find_config(path)
-		
-		novel = A.push('novel', novel, overwrite=False)
-		override = A.pull('override', {})
-		extend = A.pull('extend', None)
-		
-		if path is not None:
-			if not self.silent:
-				print(f'Loading Config: {raw_path}')
-			
-			load_A = fig.get_config(path)
-			if novel:
-				load_A.update(A)
-			A.clear()
-			A.update(load_A)
-			A.update(override)
-		
-		if extend is not None:
-			A.push('training.step_limit', extend)
-		
-		if novel:
-			self.records.update(self._initialize_records(A))
-		
-		if path is not None:
-			print('WARNING: not loading previous records due to performance issue')
-			# self._load_records(path, last=last)
-			self.records.update(self._initialize_records(A))
-			self._set_model_ckpt(path, last=last)
+		self.path = path
+		self.novel = novel
 		
 		return A
 		
 	def _setup_storage(self, A):
+		if self.path is None:
+			self._create_storage(A)
+		else:
+			self._load_storage(A)
+		
+	def _create_storage(self, A):
 		
 		name = A.pull('run.name', '<>name', None)
 		if name is None:
 			name = self._gen_name(A)
 			A.push('name', name)
 		
-		save_dir = None
-		save_path = None
+		logdate = A.pull('output.logdate', True)
+		if logdate:
+			now = self.get_timestamp()
+			name = f'{name}_{now}'
 		
-		A.push('training.stats._type', 'stats', overwrite=False)
+		self.name = name
+		
+		path = None
 		
 		invisible = A.pull('invisible', False)
 		if not invisible:
+			saveroot = A.pull('output.saveroot', os.environ.get('FOUNDATION_SAVE_DIR', DEFAULT_SAVE_PATH))
+			
+			path = os.path.join(saveroot, self.name)
+			
+			if not os.path.isdir(path):
+				create_dir(path)
+			
+			path = Path(path)
+		
+		self.path = path
+	
+	def _load_storage(self, A):
+		
+		self.name = self.path.stem
 
-			save_dir = name
-			logdate = A.pull('output.logdate', True)
-			if logdate:
-				now = self.get_timestamp()
-				save_dir = f'{name}_{now}'
-			
-			save_dir = A.push('output.save_dir', save_dir)
+		num = A.pull('ckpt-num', None, silent=self.silent)
+		last = A.pull('last', num is None, silent=self.silent)
 		
-			saveroot = A.pull('output.saveroot',
-			                  os.environ['FOUNDATION_SAVE_DIR']
-			                  if 'FOUNDATION_SAVE_DIR' in os.environ
-			                  else DEFAULT_SAVE_PATH)
-			
-			save_path = os.path.join(saveroot, save_dir)
-			
-			if not os.path.isdir(save_path):
-				create_dir(save_path)
-			
-		self.save_dir = save_dir
-		self.save_path = save_path
+		ckpts = {int(path.stem[4:]):path for path in self.path.glob('ckpt*') if path.is_dir()}
+		nums = sorted(ckpts.keys())
 		
-		return name
+		if not len(nums):
+			return
 		
-	def _load_records(self, path=None, last=False):
+		ckpt = ckpts[nums[-1]] if last or num is None or num not in ckpts else ckpts[num]
 		
-		try:
-			records_path = find_records(path, last=last)
-		except RunNotFoundError:
-			pass
-		else:
-			records = load_yaml(records_path)
-			
-			self.records.update(records)
-
-	def _load_results(self, ident):
-		raise NotImplementedError # TODO: find results with ident, load, and return
-
-	def _set_model_ckpt(self, path=None, last=False): # don't auto load yet (just prepare for loading)
+		self.records.import_(ckpt)
+		self.clock.set_time()
 		
-		if path is not None:
-			ckpt_path = find_checkpoint(path, last=last)
-			self.A.push('model._load_params', ckpt_path, overwrite=True, silent=self.silent)
-		
-	def _set_dataset_ckpt(self, path=None, last=False):
-		pass
-		
+		A.push('model._load_params', str(ckpt / 'model.pth.tar'), overwrite=True, silent=self.silent)
+	
+	# endregion
+	
 	def __getattr__(self, item):
 		try:
 			return super().__getattribute__(item)
@@ -354,66 +302,53 @@ class Run:
 			raise e
 
 	def _gen_name(self, A):
-		return None
+		return 'test'
 	
-	def _get_path_from_ident(self, ident, ext='pth.tar'):
-		if self.save_path is None:
-			return None
-		return os.path.join(self.save_path, f'{ident}.{ext}')
+	def _get_path_from_ident(self, ident, ext='pth.tar', root=None):
+		if root is None:
+			root = self.path
+		name = Path(f'{ident}.{ext}')
+		if root is None:
+			return name
+		return root / name
 	
-	def create_logger(self, save_path=None):
+	def create_logger(self, path=None):
 		
 		A = self.get_config()
 		
-		if save_path is None:
-			save_path = self.save_path
-		elif not self.silent:
-			print(f'WARNING: using a foreign path: {save_path}')
+		if path is None:
+			path = self.path
 		
-		if save_path is None:
+		if path is None:
 			return None
 		
-		# tblog = A.pull('output.tblog', False)
-		# txtlog = A.pull('output.txtlog', False)
-		#
-		# if tblog or txtlog:
-		# 	logtypes = []
-		# 	if txtlog:
-		# 		logtypes.append('stdout')
-		# 	if tblog:
-		# 		logtypes.append('on tensorboard')
-		#
-		# 	if not self.silent:
-		# 		print('Logging {}'.format(' and '.join(logtypes)))
+		A.push('logger._type', 'logger', overwrite=False, silent=self.silent)
+		A.push('logger.log_dir', str(path), overwrite=True, silent=self.silent)
 		
-		A.begin() # TODO: clean up
-		A.push('output.logger._type', 'logger', overwrite=False)
-		A.push('output.logger.log_dir', save_path, overwrite=True)
-		
-		logger = A.pull('output.logger')
-		A.abort()
+		logger = A.pull('logger', silent=self.silent)
 		return logger
 		
-	def create_stats(self, *names, model_stats_fmt=None, include_loss=True, silent=False):
-		
-		A = self.get_config()
-		
-		stats = A.pull('training.stats', silent=silent)
-		
-		if include_loss:
-			stats.new('loss')
-		
-		for name in names:
-			stats.new(name)
-		
-		if model_stats_fmt is not None:
-			model = self.get_model()
-			try:
-				stats.shallow_join(model.stats, fmt=model_stats_fmt)
-			except AttributeError:
-				pass
-		
-		return stats
+	# def create_stats(self, *names, model_stats_fmt=None, include_loss=True):
+	#
+	# 	A = self.get_config()
+	#
+	# 	A.push('stats._type', 'stats', overwrite=False, silent=self.silent)
+	# 	stats = A.pull('stats', silent=self.silent)
+	#
+	# 	if include_loss:
+	# 		stats.new('loss')
+	#
+	# 	for name in names:
+	# 		stats.new(name)
+	#
+	# 	if model_stats_fmt is not None:
+	# 		model = self.get_model()
+	# 		try:
+	# 			stats.shallow_join(model.stats, fmt=model_stats_fmt)
+	# 		except AttributeError:
+	# 			pass
+	#
+	# 	return stats
 	
 	def create_model(self, **meta):
 		return wrap_script('load-model', self.A.sub('model'), **meta)
@@ -456,6 +391,13 @@ class Run:
 
 	def get_config(self):
 		return self.A
+	
+	def get_clock(self):
+		return self.clock
+	def get_records(self):
+		return self.records
+	def get_stats(self):
+		return self.get_records().get_stats()
 
 	def get_model(self, **meta):
 		if self.model is None:
@@ -474,7 +416,7 @@ class Run:
 		if path is not None:
 			return self._create_logger(self.A, save_path=path)
 		if self.logger is None:
-			self.logger = self.create_logger(save_path=path)
+			self.logger = self.create_logger(path=path)
 		return self.logger
 	
 	def get_loaders(self, *dataset_names, **datasets):
@@ -512,10 +454,10 @@ class Run:
 		datasets = self.get_datasets()
 		return {name:dataset for name,dataset in datasets.items() if name != 'test'}
 
-	def get_stats(self, *args, purge_old=False, **kwargs):
-		if self.stats is None or purge_old:
-			self.stats = self.create_stats(*args, **kwargs)
-		return self.stats
+	# def get_stats(self, *args, purge_old=False, **kwargs):
+	# 	if self.stats is None or purge_old:
+	# 		self.stats = self.create_stats(*args, **kwargs)
+	# 	return self.stats
 	
 	
 	# endregion
@@ -531,11 +473,8 @@ class Run:
 	def get_timestamp(self):
 		return self.records['timestamp']
 
-	def get_save_path(self):
-		return self.save_path
-	
-	def get_save_dir(self):
-		return self.save_dir
+	def get_path(self):
+		return self.path
 
 	def keep_going(self):
 		sample_limit = self.train_state.sample_limit
@@ -622,21 +561,12 @@ class Run:
 			print(f'[[ no checkpoint {steps} saved ]]')
 	
 	def save_results(self, name, results, root=None):
+		path = self._get_path_from_ident(name, 'pth.tar', root=root)
 		
-		if root is None:
-			root = self.save_path
-			
-		if root is not None and os.path.isdir(root):
-			
-			path = self._get_path_from_ident(name, 'pth.tar')
-			
-			self.get_model().save_data(path, data=results)
-			
-			print(f'[[ {name} results saved to {path} ]]')
+		self.get_model().save_data(path, data=results)
 		
-		else:
-			print(f'[[ no results saved, as no root was provided ]]')
-	
+		print(f'[[ {name} results saved to {path} ]]')
+		
 	# endregion
 	
 	# region Training Phases
@@ -734,8 +664,9 @@ class Run:
 	
 	def startup(self):
 		
-		if self.save_path is not None:
-			config_path = os.path.join(self.save_path, 'config.yaml')
+		path = self.get_path()
+		if path is not None:
+			config_path = self.get_path() / 'config.yaml'
 			if not os.path.isfile(config_path):
 				self.get_config().export(config_path)
 		
@@ -1100,6 +1031,18 @@ class Run:
 			sys.exit(code)
 	
 	# endregion
+
+@fig.AutoModifier('extendable')
+class Extendable(Run):
+	
+	def _find_origin(self, A):
+		A = super()._find_origin(A)
+		
+		extend = A.pull('extend', None)
+		if extend is not None:
+			A.push('training.step_limit', extend)
+		
+		return A
 
 		
 @fig.AutoModifier('timed-run')

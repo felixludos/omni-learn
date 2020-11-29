@@ -1,6 +1,7 @@
 
 import sys, os, time
 import traceback
+from tqdm import tqdm, tqdm_notebook
 import math
 import torch
 import numpy as np
@@ -45,5 +46,57 @@ def create_param(*sizes, requires_grad=True):
 	return nn.Parameter(t, requires_grad=requires_grad)
 
 
+class Mode:
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.mode = 'train'
+	
+	def switch_mode(self, mode):
+		self.mode = mode
+	
+	def get_mode(self):
+		return self.mode
+
+
+@fig.Component('progress-bar')
+class Progress_Bar(Singleton):
+	def __init__(self, A):
+		ptype = A.pull('pbar-type', 'cmd')
+		
+		self._pbar_cls = tqdm_notebook if ptype in {'notebook', 'jupyter'} else tqdm
+		self.pbar = None
+		
+		self.limit = A.pull('limit', None)
+	
+	def init_pbar(self, limit=None, **kwargs):
+		self.reset()
+		if self._pbar_cls is not None:
+			if limit is None:
+				limit = self.limit
+			self.pbar = self._pbar_cls(total=limit, **kwargs)
+	
+	def update(self, desc=None, n=1):
+		if self.pbar is not None:
+			self.pbar.update(desc=desc, n=n)
+	
+	def __call__(self, itr, **kwargs):
+		self.reset()
+		self.pbar = self._pbar_cls(itr)
+		return self.pbar
+	
+	def __iter__(self):
+		self.init_pbar()
+		return self
+	
+	def __next__(self):
+		self.update()
+	
+	def reset(self):
+		if self.pbar is not None:
+			self.pbar.close()
+	
+	def set_description(self, desc):
+		if self.pbar is not None:
+			self.pbar.set_description(desc)
 
 
