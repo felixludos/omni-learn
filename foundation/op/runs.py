@@ -159,6 +159,9 @@ class Run:
 		self.records = A.pull('records', {})
 		self.silent = A.pull('silent', silent)
 		self.rng = random.Random()
+
+		self.save_path = None
+		self.save_dir = None
 		
 		skip_load = A.pull('skip_run_load', False)
 		
@@ -224,6 +227,9 @@ class Run:
 		if path is not None:
 			if not self.silent:
 				print(f'Loading Config: {raw_path}')
+
+			self.save_path = path
+			self.save_dir = os.path.dirname(os.path.dirname(path))
 			
 			load_A = fig.get_config(path)
 			if novel:
@@ -285,9 +291,6 @@ class Run:
 			name = self._gen_name(A)
 			A.push('name', name)
 		
-		save_dir = None
-		save_path = None
-		
 		A.push('training.stats._type', 'stats', overwrite=False)
 
 		invisible = A.pull('invisible', False)
@@ -298,22 +301,23 @@ class Run:
 			if logdate:
 				now = self.get_timestamp()
 				save_dir = f'{name}_{now}'
+
+			if self.save_dir is None:
+				self.save_dir = A.push('output.save_dir', save_dir, overwrite=self.novel)
+
+			if self.save_path is None:
+				saveroot = A.pull('output.saveroot',
+				                  os.environ['FOUNDATION_SAVE_DIR']
+				                  if 'FOUNDATION_SAVE_DIR' in os.environ
+				                  else DEFAULT_SAVE_PATH)
+
+				save_path = os.path.join(saveroot, self.save_dir)
 			
-			save_dir = A.push('output.save_dir', save_dir, overwrite=self.novel)
-		
-			saveroot = A.pull('output.saveroot',
-			                  os.environ['FOUNDATION_SAVE_DIR']
-			                  if 'FOUNDATION_SAVE_DIR' in os.environ
-			                  else DEFAULT_SAVE_PATH)
-			
-			save_path = os.path.join(saveroot, save_dir)
-			
-			if not os.path.isdir(save_path):
-				create_dir(save_path)
-			
-		self.save_dir = save_dir
-		self.save_path = save_path
-		
+				if not os.path.isdir(save_path):
+					create_dir(save_path)
+
+				self.save_path = save_path
+
 		return name
 		
 	def _load_records(self, path=None, last=False):
