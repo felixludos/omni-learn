@@ -229,7 +229,7 @@ class Run:
 				print(f'Loading Config: {raw_path}')
 
 			self.save_path = path
-			self.save_dir = os.path.dirname(os.path.dirname(path))
+			self.save_dir = os.path.dirname(path)
 			
 			load_A = fig.get_config(path)
 			if novel:
