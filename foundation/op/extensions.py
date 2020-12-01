@@ -71,7 +71,7 @@ def _config_expression(A):  # TODO: boolean ops
 	raise Exception(f'unkonwn caste: {caste}')
 
 
-@fig.Component('repeat')
+@fig.Component('iter/repeat')
 class Repeat_Iter(ConfigIter):
 	def __init__(self, A):
 		num = A.pull('_num', '<>_len')

@@ -174,7 +174,12 @@ class Run:
 			print('WARNING: did not check run origin')
 		
 		self.purge() # reset payload objs
-	
+
+		self.manual_prep()
+
+	def manual_prep(self):
+		pass
+
 	def __repr__(self):
 		return 'Run({})'.format(getattr(self, 'save_dir', ''))
 	
