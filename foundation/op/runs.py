@@ -287,7 +287,9 @@ class Run:
 		save_path = None
 		
 		A.push('training.stats._type', 'stats', overwrite=False)
-		
+
+		novel = A.pull('novel', False)
+
 		invisible = A.pull('invisible', False)
 		if not invisible:
 
@@ -297,7 +299,7 @@ class Run:
 				now = self.get_timestamp()
 				save_dir = f'{name}_{now}'
 			
-			save_dir = A.push('output.save_dir', save_dir)
+			save_dir = A.push('output.save_dir', save_dir, overwrite=novel)
 		
 			saveroot = A.pull('output.saveroot',
 			                  os.environ['FOUNDATION_SAVE_DIR']
