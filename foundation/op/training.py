@@ -1,5 +1,6 @@
 
 import sys, os
+from pathlib import Path
 from tqdm import tqdm
 import time
 
@@ -19,8 +20,12 @@ from .data import load_data
 from .evaluation import eval_model
 from .clock import Alert, Freq, Reg
 
+class Run_Event(Reg, Freq):
+	def check(self, tick, info=None):
+		return self.freq is not None and super().check(tick, info=info)
+	
 @fig.Component('run/epoch')
-class CompleteEpoch(Reg, Freq):
+class CompleteEpoch(Run_Event):
 	def __init__(self, A, **kwargs):
 		epoch_limit = A.pull('epoch-limit', None)
 		pbar = A.pull('pbar', None)
@@ -30,9 +35,6 @@ class CompleteEpoch(Reg, Freq):
 		
 		self.pbar = pbar
 		
-	def check(self, tick, info=None):
-		return self.freq is not None and super().check(tick, info=info)
-	
 	def get_mode(self):
 		return self.get_name()
 	
@@ -65,7 +67,6 @@ class CompleteEpoch(Reg, Freq):
 				model.visualize(out, logger)
 	
 	def activate(self, tick, info=None):
-		
 		assert info is not None
 		
 		mode = self.get_mode()
@@ -86,8 +87,47 @@ class CompleteEpoch(Reg, Freq):
 		
 		self.run_epoch(mode, loader, model, records=records, logger=logger)
 	
+@fig.Component('run/checkpoint')
+class Checkpointer(Run_Event):
+	def __init__(self, A, **kwargs):
+		
+		path = A.pull('save-path', '<>path', None)
+		
+		limit = A.pull('ckpt-limit', '<>keep-last', None)
+		
+		best = A.pull('track-best', False)
+		
+		super().__init__(A, **kwargs)
+		
+		self.path = Path(path)
+		self.limit = limit
+		self.best = best
 	
-
+	def _limit_checkpoints(self, root):
+		if self.limit is not None:
+			
+			
+			pass
+		
+		
+	
+	
+	def activate(self, tick, info=None):
+		assert info is not None
+		
+		root = info.get_path() if self.path is None else self.path
+		if root is None:
+			return
+		records = info.get_records()
+		clock = info.get_clock()
+		
+		num = clock.get_time()
+		path = root / f'ckpt{num}'
+		path.mkdir()
+		
+		self._limit_checkpoints(root)
+		
+		pass
 
 @fig.Script('train', description='Train new/existing models')
 def iterative_training(A=None, run=None):
