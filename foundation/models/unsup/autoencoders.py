@@ -136,9 +136,11 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
 
 		rec = out.reconstruction
 
-		loss = self.criterion(rec, x) / B
-		out.rec_loss = loss
-		self.stats.update('rec-loss', loss)
+		loss = None
+		if self.criterion is not None:
+			loss = self.criterion(rec, x) / B
+			out.rec_loss = loss
+			self.stats.update('rec-loss', loss)
 
 		return loss
 
