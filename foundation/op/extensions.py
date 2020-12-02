@@ -79,9 +79,11 @@ class Repeat_Iter(ConfigIter):
 
 		element = A['_element']
 
-		A['_elements'] = ConfigList(data=num*[*element] if unpack else num*[element], parent=A)
+		auto = A.pull('auto_pull', True)
+		include_key = A.pull('include_key', None)
 
-		super().__init__(A)
+		super().__init__(A, elements=ConfigList(data=num*[*element] if unpack else num*[element], parent=A),
+		                 auto_pull=auto, include_key=include_key)
 
 
 @fig.Component('copy')
