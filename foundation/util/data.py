@@ -156,7 +156,7 @@ def to_one_hot(idx, max_idx=None):
 def discretize(input, N, range=None):
 
 	if range is None:
-		range = input.min(), input.max()
+		range = input.min_val(), input.max()
 
 	input = input.clamp(*range)
 	input -= range[0]

@@ -8,6 +8,7 @@ from .math import *
 from .optim import *
 from .containers import *
 from .logging import *
+from .features import *
 
 #from .setup import *
 try:

@@ -1,17 +1,21 @@
 parents: ['origin']
 
-run:
-  _type: run
-  _mod: ['cls-run', 'timed-run']
+run._type: run
 
-name: 'test-cmd'
+name: 'test-mnist'
 
-output:
-  save_freq: -1
+records:
+  _type: records
+  freq: 100
 
-  tensorboard: True
+validation:
+  _type: run/epoch
+  freq: 10000
 
-  log_freq: 10
+checkpoint:
+  _type: run/checkpoint
+  freq: 10000
+
 
 dataset:
   name: 'mnist'
@@ -21,7 +25,8 @@ dataset:
 
   batch_size: 128
 
-  val_split: 0.166666
+  split.val: 0.1666666
+
 
 training:
   epochs: 10

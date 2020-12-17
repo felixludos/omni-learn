@@ -4,6 +4,8 @@ import time
 import socket
 import random
 
+from collections import OrderedDict
+
 import humpack as hp
 
 import omnifig as fig
@@ -17,15 +19,85 @@ FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH), 'trained_nets')
 
 
-# def get_saveroot(A=None, silent=False, additional_keys=()):
-# 	root = None
-# 	if A is not None:
-# 		root = A.pull('saveroot', '<>save_path', *additional_keys, None, silent=silent)
-#
-# 	if root is None:
-# 		root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
-#
-# 	return root
+@fig.Component('clock')
+class Clock:
+	def __init__(self, A, **kwargs):
+		self._ticks = 0
+		self._alerts = OrderedDict()
+		self._info = None
+	
+	def get_info(self):
+		return self._info
+	
+	def set_info(self, info):
+		self._info = info
+	
+	def register_alert(self, name, alert, **unused):
+		if name is None:
+			name = f'{alert}#{id(alert)}'
+		self._alerts[name] = alert
+	
+	def clear(self):
+		self._alerts.clear()
+		self._info = None
+	
+	def _call_alert(self, name, alert, info=None):
+		if info is None:
+			info = self._info
+		return alert.activate(self._ticks, info)
+	
+	def get_time(self):
+		return self._ticks
+	
+	def __len__(self):
+		return self.get_time()
+	
+	def set_time(self, ticks):
+		self._ticks = ticks
+	
+	def tick(self, info=None):
+		for name, alert in self._alerts.items():
+			if alert.check(self._ticks, info):
+				self._call_alert(name, alert, info=info)
+		self._ticks += 1
+	
+	def step(self, info=None, n=None):
+		if n is None:
+			n = 1
+		for _ in range(n):
+			self.tick(info=info)
+
+class Alert:
+	def __init__(self, A=None, **kwargs):
+		pass
+	
+	def check(self, tick, info=None):
+		return True
+	
+	def activate(self, tick, info=None):
+		'''
+
+		:param tick: int
+		:param info: object passed to clock.tick()
+		:return: new value (representative of the alert) or none
+		'''
+		pass
+
+class CustomAlert(Alert):
+	def __init__(self, activate=None, check=None, **kwargs):
+		super().__init__(**kwargs)
+		self._activate = activate
+		self._check = check
+	
+	def check(self, tick, info=None):
+		if self._check is None:
+			return True
+		return self._check(tick, info=info)
+	
+	def activate(self, tick, info=None):
+		if self._activate is None:
+			pass
+		return self._activate(tick, info=info)
 
 
 class RunNotFoundError(Exception):
@@ -56,77 +128,6 @@ def wrap_script(script_name, A, **kwargs):
 	
 	return obj
 
-#
-# def find_config(ident, check_root=True):
-# 	path = ident
-# 	if os.path.isfile(ident):
-# 		if 'config.yaml' in ident:
-# 			return ident
-# 		path = os.path.dirname(ident)
-#
-# 	if os.path.isdir(path):
-# 		for fname in os.listdir(path):
-# 			if fname == 'config.yaml':
-# 				return os.path.join(path, fname)
-#
-# 	root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
-#
-# 	if check_root:
-# 		return find_config(os.path.join(root, ident), check_root=False)
-# 	raise RunNotFoundError(f'no config found: {ident}')
-#
-#
-# def _get_ckpt_num(ident):
-# 	ident = os.path.basename(ident)
-#
-# 	val = ident.split('.')[0].split('_')[-1]
-# 	try:
-# 		return int(val)
-# 	except ValueError:
-# 		pass
-#
-# 	return None
-
-
-# def _find_ckpt_with(ident, last=False, req='model', check_root=True):
-# 	# valid = lambda n: ((last and 'ckpt' in n and 'best' not in n)
-# 	#                    or (not last and 'best' in n)) and req in n
-# 	valid = lambda n: f'ckpt-{req}' in n
-#
-# 	path = ident
-#
-# 	if os.path.isfile(ident):
-# 		if valid(ident):
-# 			return ident
-# 		path = os.path.dirname(ident)
-#
-# 	if os.path.isdir(path):
-# 		names = [fname for fname in os.listdir(path) if valid(fname)]
-#
-# 		if len(names) == 1:
-# 			return os.path.join(path, names[0])
-# 		elif len(names) > 1:
-# 			nums = [_get_ckpt_num(fname) for fname in names]
-#
-# 			name = max(zip(names, nums), key=lambda x: x[1] if x[1] is not None else -1)[0]
-# 			return os.path.join(path, name)
-#
-# 	root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
-# 	# return _find_ckpt_with(os.path.join(root, ident), last=last, req=req)
-#
-# 	if check_root:
-# 		return _find_ckpt_with(os.path.join(root, ident), last=last, req=req, check_root=False)
-# 	raise RunNotFoundError(f'no checkpoint found: {ident}')
-#
-#
-# def find_checkpoint(ident, last=False):
-# 	return _find_ckpt_with(ident, last=last, req='model')
-#
-#
-# def find_records(ident, last=False):
-# 	return _find_ckpt_with(ident, last=last, req='records')
-
-
 class Validation_Flag(Exception):
 	pass
 
@@ -151,23 +152,22 @@ def load_run(A):
 	
 
 @fig.Component('run')
-class Run:
+class Run(Alert):
 	'''
 	Holds all the data and functions to load, save, train, and evaluate runs.
 	Runs include the model, datasets, dataloaders, the logger, and stats
 	'''
 	def __init__(self, A, silent=False):
+		super().__init__(A)
 		self.silent = A.pull('silent', silent)
-		
-		skip_load = A.pull('skip_run_load', False)
+		self.invisible = A.pull('invisible', False)
 		
 		A = A.get_root()
 		A = self._find_origin(A)
-		self.A = A
 		
 		self._prep(A)
 		
-		if skip_load:
+		if not self.invisible:
 			self._setup_storage(A)
 		
 		self.purge() # reset payload objs
@@ -175,30 +175,32 @@ class Run:
 	# region Setup
 	
 	def __repr__(self):
-		return f'Run({self.name})'
+		return f'RUN:{self.get_name()}'
 	
 	def __str__(self):
-		return repr(self)
+		return self.get_name()
 	
 	def _prep(self, A):
-		
-		if 'records' not in A:
-			A.push('records._type', 'records', overwrite=False, silent=True)
-		self.records = A.pull('records')
-		
 		if 'clock' not in A:
 			A.push('clock._type', 'clock', overwrite=False, silent=True)
-		self.clock = A.pull('clock')
+		self.clock = A.pull('clock', ref=True)
+
+		A.push('records._type', 'records', overwrite=False, silent=True)
+
+		self.A = A
 	
 	def purge(self): # remove any potentially large objects to free memory
+		self.dataset = None
 		self.model = None
-		self.datasets = {}
-		self.loaders = {}
-		self.logger = None
-		self.viz_criterion = None
+		self.records = None
 		
-		self.active_stage = None
-		self.train_state = hp.adict()
+		self.loader = None
+		self._loader = None
+		
+		self.batch = None
+		self.out = None
+		
+		self.clock.clear()
 		
 		self.results = {}
 	
@@ -249,25 +251,33 @@ class Run:
 			name = self._gen_name(A)
 			A.push('name', name)
 		
-		logdate = A.pull('output.logdate', True)
+		logdate = A.pull('name-include-date', True)
 		if logdate:
-			now = self.get_timestamp()
+			now = get_now()
 			name = f'{name}_{now}'
 		
 		self.name = name
 		
 		path = None
 		
-		invisible = A.pull('invisible', False)
-		if not invisible:
-			saveroot = A.pull('output.saveroot', os.environ.get('FOUNDATION_SAVE_DIR', DEFAULT_SAVE_PATH))
+		if not self.invisible:
+			saveroot = A.pull('saveroot', os.environ.get('FOUNDATION_SAVE_DIR', DEFAULT_SAVE_PATH))
+			saveroot = Path(saveroot)
+
+			path = saveroot / self.name
 			
-			path = os.path.join(saveroot, self.name)
+			unique = A.pull('unique-name', True)
+			if unique and self.novel and path.is_dir():
+				idx = 2
+				nameroot = self.name
+				while path.is_dir():
+					name = f'{nameroot}_{idx}'
+					path = saveroot / name
+				self.name = name
 			
-			if not os.path.isdir(path):
-				create_dir(path)
-			
-			path = Path(path)
+			path.mkdir(exist_ok=True)
+			if self.novel:
+				A.push('path', str(path))
 		
 		self.path = path
 	
@@ -276,7 +286,10 @@ class Run:
 		self.name = self.path.stem
 
 		num = A.pull('ckpt-num', None, silent=self.silent)
-		last = A.pull('last', num is None, silent=self.silent)
+		best = A.pull('best', False, silent=self.silent)
+		if best:
+			raise NotImplementedError
+		last = A.pull('last', not best and num is None, silent=self.silent)
 		
 		ckpts = {int(path.stem[4:]):path for path in self.path.glob('ckpt*') if path.is_dir()}
 		nums = sorted(ckpts.keys())
@@ -286,106 +299,56 @@ class Run:
 		
 		ckpt = ckpts[nums[-1]] if last or num is None or num not in ckpts else ckpts[num]
 		
-		self.records.import_(ckpt)
+		
+		self.get_records().import_(ckpt)
 		self.clock.set_time()
 		
-		A.push('model._load_params', str(ckpt / 'model.pth.tar'), overwrite=True, silent=self.silent)
+		ckpt = str(ckpt)
+		A.push('dataset._load-ckpt', ckpt, overwrite=True, silent=self.silent)
+		A.push('model._load-ckpt', ckpt, overwrite=True, silent=self.silent)
+		A.push('records._load-ckpt', ckpt, overwrite=True, silent=self.silent)
 	
 	# endregion
-	
-	def __getattr__(self, item):
-		try:
-			return super().__getattribute__(item)
-		except AttributeError as e:
-			if item in self.records:
-				return self.records[item]
-			raise e
 
 	def _gen_name(self, A):
 		return 'test'
 	
-	def _get_path_from_ident(self, ident, ext='pth.tar', root=None):
-		if root is None:
-			root = self.path
-		name = Path(f'{ident}.{ext}')
-		if root is None:
-			return name
-		return root / name
-	
-	def create_logger(self, path=None):
-		
-		A = self.get_config()
-		
-		if path is None:
-			path = self.path
-		
-		if path is None:
-			return None
-		
-		A.push('logger._type', 'logger', overwrite=False, silent=self.silent)
-		A.push('logger.log_dir', str(path), overwrite=True, silent=self.silent)
-		
-		logger = A.pull('logger', silent=self.silent)
-		return logger
-		
-	# def create_stats(self, *names, model_stats_fmt=None, include_loss=True):
+	# def create_logger(self, path=None):
 	#
 	# 	A = self.get_config()
 	#
-	# 	A.push('stats._type', 'stats', overwrite=False, silent=self.silent)
-	# 	stats = A.pull('stats', silent=self.silent)
+	# 	if path is None:
+	# 		path = self.path
 	#
-	# 	if include_loss:
-	# 		stats.new('loss')
+	# 	if path is None:
+	# 		return None
 	#
-	# 	for name in names:
-	# 		stats.new(name)
+	# 	A.push('logger._type', 'logger', overwrite=False, silent=self.silent)
+	# 	A.push('logger.log_dir', str(path), overwrite=True, silent=self.silent)
 	#
-	# 	if model_stats_fmt is not None:
-	# 		model = self.get_model()
-	# 		try:
-	# 			stats.shallow_join(model.stats, fmt=model_stats_fmt)
-	# 		except AttributeError:
-	# 			pass
-	#
-	# 	return stats
+	# 	logger = A.pull('logger', silent=self.silent)
+	# 	return logger
 	
-	def create_model(self, **meta):
-		return wrap_script('load-model', self.A.sub('model'), **meta)
+	def create_dataset(self, A=None, **meta):
+		if A is None:
+			A = self.get_config().sub('dataset')
+		return wrap_script('load-data', A, **meta)
+	def create_model(self, A=None, **meta):
+		if A is None:
+			A = self.get_config().sub('model')
+		return wrap_script('load-model', A, **meta)
+	def create_records(self, A=None, **meta):
+		if A is None:
+			A = self.get_config().sub('records')
+		return A.pull_self()
 	
-	def create_datasets(self, *names, **meta):
+	def create_loader(self, mode='train', **kwargs):
+		dataset = self.get_dataset()
+		dataset.switch_to(mode)
+		return dataset.to_loader(**kwargs)
 		
-		A = self.get_config().sub('dataset')
-		
-		keep_going = True
-		name = None
-		datasets = {}
-		while keep_going:
-			for name in names:
-				if name not in datasets:
-					A.begin()
-					A.push('mode', name, overwrite=True)
-					break
-
-			result = wrap_script('load-data', A, **meta)
-
-			if type(result) == dict:
-				datasets.update(result)
-			elif name is not None:
-				datasets[name] = result
-			else:
-				datasets['train'] = result
-				datasets['val'] = None
-
-			if name is not None and name not in datasets:
-				raise Exception(f'Failed to create dataset: {name}')
-			
-			keep_going = False
-			for name in names:
-				if name not in datasets:
-					keep_going = True
-			
-		return datasets
+	def create_results(self, A=None, **meta):
+		raise NotImplementedError # TODO
 	
 	# region "Payload" objects - not loaded automatically
 
@@ -394,48 +357,28 @@ class Run:
 	
 	def get_clock(self):
 		return self.clock
-	def get_records(self):
-		return self.records
-	def get_stats(self):
-		return self.get_records().get_stats()
 
+	def get_dataset(self, **meta):
+		if self.dataset is None:
+			self.dataset = self.create_dataset(**meta)
+		return self.dataset
 	def get_model(self, **meta):
 		if self.model is None:
 			self.model = self.create_model(**meta)
 		return self.model
-	def get_datasets(self, *names, **meta):
-		missing = [name for name in names if name not in self.datasets]
-		if len(self.datasets) == 0 or len(missing):
-			self.datasets.update(self.create_datasets(*missing, **meta))
-		if len(names) == 1:
-			return self.datasets[names[0]]
-		if len(names) >= 1:
-			return {n:d for n,d in self.datasets if n in names}
-		return self.datasets.copy()
-	def get_logger(self, path=None):
-		if path is not None:
-			return self._create_logger(self.A, save_path=path)
-		if self.logger is None:
-			self.logger = self.create_logger(path=path)
-		return self.logger
+	def get_records(self, **meta):
+		if self.records is None:
+			self.records = self.create_records(**meta)
+		return self.records
 	
-	def get_loaders(self, *dataset_names, **datasets):
-		A = self.get_config().sub('dataset')
-		single_dataset = len(dataset_names) == 1
+	def get_loader(self, activate=False, **kwargs):
+		if self.loader is None:
+			self.loader = self.create_loader(**kwargs)
+		if activate and self._loader is None:
+			self._loader = iter(self.loader)
+		return self.loader
 		
-		if len(datasets) == 0:
-			datasets = self.get_datasets(*dataset_names)
-			if single_dataset:
-				datasets = {dataset_names[0] : datasets}
-		
-		for name, dataset in datasets.items():
-			if name not in self.loaders:
-				self.loaders[name] = None if dataset is None else dataset.to_loader(A)
-		
-		if single_dataset:
-			return self.loaders[next(iter(datasets.keys()))]
-		return {name:self.loaders[name] for name in datasets}
-		
+	
 	def get_results(self, ident, remove_ext=True): # you must specify which results (ident used when results were created)
 		
 		if ident in self.results:
@@ -450,337 +393,86 @@ class Run:
 
 		return self.results[fixed]
 
-	def get_training_datasets(self):
-		datasets = self.get_datasets()
-		return {name:dataset for name,dataset in datasets.items() if name != 'test'}
-
-	# def get_stats(self, *args, purge_old=False, **kwargs):
-	# 	if self.stats is None or purge_old:
-	# 		self.stats = self.create_stats(*args, **kwargs)
-	# 	return self.stats
-	
-	
 	# endregion
 	
 	# region Signals
 
-	def get_total_steps(self):
-		return self.records['total_steps']
-
-	def get_total_samples(self, mode='train'):
-		return self.records['total_samples'][mode]
-
-	def get_timestamp(self):
-		return self.records['timestamp']
-
 	def get_path(self):
 		return self.path
 
-	def keep_going(self):
-		sample_limit = self.train_state.sample_limit
-		step_limit = self.train_state.step_limit
-		return (sample_limit is None
-		        or self.get_total_samples('train') < sample_limit) \
-			and self.records['total_steps'] < step_limit
+	def get_output(self):
+		raise NotImplementedError
 
-	def print_time(self):
-		print_freq = self.train_state.print_freq
-		return print_freq is not None and self.get_total_steps() % print_freq == 0
-
-	def log_time(self):
-		logger = self.get_logger()
-		log_freq = self.train_state.log_freq
-		return logger is not None and log_freq is not None and self.get_total_steps() % log_freq == 0
-	
-	def viz_time(self):
-		logger = self.get_logger()
-		viz_freq = self.train_state.viz_freq
-		steps = self.get_total_steps()
-		return logger is not None and viz_freq is not None and steps > 0 and steps % viz_freq == 0
-	
-	def val_time(self):
-		val_freq = self.train_state.val_freq
-		return val_freq is not None and (self.get_total_steps() % val_freq == 0 or not self.keep_going())
-	
-	def save_time(self):
-		save_freq = self.train_state.save_freq
-		return save_freq is not None and ((save_freq > 0 and self.get_total_steps() % save_freq == 0)
-		                                                    or not self.keep_going())
-	
-	# endregion
-	
-	# region Saving
-	
-	def save_checkpoint(self, root=None, save_model=True):  # TODO: add an option to save dataset/loader
-		Q = self.train_state
-		start = time.time()
-
-		if root is None:
-			root = self.save_path
-		
-		steps = self.get_total_steps()
-
-		if root is not None and os.path.isdir(root):
-			
-			records = self.records
-			records['checkpoint'] = steps
-			is_best = self.train_state.is_best
-			
-			model = self.get_model()
-			
-			model_paths = []
-			
-			if steps is not None:
-				if records is not None:
-					rpath = os.path.join(root, f'ckpt-records_{steps}.yaml')
-					save_yaml(records, rpath)
-
-				mpath = os.path.join(root, f'ckpt-model_{steps}.pth.tar')
-				model_paths.append(mpath)
-			
-			if is_best:
-				if records is not None:
-					rpath = os.path.join(root, f'ckpt-records_best.yaml')
-					save_yaml(records, rpath)
-				
-				mpath = os.path.join(root, f'ckpt-model_best.pth.tar')
-				model_paths.append(mpath)
-			
-			if save_model:
-				model.save_checkpoint(*model_paths)
-			
-			best_info = ' (new best) ' if Q.is_best else ''
-			Q.is_best = False
-			
-			if not self.silent:
-				print(f'[[ Saved checkpoint {steps}{best_info} to {root} ]]')
-			
-			Q.time_stats.update('save', time.time() - start)
-	
-		elif not self.silent:
-			print(f'[[ no checkpoint {steps} saved ]]')
-	
-	def save_results(self, name, results, root=None):
-		path = self._get_path_from_ident(name, 'pth.tar', root=root)
-		
-		self.get_model().save_data(path, data=results)
-		
-		print(f'[[ {name} results saved to {path} ]]')
-		
 	# endregion
 	
 	# region Training Phases
 	
-	def prepare(self):
-		'''
-		Loads model and datasets, and preps them (linking them to each other, if necessary)
-		
-		:return:
-		'''
-		
-		model = self.get_model()
-		trainsets = self.get_training_datasets()
-		
-		model.prep(trainsets)
-		for dataset in trainsets.values():
-			if dataset is not None:
-				dataset.prep(model)
+	def activate(self, tick, info=None):
+		return self.train_step()
 	
-	def continuous(self, pbar=None):
+	def continuous(self):
 		
 		self.startup()
-		stats = self.train_state.train_stats
 		
-		self.new_epoch()
+		self.clock.step(info=self)
 		
-		restart_pbar = lambda: None if pbar is None else pbar(total=self.train_state.step_limit,
-		                                     initial=self.get_total_steps())
-		
-		
-		bar = restart_pbar()
-		
-		records = self.records
-		step_limit = self.train_state.step_limit
-		mode = 'train'
-		
-		while self.keep_going():
-		
-			out = self.train_step(force_step=True)
-
-			if self.log_time():
-				self.log_step(out, '{}/train')
-
-				sys.stdout.flush()
-		
-			if self.viz_time():
-				self.viz_step(out, measure_time=True)
-		
-			if self.val_time():
-				if bar is not None:
-					bar.close()
-					
-				self.validate('val', pbar=pbar)
-				
-				if self.keep_going():
-					bar = restart_pbar()
-
-				sys.stdout.flush()
-		
-			if self.save_time():
-				if bar is not None:
-					bar.close()
-					
-				self.save_checkpoint()
-				
-				if self.keep_going():
-					bar = restart_pbar()
-		
-			if bar is not None:
-				bar.update(1)
-				title = '{} ({})'.format(mode, records['total_epochs'][mode] + 1) \
-					if mode in records['total_epochs'] else mode
-				loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
-				                                            stats['loss'].smooth.item()) \
-					if stats['loss'].count > 0 else ''
-				bar.set_description('{} ckpt={}{}'.format(title, records['checkpoint'], loss_info))
-
-			elif self.print_time():
-
-				total_steps = self.get_total_steps()
-				title = '{} ({})'.format(mode, records['total_epochs'][mode] + 1) \
-					if mode in records['total_epochs'] else mode
-				loss_info = 'Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
-				                                            stats['loss'].smooth.item()) \
-					if stats['loss'].count > 0 else ''
-
-				tm = time.strftime("%H:%M:%S")
-				print(f'[ {tm} ] {title} {total_steps}/{step_limit} {loss_info}')
-
-				sys.stdout.flush()
-
-
-		# self.exit_run('training complete')
-	
 	
 	def startup(self):
+		
+		A = self.get_config()
+		clock = self.get_clock()
+
+		clock.register_alert('data', CustomAlert(self.dataset_step))
+		clock.register_alert('train', CustomAlert(self.train_step))
+
+		dataset = self.get_dataset()
+		model = self.get_model()
+		records = self.get_records()
+		
+		validation = A.pull('validation', None)
+		if validation is None:
+			print('No validation')
+		else:
+			clock.register_alert('val', validation)
+		
+		
+		if isinstance(records, Alert):
+			clock.register_alert('log', records)
+
+		A.push('vizualization._type', 'run/viz', overwrite=False)
+		viz_step = A.pull('vizualization', None)
+		if viz_step is None:
+			clock.register_alert('viz', viz_step)
+		
+		if self.invisible:
+			print('No checkpointing')
+		else:
+			A.push('checkpoint._type', 'run/checkpoint', overwrite=False, silent=True)
+			checkpointer = A.pull('checkpoint', None)
+		
+			if checkpointer is None:
+				print('No checkpointer found')
+			else:
+				clock.register_alert('checkpoint', checkpointer)
 		
 		path = self.get_path()
 		if path is not None:
 			config_path = self.get_path() / 'config.yaml'
-			if not os.path.isfile(config_path):
-				self.get_config().export(config_path)
+			if not config_path.is_file():
+				A.export(config_path)
 		
-		A = self.A
-		Q = self.train_state
+		dataset.prep(model=model, records=records)
+		model.prep(dataset=dataset, records=records)
+		records.prep(dataset=dataset, model=model)
 		
-		Q.step_limit = A.pull('training.step_limit', None)
-		Q.sample_limit = A.pull('training.sample_limit', None)
-		assert Q.step_limit is not None or Q.sample_limit is not None, 'No limit provided'
-		Q.val_freq = A.pull('training.val_freq', None)
-
-		Q.fast_val = A.pull('training.fast_val', False)
-		Q.val_mode = 'val'
-
-		Q.skip_prev_batches = A.pull('training.skip_prev_batches', False)
-
-		self.viz_criterion = A.pull('training.viz-criterion', None)
+		mode = 'train'
 		
-		model_stats_fmt = A.pull('training.model_train_stats_fmt', '<>training.model_stats_fmt', '{}')
-		Q.train_stats = self.create_stats(model_stats_fmt=model_stats_fmt)
-		Q.time_stats = A.pull('training.time_stats', '<>training.stats')
-		Q.time_stats.new('data', 'model', 'viz', 'val', 'save')
+		dataset.switch_to(mode)
+		model.switch_to(mode)
+		records.switch_to(mode)
 		
-		
-		Q.save_freq = A.pull('output.save_freq', -1)
-		Q.print_freq = A.pull('output.print_freq', None)
-		Q.log_freq = A.pull('output.log_freq', None)
-		Q.viz_freq = A.pull('output.viz_freq', Q.log_freq)
-		Q.unique_tests = A.pull('output.unique_tests', False)
-		Q.model_val_stats_fmt = A.pull('training.model_val_stats_fmt', '<>training.model_stats_fmt', '{}')
-		Q.display_samples = A.pull('output.display_samples', False)  # count in terms of samples instead of iterations
-		Q.display_smoothed = A.pull('output.display_smoothed', True)
-		time_stats_fmt = A.pull('output.time_stats_fmt', 'time-{}')
-		if time_stats_fmt is not None:
-			Q.train_stats.shallow_join(Q.time_stats, fmt=time_stats_fmt)
-
-		trainloader = self.get_loaders('train')
-		
-		valloader = self.get_loaders('val')
-		if valloader is None:
-			if Q.fast_val:
-				Q.val_mode = 'train'
-			else:
-				Q.val_freq = None
-
-		
-		save_freq = Q.get('save_freq', -1)
-		if save_freq is not None and 0 < save_freq < len(trainloader):
-			if not self.silent:
-				print('WARNING: saving more than once per epoch: checkpoint every {} iterations'.format(save_freq))
-			
-			# assert save_freq > 100, 'not allowed to save more often than once every 100 steps -- remember 55-8'
-			
-			# quick_save = A.pull('output.quick_save', False)  # force saving so frequently
-			#
-			# if not quick_save:
-			# 	raise Exception('not allowed to save more often than once every 100 steps')
-
-			# if not quick_save:
-			# 	save_freq = len(trainloader)
-		if not self.silent and (save_freq is not None and save_freq > 0):
-			print(f'Will save a checkpoint every {save_freq} steps')
-		Q.save_freq = save_freq
-	
-		Q.is_best = False
-	
-	def start_loader(self, mode='train', dataloader=None):
-		Q = self.train_state
-		
-		if dataloader is None:
-			dataloader = self.get_loaders(mode)
-		
-		if mode == 'train':
-			epoch_seed = self.records.get('epoch_seed', None)
-			if epoch_seed is not None:
-				dataloader.set_seed(epoch_seed)
-				self.records['epoch_seed'] = self._increment_rng(epoch_seed)
-		
-		loader = iter(dataloader)
-		if mode == 'train' and Q.skip_prev_batches:
-			skip_batches = min(self.records.get('batch', 0), len(dataloader))
-			try:
-				loader.skip(skip_batches)
-			except AttributeError:
-				print('WARNING: no auto skip implemented')
-				for _ in range(skip_batches):
-					next(loader)
-		
-		assert len(dataloader) >= 1, 'no batches'
-		
-		Q.loader = loader
-		
-		return loader
-	
-	def new_epoch(self, mode='train'):
-		
-		model = self.get_model()
-		model.pre_epoch(mode, self.records)
-		self.get_datasets(mode).pre_epoch(mode, self.records)
-		
-		if mode == 'train':
-			model.train()
-		else:
-			model.eval()
-		
-		return self.start_loader(mode)
-		
-	def end_epoch(self, mode='train', stats=None):
-		
-		self.get_model().post_epoch(mode, self.records, stats=stats)
-		self.get_datasets(mode).post_epoch(mode, self.records, stats=stats)
-
-		self.records['total_epochs'][mode] += 1
-		self.records['stats'][mode].append(stats.export())
+		self.loader = None
+		self.get_loader(activate=True, mode=mode, infinite=True)
 	
 	def log_step(self, out, tag_fmt='{}/train', measure_time=True):
 		Q = self.train_state
@@ -797,167 +489,25 @@ class Run:
 		for k, v in display.items():
 			logger.add('scalar', k, v)
 		
-	def viz_step(self, out, measure_time=True):
-		Q = self.train_state
-		logger = self.get_logger()
-		
-		start = time.time()
-		
-		try:
-			vfun = self.get_model().visualize
-		except AttributeError:
-			pass
-		else:
-			vfun(out, logger)
-		
-		if measure_time:
-			Q.time_stats.update('viz', time.time() - start)
-		
-	def train_step(self, force_step=False, maintenance=True):
-		
-		Q = self.train_state
-		time_stats = Q.time_stats
-		
-		if 'loader' not in Q or Q.loader is None:
-			Q.loader = self.new_epoch('train')
-		
-		loader = Q.loader
-		
-		try:
-			start = time.time()
-			# batch = loader.next_batch()
-			batch = next(loader)
-			
-		except StopIteration:
-			self.end_epoch('train', Q.train_stats)
-			
-			if not force_step:
-				raise StopIteration
-		
-			loader = self.new_epoch('train')
-			Q.loader = loader
+	def dataset_step(self):
 
-			self.records['batch'] = 0
+		if self._loader is None:
+			self.startup()
 			
-			start = time.time()
-			batch = next(loader)
-		
-		time_stats.update('data', time.time() - start)
-		start = time.time()
-
-		model = self.get_model()
-		out = model.step(batch)
-		
-		if 'loss' in out:
-			Q.train_stats.update('loss', out['loss'].detach())
-		
-		time_stats.update('model', time.time() - start)
-		
-		B = batch.size(0)
-		self.records['total_samples']['train'] += B
-		self.records['batch'] += 1
-		self.records['total_steps'] += 1
+		self.batch = None
+		self.out = None
+		self.batch = next(self._loader)
 	
-		if len(loader) == 0:
-			self.end_epoch('train', Q.train_stats)
-			self.records['batch'] = 0
-			Q.loader = None
-
-		if maintenance:
-			model.maintenance(self.records, Q.train_stats)
-	
-		return out
-	
-	def validate(self, mode='val', pbar=None):
-		if mode != 'val':
-			raise NotImplementedError
-		Q = self.train_state
-		records = self.records
-		model = self.get_model()
+	def train_step(self):
 		
-		train_model_stats = getattr(model, 'stats', None)
-		stats = self.create_stats(model_stats_fmt=None, silent=True)
+		batch = self.get_batch()
 		
-		if stats is not None and train_model_stats is not None and Q.model_val_stats_fmt is not None:
-			
-			model.stats = model.stats.copy()
-			model.stats.reset()
-			
-			stats.shallow_join(model.stats, fmt=Q.model_val_stats_fmt)
-
-		loader = self.new_epoch(Q.val_mode)
+		if batch is None:
+			raise RuntimeError('No batch found')
 		
-		bar = None
-		if pbar is not None:
-			bar = pbar(total=len(loader))
+		self.out = self.model.step(batch)
 		
-		out = None
 		
-		title = '{} ({})'.format(mode, records['total_epochs'][mode]+1) \
-			if mode in records['total_epochs'] else mode
-		
-		start = time.time()
-		
-		for batch in loader:
-			
-			B = batch.size(0)
-			if mode in records['total_samples']:
-				records['total_samples'][mode] += B
-			
-			out = model.test(batch)
-			if 'loss' in out:
-				stats.update('loss', out.loss.detach())
-			
-			if bar is not None:
-				bar.update(1)
-				loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
-				                                            stats['loss'].smooth.item()) \
-					if stats['loss'].count > 0 else ''
-				bar.set_description('{} ckpt={}{}'.format(title, records['checkpoint'], loss_info))
-
-			if Q.fast_val:
-				break
-
-		if mode in Q.time_stats:
-			Q.time_stats.update(mode, time.time() - start)
-		
-		if out is not None:
-			self.log_step(out, '{}/{}'.format('{}', mode), measure_time=False)
-		
-		if bar is not None:
-			bar.close()
-		
-		loss_info = ''
-		if mode == 'val':
-			val_loss = stats['loss']
-			
-			best_info = ''
-			if 'best' in records and \
-					records['best']['loss'] is None or (val_loss.count > 0
-					                                    and val_loss.avg <= records['best']['loss']):
-				prev = '!' if records['best']['loss'] is None \
-					else ', previous was: {:.3f} (ckpt={})'.format(records['best']['loss'],
-					                                               records['best']['checkpoint'])
-				best_info = f' which is a new best{prev}'
-				records['best']['loss'] = val_loss.avg.item()
-				records['best']['checkpoint'] = records['checkpoint']
-				Q.is_best = True
-			loss_info = ' Loss: {:.3f}{}'.format(val_loss.avg.item(), best_info) \
-				if val_loss.count > 0 else ''
-		
-		total_steps = self.get_total_steps()
-		
-		if not self.silent:
-			print('[ {} ] {} Last={} Now={}/{}\n\t{}'.format(
-				time.strftime("%H:%M:%S"), mode, records['checkpoint'],
-				total_steps, Q.step_limit, loss_info))
-			
-		self.end_epoch(mode, stats)
-		self.records[mode] = total_steps
-		
-		if train_model_stats is not None:
-			model.stats = train_model_stats
-	
 	def prep_eval(self):
 		
 		A = self.get_config()

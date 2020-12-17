@@ -10,12 +10,13 @@ import torch.distributions as distrib
 
 import omnifig as fig
 
-from ... import framework as fm
+# from ... import framework as fm
+from ...op import framework as fm
 from ... import util
 
 
 @fig.Component('ae')
-class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Full_Model):
+class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 	# def __init__(self, encoder, decoder, reg='L2', reg_wt=0, criterion=None,
 	#              viz_latent=True, viz_rec=True):
 	def __init__(self, A, encoder=None, decoder=None, **other):

@@ -1,32 +1,17 @@
 
 import sys, os
 
+from copy import deepcopy
+
 import numpy as np
 import torch
 
 import omnifig as fig
 
-from ..data import get_loaders, Info_Dataset, Subset_Dataset, simple_split_dataset, DataLoader, BatchedDataLoader
+# from ..data import get_loaders, Info_Dataset, Subset_Dataset, simple_split_dataset, DataLoader, BatchedDataLoader
 from .. import util
 from ..op.runs import wrap_script
 
-dataset_registry = util.Registry()
-
-
-def register_dataset(name, dataset):
-	cmpn_name = f'dataset/{name}'
-	fig.Component(cmpn_name)(dataset)
-
-	dataset_registry.new(name, cmpn_name)
-
-
-def Dataset(name):
-	def _reg_fn(fn):
-		nonlocal name
-		register_dataset(name, fn)
-		return fn
-	
-	return _reg_fn
 
 
 # FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -163,10 +148,11 @@ def Dataset(name):
 # 		except AttributeError:
 # 			if self.active is not None:
 # 				return self.active.__getattribute__(item)
-	
 
-@fig.Component('dataset')
-@fig.Script('load-data', description='Load datasets')
+
+
+# @fig.Component('dataset')
+# @fig.Script('load-data', description='Load datasets')
 def load_data(A, mode=None):
 	'''
 	Loads datasets and optionally splits datasets into

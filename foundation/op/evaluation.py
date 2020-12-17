@@ -6,7 +6,6 @@ import torch
 
 import omnifig as fig
 
-from ..framework import Recordable, Schedulable, Evaluatable
 from .runs import NoOverwriteError
 from .. import util
 

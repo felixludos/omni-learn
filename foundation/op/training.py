@@ -18,116 +18,240 @@ from .loading import respect_config
 from .model import load_model
 from .data import load_data
 from .evaluation import eval_model
-from .clock import Alert, Freq, Reg
+from .clock import Alert, Freq, Reg, Priority, Clock
+from .framework import Visualizable
 
-class Run_Event(Reg, Freq):
+
+
+class Run_Event(Reg, Freq, Priority):
 	def check(self, tick, info=None):
 		return self.freq is not None and super().check(tick, info=info)
 	
+	def purge(self):
+		pass
+
 @fig.Component('run/epoch')
-class CompleteEpoch(Run_Event):
+class Epoch(Run_Event):
 	def __init__(self, A, **kwargs):
-		epoch_limit = A.pull('epoch-limit', None)
+		step_limit = A.pull('step-limit', None)
 		pbar = A.pull('pbar', None)
+		mode = A.pull('mode', 'val')
+		metric = A.pull('metric', None)
+
+		dataset = A.pull('dataset', None, ref=True)
+		model = A.pull('model', None, ref=True)
+		records = A.pull('records', None, ref=True)
+		
+		if metric is not None and records is not None:
+			records.new(metric)
+		
 		super().__init__(A, **kwargs)
+		
+		self.mode = mode
 	
-		self.epoch_limit = epoch_limit
+		self.dataset = dataset
+		self.model = model
+		self.records = records
+	
+		self.step_limit = step_limit
+		if self.step_limit is not None:
+			raise NotImplementedError
 		
 		self.pbar = pbar
+		
+	def purge(self):
+		self.dataset = None
+		self.model = None
+		self.records = None
 		
 	def get_mode(self):
 		return self.get_name()
 	
-	@classmethod
-	def epoch_step(cls, mode, batch, model, records):
+	@staticmethod
+	def pre_epoch(mode, dataset, model, records=None):
 		
-		B = batch.size(0)
-		if mode in records['total_samples']:
-			records['total_samples'][mode] += B
+		dataset.switch_mode(mode)
+		model.switch_mode(mode)
+		if records is not None:
+			records.switch_mode(mode)
 		
-		out = model.test(batch)
-		if 'loss' in out:
-			records.stats.update('loss', out.loss.detach())
+	@staticmethod
+	def post_epoch(mode, dataset, model, records=None):
+		pass
+	
+	@staticmethod
+	def epoch_step(batch, model, records=None):
+		
+		out = model.step(batch)
+		if records is not None:
+			records.increment_samples(batch.size(0))
 			
 		return out
 
-	@classmethod
-	def run_epoch(cls, mode, loader, model, records=None, logger=None, step_fn=None):
+	@staticmethod
+	def epoch_end(dataset, model, records, batch, out):
 		
-		if step_fn is None:
-			step_fn = cls.epoch_step
-		
-		out = None
-		for batch in loader:
-			out = step_fn(mode, batch, model, records)
-		
-		if out is not None and logger is not None:
-			logger.step(records, fmt='{}/{}'.format('{}', mode))
+		if out is not None and records is not None:
+			records.step()
 			if isinstance(model, Visualizable):
-				model.visualize(out, logger)
-	
-	def activate(self, tick, info=None):
-		assert info is not None
+				model.visualize(out, records)
+
+	def run_epoch(self, dataset=None, model=None, records=None,
+	              pre_epoch=None, step_fn=None, epoch_end=None, post_epoch=None):
 		
-		mode = self.get_mode()
+		if pre_epoch is None:
+			pre_epoch = self.pre_epoch
+		if step_fn is None:
+			step_fn = self.epoch_step
+		if epoch_end is None:
+			epoch_end = self.epoch_end
+		if post_epoch is None:
+			post_epoch = self.post_epoch
 		
-		dataset = info.get_dataset(mode)
 		if dataset is None:
-			return
+			dataset = self.dataset
+		if model is None:
+			model = self.model
+		if records is None:
+			records = self.records
 		
-		model = info.get_model()
-		model.switch_mode(mode)
+		prev_mode = model.get_mode()
 		
-		records = info.get_records()
-		records.switch_mode(mode)
+		pre_epoch(self.mode, dataset, model, records)
 		
-		loader = dataset.to_loader(infinite=False)
+		loader = enumerate(dataset.to_loader(infinite=False))
+		if self.pbar is not None:
+			loader = self.pbar(loader)
 		
-		logger = info.get_logger()
+		batch, out = None, None
+		for i, batch in loader:
+			out = step_fn(batch, model, records)
+			
+			if records is not None and self.metric is not None and self.metric in out:
+				records.update(self.metric, out[self.metric].detach())
+			
+			if self.step_limit is not None and i >= self.step_limit:
+				break
 		
-		self.run_epoch(mode, loader, model, records=records, logger=logger)
+		if self.pbar is not None:
+			self.pbar.reset()
+		
+		if records is not None:
+			epoch_end(dataset, model, records, batch, out)
+		
+		post_epoch(self.mode, dataset, model, records)
+		
+		dataset.switch_to(prev_mode)
+		model.switch_to(prev_mode)
+		if records is not None:
+			records.switch_to(prev_mode)
+	
+	def activate(self, tick=None, info=None):
+		
+		dataset, model, records = None, None, None
+		
+		if info is not None:
+			dataset = info.get_data() if self.dataset is None else self.dataset
+			model = info.get_model() if self.model is None else self.model
+			records = info.get_records() if self.records is None else self.records
+		
+		self.run_epoch(dataset, model, records)
 	
 @fig.Component('run/checkpoint')
 class Checkpointer(Run_Event):
 	def __init__(self, A, **kwargs):
 		
-		path = A.pull('save-path', '<>path', None)
+		path = A.pull('save-root', '<>root', '.')
 		
-		limit = A.pull('ckpt-limit', '<>keep-last', None)
+		limit = A.pull('keep-only', '<>limit', None)
 		
-		best = A.pull('track-best', False)
+		metric = A.pull('track-best', None)
+		
+		dataset = A.pull('dataset', None, ref=True)
+		model = A.pull('model', None, ref=True)
+		records = A.pull('records', None, ref=True)
 		
 		super().__init__(A, **kwargs)
 		
 		self.path = Path(path)
 		self.limit = limit
-		self.best = best
+		if self.limit is not None:
+			raise NotImplementedError
+		self.best_metric = metric
+		if self.best_metric is not None:
+			raise NotImplementedError
+	
+		self.dataset = dataset
+		self.model = model
+		self.records = records
+	
+	def purge(self):
+		self.dataset = None
+		self.model = None
+		self.records = None
 	
 	def _limit_checkpoints(self, root):
 		if self.limit is not None:
-			
-			
-			pass
-		
-		
+			raise NotImplementedError
 	
-	
+	def checkpoint(self, path, dataset=None, model=None, records=None):
+		
+		path = Path(path)
+		path.mkdir(exist_ok=True)
+		
+		if dataset is None:
+			dataset = self.dataset
+		if dataset is not None:
+			dataset.checkpoint(path)
+		
+		if model is None:
+			model = self.model
+		if model is not None:
+			model.checkpoint(path)
+		
+		if records is None:
+			records = self.records
+		if records is not None:
+			records.checkpoint(path)
+		
 	def activate(self, tick, info=None):
 		assert info is not None
 		
 		root = info.get_path() if self.path is None else self.path
 		if root is None:
 			return
-		records = info.get_records()
-		clock = info.get_clock()
 		
-		num = clock.get_time()
-		path = root / f'ckpt{num}'
-		path.mkdir()
+		path = root / f'ckpt{tick}'
+		
+		dataset = info.get_dataset() if self.dataset is None else self.dataset
+		model = info.get_model() if self.model is None else self.model
+		records = info.get_records() if self.records is None else self.records
+		
+		self.checkpoint(path, dataset=dataset, model=model, records=records)
 		
 		self._limit_checkpoints(root)
 		
-		pass
+@fig.Component('run/viz')
+class VizStep(Run_Event):
+	def __init__(self, A, **kwargs):
+		
+		super().__init__(A, **kwargs)
+		
+		self.model = A.pull('model', None, ref=True)
+		self.records = A.pull('records', None, ref=True)
+		
+	def activate(self, tick, info=None):
+		
+		assert info is not None, 'no info provided'
+		
+		model = info.get_model() if self.model is None else self.model
+		records = info.get_records() if self.records is None else self.records
+		
+		out = info.get_out()
+	
+		if isinstance(model, Visualizable):
+			model.visualize(out, records)
+
 
 @fig.Script('train', description='Train new/existing models')
 def iterative_training(A=None, run=None):
@@ -148,24 +272,12 @@ def iterative_training(A=None, run=None):
 		run = A.pull('run')
 	
 	A = run.get_config()
-
-	safe_config = A.pull('safe_config', False)
-
-	if safe_config:
-		A.begin()
 	
-	datasets = run.get_datasets()
-	model = run.get_model()
+	run.continuous()
+	
+	raise NotImplementedError
+	
 
-	if safe_config:
-		A.abort()
-
-	logger = run.get_logger()
-	
-	run.prepare()
-	
-	loaders = run.get_loaders()
-	
 	# endregion
 	#######################
 	# region Smart Defaults
@@ -188,8 +300,8 @@ def iterative_training(A=None, run=None):
 	util.set_default_tau(tau)
 	if isinstance(model, Recordable):
 		model.stats.set_tau(tau)
-	A.push('output.print_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
-	A.push('output.log_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
+	# A.push('output.print_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
+	# A.push('output.log_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
 	
 	epochs = A.pull('training.epochs', 10)
 	step_limit = A.push('training.step_limit', epochs * epoch_len, overwrite=False)
@@ -220,16 +332,16 @@ def iterative_training(A=None, run=None):
 	# region Run Training
 	#####################
 	
-	remaining_steps = step_limit - run.get_total_steps()
-	
-	if remaining_steps > 0:
-		print(f'Training for {remaining_steps} steps')
-		# run.prepare(model, trainloader)
-		run.continuous(pbar=pbar)
-		print('Training complete.')
-	
-	else:
-		print('No training')
+	# remaining_steps = step_limit - run.get_total_steps()
+	#
+	# if remaining_steps > 0:
+	# 	print(f'Training for {remaining_steps} steps')
+	# 	# run.prepare(model, trainloader)
+	# 	run.continuous(pbar=pbar)
+	# 	print('Training complete.')
+	#
+	# else:
+	# 	print('No training')
 	
 	# endregion
 	#####################

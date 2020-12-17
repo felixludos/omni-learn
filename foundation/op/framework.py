@@ -1,8 +1,11 @@
 import sys, os
+from pathlib import Path
 import numpy as np
 import torch
 import copy
 import torch.nn as nn
+
+from omnibelt import primitives
 
 import omnifig as fig
 
@@ -10,89 +13,75 @@ from .. import util
 import torch.multiprocessing as mp
 from itertools import chain
 
-class Model(nn.Module):  # any vector function
-	def __init__(self, din=None, dout=None):
-		super().__init__()
-		self.din = din
-		self.dout = dout
-		self.device = 'cpu'
-		
-		self.savable_buffers = set()
-		
-		self.volatile = util.TensorDict()
-		self._saveable_attrs = set()
 
-	def register_buffer(self, name, tensor=None, save=True):
-		super().register_buffer(name, tensor)
-		self.savable_buffers.add(name)
-
-	def register_attr(self, name, data=None):
-		self._saveable_attrs.add(name)
-		self.__setattr__(name, data)
-
-	def cuda(self, device=None):
-		self.device = 'cuda' if device is None else device
-		self.volatile.to(self.device)
-		super(Model, self).cuda(device)
-
-	def cpu(self):
-		self.device = 'cpu'
-		self.volatile.to('cpu')
-		super(Model, self).cpu()
-
-	def to(self, device):
-		self.device = device
-		self.volatile.to(self.device)
-		super(Model, self).to(device)
-
-	def state_dict(self, *args, **kwargs):
-		volatile = self.volatile
-		self.volatile = None
-		
-		out = super().state_dict(*args, **kwargs)
-		
-		self.volatile = volatile
-		return {'parameters': out,
-		        'buffers': {name: getattr(self, name, None)
-		                    for name in self.savable_buffers},
-		        'attrs': {name: getattr(self, name, None)
-		                  for name in self._saveable_attrs}}
+class FunctionBase(util.DimensionBase, util.DeviceBase, nn.Module):  # any differentiable vector function
+	def __init__(self, din=None, dout=None, device=None, **unused):
+		super().__init__(din=din, dout=dout, device=device, **unused)
 	
-	def load_state_dict(self, state_dict, **kwargs):
-		for name, buffer in state_dict.get('buffers', {}).items():
-			self.register_buffer(name, buffer, save=True)
-		for name, data in state_dict.get('attrs', {}).items():
-			self.register_attr(name, data)
-		return super().load_state_dict(state_dict['parameters']
-		                               if 'parameters' in state_dict
-		                               else state_dict, **kwargs)
 
-	def pre_epoch(self, mode, records): # called at the beginning of each epoch
-		pass
-
-	def post_epoch(self, mode, records, stats=None): # called at the end of each epoch
-		pass
-
-	def get_hparams(self):
-		return {}
-
-class CompositeModel(Model): # TODO integrate with component based models
-	def __init__(self, *models):
-		super().__init__(models[0].din, models[-1].dout)
-		self.models = nn.ModuleList(models)
-
-	def forward(self, x):
-		for m in self.models:
-			x = m(x)
-		return x
-
-class ModedModel(util.Mode, Model):
+class Function(util.Switchable, util.TrackedAttrs, util.Dimensions, FunctionBase):
+	
 	def switch_mode(self, mode):
 		super().switch_mode(mode)
 		if mode == 'train':
 			self.train()
 		else:
 			self.eval()
+	
+	def get_hparams(self):
+		return {}
+
+class HyperParam(Function):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._hparams = set()
+	
+	def register_hparam(self, name, val):
+		if not isinstance(val, util.ValueBase):
+			val = util.ValueBase(val)
+		self._hparams.add(name)
+		self.register_attr(name, val)
+		
+	def state_dict(self, *args, **kwargs):
+		state = super().state_dict(*args, **kwargs)
+		state['hparams'] = list(self._hparams)
+		
+	def load_state_dict(self, state_dict, strict=True):
+		if strict:
+			assert len(self._hparams) == len(state_dict['hparams']) == len(self._hparams*set(state_dict['hparams']))
+		return super().load_state_dict(state_dict, strict=strict)
+	
+	def get_hparams(self):
+		hparams = {}
+		for name in self._hparams:
+			try:
+				val = getattr(self, name, None)
+			except AttributeError:
+				continue
+			hparams[name] = val if type(val) in primitives else val.item()
+		return hparams
+
+
+class Savable(util.Checkpointable, Function):
+	
+	def checkpoint(self, path, ident='model'):
+		data = {
+			'model_str': str(self),
+			'model_state': self.state_dict(),
+		}
+		path = Path(path)
+		if path.is_dir():
+			path = path / f'{ident}.pth.tar'
+		torch.save(data, str(path))
+		
+	def load_checkpoint(self, path, ident='model'):
+		path = Path(path)
+		if path.is_dir():
+			path = path / f'{ident}.pth.tar'
+		data = torch.load(str(path))
+		self.load_state_dict(data['model_state'])
+		return path
+	
 
 @fig.AutoModifier('generative')
 class Generative(object):
@@ -119,56 +108,27 @@ class Invertible(object):
 	def inverse(self, *args, **kwargs):
 		raise NotImplementedError
 
-class Savable(Model):
-	
-	def save_checkpoint(self, *paths, **data):
-		data.update({
-			'model_str': str(self),
-			'model_state': self.state_dict(),
-		})
 		
-		self.save_data(*paths, data=data)
-		
-	def save_data(self, *paths, data={}):
-		for path in paths:
-			torch.save(data, path)
-
-class Recordable(util.StatsContainer, Model):
+class Recordable(util.StatsClient, Function):
 	pass
-
-class Maintained(Model):
-
-	def maintenance(self, tick, info=None):
-		pass
-
 	
 
 class Visualizable(Recordable):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.reset_viz_counter()
-	def reset_viz_counter(self):
-		self._viz_counter = 0
 	def visualize(self, info, logger): # records output directly to logger
 		with torch.no_grad():
 			self._visualize(info, logger)
-		self._viz_counter += 1
 			
 	def _visualize(self, info, logger):
 		pass # by default nothing is visualized
-		# raise NotImplementedError
 
-	# def pre_epoch(self, mode, epoch):
-	# 	self.reset_viz_counter()
-	# 	super().pre_epoch(mode, epoch)
 
 class Evaluatable(Recordable): # TODO: maybe not needed
 
-	def evaluate(self, loader, logger=None, A=None, run=None):
+	def evaluate(self, loader, records=None):
 		# self._eval_counter += 1
-		return self._evaluate(loader, logger=logger, A=A, run=run)
+		return self._evaluate(loader, records=records)
 
-	def _evaluate(self, loader, logger=None, A=None, run=None):
+	def _evaluate(self, loader, records=None):
 		pass # by default eval does nothing
 	# 	raise NotImplementedError
 
@@ -177,8 +137,8 @@ class Evaluatable(Recordable): # TODO: maybe not needed
 @fig.AutoModifier('optim')
 class Optimizable(Recordable):
 
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
 		self.optim = None
 
 	def set_optim(self, A=None):
@@ -243,61 +203,8 @@ class Regularizable(object):
 	def regularize(self, q):
 		return torch.tensor(0).type_as(q)
 
-class Cacheable(Model):
-	def __init__(self, *args, cache_device=None, **kwargs):
-		self._cache_names = set()
-		self._cache_device = cache_device
-		super().__init__(*args, **kwargs)
 
-	def register_cache(self, name, value=None):
-		self._cache_names.add(name)
-
-		setattr(self, name,
-		        value if self._cache_device is None else value.to(self._cache_device))
-
-	def clear_cache(self):
-		for name in self._cache_names:
-			setattr(self, name, None)
-
-	def cuda(self, device=None):
-		super().cuda(device)
-		if self._cache_device is None:
-			for name in self._cache_names:
-				obj = getattr(self, name)
-				if obj is not None:
-					setattr(self, name, obj.cuda(device))
-
-	def cpu(self):
-		super().cpu()
-		if self._cache_device is None:
-			for name in self._cache_names:
-				obj = getattr(self, name)
-				if obj is not None:
-					setattr(self, name, obj.cpu())
-
-	def to(self, device):
-		super().to(device)
-		if self._cache_device is None:
-			for name in self._cache_names:
-				obj = getattr(self, name)
-				if obj is not None:
-					setattr(self, name, obj.to(device))
-
-	def state_dict(self, *args, **kwargs): # dont include cached items in the state_dict
-		cache = {}
-		for name in self._cache_names:
-			cache[name] = getattr(self, name)
-			delattr(self, name)
-
-		out = super().state_dict(*args, **kwargs)
-
-		for name, value in cache.items():
-			setattr(self, name, value)
-
-		return out
-
-
-class Trainable_Model(Optimizable, Savable, Model): # top level - must be implemented to train
+class Model(Savable, Evaluatable, Visualizable, Optimizable, Function): # top level - must be implemented to train
 	def step(self, batch):  # Override pre-processing mixins
 		return self._step(batch)
 
@@ -312,9 +219,6 @@ class Trainable_Model(Optimizable, Savable, Model): # top level - must be implem
 	def _test(self, batch):  # Override post-processing mixins
 		return self._step(batch)  # by default do the same thing as during training
 
-	def prep(self, *datasets):
-		pass
-
 	# NOTE: never call an optimizer outside of _step (not in mixinable functions)
 	# NOTE: before any call to an optimizer check with self.train_me()
 	def train_me(self):
@@ -322,7 +226,66 @@ class Trainable_Model(Optimizable, Savable, Model): # top level - must be implem
 
 
 
-class Full_Model(Cacheable, Visualizable, Evaluatable, Trainable_Model): # simple shortcut for subclassing
-	pass
+
+
+
+
+# class Cacheable(ModelBase):
+# 	def __init__(self, *args, cache_device=None, **kwargs):
+# 		self._cache_names = set()
+# 		self._cache_device = cache_device
+# 		super().__init__(*args, **kwargs)
+#
+# 	def register_cache(self, name, value=None):
+# 		self._cache_names.add(name)
+#
+# 		setattr(self, name,
+# 		        value if self._cache_device is None else value.to(self._cache_device))
+#
+# 	def clear_cache(self):
+# 		for name in self._cache_names:
+# 			setattr(self, name, None)
+#
+# 	def cuda(self, device=None):
+# 		super().cuda(device)
+# 		if self._cache_device is None:
+# 			for name in self._cache_names:
+# 				obj = getattr(self, name)
+# 				if obj is not None:
+# 					setattr(self, name, obj.cuda(device))
+#
+# 	def cpu(self):
+# 		super().cpu()
+# 		if self._cache_device is None:
+# 			for name in self._cache_names:
+# 				obj = getattr(self, name)
+# 				if obj is not None:
+# 					setattr(self, name, obj.cpu())
+#
+# 	def to(self, device):
+# 		super().to(device)
+# 		if self._cache_device is None:
+# 			for name in self._cache_names:
+# 				obj = getattr(self, name)
+# 				if obj is not None:
+# 					setattr(self, name, obj.to(device))
+#
+# 	def state_dict(self, *args, **kwargs): # dont include cached items in the state_dict
+# 		cache = {}
+# 		for name in self._cache_names:
+# 			cache[name] = getattr(self, name)
+# 			delattr(self, name)
+#
+# 		out = super().state_dict(*args, **kwargs)
+#
+# 		for name, value in cache.items():
+# 			setattr(self, name, value)
+#
+# 		return out
+
+
+
+# class Full_Model(Cacheable, Visualizable, Evaluatable, Trainable_Model): # simple shortcut for subclassing
+# 	pass
 
 

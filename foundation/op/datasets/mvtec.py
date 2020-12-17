@@ -20,9 +20,8 @@ from omnibelt import create_dir
 import omnifig as fig
 
 from ... import util
-from ..data import Dataset
 
-from ...data import standard_split, Device_Dataset, Info_Dataset, Splitable_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
+from ...data import Dataset, Deviced, Batchable, Image_Dataset
 
 DATASET_URL = 'ftp://guest:GU.205dldo@ftp.softronics.ch/mvtec_anomaly_detection/mvtec_anomaly_detection.tar.xz'
 
@@ -126,7 +125,7 @@ def download_mvtec(A):
 	return path
 
 @Dataset('mvtec')
-class MVTec_Anomaly_Detection(Info_Dataset, Batchable_Dataset):
+class MVTec_Anomaly_Detection(Batchable):
 
 	CATEGORIES = {'bottle', 'carpet', 'leather', 'screw', 'transistor', 'cable', 'grid',
         'metal_nut', 'tile', 'wood', 'capsule', 'hazelnut', 'pill','toothbrush', 'zipper'}

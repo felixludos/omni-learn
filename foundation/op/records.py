@@ -8,7 +8,7 @@ import omnifig as fig
 from .. import util
 
 @fig.Component('records')
-class Records(util.StatsContainer, dict):
+class Records(util.StatsClient, dict):
 	
 	def __init__(self, A):
 		super().__init__()
@@ -55,17 +55,40 @@ class Records(util.StatsContainer, dict):
 	def _init_stats(self, A=None):
 		if A is not None:
 			if 'stats' not in A:
-				A.push('stats._type', 'stats-manager', silent=True)
+				A.push('stats._type', 'stats-manager', silent=True, force_root=True)
 			stats = A.pull('stats')
 			self._active_stats = {self['mode']:stats}
 			self.archive = {}
 			return stats
 		
 	def get_description(self): # for logging
-		raise NotImplementedError
+		
+		if bar is not None:
+			bar.update(1)
+			title = '{} ({})'.format(mode, records['total_epochs'][mode] + 1) \
+				if mode in records['total_epochs'] else mode
+			loss_info = ' Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
+			                                            stats['loss'].smooth.item()) \
+				if stats['loss'].count > 0 else ''
+			bar.set_description('{} ckpt={}{}'.format(title, records['checkpoint'], loss_info))
+		
+		elif self.print_time():
+			
+			total_steps = self.get_total_steps()
+			title = '{} ({})'.format(mode, records['total_epochs'][mode] + 1) \
+				if mode in records['total_epochs'] else mode
+			loss_info = 'Loss: {:.3f} ({:.3f})'.format(stats['loss'].val.item(),
+			                                           stats['loss'].smooth.item()) \
+				if stats['loss'].count > 0 else ''
+			
+			tm = time.strftime("%H:%M:%S")
+			print(f'[ {tm} ] {title} {total_steps}/{step_limit} {loss_info}')
+			
+			sys.stdout.flush()
+		raise NotImplementedError # TODO
 		
 	def get_short_description(self): # for progress bar
-		raise NotImplementedError
+		raise NotImplementedError # TODO
 	
 	def register_stats_client(self, client, fmt=None):
 		self.stats.register_client(client, fmt=fmt)

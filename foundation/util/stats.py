@@ -2,34 +2,35 @@
 import numpy as np
 
 import torch
-from collections import deque
+from collections import deque, OrderedDict
 
 import omnifig as fig
 
-class StatsCollector(object):
-	def __init__(self, require_all_keys=True):
-		assert require_all_keys
-		self.bag = None
-		self.steps = deque()
+from .features import Configurable, Switchable
 
-	def update(self, step, stats):
-		if self.bag is None:
-			self.bag = {stat:deque() for stat in stats}
-		self.steps.append(step)
-		for stat, val in stats.items():
-			self.bag[stat].append(val)
-
-	def export(self):
-		data = {'steps':np.array(self.steps)}
-		if self.bag is not None:
-			data['stats'] = {stat:np.array(data) for stat, data in self.bag.items()}
-		return data
-
-	def save(self, path):
-		torch.save(self.export(), path)
+# class StatsCollector(object):
+# 	def __init__(self, require_all_keys=True):
+# 		assert require_all_keys
+# 		self.bag = None
+# 		self.steps = deque()
+#
+# 	def update(self, step, stats):
+# 		if self.bag is None:
+# 			self.bag = {stat:deque() for stat in stats}
+# 		self.steps.append(step)
+# 		for stat, val in stats.items():
+# 			self.bag[stat].append(val)
+#
+# 	def export(self):
+# 		data = {'steps':np.array(self.steps)}
+# 		if self.bag is not None:
+# 			data['stats'] = {stat:np.array(data) for stat, data in self.bag.items()}
+# 		return data
+#
+# 	def save(self, path):
+# 		torch.save(self.export(), path)
 
 _tau = 0.001
-
 def set_default_tau(tau):
 	global _tau
 	_tau = tau
@@ -37,127 +38,106 @@ def set_default_tau(tau):
 # def override_all_stats_tau(tau): # TODO: track all stats objs and then update tau
 # 	pass
 
-class StatsContainer:
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		
-		self._init_stats()
-	
-	def _init_stats(self):
-		self.stats = StatsMeter()
-		
-	def get_stats(self):
-		return self.stats
 
-@fig.AutoModifier('reg-stats')
-class RegStats(StatsContainer):
-	def __init__(self, A, **kwargs):
-		
-		super().__init__(A, **kwargs)
-		
-		self._init_stats(A)
-		
-	def _init_stats(self, A=None):
-		if A is not None:
-			A.push('stats._type', 'stats', overwrite=False, silent=True)
-			self.stats = A.pull('stats')
-			
-			if A.pull('_reg_stats', True):
-				records = A.pull('records', None, ref=True)
-				if records is not None:
-					stats_fmt = A.pull('_stats_fmt', None)
-					records.register_stats_client(self, fmt=stats_fmt)
 
-@fig.AutoComponent('stats')
-class StatsMeter(object):
-	def __init__(self , *names, tau=None, **_stats):
-		self._stats = {}
-		
-		self.tau = tau if tau is not None else _tau
-		
-		for name in names:
-			self.new(name)
-		if len(_stats):
-			self.load(_stats)
 
+# @fig.AutoModifier('reg-stats')
+# class RegStats(StatsContainer):
+# 	def __init__(self, A, **kwargs):
+#
+# 		super().__init__(A, **kwargs)
+#
+# 		self._init_stats(A)
+#
+# 	def _init_stats(self, A=None):
+# 		if A is not None:
+# 			A.push('stats._type', 'stats', overwrite=False, silent=True)
+# 			self.stats = A.pull('stats')
+#
+# 			if A.pull('_reg_stats', True):
+# 				records = A.pull('records', None, ref=True)
+# 				if records is not None:
+# 					stats_fmt = A.pull('_stats_fmt', None)
+# 					records.register_stats_client(self, fmt=stats_fmt)
+
+@fig.Component('stats')
+class StatsMeter(Configurable, OrderedDict):
+	def __init__(self , A=None, meter_info=None):
+		
+		if meter_info is None:
+			assert A is not None, 'need config to know how to create new meters'
+			if 'meter-info' not in A:
+				A.push('meter-info._type', 'meter', overwrite=False)
+			meter_info = A.pull('meter-info', raw=True)
+		
+		super().__init__()
+		
+		self.meter_info = meter_info
+		
 	def set_tau(self, tau):
-		self.tau = tau
-		for s in self._stats.values():
-			s.tau = tau
+		for meter in self.values():
+			meter.tau = tau
 
 	def reset(self):
-		for stat in self._stats.values():
-			stat.reset()
+		for meter in self.values():
+			meter.reset()
 	
-	def copy(self):
-		'''returns deepcopy of self'''
-		new = self.__class__(tau=self.tau)
-		for name, meter in self._stats.items():
-			new._stats[name] = meter.copy()
-		return new
-	
-	def __getitem__(self, name):
-		#assert name in self._stats, name + ' not found'
-		return self._stats[name]
+	# def __deepcopy__(self):
+	# 	'''returns deepcopy of self'''
+	# 	new = self.__class__(meter_info=self.meter_info)
+	# 	for name, meter in self.items():
+	# 		new[name] = meter.copy()
+	# 	return new
 
-	def __contains__(self, name):
-		return name in self._stats
+	def _create_meter(self, name=None):
+		return self.meter_info.pull_self()
 
 	def new(self, *names):
 		for name in names:
-			#assert name not in self._stats, 'The stat ' + name + ' already exists'
-			if name not in self._stats:
-				self._stats[name] = AverageMeter(tau=self.tau)
+			if name not in self:
+				self[name] = self._create_meter(name)
 
 	def discard(self, *names):
 		for name in names:
-			if name in self._stats:
-				del self._stats[name]
+			if name in self:
+				del self[name]
 	def remove(self, *names):
 		for name in names:
-			del self._stats[name]
+			del self[name]
 
-	def __delitem__(self, key):
-		del self._stats[key]
-	
-	def update(self, name, value, n=1):
+	def mete(self, name, value, n=1):
 		# assert isinstance(value, (int,float)) or value.size == 1, 'unknown: {} {}'.format(value.shape, value)
-		self._stats[name].update(value, n=n)
+		self[name].mete(value, n=n)
 	
 	def __add__(self, other):
 		new = self.copy()
 		new.join(other)
 		return new
 	
-	def join(self, other, intersection=False, prefix=''):
+	def join(self, other, intersection=False, fmt=None):
 		'''other is another stats meter'''
-		for name, meter in other._stats.items():
-			name = prefix + name
-			if name in self._stats:
-				self._stats[name].join(meter)
-			elif not intersection:
-				self._stats[name] = meter.copy()
-
-	def shallow_join(self, other, fmt=None):
-		for name, meter in other._stats.items():
+		for name, meter in other.items():
 			if fmt is not None:
 				name = fmt.format(name)
-			self._stats[name] = meter
-	
-	def keys(self):
-		return self._stats.keys()
-	
-	def items(self):
-		return self._stats.items()
+			if name in self:
+				self[name].join(meter)
+			elif not intersection:
+				self[name] = meter.copy()
 
+	def shallow_join(self, other, fmt=None):
+		for name, meter in other.items():
+			if fmt is not None:
+				name = fmt.format(name)
+			self[name] = meter
+	
 	def vals(self, fmt='{}'):
-		return {fmt.format(k):v.val.item() for k,v in self._stats.items()}
+		return {fmt.format(k):v.val.item() for k,v in self.items()}
 
 	def avgs(self, fmt='{}'):
-		return {fmt.format(k):v.avg.item() for k,v in self._stats.items() if v.count > 0}
+		return {fmt.format(k):v.avg.item() for k,v in self.items() if v.count > 0}
 	
 	def smooths(self, fmt='{}'):
-		return {fmt.format(k): (v.smooth.item()) for k,v in self._stats.items() if v.smooth is not None}
+		return {fmt.format(k): (v.smooth.item()) for k,v in self.items() if v.smooth is not None}
 
 	def split(self):
 		all_vals = {k:v.export() for k,v in self.__dict__.items()}
@@ -172,10 +152,10 @@ class StatsMeter(object):
 		return [StatsMeter(**info) for info in stats]
 
 	def load(self, stats):
-		self._stats.update({stat:AverageMeter(vals) for stat,vals in stats.items()})
+		self.update({stat:self._create_meter(stat).load(vals) for stat,vals in stats.items()})
 
 	def export(self):
-		return {name : meter.export() for name, meter in self._stats.items()}
+		return {name : meter.export() for name, meter in self.items()}
 	#
 	# def save(self, filename):
 	# 	torch.save(self.export() ,filename)
@@ -191,59 +171,113 @@ class StatsMeter(object):
 		return self.__str__()
 		
 	def __str__(self):
-		return 'StatsMeter({})'.format(', '.join(['{}:{:.4f}'.format(k,v.val.item()) for k,v in self._stats.items()]))
+		return 'StatsMeter({})'.format(', '.join(['{}:{:.4f}'.format(k,v.val.item()) for k,v in self.items()]))
 
 
-@fig.AutoComponent('stats-manager')
-class StatsManager(StatsMeter):
-	
-	def __init__(self, *names, tau=None, **_stats):
-		super().__init__(*names, tau=tau, **_stats)
-		self._clients = []
-		self._client_fmts = []
-	
-	def register_client(self, client, fmt=None):
-		self._clients.append(client)
+@fig.Component('stats-manager')
+class StatsManager(Switchable, StatsMeter):
+
+	def __init__(self, A=None, collections=None, collection_fmts=None, **kwargs):
 		
-		stats_keys = {}
+		if collection_fmts is None and A is not None:
+			collection_fmts = A.pull('stat-collection-fmts', {})
+		if collections is None:
+			collections = {}
 		
-		for name, meter in client.items():
-			key = name if fmt is None else fmt.format(name)
-			stats_keys[key] = name
-			self._stats[key] = meter
+		super().__init__(A=A, **kwargs)
+		self._master_names = set()
+		self._collections = collections
+		self._collection_fmts = collection_fmts
+	
+	def vals(self, fmt=None):
+		if fmt is None:
+			fmt = self._collection_fmts.get(self.get_mode(), '{}')
+		return super().vals(fmt=fmt)
+	
+	def avgs(self, fmt=None):
+		if fmt is None:
+			fmt = self._collection_fmts.get(self.get_mode(), '{}')
+		return super().avgs(fmt=fmt)
+	
+	def smooths(self, fmt=None):
+		if fmt is None:
+			fmt = self._collection_fmts.get(self.get_mode(), '{}')
+		return super().smooths(fmt=fmt)
+	
+	def new(self, *names):
+		self._master_names.update(names)
+		super().new(*names)
+	
+	def remove(self, *names):
+		self._master_names.difference_update(names)
+		super().remove(*names)
+
+	def discard(self, *names):
+		self._master_names.difference_update(names)
+		super().discard(*names)
 		
-		self._client_keys.append(stats_keys)
+	def _create_collection(self):
+		return {name:self._create_meter(name) for name in self._master_names}
 	
-	def pull_clients(self):
-		for client, keys in zip(self._clients, self._client_keys):
-			for key, name in keys.items():
-				self._stats[key] = client._stats[name]
-	
-	def push_clients(self):
-		for client, keys in zip(self._clients, self._client_keys):
-			for key, name in keys.items():
-				if key in self._stats:
-					client._stats[name] = self._stats[key]
-	
-	def copy(self):
-		new = super().copy()
-		new._clients = self._clients.copy()
-		new._client_keys = self._client_keys.copy()
+	def switch_mode(self, mode):
+		
+		old = self.get_mode()
+		if mode == old:
+			return
+		self._sync_collections()
+		
+		super().switch_mode(mode)
+		self.clear()
+		
+		if mode not in self._collections:
+			collection = self._create_collection()
+			self._collections[mode] = collection
+		self.update(self._collections[mode])
+		
+	def _sync_collections(self):
+		mode = self.get_mode()
+		if mode is not None:
+			self._collections[self.get_mode()] = dict(self)
+		
+	def export(self):
+		
+		self._sync_collections()
+		
+		return {mode: {name:meter.export() for name,meter in stats} for mode, stats in self._collections.items()}
+		
+	def load(self, stats):
+		mode = None
+		self._collections = {mode:{name:self._create_meter(name).load(vals) for name,vals in meters.items()}
+		                     for mode, meters in stats.items()}
+		
+		if mode is not None:
+			self._master_names = set(self._collections[mode].keys())
+		
+		self.clear()
+		self.mode = None
+
+	# def copy(self):
+	# 	new = super().copy()
+	# 	new._collections = self._collections.copy()
+	# 	new._collection_fmts = self._collection_fmts.copy()
 
 
 ### Computes sum/avg stats
-class AverageMeter(object):
+@fig.Component('meter')
+class AverageMeter(Configurable):
 	"""Computes and stores the average and current value"""
-	def __init__(self, vals=None, tau=0.001):
-		if vals is not None:
-			self.load(vals)
-		else:
-			self.reset()
-			
+	def __init__(self, A=None, tau=None, **kwargs):
+		super().__init__(A, **kwargs)
+		
+		self.reset()
+		
+		if tau is None:
+			assert A is not None, 'no config provided'
+			tau = A.pull('smooth-tau', '<>tau', 0.001)
 		self.tau = tau
-	
+		
 	def copy(self):
-		new = AverageMeter()
+		new = self.__class__(tau=self.tau)
 		for k, v in self.__dict__.items():
 			if k == 'tau':
 				new.tau = self.tau
@@ -267,7 +301,7 @@ class AverageMeter(object):
 		self.std = torch.tensor(0.)
 		self.S = torch.tensor(0.)
 	
-	def update(self, val, n=1):
+	def mete(self, val, n=1):
 		try:
 			val = val.float().detach().cpu()
 		except:
@@ -291,6 +325,7 @@ class AverageMeter(object):
 	def load(self, vals):
 		for k, v in vals.items():
 			self.__dict__[k] = torch.tensor(v)
+		return self
 	
 	def export(self): #
 		if self.val.nelement() > 1:
@@ -324,7 +359,7 @@ class AverageMeter(object):
 		elif other.max is not None:
 			self.max = max(self.max, other.max)
 		if self.min is None:
-			self.min = other.min
-		elif other.min is not None:
-			self.min = min(self.min, other.min)
+			self.min = other.min_val
+		elif other.min_val is not None:
+			self.min = min(self.min, other.min_val)
 

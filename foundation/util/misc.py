@@ -45,19 +45,6 @@ def create_param(*sizes, requires_grad=True):
 	nn.init.xavier_normal_(t)
 	return nn.Parameter(t, requires_grad=requires_grad)
 
-
-class Mode:
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.mode = 'train'
-	
-	def switch_mode(self, mode):
-		self.mode = mode
-	
-	def get_mode(self):
-		return self.mode
-
-
 @fig.Component('progress-bar')
 class Progress_Bar(Singleton):
 	def __init__(self, A):
@@ -89,7 +76,7 @@ class Progress_Bar(Singleton):
 		return self
 	
 	def __next__(self):
-		self.update()
+		return self.update()
 	
 	def reset(self):
 		if self.pbar is not None:

@@ -7,7 +7,8 @@ from torch.nn.utils import spectral_norm
 
 import omnifig as fig
 
-from .. import framework as fm
+# from .. import framework as fm
+from ..op import framework as fm
 from .. import util
 
 
@@ -140,7 +141,7 @@ def spec_norm_layer(layer, config):
 #################
 
 @fig.AutoComponent('recurrence')
-class Recurrence(fm.Model):
+class Recurrence(fm.FunctionBase):
 	def __init__(self, din, dout, hidden_dim=None, num_layers=1, output_nonlin=None,
 				 rec_type='gru', dropout=0., batch_first=False, bidirectional=False, auto_reset=True):
 		super().__init__(din, dout)
@@ -190,7 +191,7 @@ class Recurrence(fm.Model):
 		return out
 
 @fig.AutoComponent('fourier-layer')
-class FourierLayer(fm.Model): # TODO: generalize period to multiple din
+class FourierLayer(fm.FunctionBase): # TODO: generalize period to multiple din
 	def __init__(self, din=1, dout=1, order=100, periods=None):
 		super().__init__(din, dout)
 
@@ -219,7 +220,7 @@ class FourierLayer(fm.Model): # TODO: generalize period to multiple din
 		return 2 * np.pi / self.w
 
 
-class Invertible(fm.Model):
+class Invertible(fm.FunctionBase):
 	def __init__(self, features, bias=True):
 		super().__init__(features, features)
 		
@@ -289,15 +290,15 @@ class InvertibleLayer(Invertible):
 		super().__init__(dim, bias=bias)
 
 
-class PowerLinear(fm.Model):  # includes powers of input as features
+class PowerLinear(fm.FunctionBase):  # includes powers of input as features
 	def __init__(self):
 		raise NotImplementedError
 
 
 @fig.AutoComponent('dense-layer')
-class DenseLayer(fm.Model):
+class DenseLayer(fm.FunctionBase):
 	def __init__(self, din, dout, bias=True, nonlin='elu'):
-		super().__init__(din, dout)
+		super().__init__(din=din, dout=dout)
 
 		seq = []
 
@@ -322,7 +323,7 @@ class DenseLayer(fm.Model):
 		return self.layer(x)
 
 @fig.Component('conv-layer')
-class ConvLayer(fm.Model):
+class ConvLayer(fm.FunctionBase):
 
 	def __init__(self, A):
 		# in_shape=None, out_shape=None, channels=None,
@@ -495,7 +496,7 @@ class ConvLayer(fm.Model):
 		print_dims = A.pull('print_dims', False)
 		din, dout = (Cin, Hin, Win), (Cout, Hout, Wout)
 
-		super().__init__(din, dout)
+		super().__init__(din=din, dout=dout)
 
 		self.unpool = unpool
 
@@ -551,7 +552,7 @@ class ConvLayer(fm.Model):
 
 
 @fig.AutoComponent('layer-norm')
-class LayerNorm(fm.Model):
+class LayerNorm(fm.FunctionBase):
 	def __init__(self, din, eps=1e-5, elementwise_affine=True):
 		super().__init__(din, din)
 		self.norm = nn.LayerNorm(din, eps=eps,
@@ -561,7 +562,7 @@ class LayerNorm(fm.Model):
 		return self.norm(x)
 
 @fig.AutoComponent('interpolate')
-class Interpolate(fm.Model):
+class Interpolate(fm.FunctionBase):
 	def __init__(self, din=None, size=None, scale_factor=None, mode='nearest',
 				 align_corners=None, recompute_scale_factor=None):
 		assert size is not None or (din is not None and scale_factor is not None)
@@ -588,7 +589,7 @@ class Interpolate(fm.Model):
 
 
 @fig.AutoComponent('conv-lstm')
-class ConvLSTM(fm.Model):
+class ConvLSTM(fm.FunctionBase):
 	def __init__(self, input_dim, hidden_dim, kernel_size,
 				 batch_first=False, auto_reset=True,
 				 peephole=True):

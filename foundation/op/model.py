@@ -5,8 +5,8 @@ import torch
 from torch import nn
 
 from .. import util
-from .clock import CustomAlert
-from .. import framework as fm
+from .runs import CustomAlert
+from . import framework as fm
 
 
 def load_checkpoint(path):  # model parameters - TODO: maybe add more options
@@ -57,11 +57,6 @@ def load_model(A):
 			if not load_optim:
 				del params['optim']
 	
-			elif 'scheduler' in params['optim']:
-				load_scheduler = A.pull('load_scheduler_params', True)
-				if not load_scheduler:
-					del params['optim']['scheduler']
-				
 		strict_load_state = A.pull('strict_load_state', True)
 		
 		model.load_state_dict(params, strict=strict_load_state)
@@ -101,7 +96,7 @@ class Viz_Criterion(nn.Module):
 	             allow_grads=False):
 		super().__init__()
 		
-		self.criterion = criterion
+		self.criterion = util.get_loss_type(criterion)
 		self.arg_names = arg_names
 		self.kwarg_names = kwarg_names
 		self.allow_grads = allow_grads
@@ -118,7 +113,7 @@ class Viz_Criterion(nn.Module):
 			return self.criterion(*args, **kwargs)
 
 # @Component('stage') # TODO
-class Stage_Model(fm.Schedulable, fm.Trainable_Model):
+class Stage_Model(fm.Model):
 	def __init__(self, A):
 		stages = A.pull('stages')
 

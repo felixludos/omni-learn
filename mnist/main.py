@@ -8,18 +8,18 @@ import foundation as fd
 from foundation import util
 
 @fig.Component('simple')
-class Simple_Model(fd.Evaluatable, fd.Visualizable, fd.Schedulable, fd.Trainable_Model):
+class Simple_Model(fd.Model):
 	def __init__(self, info):
 
 		net = info.pull('net')
 		criterion = info.pull('criterion', 'cross-entropy')
 
-		super().__init__(net.din, net.dout)
+		super().__init__(info, din=net.din, dout=net.dout)
 
 		self.net = net
 		self.criterion = util.get_loss_type(criterion)
 
-		self.stats.new('accuracy', 'confidence')
+		self.register_stats('accuracy', 'confidence')
 
 	def forward(self, x):
 		return self.net(x)
