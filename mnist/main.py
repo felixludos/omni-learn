@@ -57,20 +57,14 @@ class Simple_Model(fd.Model):
 		results['stats'] = self.stats.export()
 		display = self.stats.avgs()  # if smooths else stats.avgs()
 		for k, v in display.items():
-			logger.add('scalar', k, v)
+			logger.log('scalar', k, v)
 		results['stats_num'] = total
 		
 		return results
 
 	def _visualize(self, info, logger):
 
-		conf, pick = info.pred.max(-1)
-
-		confidence = conf.detach()
-		correct = pick.sub(info.y).eq(0).float().detach()
-
-		self.stats.update('confidence', confidence.mean())
-		self.stats.update('accuracy', correct.mean())
+		pass
 
 
 	def _step(self, batch, out=None):
@@ -84,6 +78,12 @@ class Simple_Model(fd.Model):
 
 		pred = self(x)
 		out.pred = pred
+
+		conf, pick = pred.max(-1)
+		confidence = conf.detach()
+		correct = pick.sub(y).eq(0).float().detach()
+		self.mete('confidence', confidence.mean())
+		self.mete('accuracy', correct.mean())
 
 		loss = self.criterion(pred, y)
 		out.loss = loss

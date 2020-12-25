@@ -1,6 +1,7 @@
 
 import sys, os
 from pathlib import Path
+from wrapt import ObjectProxy
 import numpy as np
 import torch
 from torch.utils.data import Dataset as PytorchDataset
@@ -11,15 +12,14 @@ from .. import util
 
 
 class ExistingModes:
-	def __init__(self, A, **kwargs):
-		self._available_cuts = {'train'}
-		super().__init__(A, **kwargs)
+	def __init_subclass__(cls, **kwargs):
+		cls.available_modes = {'train'}
 	
 	def add_existing_modes(self, *modes):
-		self._available_cuts.update(modes)
+		self.available_modes.update(modes)
 	
 	def get_available_modes(self):
-		return self._available_cuts
+		return self.available_modes
 
 class DatasetBase(ExistingModes, util.Dimensions, util.Configurable, PytorchDataset):
 	pass
@@ -103,24 +103,12 @@ class List_Dataset(DatasetBase):
 	
 # region Wrappers
 
-class DatasetWrapper(util.Proper_Child, PytorchDataset):
-	def __init__(self, dataset):
-		parent = dataset
-		if isinstance(dataset, util.Proper_Child):
-			parent = dataset._parent
-		
-		super().__init__(_parent=parent)
-		self.dataset = dataset
-
+class DatasetWrapper(ObjectProxy):
+	pass
+	
 class Indexed_Dataset(DatasetWrapper):
-	def __init__(self, dataset):
-		self.dataset = dataset
-
-	def __len__(self):
-		return len(self.dataset)
-
 	def __getitem__(self, idx):
-		return idx, self.dataset[idx]
+		return idx, self.__wrapped__[idx]
 
 
 class Subset_Dataset(DatasetWrapper):
@@ -130,17 +118,17 @@ class Subset_Dataset(DatasetWrapper):
 		self.indices = indices
 
 		try:
-			device = self.dataset.get_device()
+			device = self.__wrapped__.get_device()
 			if self.indices is not None:
 				self.indices = self.indices.to(device)
 		except AttributeError:
 			pass
 
 	def __getitem__(self, idx):
-		return self.dataset[idx] if self.indices is None else self.dataset[self.indices[idx]]
+		return self.__wrapped__[idx] if self.indices is None else self.__wrapped__[self.indices[idx]]
 
 	def __len__(self):
-		return len(self.dataset) if self.indices is None else len(self.indices)
+		return len(self.__wrapped__) if self.indices is None else len(self.indices)
 
 class Repeat_Dataset(DatasetWrapper):
 
@@ -152,7 +140,7 @@ class Repeat_Dataset(DatasetWrapper):
 		print('Repeating dataset {} times'.format(factor))
 
 	def __getitem__(self, idx):
-		return self.dataset[idx % self.num_real]
+		return self.__wrapped__[idx % self.num_real]
 
 	def __len__(self):
 		return self.total
@@ -167,12 +155,9 @@ class Format_Dataset(DatasetWrapper):
 		self.format_args = {} if format_args is None else format_args
 		self.include_original = include_original
 
-	def __len__(self):
-		return len(self.dataset)
-
 	def __getitem__(self, idx):
 
-		sample = self.dataset[idx]
+		sample = self.__wrapped__[idx]
 
 		formatted = self.format_fn(sample, **self.format_args)
 
@@ -186,18 +171,15 @@ class Shuffle_Dataset(DatasetWrapper):
 	def __init__(self, dataset):
 		super().__init__(dataset)
 
-		self._shfl_indices = torch.randperm(len(self.dataset)).clone()
+		self._shfl_indices = torch.randperm(len(self.__wrapped__)).clone()
 
 		try:
-			device = self.dataset.get_device()
+			device = self.__wrapped__.get_device()
 			self._shfl_indices = self._shfl_indices.to(device).clone()
 		except AttributeError:
 			pass
 
-	def __len__(self):
-		return len(self.dataset)
-
 	def __getitem__(self, idx):
-		return self.dataset[self._shfl_indices[idx]]
+		return self.__wrapped__[self._shfl_indices[idx]]
 
 # endregion

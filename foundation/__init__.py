@@ -6,7 +6,7 @@ from . import eval
 
 from . import models
 # from .framework import * # TODO: cleanup
-from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
+from foundation.op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
 	Evaluatable, Visualizable
 
 try:

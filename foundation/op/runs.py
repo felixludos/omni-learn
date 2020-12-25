@@ -9,6 +9,7 @@ from collections import OrderedDict
 import humpack as hp
 
 import omnifig as fig
+from omnifig import Configurable
 from omnifig.errors import MissingParameterError
 
 from omnibelt import load_yaml, save_yaml, get_now, create_dir
@@ -19,114 +20,13 @@ FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH), 'trained_nets')
 
 
-@fig.Component('clock')
-class Clock:
-	def __init__(self, A, **kwargs):
-		self._ticks = 0
-		self._alerts = OrderedDict()
-		self._info = None
-	
-	def get_info(self):
-		return self._info
-	
-	def set_info(self, info):
-		self._info = info
-	
-	def register_alert(self, name, alert, **unused):
-		if name is None:
-			name = f'{alert}#{id(alert)}'
-		self._alerts[name] = alert
-	
-	def clear(self):
-		self._alerts.clear()
-		self._info = None
-	
-	def _call_alert(self, name, alert, info=None):
-		if info is None:
-			info = self._info
-		return alert.activate(self._ticks, info)
-	
-	def get_time(self):
-		return self._ticks
-	
-	def __len__(self):
-		return self.get_time()
-	
-	def set_time(self, ticks):
-		self._ticks = ticks
-	
-	def tick(self, info=None):
-		for name, alert in self._alerts.items():
-			if alert.check(self._ticks, info):
-				self._call_alert(name, alert, info=info)
-		self._ticks += 1
-	
-	def step(self, info=None, n=None):
-		if n is None:
-			n = 1
-		for _ in range(n):
-			self.tick(info=info)
-
-class Alert:
-	def __init__(self, A=None, **kwargs):
-		pass
-	
-	def check(self, tick, info=None):
-		return True
-	
-	def activate(self, tick, info=None):
-		'''
-
-		:param tick: int
-		:param info: object passed to clock.tick()
-		:return: new value (representative of the alert) or none
-		'''
-		pass
-
-class CustomAlert(Alert):
-	def __init__(self, activate=None, check=None, **kwargs):
-		super().__init__(**kwargs)
-		self._activate = activate
-		self._check = check
-	
-	def check(self, tick, info=None):
-		if self._check is None:
-			return True
-		return self._check(tick, info=info)
-	
-	def activate(self, tick, info=None):
-		if self._activate is None:
-			pass
-		return self._activate(tick, info=info)
-
 
 class RunNotFoundError(Exception):
 	def __init__(self, name):
 		super().__init__(f'Run not found: {name}')
 
 
-def wrap_script(script_name, A, **kwargs):
-	A.begin()
-	
-	obj = fig.run(script_name, A, **kwargs)
-	
-	store_keys = A.pull('store_keys', [])
-	
-	stored = {}
-	for key in store_keys:
-		try:
-			val = A.pull(key, silent=True)
-		except MissingParameterError:
-			pass
-		else:
-			stored[key] = val
-	
-	A.abort()
-	
-	for key, val in stored.items():
-		A.push(key, val, silent=True, force_root=True)
-	
-	return obj
+
 
 class Validation_Flag(Exception):
 	pass
@@ -152,23 +52,23 @@ def load_run(A):
 	
 
 @fig.Component('run')
-class Run(Alert):
+class Run(Configurable):
 	'''
 	Holds all the data and functions to load, save, train, and evaluate runs.
 	Runs include the model, datasets, dataloaders, the logger, and stats
 	'''
-	def __init__(self, A, silent=False):
-		super().__init__(A)
+	def __init__(self, A, silent=False, **kwargs):
+		super().__init__(A, **kwargs)
 		self.silent = A.pull('silent', silent)
 		self.invisible = A.pull('invisible', False)
 		
 		A = A.get_root()
 		A = self._find_origin(A)
 		
-		self._prep(A)
-		
 		if not self.invisible:
 			self._setup_storage(A)
+		
+		self._prep(A)
 		
 		self.purge() # reset payload objs
 	
@@ -186,13 +86,13 @@ class Run(Alert):
 		self.clock = A.pull('clock', ref=True)
 
 		A.push('records._type', 'records', overwrite=False, silent=True)
+		self.records = A.pull('records', ref=True)
 
 		self.A = A
 	
 	def purge(self): # remove any potentially large objects to free memory
 		self.dataset = None
 		self.model = None
-		self.records = None
 		
 		self.loader = None
 		self._loader = None
@@ -201,8 +101,13 @@ class Run(Alert):
 		self.out = None
 		
 		self.clock.clear()
+		self.records.purge()
+		self.checkpointer = None
+		self.validation = None
 		
 		self.results = {}
+	
+		self._started = False
 	
 	def _find_origin(self, A):
 		
@@ -226,7 +131,7 @@ class Run(Alert):
 			if not self.silent:
 				print(f'Loading Config: {config_path}')
 			
-			load_A = fig.get_config(path)
+			load_A = fig.get_config(str(path))
 			if novel:
 				load_A.update(A)
 			A.clear()
@@ -299,10 +204,6 @@ class Run(Alert):
 		
 		ckpt = ckpts[nums[-1]] if last or num is None or num not in ckpts else ckpts[num]
 		
-		
-		self.get_records().import_(ckpt)
-		self.clock.set_time()
-		
 		ckpt = str(ckpt)
 		A.push('dataset._load-ckpt', ckpt, overwrite=True, silent=self.silent)
 		A.push('model._load-ckpt', ckpt, overwrite=True, silent=self.silent)
@@ -313,30 +214,44 @@ class Run(Alert):
 	def _gen_name(self, A):
 		return 'test'
 	
-	# def create_logger(self, path=None):
-	#
-	# 	A = self.get_config()
-	#
-	# 	if path is None:
-	# 		path = self.path
-	#
-	# 	if path is None:
-	# 		return None
-	#
-	# 	A.push('logger._type', 'logger', overwrite=False, silent=self.silent)
-	# 	A.push('logger.log_dir', str(path), overwrite=True, silent=self.silent)
-	#
-	# 	logger = A.pull('logger', silent=self.silent)
-	# 	return logger
+	@staticmethod
+	def wrap_pull(A, keep_instance=True, **kwargs):
+		A.begin()
+		
+		obj = A.pull_self()
+		
+		store_keys = A.pull('store_keys', [], silent=True)
+		
+		stored = {}
+		
+		if len(store_keys):
+			
+			for key in store_keys:
+				try:
+					val = A.pull(key, silent=True)
+				except MissingParameterError:
+					pass
+				else:
+					stored[key] = val
+		
+		A.abort()
+		
+		for key, val in stored.items():
+			A.push(key, val, silent=True, force_root=True)
+			
+		if A.pull('keep_instance', keep_instance, silent=True):
+			A.push('__obj', obj, silent=True)
+		
+		return obj
 	
 	def create_dataset(self, A=None, **meta):
 		if A is None:
 			A = self.get_config().sub('dataset')
-		return wrap_script('load-data', A, **meta)
+		return self.wrap_pull(A, **meta)
 	def create_model(self, A=None, **meta):
 		if A is None:
 			A = self.get_config().sub('model')
-		return wrap_script('load-model', A, **meta)
+		return self.wrap_pull(A, **meta)
 	def create_records(self, A=None, **meta):
 		if A is None:
 			A = self.get_config().sub('records')
@@ -349,6 +264,20 @@ class Run(Alert):
 		
 	def create_results(self, A=None, **meta):
 		raise NotImplementedError # TODO
+	
+	def get_description(self, ticks=None):
+		if ticks is None:
+			ticks = self.clock.get_time()
+		
+		tm = time.strftime("%H:%M:%S")
+		
+		progress = self.model.get_description()
+		limit = self.clock.get_limit()
+		
+		mode = 'train'
+		epochs = self.records['total_epochs'][mode]
+		
+		return f'[ {tm} ] {mode}:{epochs} {ticks}/{limit} {progress}'
 	
 	# region "Payload" objects - not loaded automatically
 
@@ -371,13 +300,8 @@ class Run(Alert):
 			self.records = self.create_records(**meta)
 		return self.records
 	
-	def get_loader(self, activate=False, **kwargs):
-		if self.loader is None:
-			self.loader = self.create_loader(**kwargs)
-		if activate and self._loader is None:
-			self._loader = iter(self.loader)
-		return self.loader
-		
+	def get_loader(self, mode=None, **kwargs):
+		return self.get_dataset().get_loader(mode, **kwargs)
 	
 	def get_results(self, ident, remove_ext=True): # you must specify which results (ident used when results were created)
 		
@@ -400,60 +324,103 @@ class Run(Alert):
 	def get_path(self):
 		return self.path
 
+	def get_batch(self):
+		if self.batch is None:
+			self.batch = self.get_dataset().get_batch()
+		return self.batch
+	
 	def get_output(self):
-		raise NotImplementedError
+		if self.out is None:
+			self.out = self.get_model().step(self.get_batch())
+		return self.out
 
 	# endregion
 	
 	# region Training Phases
 	
-	def activate(self, tick, info=None):
-		return self.train_step()
+	def take_steps(self, n=1, complete=False):
+		
+		if not self._started:
+			self.startup()
+		
+		if complete:
+			n = self.clock.get_remaining()
 	
-	def continuous(self):
+		out = self._take_steps(n)
 		
-		self.startup()
+		if self.clock.get_remaining() <= 0:
+			print('Training Complete')
+			ticks = self.clock.get_time()
+			if self.validation is not None:
+				self.validation.activate(ticks, info=self)
+			if self.checkpointer is not None:
+				self.checkpointer.activate(ticks, info=self)
 		
-		self.clock.step(info=self)
+		return out
+	
+	def _take_steps(self, n=1):
+		for i in range(n):
+			self._take_step()
+			
+	def _take_step(self):
+		self.clock.tick(self)
+	
+	def receive_batch(self, batch):
+		self.out = None
+		self.batch = batch
+	
+	def receive_output(self, batch, out):
+		self.out = out
 		
+		records = self.get_records()
+		records['total_steps']['train'] += 1
+		records['total_samples']['train'] += batch.size(0)
 	
 	def startup(self):
+		
+		self._started = True
 		
 		A = self.get_config()
 		clock = self.get_clock()
 
-		clock.register_alert('data', CustomAlert(self.dataset_step))
-		clock.register_alert('train', CustomAlert(self.train_step))
-
 		dataset = self.get_dataset()
+		clock.register_alert('data', dataset)
 		model = self.get_model()
+		clock.register_alert('train', model)
+		
+		clock.sort_alerts(start_with=['data', 'train'])
+		
 		records = self.get_records()
+		clock.register_alert('log', records)
 		
-		validation = A.pull('validation', None)
-		if validation is None:
-			print('No validation')
-		else:
-			clock.register_alert('val', validation)
-		
-		
-		if isinstance(records, Alert):
-			clock.register_alert('log', records)
-
-		A.push('vizualization._type', 'run/viz', overwrite=False)
+		if 'vizualization' not in A:
+			A.push('vizualization._type', 'run/viz', overwrite=False)
 		viz_step = A.pull('vizualization', None)
 		if viz_step is None:
 			clock.register_alert('viz', viz_step)
+		
+		self.validation = A.pull('validation', None)
+		if self.validation is None:
+			print('No validation')
+		else:
+			clock.register_alert('val', self.validation)
 		
 		if self.invisible:
 			print('No checkpointing')
 		else:
 			A.push('checkpoint._type', 'run/checkpoint', overwrite=False, silent=True)
-			checkpointer = A.pull('checkpoint', None)
+			self.checkpointer = A.pull('checkpoint', None)
 		
-			if checkpointer is None:
+			if self.checkpointer is None:
 				print('No checkpointer found')
 			else:
-				clock.register_alert('checkpoint', checkpointer)
+				clock.register_alert('save', self.checkpointer)
+		
+		if 'print' not in A:
+			A.push('print._type', 'run/print')
+		print_step = A.pull('print', None)
+		if print_step is not None:
+			clock.register_alert('print', print_step)
 		
 		path = self.get_path()
 		if path is not None:
@@ -461,53 +428,41 @@ class Run(Alert):
 			if not config_path.is_file():
 				A.export(config_path)
 		
-		dataset.prep(model=model, records=records)
-		model.prep(dataset=dataset, records=records)
-		records.prep(dataset=dataset, model=model)
-		
 		mode = 'train'
 		
 		dataset.switch_to(mode)
 		model.switch_to(mode)
 		records.switch_to(mode)
 		
-		self.loader = None
-		self.get_loader(activate=True, mode=mode, infinite=True)
-	
-	def log_step(self, out, tag_fmt='{}/train', measure_time=True):
-		Q = self.train_state
-		logger = self.get_logger()
-		train_stats = Q.train_stats
+		dataset.prep(model=model, records=records)
+		model.prep(dataset=dataset, records=records)
+		records.prep(dataset=dataset, model=model)
 		
-		if self.viz_criterion is not None:
-			train_stats.update('loss-viz', self.viz_criterion(out).detach())
-		
-		logger.set_step(self.records['total_samples']['train'] if Q.display_samples else self.records['total_steps'])
-		logger.set_tag_format(tag_fmt)
-		
-		display = train_stats.smooths() if Q.display_smoothed else train_stats.avgs()
-		for k, v in display.items():
-			logger.add('scalar', k, v)
-		
-	def dataset_step(self):
-
-		if self._loader is None:
-			self.startup()
+		if mode not in records['total_steps']:
+			records['total_steps'][mode] = 0
+		if mode not in records['total_samples']:
+			records['total_samples'][mode] = 0
+		if mode not in records['total_epochs']:
+			records['total_epochs'][mode] = 0
 			
-		self.batch = None
-		self.out = None
-		self.batch = next(self._loader)
+		# sync clock
+		
+		clock.set_time(records['total_steps'][mode])
+		clock.sort_alerts(end_with=['save', 'print'], strict=False)
+		
+		if clock.get_remaining() is None:
+			steps = A.pull('training.steps', '<>budget', None)
+			if steps is None:
+				epochs = A.pull('training.epochs', '<>epochs', None)
+				if epochs is None:
+					raise Exception('Clock has no limit')
+				steps = len(dataset.get_loader()) * epochs
+				
+			clock.set_limit(steps)
+		
+		# self.loader = None
+		# self.get_loader(activate=True, mode=mode, infinite=True)
 	
-	def train_step(self):
-		
-		batch = self.get_batch()
-		
-		if batch is None:
-			raise RuntimeError('No batch found')
-		
-		self.out = self.model.step(batch)
-		
-		
 	def prep_eval(self):
 		
 		A = self.get_config()
@@ -570,18 +525,61 @@ class Run(Alert):
 
 		return results
 		
-	def exit_run(self, cause, code=None):
+	def exit_run(self, cause, code=None, checkpoint=True):
 		
 		cmsg = f' (code={code})'
 		
 		if not self.silent:
 			print(f'Exiting due to {cause}{cmsg}')
+			
+		if checkpoint and self.checkpointer is not None:
+			print('Saving checkpoint')
+			self.checkpointer.checkpoint()
 		
 		if code is not None:
 			sys.exit(code)
 	
 	# endregion
 
+@fig.AutoModifier('inline')
+class Inline(Run):
+	def _prep(self, A):
+		
+		inline = A.pull('inline', False)
+		if inline:
+			A.push('pbar._type', 'progress-bar', silent=True, overwrite=False)
+		self.pbar = A.pull('pbar', None)
+		if self.pbar is not None:
+			A.push('print', None)
+
+		super()._prep(A)
+
+	def _take_steps(self, n=1):
+		
+		if self.pbar is not None and n > 1:
+			self.pbar.init_pbar(limit=n)
+		
+		return super()._take_steps(n=n)
+	
+	def _take_step(self):
+		
+		super()._take_step()
+		
+		if self.pbar is not None:
+			self.pbar.update(self.get_inline_description())
+	
+	def get_inline_description(self):
+		
+		progress = self.model.get_description()
+		ticks = self.clock.get_time()
+		limit = self.clock.get_limit()
+		
+		mode = 'train'
+		epochs = self.records['total_epochs'][mode]
+		
+		return f'{mode}:{epochs} {ticks}/{limit} {progress}'
+		
+		
 @fig.AutoModifier('extendable')
 class Extendable(Run):
 	
@@ -590,7 +588,8 @@ class Extendable(Run):
 		
 		extend = A.pull('extend', None)
 		if extend is not None:
-			A.push('training.step_limit', extend)
+			assert 'clock' in A
+			A.push('clock.limit', extend)
 		
 		return A
 

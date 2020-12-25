@@ -1,18 +1,11 @@
-
-import numpy as np
 import torch
 import torch.nn as nn
-from itertools import zip_longest
-from copy import deepcopy
-import torch.nn.functional as F
 from torch.distributions import Normal as NormalDistribution
-from torch.nn.utils import spectral_norm
 # from .. import framework as fm
 from ..op import framework as fm
 
 import omnifig as fig
 
-from .. import util
 from .layers import make_MLP
 
 #################

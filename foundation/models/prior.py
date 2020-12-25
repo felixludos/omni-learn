@@ -8,8 +8,7 @@ import omnifig as fig
 # from .. import framework as fm
 from ..op import framework as fm
 from .nets import MultiLayer
-from .unsup import Autoencoder
-from .. import util
+
 
 @fig.AutoModifier('prior-tfm') # for the generator
 class PriorTfm:

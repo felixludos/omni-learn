@@ -29,6 +29,7 @@ def _get_common_args(A, **kwargs):
 
 
 class Torchvision_Toy_Dataset(Batchable, Deviced, Image_Dataset):
+	available_modes = {'train', 'test'}
 
 	def __init__(self, dataset, label_attr=None, din=None, dout=None,
 	             A=None, root=None, **unused):

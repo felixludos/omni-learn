@@ -5,7 +5,7 @@ import omnifig as fig
 
 from ..op import framework as fm
 
-from ..op.clock import Freq, Alert
+from foundation.op.clock import Freq
 
 from .. import util
 

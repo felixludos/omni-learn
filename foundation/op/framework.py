@@ -9,20 +9,24 @@ from omnibelt import primitives
 
 import omnifig as fig
 
-from .. import util
+from foundation import util
+from foundation.util import Configurable, Seed, Checkpointable, Switchable, TrackedAttrs, \
+	Dimensions, Deviced, DeviceBase, DimensionBase
 import torch.multiprocessing as mp
 from itertools import chain
 
+from .clock import AlertBase
 
-class FunctionBase(util.DimensionBase, util.DeviceBase, nn.Module):  # any differentiable vector function
+
+class FunctionBase(DimensionBase, DeviceBase, nn.Module):  # any differentiable vector function
 	def __init__(self, din=None, dout=None, device=None, **unused):
 		super().__init__(din=din, dout=dout, device=device, **unused)
 	
 
-class Function(util.Switchable, util.TrackedAttrs, util.Dimensions, FunctionBase):
+class Function(Switchable, TrackedAttrs, Dimensions, Deviced, Configurable, FunctionBase):
 	
-	def switch_mode(self, mode):
-		super().switch_mode(mode)
+	def switch_to(self, mode):
+		super().switch_to(mode)
 		if mode == 'train':
 			self.train()
 		else:
@@ -62,7 +66,14 @@ class HyperParam(Function):
 		return hparams
 
 
-class Savable(util.Checkpointable, Function):
+class Savable(Checkpointable, Function):
+	
+	def __init__(self, A, **kwargs):
+		strict_load_state = A.pull('strict_load_state', True)
+		
+		super().__init__(A, **kwargs)
+		
+		self._strict_load_state = strict_load_state
 	
 	def checkpoint(self, path, ident='model'):
 		data = {
@@ -74,12 +85,15 @@ class Savable(util.Checkpointable, Function):
 			path = path / f'{ident}.pth.tar'
 		torch.save(data, str(path))
 		
-	def load_checkpoint(self, path, ident='model'):
-		path = Path(path)
-		if path.is_dir():
-			path = path / f'{ident}.pth.tar'
-		data = torch.load(str(path))
-		self.load_state_dict(data['model_state'])
+	def load_checkpoint(self, path, ident='model', _data=None):
+		if _data is None:
+			path = Path(path)
+			if path.is_dir():
+				path = path / f'{ident}.pth.tar'
+			data = torch.load(str(path))
+		else:
+			data = _data
+		self.load_state_dict(data['model_state'], strict=self._strict_load_state)
 		return path
 	
 
@@ -112,6 +126,13 @@ class Invertible(object):
 class Recordable(util.StatsClient, Function):
 	pass
 	
+class Maintained(Function, AlertBase):
+	
+	def maintain(self, tick, info=None):
+		pass
+	
+	def activate(self, tick, info=None):
+		return self.maintain(tick, info=info)
 
 class Visualizable(Recordable):
 	def visualize(self, info, logger): # records output directly to logger
@@ -133,9 +154,8 @@ class Evaluatable(Recordable): # TODO: maybe not needed
 	# 	raise NotImplementedError
 
 
-
 @fig.AutoModifier('optim')
-class Optimizable(Recordable):
+class Optimizable(Function):
 
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
@@ -152,7 +172,6 @@ class Optimizable(Recordable):
 				sub_optims[name] = child.optim
 
 		if len(sub_optims):
-
 			params = [] # param eters not already covered by sub_optims
 			for name, param in self.named_parameters():
 				name = name.split('.')[0]
@@ -203,26 +222,58 @@ class Regularizable(object):
 	def regularize(self, q):
 		return torch.tensor(0).type_as(q)
 
-
-class Model(Savable, Evaluatable, Visualizable, Optimizable, Function): # top level - must be implemented to train
-	def step(self, batch):  # Override pre-processing mixins
-		return self._step(batch)
-
-	def test(self, batch):  # Override pre-processing mixins
-		return self._test(batch)
+class Trainable(Maintained, Recordable, Optimizable, Function, AlertBase):
+	
+	def __init__(self, A, **kwargs):
+		
+		optim_metric = A.pull('optim-metric', 'loss')
+		
+		super().__init__(A, **kwargs)
+		
+		self.optim_metric = optim_metric
+		self.register_stats(self.optim_metric)
+	
+	def activate(self, tick, info=None):
+		batch = info.get_batch()
+		info.receive_output(batch, self.step(batch))
+		return super().activate(tick, info=info)
+	
+	def step(self, batch, **kwargs):  # Override pre-processing mixins
+		out = self._step(batch, **kwargs)
+		# if self.train_me() and self.optim_metric in out:
+		if self.optim_metric in out:
+			self.mete(self.optim_metric, out[self.optim_metric])
+		return out
 
 	def _step(self, batch, out=None):  # Override post-processing mixins
 		if out is None:
 			out = util.TensorDict()
 		return out
 
-	def _test(self, batch):  # Override post-processing mixins
-		return self._step(batch)  # by default do the same thing as during training
+	def get_metric(self):
+		if self.optim_metric is not None:
+			return self.get_stat(self.optim_metric)
+
+	def get_description(self):
+		progress = ''
+		if self.optim_metric is not None:
+			metric = self.get_metric()
+			if metric is not None and metric.count > 0:
+				progress = f'{self.optim_metric}: {metric.val:.3f} ({metric.smooth:.3f})'
+				
+		return progress
+	
+	def prep(self, dataset=None, records=None):
+		pass
 
 	# NOTE: never call an optimizer outside of _step (not in mixinable functions)
 	# NOTE: before any call to an optimizer check with self.train_me()
 	def train_me(self):
 		return self.training and self.optim is not None
+	
+
+class Model(Seed, Savable, Trainable, Evaluatable, Visualizable, Function): # top level - must be implemented to train
+	pass
 
 
 

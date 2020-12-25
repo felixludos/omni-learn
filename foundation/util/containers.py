@@ -2,6 +2,7 @@
 import torch
 from collections import OrderedDict
 
+from .features import DeviceBase, Statelike, Deviced
 
 def to(obj, device):
 	try:
@@ -13,11 +14,7 @@ def to(obj, device):
 			return TensorDict({k:to(v,device) for k,v in obj.items()})
 		raise Exception('Unknown object {}: {}'.format(type(obj), obj))
 
-class Movable(object):
-
-	def to(self, device):
-		raise NotImplementedError
-
+class Movable(DeviceBase):
 	def size(self, *args, **kwargs):
 		raise NotImplementedError
 
@@ -27,8 +24,8 @@ class TensorDict(Movable, OrderedDict):
 		super().__init__(*args, **kwargs)
 		self.__dict__['_size_key'] = _size_key
 
-
 	def to(self, device):
+		super().to(device)
 		for k,v in self.items():
 			try:
 				self[k] = v.to(device)
@@ -81,6 +78,7 @@ class TensorList(Movable, list):
 		self._size_key = _size_key
 
 	def to(self, device):
+		super().to(device)
 		for i,x in enumerate(self):
 			try:
 				self[i] = x.to(device)
@@ -101,6 +99,81 @@ class TensorList(Movable, list):
 		if self._size_key is None:
 			self._find_size_key()
 		return self[self._size_key].size(*args, **kwargs)
+
+
+class Cached(Deviced):
+	def __init__(self, A, **kwargs):
+		self.volatile = TensorDict()
+		super().__init__(A, **kwargs)
+	
+	def to(self, device):
+		super().to(device)
+		self.volatile.to(self.get_device())
+
+
+class TrackedAttrs(Statelike, Cached):
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
+		
+		self._saveable_attrs = set()
+	
+	def register_attr(self, name, data=None, update=True):
+		self._saveable_attrs.add(name)
+		if update:
+			setattr(self, name, data)
+	
+	def state_dict(self, *args, **kwargs):
+		volatile = self.volatile
+		self.volatile = None
+		
+		try:
+			data = super().state_dict(*args, **kwargs)
+		except AttributeError:
+			data = None
+		
+		attrs = {}
+		for name in self._saveable_attrs:
+			try:
+				val = getattr(self, name, None)
+			except AttributeError:
+				pass
+			else:
+				attrs[name] = val.state_dict() if isinstance(val, Statelike) else val
+		
+		self.volatile = volatile
+		return {'parameters': data, 'attrs': attrs}
+	
+	def load_state_dict(self, state_dict, strict=True):
+		missing_attrs = []
+		for name, data in state_dict.get('attrs', {}).items():
+			try:
+				val = getattr(self, name)
+			except AttributeError:
+				missing_attrs.append(name)
+			else:
+				if isinstance(val, Statelike):
+					val.load_state_dict(data)
+				else:
+					setattr(self, name, data)
+		if strict and len(missing_attrs):
+			raise RuntimeError('Missing registered attributes: {}'.format(', '.join(missing_attrs)))
+		try:
+			return super().load_state_dict(state_dict['parameters']
+			                               if 'parameters' in state_dict
+			                               else state_dict, strict=strict)
+		except AttributeError:
+			pass
+	
+	def __setattr__(self, key, value):
+		if isinstance(value, Statelike):
+			self.register_attr(key, value, update=False)
+		super().__setattr__(key, value)
+	
+	def __delattr__(self, item):
+		if item in self._saveable_attrs:
+			self._saveable_attrs.discard(item)
+		return super().__delattr__(item)
+
 
 
 

@@ -1,19 +1,10 @@
-
-import sys, os
-import tqdm
-
-import torch
-
 import omnifig as fig
 
-from .runs import NoOverwriteError
+from foundation.op.runs import NoOverwriteError
 from .. import util
 
 # from .loading import load_config, load_records, setup_logging, setup_records, \
 # from .loading import wrap_datasets, wrap_transaction, get_raw_path
-
-from .model import load_model
-from .data import load_data
 
 
 @fig.Script('eval', description='Evaluate an existing model')

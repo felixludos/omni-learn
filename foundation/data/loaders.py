@@ -74,7 +74,7 @@ class Featured_DataLoader(Seedable, DataLoader):
 class BatchedDataLoader(Featured_DataLoader, Seedable): # loads full batches at a time (dataset must be Batched
 
 	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False,
-	             auto_reset=False, device=None):
+	             auto_reset=False, num_workers=None, pin_memory=False, device=None):
 		self.dataset = dataset
 
 		if len(self.dataset) < batch_size:
@@ -88,6 +88,8 @@ class BatchedDataLoader(Featured_DataLoader, Seedable): # loads full batches at 
 
 		self.batch_size = batch_size
 		self.shuffle = shuffle
+		self.num_workers = num_workers
+		self.pin_memory = pin_memory
 		self.drop_last = drop_last
 		self.auto_reset = False
 		self.num = len(self.dataset) // batch_size
@@ -222,7 +224,7 @@ def get_loaders(*datasets, batch_size=64, num_workers=0, shuffle=True, pin_memor
 		except (AttributeError, AssertionError):
 			pass
 		else:
-			print('Using batched data loader')
+			# print('Using batched data loader')
 			loader_cls = BatchedDataLoader
 	else:
 

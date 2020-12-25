@@ -52,27 +52,60 @@ class Progress_Bar(Singleton):
 		
 		self._pbar_cls = tqdm_notebook if ptype in {'notebook', 'jupyter'} else tqdm
 		self.pbar = None
+		self.pbariter = None
 		
-		self.limit = A.pull('limit', None)
+		self.default_limit = A.pull('limit', None)
+		
+		self.pause_state = None
+		self._val = None
+		self._desc = None
+		self._limit = None
 	
-	def init_pbar(self, limit=None, **kwargs):
+	def pause(self):
+		self.pause_state = {'limit':self._limit, 'initial':self._val, 'desc':self._desc}
+		self.reset()
+	
+	def unpause(self):
+		if self.pause_state is not None:
+			self.reset()
+			self.init_pbar(**self.pause_state)
+			self.pause_state = None
+	
+	def init_pbar(self, itr=None, limit=None, initial=0, desc=None, **kwargs):
 		self.reset()
 		if self._pbar_cls is not None:
+			if itr is not None:
+				try:
+					limit = len(itr)
+				except TypeError:
+					pass
 			if limit is None:
-				limit = self.limit
-			self.pbar = self._pbar_cls(total=limit, **kwargs)
+				limit = self.default_limit
+			self._limit = limit
+			self._val = initial
+			self._desc = desc
+			self.pbar = self._pbar_cls(itr, total=limit, initial=initial, desc=desc, **kwargs)
+			# if itr is not None:
+			# 	self.pbariter = iter(self.pbar)
 	
 	def update(self, desc=None, n=1):
 		if self.pbar is not None:
-			self.pbar.update(desc=desc, n=n)
+			self._desc = desc
+			self._val += n
+			if desc is not None:
+				self.set_description(desc)
+			if self.pbariter is not None:
+				return next(self.pbariter)
+			else:
+				self.pbar.update(n=n)
 	
 	def __call__(self, itr, **kwargs):
-		self.reset()
-		self.pbar = self._pbar_cls(itr)
-		return self.pbar
+		self.init_pbar(itr, **kwargs)
+		return self
 	
 	def __iter__(self):
-		self.init_pbar()
+		if self.pbariter is None and self.pbar is not None:
+			self.pbariter = iter(self.pbar)
 		return self
 	
 	def __next__(self):
@@ -81,6 +114,9 @@ class Progress_Bar(Singleton):
 	def reset(self):
 		if self.pbar is not None:
 			self.pbar.close()
+			print('\r', end='')
+		self.pbar = None
+		self.pbariter = None
 	
 	def set_description(self, desc):
 		if self.pbar is not None:

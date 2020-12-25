@@ -1,21 +1,99 @@
 import time
 from collections import OrderedDict
-
-from tqdm import tqdm, tqdm_notebook
-
 # from omnibelt import InitSingleton
 import omnifig as fig
 
-from .runs import Clock, Alert
 from .. import util
+from ..util import Named, StatsClient, Configurable
 
 ################
 # region Clocks
 ################
 
+class AlertNotFoundError(Exception):
+	def __init__(self, name):
+		super().__init__(f'Could not find an alert named {name}')
+		self.name = name
 
-@fig.AutoModifier('clock-limit')
-class Limited(Clock):
+@fig.Component('clock/simple')
+class SimpleClock(Configurable):
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
+		self.ticks = 0
+		self.alerts = OrderedDict()
+		self._info = None
+	
+	def sort_alerts(self, start_with=None, end_with=None, strict=True):
+		order = OrderedDict()
+		
+		if start_with is not None:
+			for name in start_with:
+				if name in self.alerts:
+					order[name] = self.alerts[name]
+				elif strict:
+					raise AlertNotFoundError(name)
+				
+		for name, alert in self.alerts.items():
+			if end_with is None or name not in end_with:
+				order[name] = alert
+		
+		if end_with is not None:
+			for name in end_with:
+				if name in self.alerts:
+					order[name] = self.alerts[name]
+				elif strict:
+					raise AlertNotFoundError(name)
+		
+		self.alerts.clear()
+		self.alerts.update(order)
+	
+	def get_info(self):
+		return self._info
+	
+	def set_info(self, info):
+		self._info = info
+	
+	def register_alert_fn(self, name, check=None, activate=None):
+		self.register_alert(name, CustomAlert(check=check, activate=activate))
+	
+	def register_alert(self, name, alert, **unused):
+		if name is None:
+			name = f'{alert}#{id(alert)}'
+		self.alerts[name] = alert
+	
+	def clear(self):
+		self.alerts.clear()
+		self._info = None
+	
+	def _call_alert(self, name, alert, info=None):
+		if info is None:
+			info = self._info
+		return alert.activate(self.ticks, info)
+	
+	def get_time(self):
+		return self.ticks
+	
+	def __len__(self):
+		return self.get_time()
+	
+	def set_time(self, ticks):
+		self.ticks = ticks
+	
+	def tick(self, info=None):
+		for name, alert in self.alerts.items():
+			if alert.check(self.ticks, info):
+				self._call_alert(name, alert, info=info)
+		self.ticks += 1
+	
+	def step(self, info=None, n=None):
+		if n is None:
+			n = 1
+		for _ in range(n):
+			self.tick(info=info)
+
+
+@fig.AutoModifier('clock/limit')
+class Limited(SimpleClock):
 	def __init__(self, A, **kwargs):
 		limit = A.pull('limit', None)
 		super().__init__(A, **kwargs)
@@ -34,49 +112,18 @@ class Limited(Clock):
 		self.limit = limit
 		return old
 	
+	def tick(self, info=None, force=False):
+		if self.get_limit() <= self.get_time() and not force:
+			raise StopIteration
+		return super().tick(info=info)
+	
 	def step(self, info=None, n=None):
 		if n is None:
 			n = self.get_remaining()
 		return super().step(info=info, n=n)
 
-
-# @fig.AutoModifier('clock-pbar')
-# class Pbar(Limited):
-# 	def __init__(self, A, **kwargs):
-#
-# 		A.push('pbar._type', 'progress-bar', silent=False, overwrite=False)
-# 		pbar = A.pull('pbar')
-#
-# 		super().__init__(A, **kwargs)
-#
-# 		self.pbar = pbar
-#
-# 	def init_pbar(self, limit=None, **kwargs):
-# 		if limit is None:
-# 			limit = self._limit
-# 		self.pbar.init_pbar(limit, **kwargs)
-#
-# 	def reset(self):
-# 		self.pbar.reset()
-#
-# 	def set_limit(self, limit):
-# 		old = super().set_limit(limit)
-# 		if self.pbar is not None and old is None or old != limit:
-# 			self.init_pbar()
-# 		return old
-#
-# 	def tick(self, info=None):
-# 		out = super().tick(info=info)
-# 		if self.pbar is not None:
-# 			self.pbar.update(n=1)
-# 		return out
-#
-# 	def set_description(self, desc):
-# 		self.pbar.set_description(desc)
-
-
 @fig.AutoModifier('clock/stats')
-class Stats(util.StatsClient, Clock):
+class Stats(StatsClient, SimpleClock):
 	def register_alert(self, name, alert, add_to_stats=True, **unused):
 		if add_to_stats:
 			self.register_stats(name)
@@ -109,9 +156,14 @@ class Timed(Stats):
 		out = super()._call_alert(name, alert, info=info)
 		
 		if name in self._timed_stats:
-			self.stats.update(self._timed_stats[name], time.time() - start)
+			self.mete(self._timed_stats[name], time.time() - start)
 		
 		return out
+
+@fig.Component('clock')
+class Clock(Timed, Limited):
+	pass
+
 
 # endregion
 ################
@@ -122,33 +174,43 @@ class Timed(Stats):
 ################
 
 
+class AlertBase:
+	def check(self, tick, info=None):
+		return True
+	
+	def activate(self, tick, info=None):
+		'''
+
+		:param tick: int
+		:param info: object passed to clock.tick()
+		:return: new value (representative of the alert) or none
+		'''
+		pass
 
 
+class CustomAlert(AlertBase):
+	def __init__(self, activate=None, check=None, **kwargs):
+		super().__init__(**kwargs)
+		self._activate = activate
+		self._check = check
+	
+	def check(self, tick, info=None):
+		if self._check is None:
+			return True
+		return self._check(tick, info=info)
+	
+	def activate(self, tick, info=None):
+		if self._activate is None:
+			pass
 
-@fig.AutoModifier('alert/named')
-class Named(Alert):
-	def __init__(self, A, **kwargs):
-		ident = A.pull('ident', '<>__origin_key', None)
-		super().__init__(A, **kwargs)
-		self.name = ident
-		
-	def get_name(self):
-		return self.name
 
+class Alert(Configurable, AlertBase):
+	pass
 
-@fig.AutoModifier('alert/priority')
-class Priority(Alert):
-	def __init__(self, A, **kwargs):
-		priority = A.pull('priority', None)
-		super().__init__(A, **kwargs)
-		self.priority = priority
-		
-	def get_priority(self):
-		return self.priority
 
 
 @fig.AutoModifier('alert/reg')
-class Reg(Named):
+class Reg(Named, Alert):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
 		clock = A.pull('clock', None, ref=True)
@@ -166,7 +228,7 @@ class Freq(Alert):
 		self._include_zero = zero
 	
 	def check(self, tick, info=None):
-		return self.freq is None or ((self._include_zero or self.freq >= 1) and tick % self.freq == 0)
+		return self.freq is None or ((self._include_zero or tick >= 1) and tick % self.freq == 0)
 
 # endregion
 ################

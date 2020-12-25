@@ -1,24 +1,21 @@
 parents: ['origin']
 
-run._type: run
+#inline: True
 
-name: 'test-mnist'
+name: test-mnist
 
-records:
-  _type: records
-  freq: 100
+epochs: 10
 
-validation:
-  _type: run/epoch
-  freq: 10000
+validation.freq: 1000
+checkpoint.freq: 1000
+print.freq: 100
 
-checkpoint:
-  _type: run/checkpoint
-  freq: 10000
+
+records.freq: 100
 
 
 dataset:
-  name: 'mnist'
+  name: mnist
 
   download: False
   labeled: True
@@ -27,13 +24,10 @@ dataset:
 
   split.val: 0.1666666
 
-
-training:
-  epochs: 10
+  device: cpu
 
 
 model:
-  _type: model
   _model_type: simple
 
   nonlin: elu
@@ -61,14 +55,8 @@ model:
       _type: mlp
       hidden: [64, 32]
 
-
-  optim_type: 'adam'
-  lr: 1.e-3
-  weight_decay: 1.e-4
-#  momentum: 0.9
-#
-#  scheduler_type: step
-#  scheduler_step: 2
-#  scheduler_decay: 0.4
-
+  optim:
+    _type: adam
+    lr: 1.e-3
+    weight_decay: 1.e-4
 
