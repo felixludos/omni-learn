@@ -25,7 +25,6 @@ class Featured_DataLoaderIter:
 	
 	def __next__(self):
 		return util.to(super().__next__(), self.device)
-	
 
 class Featured_SingleProcessIter(Featured_DataLoaderIter, _SingleProcessDataLoaderIter):
 	pass

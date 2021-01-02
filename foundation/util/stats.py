@@ -335,7 +335,7 @@ class AverageMeter(Configurable):
 		self.set_tau(tau)
 		
 	def set_tau(self, tau):
-		self.tau = tau
+		self.tau = torch.tensor(tau)
 		
 	def copy(self):
 		new = self.__class__(tau=self.tau)
@@ -392,7 +392,7 @@ class AverageMeter(Configurable):
 		if self.val.nelement() > 1:
 			return {k: v.detach().cpu().numpy() for k, v in self.__dict__.items() if v is not None}
 		else:
-			return {k: v.item() for k,v in self.__dict__.items() if v is not None and k != 'tau'}
+			return {k: v.item() for k,v in self.__dict__.items() if v is not None}
 
 	def type(self):
 		return '{}-{}'.format(self.val.type(), tuple(self.val.size()))

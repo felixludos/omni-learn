@@ -4,7 +4,7 @@ _meta.script_name: train
 parents: [demo]
 
 
-#resume: test-pycharm_201226-211608
+resume: test-pycharm_210102-013010
 
 
 #epochs: 2
@@ -15,13 +15,13 @@ name: test-pycharm
 
 inline: True
 
-#model.optim.lr:
-#  _type: scheduler/cos
-#  value: 0.01
-#  end: 0.0001
-#  freq: 100
-#  skew: 0.5
-#  limit: <>budget
-#  include_zero: False
+model.optim.lr:
+  _type: scheduler/cos
+  value: 0.01
+  end: 0.0001
+  freq: 100
+  skew: 0.5
+  limit: <>budget
+  include_zero: False
 
 

@@ -5,6 +5,8 @@ from torch import optim as O
 from torch import nn
 from torch.optim import Optimizer as PytorchOptimizer
 
+from omnibelt import LoadedValue
+
 from .stats import StatsMeter
 
 import omnifig as fig
@@ -15,6 +17,14 @@ class OptimizerBase(PytorchOptimizer):
 	def __init__(self, A=None, **settings):
 		super().__init__(params=[torch.zeros(0)], **settings)
 		self.param_groups.clear()
+	
+	def __setstate__(self, state):
+		groups = state.get('param_groups', None)
+		if groups is not None:
+			for group, new in zip(self.param_groups, groups):
+				group.update({k:v for k,v in new.items() if not isinstance(v, LoadedValue)})
+			del state['param_groups']
+		super().__setstate__(state)
 	
 	def prep(self, params):
 		

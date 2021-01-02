@@ -211,9 +211,11 @@ class Splitable(SimpleDataManager):
 			n = int(np.round(len(dataset) * r))
 			if n < 1:
 				raise Exception(f'invalid ratio: {r} for dataset len {len(dataset)}')
-			parts.append(Subset_Dataset(dataset, torch.arange(idx, idx+n)))
+			part = Subset_Dataset(dataset, torch.arange(idx, idx+n))
+			parts.append(part)
 			idx += n
-		parts.append(Subset_Dataset(dataset, torch.arange(idx, len(dataset))))
+		last = Subset_Dataset(dataset, torch.arange(idx, len(dataset)))
+		parts.append(last)
 		
 		return parts
 
@@ -230,8 +232,10 @@ class Active(Loadable, AlertBase):
 		self.rng.seed(seed)
 		return self.rng.getrandbits(32)
 	
-	def _start_epoch(self):
-		loader = self.get_loader(seed=self.epoch_seed)
+	def _start_epoch(self, seed=None, **loader_args):
+		if seed is None:
+			seed = self.epoch_seed
+		loader = self.get_loader(seed=seed, **loader_args)
 		assert len(loader)
 		
 		loader = iter(loader)
@@ -245,10 +249,10 @@ class Active(Loadable, AlertBase):
 	def __next__(self):
 		return self.get_batch()
 	
-	def get_batch(self, force=True):
+	def get_batch(self, force=True, **loader_args):
 		
 		if self._loader is None:
-			self._loader = self._start_epoch()
+			self._loader = self._start_epoch(**loader_args)
 		
 		try:
 			return next(self._loader)
@@ -256,7 +260,7 @@ class Active(Loadable, AlertBase):
 			self._end_epoch()
 			if force:
 				self._loader = None
-				return self.get_batch()
+				return self.get_batch(**loader_args)
 			raise
 	
 	def activate(self, tick, info=None):
@@ -301,12 +305,12 @@ class InfoManager(Checkpointable, Active):
 		self.info['epoch_seed'] = epoch_seed
 		return epoch_seed
 	
-	def _start_epoch(self):
+	def _start_epoch(self, **loader_args):
 		if self.info['batch'] is None:
 			self.info['batch'] = 0
 		if self.info['epoch'] is None:
 			self.info['epoch'] = 0
-		loader = super()._start_epoch()
+		loader = super()._start_epoch(**loader_args)
 		# loader.skip(self.info['batch'])
 		return loader
 	
@@ -319,8 +323,8 @@ class InfoManager(Checkpointable, Active):
 		
 		super()._end_epoch()
 	
-	def get_batch(self, force=True):
-		batch = super().get_batch(force=force)
+	def get_batch(self, force=True, **loader_args):
+		batch = super().get_batch(force=force, **loader_args)
 		self.info['batch'] += 1
 		# mode = self.get_mode()
 		# self._records['total_steps'][mode] += 1

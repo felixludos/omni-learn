@@ -114,35 +114,35 @@ class Subset_Dataset(DatasetWrapper):
 
 	def __init__(self, dataset, indices=None):
 		super().__init__(dataset)
-		self.indices = indices
+		self._self_indices = indices
 
 		try:
 			device = self.__wrapped__.get_device()
-			if self.indices is not None:
-				self.indices = self.indices.to(device)
+			if self._self_indices is not None:
+				self._self_indices = self._self_indices.to(device)
 		except AttributeError:
 			pass
 
 	def __getitem__(self, idx):
-		return self.__wrapped__[idx] if self.indices is None else self.__wrapped__[self.indices[idx]]
+		return self.__wrapped__[idx] if self._self_indices is None else self.__wrapped__[self._self_indices[idx]]
 
 	def __len__(self):
-		return len(self.__wrapped__) if self.indices is None else len(self.indices)
+		return len(self.__wrapped__) if self._self_indices is None else len(self._self_indices)
 
-class Repeat_Dataset(DatasetWrapper):
+class Repeat_Dataset(ObjectProxy):
 
 	def __init__(self, dataset, factor):
 		super().__init__(dataset)
-		self.factor = factor
-		self.num_real = len(dataset)
-		self.total = self.factor * self.num_real
+		self._self_factor = factor
+		self._self_num_real = len(dataset)
+		self._self_total = self._self_factor * self._self_num_real
 		print('Repeating dataset {} times'.format(factor))
 
 	def __getitem__(self, idx):
-		return self.__wrapped__[idx % self.num_real]
+		return self.__wrapped__[idx % self._self_num_real]
 
 	def __len__(self):
-		return self.total
+		return self._self_total
 
 
 class Format_Dataset(DatasetWrapper):
@@ -150,17 +150,17 @@ class Format_Dataset(DatasetWrapper):
 	def __init__(self, dataset, format_fn, format_args=None, include_original=False):
 		super().__init__(dataset)
 
-		self.format_fn = format_fn
-		self.format_args = {} if format_args is None else format_args
-		self.include_original = include_original
+		self._self_format_fn = format_fn
+		self._self_format_args = {} if format_args is None else format_args
+		self._self_include_original = include_original
 
 	def __getitem__(self, idx):
 
 		sample = self.__wrapped__[idx]
 
-		formatted = self.format_fn(sample, **self.format_args)
+		formatted = self._self_format_fn(sample, **self._self_format_args)
 
-		if self.include_original:
+		if self._self_include_original:
 			return formatted, sample
 
 		return formatted
@@ -170,15 +170,15 @@ class Shuffle_Dataset(DatasetWrapper):
 	def __init__(self, dataset):
 		super().__init__(dataset)
 
-		self._shfl_indices = torch.randperm(len(self.__wrapped__)).clone()
+		self._self_indices = torch.randperm(len(self.__wrapped__)).clone()
 
 		try:
 			device = self.__wrapped__.get_device()
-			self._shfl_indices = self._shfl_indices.to(device).clone()
+			self._self_indices = self._self_indices.to(device).clone()
 		except AttributeError:
 			pass
 
 	def __getitem__(self, idx):
-		return self.__wrapped__[self._shfl_indices[idx]]
+		return self.__wrapped__[self._self_indices[idx]]
 
 # endregion

@@ -16,12 +16,12 @@ class Scheduler(util.Value, Savable, Reg, Freq):
 		self.start = A.pull('start', 0)
 		self.stop = A.pull('stop', None)
 		
-		self.end_val = A.pull('end_val', '<>end', None)
+		self.end = A.pull('end', '<>end', None)
 
 		self.initial = self.get()
 	
 	def extra_repr(self):
-		return {'end_val': self.end_val}
+		return {'end': self.end}
 	
 	def __repr__(self):
 		extra = [f'    {k}: {v},' for k, v in self.extra_repr().items() if v is not None]
@@ -41,7 +41,7 @@ class Scheduler(util.Value, Savable, Reg, Freq):
 		return x
 	
 	def state_dict(self):
-		return {'end_val': self.end_val, 'start': self.start, 'stop': self.stop, 'val':self.get()}
+		return {'end': self.end, 'start': self.start, 'stop': self.stop, 'val':self.get()}
 	
 	def load_state_dict(self, data):
 		self.set(data['val'])
@@ -98,7 +98,7 @@ class FunctionScheduler(Scheduler):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
 		
-		assert self.end_val is not None, 'must have a min for exponential scheduler'
+		assert self.end is not None, 'must have a min for exponential scheduler'
 		
 		self.limit = A.pull('limit', '<>stop')
 		
@@ -137,19 +137,19 @@ class CosScheduler(FunctionScheduler):
 		self.nodes = nodes
 		
 	def _func(self, progress, x0):
-		return (x0 - self.end_val) * (self.trig(self.nodes * math.pi * progress) + 1) / 2 + self.end_val
+		return (x0 - self.end) * (self.trig(self.nodes * math.pi * progress) + 1) / 2 + self.end
 
 
 @fig.Component('scheduler/exp')
 class ExpScheduler(FunctionScheduler):
 	def _func(self, progress, x0):
-		return x0 * (self.end_val / x0) ** progress
+		return x0 * (self.end / x0) ** progress
 
 
 @fig.Component('scheduler/lin')
 class LinScheduler(FunctionScheduler):
 	def _func(self, progress, x0):
-		return x0 - (x0 - self.end_val) * progress
+		return x0 - (x0 - self.end) * progress
 
 
 #### old

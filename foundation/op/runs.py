@@ -210,6 +210,7 @@ class Run(Configurable):
 		A.push('dataset._load-ckpt', ckpt, overwrite=True, silent=self.silent)
 		A.push('model._load-ckpt', ckpt, overwrite=True, silent=self.silent)
 		A.push('records._load-ckpt', ckpt, overwrite=True, silent=self.silent)
+		A.push('clock._load-ckpt', ckpt, overwrite=True, silent=self.silent)
 	
 	# endregion
 
@@ -430,6 +431,11 @@ class Run(Configurable):
 		print_step = A.pull('print', None)
 		if print_step is not None:
 			clock.register_alert('print', print_step)
+		
+		ckpt = A.pull('clock._load-ckpt', None, silent=self.silent)
+		if ckpt is not None:
+			ckpt = Path(ckpt)
+			clock.load_checkpoint(ckpt)
 		
 		path = self.get_path()
 		if path is not None:
