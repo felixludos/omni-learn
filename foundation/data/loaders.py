@@ -6,16 +6,16 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataloader import _SingleProcessDataLoaderIter, _MultiProcessingDataLoaderIter
 # from .collectors import Batchable_Dataset, Device_Dataset # TODO: clean up import order
 
-from .. import util
+from .collectors import Batchable
 
-class Seedable(object):
-	def set_seed(self, seed=None):
-		return util.set_seed(seed)
+from .. import util
 
 class Featured_DataLoaderIter:
 	
 	def __init__(self, loader):
+		# loader.batched = isinstance(loader.dataset, Batchable)
 		super().__init__(loader)
+		# self._dataset_fetcher.auto_collation = not isinstance(loader.dataset, Batchable)
 		self.device = loader.device
 		self.N = len(loader)
 	
@@ -25,17 +25,27 @@ class Featured_DataLoaderIter:
 	
 	def __next__(self):
 		return util.to(super().__next__(), self.device)
+	
 
 class Featured_SingleProcessIter(Featured_DataLoaderIter, _SingleProcessDataLoaderIter):
 	pass
 class Featured_MultiProcessIter(Featured_DataLoaderIter, _MultiProcessingDataLoaderIter):
 	pass
 
-class Featured_DataLoader(Seedable, DataLoader):
+class Featured_DataLoader(DataLoader):
 	
-	def __init__(self, *args, device=None, **kwargs):
+	def __init__(self, dataset, *args, device=None, seed=None, generator=None, **kwargs):
 
-		super().__init__(*args, **kwargs)
+		if seed is not None and generator is None:
+			generator = torch.Generator()
+			generator.manual_seed(seed)
+
+		self.batched = not isinstance(dataset, Batchable)
+		# self.batched = None
+
+		super().__init__(dataset, *args, generator=generator, **kwargs)
+		
+		# self._auto_collation = False
 
 		if device is None:
 			try:
@@ -43,6 +53,26 @@ class Featured_DataLoader(Seedable, DataLoader):
 			except AttributeError:
 				device = 'cpu'
 		self.device = device
+	
+	@property
+	def _index_sampler(self):
+		# The actual sampler used for generating indices for `_DatasetFetcher`
+		# (see _utils/fetch.py) to read data at each time. This would be
+		# `.batch_sampler` if in auto-collation mode, and `.sampler` otherwise.
+		# We can't change `.sampler` and `.batch_sampler` attributes for BC
+		# reasons.
+		if self.batch_sampler is not None:
+			return self.batch_sampler
+		else:
+			return self.sampler
+		
+	@property
+	def _auto_collation(self):
+		return (self.batched is not None and self.batched) or (self.batched is None and super()._auto_collation)
+		
+	# def _auto_collation(self):
+	# 	return not self.batched or super()._auto_collation()
+		
 	
 	# def __iter__(self):
 	# 	itr = super().__iter__()
@@ -71,10 +101,10 @@ class Featured_DataLoader(Seedable, DataLoader):
 
 
 
-class BatchedDataLoader(Featured_DataLoader, Seedable): # loads full batches at a time (dataset must be Batched
+class BatchedDataLoader(Featured_DataLoader): # loads full batches at a time (dataset must be Batched
 
 	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False,
-	             auto_reset=False, num_workers=None, pin_memory=False, device=None):
+	             auto_reset=False, num_workers=None, pin_memory=False, device=None, **kwargs):
 		self.dataset = dataset
 
 		if len(self.dataset) < batch_size:

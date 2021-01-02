@@ -102,8 +102,10 @@ class Run(Configurable):
 		
 		self.clock.clear()
 		self.records.purge()
+		
 		self.checkpointer = None
 		self.validation = None
+		self.vizualizer = None
 		
 		self.results = {}
 	
@@ -131,7 +133,7 @@ class Run(Configurable):
 			if not self.silent:
 				print(f'Loading Config: {config_path}')
 			
-			load_A = fig.get_config(str(path))
+			load_A = fig.get_config(str(config_path))
 			if novel:
 				load_A.update(A)
 			A.clear()
@@ -265,6 +267,9 @@ class Run(Configurable):
 	def create_results(self, A=None, **meta):
 		raise NotImplementedError # TODO
 	
+	def get_name(self):
+		return self.name
+	
 	def get_description(self, ticks=None):
 		if ticks is None:
 			ticks = self.clock.get_time()
@@ -351,9 +356,13 @@ class Run(Configurable):
 		if self.clock.get_remaining() <= 0:
 			print('Training Complete')
 			ticks = self.clock.get_time()
-			if self.validation is not None:
+			if self.records is not None and not self.records.check(ticks, self):
+				self.records.activate(ticks, info=self)
+			if self.vizualizer is not None and not self.vizualizer.check(ticks, self):
+				self.vizualizer.activate(ticks, info=self)
+			if self.validation is not None and not self.validation.check(ticks, self):
 				self.validation.activate(ticks, info=self)
-			if self.checkpointer is not None:
+			if self.checkpointer is not None and not self.checkpointer.check(ticks, self):
 				self.checkpointer.activate(ticks, info=self)
 		
 		return out
@@ -393,11 +402,11 @@ class Run(Configurable):
 		records = self.get_records()
 		clock.register_alert('log', records)
 		
-		if 'vizualization' not in A:
-			A.push('vizualization._type', 'run/viz', overwrite=False)
-		viz_step = A.pull('vizualization', None)
-		if viz_step is None:
-			clock.register_alert('viz', viz_step)
+		if 'viz' not in A:
+			A.push('viz._type', 'run/viz', overwrite=False)
+		self.vizualizer = A.pull('viz', None)
+		if self.vizualizer is not None:
+			clock.register_alert('viz', self.vizualizer)
 		
 		self.validation = A.pull('validation', None)
 		if self.validation is None:
@@ -559,7 +568,12 @@ class Inline(Run):
 		if self.pbar is not None and n > 1:
 			self.pbar.init_pbar(limit=n)
 		
-		return super()._take_steps(n=n)
+		out = super()._take_steps(n=n)
+		
+		if self.pbar is not None:
+			self.pbar.reset()
+			
+		return out
 	
 	def _take_step(self):
 		
@@ -580,18 +594,18 @@ class Inline(Run):
 		return f'{mode}:{epochs} {ticks}/{limit} {progress}'
 		
 		
-@fig.AutoModifier('extendable')
-class Extendable(Run):
-	
-	def _find_origin(self, A):
-		A = super()._find_origin(A)
-		
-		extend = A.pull('extend', None)
-		if extend is not None:
-			assert 'clock' in A
-			A.push('clock.limit', extend)
-		
-		return A
+# @fig.AutoModifier('extendable')
+# class Extendable(Run):
+#
+# 	def startup(self, A):
+# 		super().startup()
+#
+# 		A = self.get_config()
+#
+# 		extend = A.pull('extend', None)
+# 		if extend is not None:
+# 			self.clock.set_time(extend)
+
 
 		
 @fig.AutoModifier('timed-run')

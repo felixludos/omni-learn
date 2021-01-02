@@ -51,6 +51,8 @@ class StatelikeDict(Statelike, dict):
 
 class ValueBase(Statelike, ValueWrapper):
 	
+	# def __init__(self):
+	
 	def state_dict(self):
 		return self.get()
 	
@@ -59,18 +61,29 @@ class ValueBase(Statelike, ValueWrapper):
 	
 	def item(self):  # compat for hyperparams
 		return self.get()
+	
+	def __getstate__(self):
+		return self.state_dict()
+	
+	def __setstate__(self, state):
+		return self.load_state_dict(state)
+	
+	def __reduce__(self, *args, **kwargs):
+		return type(self), (self.get(),)
 
 
 class Value(ValueBase):
 	def __init__(self, A, **kwargs):
 		val = A.pull('value', '<>initial')
 		assert val is None or isinstance(val, primitives), f'{val} should be a primitive'
+		super().__init__(val)
+		# self.__wrapped__ = val
+		self._self_as_int = A.pull('as-int', isinstance(val, int))
 		self.set(val)
-		self.as_int = A.pull('as-int', isinstance(self.get(), int))
 		super(ObjectProxy, self).__init__(A, **kwargs)
 	
 	def set(self, val):
-		if self.as_int:
+		if hasattr(self, '_self_as_int') and self._self_as_int:
 			val = int(val)
 		return super().set(val)
 

@@ -287,7 +287,7 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 				and shape[0 if len(shape) == 3 else 1] in {1, 3, 4} and shape[-1] not in {1, 3, 4}:
 			channel_first = True
 		
-		print(channel_first, shape)
+		# print(channel_first, shape)
 		
 		if len(shape) == 2 or (len(shape) == 3 and ((shape[0] in {1,3,4} and channel_first)
 		                          or (shape[-1] in {1,3,4} and not channel_first))):

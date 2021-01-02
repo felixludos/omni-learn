@@ -9,6 +9,7 @@ epochs: 10
 validation.freq: 1000
 checkpoint.freq: 1000
 print.freq: 100
+viz.freq: 500
 
 
 records.freq: 100

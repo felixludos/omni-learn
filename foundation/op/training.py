@@ -32,6 +32,7 @@ class Epoch(Run_Event):
 		pbar = A.pull('pbar', None)
 		mode = A.pull('mode', 'val')
 		print_results = A.pull('print_metric', True)
+		fixed_loader_seed = A.pull('loader-seed', None)
 
 		dataset = A.pull('dataset', None, ref=True)
 		model = A.pull('model', None, ref=True)
@@ -40,6 +41,7 @@ class Epoch(Run_Event):
 		super().__init__(A, **kwargs)
 		
 		self.mode = mode
+		self.loader_seed = fixed_loader_seed
 	
 		self.dataset = dataset
 		self.model = model
@@ -75,7 +77,7 @@ class Epoch(Run_Event):
 				records['total_steps'][mode] = 0
 			if mode not in records['total_samples']:
 				records['total_samples'][mode] = 0
-		
+			
 	@staticmethod
 	def post_epoch(mode, dataset, model, records=None):
 		
@@ -139,7 +141,7 @@ class Epoch(Run_Event):
 		
 		pre_epoch(self.mode, dataset, model, records)
 		
-		loader = dataset.get_loader(infinite=False)
+		loader = dataset.get_loader(infinite=False, seed=self.loader_seed)
 		N = len(loader)
 		loader = enumerate(loader)
 		if self.pbar is not None:
@@ -183,6 +185,9 @@ class Epoch(Run_Event):
 			dataset = info.get_data() if self.dataset is None else self.dataset
 			model = info.get_model() if self.model is None else self.model
 			records = info.get_records() if self.records is None else self.records
+
+		if records is not None:
+			records.set_step(tick)
 		
 		self.run_epoch(dataset, model, records)
 	
@@ -199,6 +204,7 @@ class Checkpointer(Run_Event):
 		dataset = A.pull('dataset', None, ref=True)
 		model = A.pull('model', None, ref=True)
 		records = A.pull('records', None, ref=True)
+		clock = A.pull('clock', None, ref=True)
 		
 		super().__init__(A, **kwargs)
 		
@@ -213,11 +219,13 @@ class Checkpointer(Run_Event):
 		self.dataset = dataset
 		self.model = model
 		self.records = records
+		self.clock = clock
 	
 	def purge(self):
 		self.dataset = None
 		self.model = None
 		self.records = None
+		self.clock = None
 	
 	def _limit_checkpoints(self, root):
 		if self.limit is not None:
@@ -228,7 +236,7 @@ class Checkpointer(Run_Event):
 			raise NotImplementedError # TODO
 	
 	@staticmethod
-	def save_checkpoint(path, dataset=None, model=None, records=None):
+	def save_checkpoint(path, dataset=None, model=None, records=None, clock=None):
 
 		path = Path(path)
 		path.mkdir(exist_ok=True)
@@ -239,6 +247,8 @@ class Checkpointer(Run_Event):
 			model.checkpoint(path)
 		if records is not None:
 			records.checkpoint(path)
+		if clock is not None:
+			clock.checkpoint(path)
 	
 	def create_path(self, num, root=None):
 		if root is None:
@@ -250,7 +260,7 @@ class Checkpointer(Run_Event):
 		path = Path(root) / f'ckpt{num}'
 		return path
 	
-	def checkpoint(self, dataset=None, model=None, records=None, root=None, num=None):
+	def checkpoint(self, dataset=None, model=None, records=None, clock=None, root=None, num=None):
 		
 		path = self.create_path(num=num, root=root)
 		if path is None:
@@ -263,11 +273,13 @@ class Checkpointer(Run_Event):
 			model = self.model
 		if records is None:
 			records = self.records
+		if clock is None:
+			clock = self.clock
 		
 		if records is not None:
 			records.prep_checkpoint(num)
 		
-		return self.save_checkpoint(path, dataset, model, records)
+		return self.save_checkpoint(path, dataset, model, records, clock)
 		
 	def activate(self, tick, info=None):
 		assert info is not None
@@ -280,9 +292,9 @@ class Checkpointer(Run_Event):
 		dataset = info.get_dataset() if self.dataset is None else self.dataset
 		model = info.get_model() if self.model is None else self.model
 		records = info.get_records() if self.records is None else self.records
+		clock = info.get_clock() if self.clock is None else self.clock
 		
-		
-		self.checkpoint(dataset=dataset, model=model, records=records, root=root, num=tick)
+		self.checkpoint(dataset=dataset, model=model, records=records, clock=clock, root=root, num=tick)
 		
 		self._limit_checkpoints(root)
 		
@@ -302,11 +314,11 @@ class VizStep(Run_Event):
 		model = info.get_model() if self.model is None else self.model
 		records = info.get_records() if self.records is None else self.records
 		
-		out = info.get_out()
+		out = info.get_output()
 	
 		if isinstance(model, Visualizable):
 			if records is not None:
-				records.set_logger_step(tick)
+				records.set_step(tick)
 			model.visualize(out, records)
 
 @fig.Component('run/print')
@@ -325,10 +337,7 @@ def iterative_training(A=None, run=None):
 	Existing runs (or models) can be specified using "path", "load",
 	or "resume" with the run name
 	'''
-	#####################
-	# region Loading
-	#####################
-
+	
 	respect_config(A)
 
 	if run is None:
@@ -340,88 +349,10 @@ def iterative_training(A=None, run=None):
 	
 	run.take_steps(complete=True)
 	
-	return
-	# return run
+	# include_eval = A.pull('eval-after-training', True)
+	# if include_eval:
+	# 	eval_model(A, run=run)
 	
-	raise NotImplementedError
-	
-
-	# endregion
-	#######################
-	# region Smart Defaults
-	#######################
-	
-	if 'train' not in datasets:
-		raise Exception(f'No training dataset found (how did this happen?)')
-		
-	for key in ['train', 'val', 'test']:
-		if key in datasets:
-			if datasets[key] is None:
-				print(f'{key} is None')
-			else:
-				print(f'{key}data len={len(datasets[key])}, {key}loader len={len(loaders[key])}')
-	
-	trainloader = loaders['train']
-	epoch_len = len(trainloader)
-	
-	tau = A.push('training.stats.tau', max(0.01, min(100/epoch_len, 0.1)), overwrite=False)
-	util.set_default_tau(tau)
-	if isinstance(model, Recordable):
-		model.stats.set_tau(tau)
-	# A.push('output.print_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
-	# A.push('output.log_freq', min(max(20, epoch_len // 40), 200), overwrite=False)
-	
-	epochs = A.pull('training.epochs', 10)
-	step_limit = A.push('training.step_limit', epochs * epoch_len, overwrite=False)
-
-	expected_epochs = A.push('expected_epochs', step_limit//epoch_len, overwrite=False)
-
-	no_val = A.pull('training.no_val', False)
-	A.push('training.val_freq', None if no_val else epoch_len, overwrite=False)
-
-	inline = A.pull('inline', False)
-	pbar = tqdm if inline else None
-	
-	# endregion
-	#####################
-	# region Model
-	#####################
-	
-	print(model)
-	print(model.optim)
-	if hasattr(model, 'scheduler'):
-		print(model.scheduler)
-	print('Model has {} parameters'.format(util.count_parameters(model)))
-	
-	sys.stdout.flush()
-	
-	# endregion
-	#####################
-	# region Run Training
-	#####################
-	
-	# remaining_steps = step_limit - run.get_total_steps()
-	#
-	# if remaining_steps > 0:
-	# 	print(f'Training for {remaining_steps} steps')
-	# 	# run.prepare(model, trainloader)
-	# 	run.continuous(pbar=pbar)
-	# 	print('Training complete.')
-	#
-	# else:
-	# 	print('No training')
-	
-	# endregion
-	#####################
-	# region Run Evaluation
-	#####################
-
-	include_eval = A.pull('eval-after-training', True)
-
-	if include_eval and isinstance(model, Evaluatable):
-		eval_model(A, run=run)
-		
-	# endregion
 	
 	return run
 

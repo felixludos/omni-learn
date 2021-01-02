@@ -4,7 +4,7 @@ from pathlib import Path
 import random
 import numpy as np
 import torch
-from torch.utils.data import Dataset as PytorchDataset
+from torch.utils.data import Dataset as PytorchDataset, DataLoader
 import h5py as hf
 
 from omnibelt import save_yaml, load_yaml
@@ -131,15 +131,16 @@ class Loadable(SimpleDataManager):
 		settings.update(updates)
 		
 		loader_cls = Featured_DataLoader
+		# loader_cls = DataLoader
 		
-		if self._allow_batched:
-			try:
-				assert dataset.allow_batched()
-			except (AttributeError, AssertionError):
-				pass
-			else:
-				# print('Using batched data loader')
-				loader_cls = BatchedDataLoader
+		# if self._allow_batched:
+		# 	try:
+		# 		assert dataset.allow_batched()
+		# 	except (AttributeError, AssertionError):
+		# 		pass
+		# 	else:
+		# 		# print('Using batched data loader')
+		# 		loader_cls = BatchedDataLoader
 		
 		loader = loader_cls(dataset, **settings)
 		
@@ -230,10 +231,7 @@ class Active(Loadable, AlertBase):
 		return self.rng.getrandbits(32)
 	
 	def _start_epoch(self):
-		
-		util.set_seed(self.epoch_seed)
-		
-		loader = self.get_loader()
+		loader = self.get_loader(seed=self.epoch_seed)
 		assert len(loader)
 		
 		loader = iter(loader)
@@ -309,7 +307,7 @@ class InfoManager(Checkpointable, Active):
 		if self.info['epoch'] is None:
 			self.info['epoch'] = 0
 		loader = super()._start_epoch()
-		loader.skip(self.info['batch'])
+		# loader.skip(self.info['batch'])
 		return loader
 	
 	def _end_epoch(self):

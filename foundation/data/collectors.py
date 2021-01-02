@@ -7,7 +7,6 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset
 import h5py as hf
 
-from .loaders import get_loaders
 from .. import util
 
 

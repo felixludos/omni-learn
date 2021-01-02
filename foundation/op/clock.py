@@ -1,10 +1,12 @@
+
 import time
+from pathlib import Path
 from collections import OrderedDict
-# from omnibelt import InitSingleton
+from omnibelt import load_json, save_json
 import omnifig as fig
 
 from .. import util
-from ..util import Named, StatsClient, Configurable
+from ..util import Named, StatsClient, Configurable, Statelike, Checkpointable
 
 ################
 # region Clocks
@@ -16,7 +18,7 @@ class AlertNotFoundError(Exception):
 		self.name = name
 
 @fig.Component('clock/simple')
-class SimpleClock(Configurable):
+class SimpleClock(Checkpointable, Configurable):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
 		self.ticks = 0
@@ -61,6 +63,29 @@ class SimpleClock(Configurable):
 			name = f'{alert}#{id(alert)}'
 		self.alerts[name] = alert
 	
+	def checkpoint(self, path, ident='clock'):
+		
+		path = Path(path) / f'{ident}.json'
+		
+		states = {}
+		for name, alert in self.alerts.items():
+			if isinstance(alert, Savable):
+				states[name] = alert.state_dict()
+			
+		if len(states):
+			save_json(states, path)
+	
+	def load_checkpoint(self, path, ident='clock'):
+		
+		path = Path(path) / f'{ident}.json'
+		
+		if path.is_file():
+			states = load_json(path)
+		
+			for name, state in states.items():
+				if name in self.alerts:
+					self.alerts[name].load_state_dict(state)
+	
 	def clear(self):
 		self.alerts.clear()
 		self._info = None
@@ -80,10 +105,10 @@ class SimpleClock(Configurable):
 		self.ticks = ticks
 	
 	def tick(self, info=None):
+		self.ticks += 1
 		for name, alert in self.alerts.items():
 			if alert.check(self.ticks, info):
 				self._call_alert(name, alert, info=info)
-		self.ticks += 1
 	
 	def step(self, info=None, n=None):
 		if n is None:
@@ -105,7 +130,7 @@ class Limited(SimpleClock):
 	def get_remaining(self):
 		lim = self.get_limit()
 		if lim is not None:
-			return max(lim-self.get_time(),0)
+			return max(lim-self.get_time(), 0)
 	
 	def set_limit(self, limit):
 		old = self.limit
@@ -113,7 +138,7 @@ class Limited(SimpleClock):
 		return old
 	
 	def tick(self, info=None, force=False):
-		if self.get_limit() <= self.get_time() and not force:
+		if self.get_limit() < self.get_time() and not force:
 			raise StopIteration
 		return super().tick(info=info)
 	
@@ -124,6 +149,10 @@ class Limited(SimpleClock):
 
 @fig.AutoModifier('clock/stats')
 class Stats(StatsClient, SimpleClock):
+	# def __init__(self, A, **kwargs):
+	# 	super().__init__(A, **kwargs)
+	
+	
 	def register_alert(self, name, alert, add_to_stats=True, **unused):
 		if add_to_stats:
 			self.register_stats(name)
@@ -132,7 +161,7 @@ class Stats(StatsClient, SimpleClock):
 	def _call_alert(self, name, alert, info=None):
 		val = super()._call_alert(name, alert, info=info)
 		if val is not None:
-			self.update_stat(name, val)
+			self.mete(name, val)
 		return val
 
 
@@ -221,7 +250,7 @@ class Reg(Named, Alert):
 @fig.AutoModifier('alert/freq')
 class Freq(Alert):
 	def __init__(self, A, **kwargs):
-		zero = A.pull('include-zero', False)
+		zero = A.pull('include_zero', False)
 		freq = A.pull('freq', None)
 		super().__init__(A, **kwargs)
 		self.freq = freq
@@ -229,6 +258,9 @@ class Freq(Alert):
 	
 	def check(self, tick, info=None):
 		return self.freq is None or ((self._include_zero or tick >= 1) and tick % self.freq == 0)
+
+class Savable(Statelike, Alert):
+	pass
 
 # endregion
 ################

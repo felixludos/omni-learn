@@ -5,23 +5,23 @@ import omnifig as fig
 
 from ..op import framework as fm
 
-from foundation.op.clock import Freq
+from foundation.op.clock import Freq, Reg, Savable
 
 from .. import util
 
 
-class Scheduler(util.Value, Freq):
+class Scheduler(util.Value, Savable, Reg, Freq):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
 		self.start = A.pull('start', 0)
 		self.stop = A.pull('stop', None)
 		
-		self.min_val = A.pull('min_val', None)
+		self.end_val = A.pull('end_val', '<>end', None)
 
 		self.initial = self.get()
 	
 	def extra_repr(self):
-		return {'min': self.min_val}
+		return {'end_val': self.end_val}
 	
 	def __repr__(self):
 		extra = [f'    {k}: {v},' for k, v in self.extra_repr().items() if v is not None]
@@ -41,12 +41,14 @@ class Scheduler(util.Value, Freq):
 		return x
 	
 	def state_dict(self):
-		return {'min_val': self.min_val, 'start': self.start, 'stop': self.stop}
+		return {'end_val': self.end_val, 'start': self.start, 'stop': self.stop, 'val':self.get()}
 	
 	def load_state_dict(self, data):
+		self.set(data['val'])
 		if data is not None:
 			for k, v in data.items():
-				setattr(self, k, v)
+				if k != 'val':
+					setattr(self, k, v)
 	
 	def step(self, x, x0, tick, info=None):
 		raise NotImplementedError
@@ -96,7 +98,7 @@ class FunctionScheduler(Scheduler):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
 		
-		assert self.min_val is not None, 'must have a min for exponential scheduler'
+		assert self.end_val is not None, 'must have a min for exponential scheduler'
 		
 		self.limit = A.pull('limit', '<>stop')
 		
@@ -105,15 +107,16 @@ class FunctionScheduler(Scheduler):
 	
 	def state_dict(self):
 		data = super().state_dict()
-		data.update({'limit': self.limit, 'power': self.skew,
+		data.update({'limit': self.limit, 'skew': self.skew,
 		             'constrain_progress': self.constrain_progress})
 		return data
 	
 	def step(self, x, x0, tick, info=None):
-		progress = (tick / self.limit) ** math.exp(self.skew)
+		progress = (tick / self.limit) ** self.skew
 		if self.constrain_progress:
 			progress = max(0., min(progress, 1.))
-		return self._func(progress, x0)
+		val = self._func(progress, x0)
+		return val
 	
 	def _func(self, progress, x0):
 		raise NotImplementedError
@@ -134,19 +137,19 @@ class CosScheduler(FunctionScheduler):
 		self.nodes = nodes
 		
 	def _func(self, progress, x0):
-		return (x0 - self.min_val) * (self.trig(self.nodes * math.pi * progress) + 1) / 2 + self.min_val
+		return (x0 - self.end_val) * (self.trig(self.nodes * math.pi * progress) + 1) / 2 + self.end_val
 
 
 @fig.Component('scheduler/exp')
 class ExpScheduler(FunctionScheduler):
 	def _func(self, progress, x0):
-		return x0 * (self.min_val / x0) ** progress
+		return x0 * (self.end_val / x0) ** progress
 
 
 @fig.Component('scheduler/lin')
 class LinScheduler(FunctionScheduler):
 	def _func(self, progress, x0):
-		return x0 - (x0 - self.min_val) * progress
+		return x0 - (x0 - self.end_val) * progress
 
 
 #### old

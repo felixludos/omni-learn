@@ -85,13 +85,16 @@ class StatsMeter(Configurable, OrderedDict):
 	# 		new[name] = meter.copy()
 	# 	return new
 
-	def _create_meter(self, name=None):
-		return self.meter_info.pull_self(silent=True)
+	def _create_meter(self, name=None, tau=None):
+		meter = self.meter_info.pull_self(silent=True)
+		if tau is not None:
+			meter.set_tau(tau)
+		return meter
 
-	def new(self, *names):
+	def new(self, *names, tau=None):
 		for name in names:
 			if name not in self:
-				self[name] = self._create_meter(name)
+				self[name] = self._create_meter(name, tau=tau)
 
 	def discard(self, *names):
 		for name in names:
@@ -183,9 +186,10 @@ class StatsManager(Switchable, StatsMeter):
 		reset_collections = set(A.pull('reset-modes', []))
 		
 		super().__init__(A=A, **kwargs)
-		self._master_names = set()
 		self._collections = collections
 		self._reset_collections = reset_collections
+		self._master_names = set()
+		self._timestep = None
 		self._archive = {}
 		self._collection_fmts = collection_fmts
 	
@@ -204,9 +208,9 @@ class StatsManager(Switchable, StatsMeter):
 			fmt = self._collection_fmts.get(self.get_mode(), '{}')
 		return super().smooths(fmt=fmt)
 	
-	def new(self, *names):
+	def new(self, *names, tau=None):
 		self._master_names.update(names)
-		super().new(*names)
+		super().new(*names, tau=tau)
 	
 	def remove(self, *names):
 		self._master_names.difference_update(names)
@@ -219,17 +223,22 @@ class StatsManager(Switchable, StatsMeter):
 	def _create_collection(self):
 		return {name:self._create_meter(name) for name in self._master_names}
 	
-	def archive(self, mode=None):
+	def set_step(self, ticks):
+		self._timestep = ticks
+	
+	def archive(self, ticks=None, mode=None):
 		if mode is None:
 			mode = self.get_mode()
-		if mode is None:
+		if ticks is None:
+			ticks = self._timestep
+		if mode is None or ticks is None:
 			return
 		
 		self._sync_collections()
 		
 		if mode not in self._archive:
-			self._archive[mode] = []
-		self._archive[mode].append({name: meter.export() for name, meter in self._collections[mode].items()})
+			self._archive[mode] = {}
+		self._archive[mode][str(ticks)] = {name: meter.export() for name, meter in self._collections[mode].items()}
 	
 	def switch_to(self, mode):
 		
@@ -259,12 +268,14 @@ class StatsManager(Switchable, StatsMeter):
 		mode = None
 		self._archive = stats
 		self._collections = {}
-		for mode, ls in stats.items():
+		for mode, arc in stats.items():
+			last = arc[str(max(map(int,arc.keys())))]
 			if mode not in self._reset_collections:
-				self._collections[mode] = {name:self._create_meter(name).load(vals) for name, vals in ls[-1].items()}
+				self._collections[mode] = {name:self._create_meter(name).load(vals)
+				                                for name, vals in last.items()}
 		
 		if mode is not None:
-			self._master_names = set(self._collections[mode].keys())
+			self._master_names = set(last.keys())
 		
 		self.clear()
 		self.mode = None
@@ -276,16 +287,20 @@ class StatsClient(Configurable):
 		if stats is None:
 			print('WARNING: no stats manager found')
 		fmt = A.pull('stats-fmt', None)
+		
+		default_tau = A.pull('smooth-tau', '<>tau', None)
+		
 		super().__init__(A, **kwargs)
 		
 		self._stats = stats
 		self._stats_fmt = fmt
+		self._stats_tau = default_tau
 	
 	def register_stats(self, *names):
 		if self._stats is not None:
 			if self._stats_fmt is not None:
 				names = [self._stats_fmt.format(name) for name in names]
-			self._stats.new(*names)
+			self._stats.new(*names, tau=self._stats_tau)
 	
 	def mete(self, name, val, n=1):
 		if self._stats is not None:
@@ -317,6 +332,9 @@ class AverageMeter(Configurable):
 		if tau is None:
 			assert A is not None, 'no config provided'
 			tau = A.pull('smooth-tau', '<>tau', _tau)
+		self.set_tau(tau)
+		
+	def set_tau(self, tau):
 		self.tau = tau
 		
 	def copy(self):

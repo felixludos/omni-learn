@@ -46,7 +46,7 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 			
 			'history': A.pull('_history', None, silent=False),
 			'argv': sys.argv,
-			'timestamp': datetime.time(),
+			'timestamp': datetime.now(),
 		}
 		
 		return info
@@ -54,13 +54,16 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 	def _init_stats(self, A=None):
 		if 'stats' not in A:
 			A.push('stats._type', 'stats-manager', silent=True, force_root=True, overwrite=False)
-		stats = A.pull('stats')
+		stats = A.pull('stats', ref=True)
 		return stats
 		
 	def _init_logger(self, A=None):
 		if 'logger' not in A:
 			A.push('logger._type', 'logger', silent=True, overwrite=False)
 		logger = A.pull('logger')
+		
+		self._use_fmt = A.pull('use_log_fmts', True)
+		
 		return logger
 		
 	def activate(self, tick, info=None):
@@ -70,7 +73,7 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 		
 		if self.logger is not None:
 			if num is not None:
-				self.set_logger_step(num)
+				self.set_step(num)
 			
 			display = self.stats.smooths() if self._log_smooths else self.stats.vals()
 			
@@ -78,12 +81,16 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 				self.log('scalar', name, val)
 		
 		
-	def set_logger_step(self, tick):
+	def set_step(self, tick):
 		if self.logger is not None:
 			self.logger.set_step(tick)
+		if self.stats is not None:
+			self.stats.set_step(tick)
 		
 	def log(self, data_type, tag, *args, global_step=None, **kwargs):
 		if self.logger is not None:
+			if self._use_fmt:
+				tag = f'{tag}/{self.get_mode()}'
 			self.logger.add(data_type, tag, *args, global_step=global_step, **kwargs)
 		
 	def switch_to(self, mode='train'):

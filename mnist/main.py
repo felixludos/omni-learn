@@ -63,8 +63,15 @@ class Simple_Model(fd.Model):
 		return results
 
 	def _visualize(self, info, logger):
-
-		pass
+		
+		x, y, pred  = info.x, info.y, info.pred
+		N = 24
+		
+		guess = pred[:N].max(-1)[1]
+		
+		fg, ax = util.show_imgs(x[:N], titles=guess[:N].tolist())
+		
+		logger.log('figure', 'samples', fg)
 
 
 	def _step(self, batch, out=None):
@@ -94,6 +101,14 @@ class Simple_Model(fd.Model):
 			self.optim.step()
 
 		return out
+
+@fig.Script('test')
+def _test(A):
+	
+	run = A.pull('run')
+	
+	pass
+
 
 if __name__ == '__main__':
 	fig.entry()

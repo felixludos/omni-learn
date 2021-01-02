@@ -34,6 +34,7 @@ class Logger(object):
 
 		self.global_step = None
 		self.tag_fmt = None
+		
 
 	def set_step(self, step):
 		self.global_step = step

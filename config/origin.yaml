@@ -5,17 +5,24 @@ device: cuda
 num_workers: 0
 seed: 0
 
+#limit: <>budget
+
 run:
   _type: run
-  _mod.inline: 5
+  _mod:
+    inline: 5
   allow-missing-mods: True
 
 
-clock._type: clock
+clock:
+  _type: clock
+  tau: 1
 
-
-validation._type: run/epoch
+validation:
+  _type: run/epoch
+  loader-seed: <>seed
 checkpoint._type: run/checkpoint
+viz._type: run/viz
 print._type: run/print
 
 logger:
@@ -23,13 +30,11 @@ logger:
   tensorboard: true
   log_dir: <>path
 
+  use_log_fmts: True
+
 stats:
   _type: stats-manager
   reset-modes: [val, test]
-  stat-collection-fmts:
-    train: "{}/train"
-    val: "{}/val"
-    test: "{}/test"
 
 
 records:
