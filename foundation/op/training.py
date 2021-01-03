@@ -18,7 +18,7 @@ from .framework import Visualizable
 
 
 
-class Run_Event(Freq):
+class RunEvent(Freq):
 	def check(self, tick, info=None):
 		return self.freq is not None and super().check(tick, info=info)
 	
@@ -26,7 +26,7 @@ class Run_Event(Freq):
 		pass
 
 @fig.Component('run/epoch')
-class Epoch(Run_Event):
+class Epoch(RunEvent):
 	def __init__(self, A, **kwargs):
 		step_limit = A.pull('step-limit', None)
 		pbar = A.pull('pbar', None)
@@ -192,14 +192,14 @@ class Epoch(Run_Event):
 		self.run_epoch(dataset, model, records)
 	
 @fig.Component('run/checkpoint')
-class Checkpointer(Run_Event):
+class Checkpointer(RunEvent):
 	def __init__(self, A, **kwargs):
 		
 		path = A.pull('save-root', '<>root', '<>path', None)
 		
 		limit = A.pull('keep-only', '<>limit', None)
 		
-		metric = A.pull('track-best', None)
+		# metric = A.pull('track-best', None)
 		
 		dataset = A.pull('dataset', None, ref=True)
 		model = A.pull('model', None, ref=True)
@@ -212,9 +212,9 @@ class Checkpointer(Run_Event):
 		self.limit = limit
 		if self.limit is not None:
 			raise NotImplementedError
-		self.best_metric = metric
-		if self.best_metric is not None:
-			raise NotImplementedError
+		# self.best_metric = metric
+		# if self.best_metric is not None:
+		# 	raise NotImplementedError
 	
 		self.dataset = dataset
 		self.model = model
@@ -299,13 +299,16 @@ class Checkpointer(Run_Event):
 		self._limit_checkpoints(root)
 		
 @fig.Component('run/viz')
-class VizStep(Run_Event):
+class VizStep(RunEvent):
 	def __init__(self, A, **kwargs):
+		
+		model = A.pull('model', None, ref=True)
+		records = A.pull('records', None, ref=True)
 		
 		super().__init__(A, **kwargs)
 		
-		self.model = A.pull('model', None, ref=True)
-		self.records = A.pull('records', None, ref=True)
+		self.model = model
+		self.records = records
 		
 	def activate(self, tick, info=None):
 		
@@ -322,7 +325,7 @@ class VizStep(Run_Event):
 			model.visualize(out, records)
 
 @fig.Component('run/print')
-class PrintStep(Run_Event):
+class PrintStep(RunEvent):
 	def activate(self, tick, info=None):
 		if info is not None:
 			desc = info.get_description(tick)
