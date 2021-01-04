@@ -97,31 +97,6 @@ class Savable(Checkpointable, Function):
 		return path
 	
 
-@fig.AutoModifier('generative')
-class Generative(object):
-	def sample_prior(self, N=1):
-		raise NotImplementedError
-
-	def generate(self, N=1, q=None):
-		if q is None:
-			q = self.sample_prior(N)
-		return self(q)
-
-@fig.AutoModifier('encodable')
-class Encodable(object):
-	def encode(self, x): # by default this is just forward pass
-		return self(x)
-
-@fig.AutoModifier('decodable')
-class Decodable(object): # by default this is just the forward pass
-	def decode(self, q):
-		return self(q)
-
-@fig.AutoModifier('invertible')
-class Invertible(object):
-	def inverse(self, *args, **kwargs):
-		raise NotImplementedError
-
 		
 class Recordable(util.StatsClient, Function):
 	pass
@@ -218,11 +193,7 @@ class Optimizable(Function):
 		return state_dict
 
 
-class Regularizable(object):
-	def regularize(self, q):
-		return torch.tensor(0).type_as(q)
-
-class Trainable(Maintained, Recordable, Optimizable, Function, AlertBase):
+class Trainable(Maintained, HyperParam, Recordable, Optimizable, Function, AlertBase):
 	
 	def __init__(self, A, **kwargs):
 		
@@ -278,65 +249,39 @@ class Model(Seed, Savable, Trainable, Evaluatable, Visualizable, Function): # to
 
 
 
+class Regularizable(object):
+	def regularize(self, q):
+		return torch.tensor(0).type_as(q)
 
 
 
-# class Cacheable(ModelBase):
-# 	def __init__(self, *args, cache_device=None, **kwargs):
-# 		self._cache_names = set()
-# 		self._cache_device = cache_device
-# 		super().__init__(*args, **kwargs)
-#
-# 	def register_cache(self, name, value=None):
-# 		self._cache_names.add(name)
-#
-# 		setattr(self, name,
-# 		        value if self._cache_device is None else value.to(self._cache_device))
-#
-# 	def clear_cache(self):
-# 		for name in self._cache_names:
-# 			setattr(self, name, None)
-#
-# 	def cuda(self, device=None):
-# 		super().cuda(device)
-# 		if self._cache_device is None:
-# 			for name in self._cache_names:
-# 				obj = getattr(self, name)
-# 				if obj is not None:
-# 					setattr(self, name, obj.cuda(device))
-#
-# 	def cpu(self):
-# 		super().cpu()
-# 		if self._cache_device is None:
-# 			for name in self._cache_names:
-# 				obj = getattr(self, name)
-# 				if obj is not None:
-# 					setattr(self, name, obj.cpu())
-#
-# 	def to(self, device):
-# 		super().to(device)
-# 		if self._cache_device is None:
-# 			for name in self._cache_names:
-# 				obj = getattr(self, name)
-# 				if obj is not None:
-# 					setattr(self, name, obj.to(device))
-#
-# 	def state_dict(self, *args, **kwargs): # dont include cached items in the state_dict
-# 		cache = {}
-# 		for name in self._cache_names:
-# 			cache[name] = getattr(self, name)
-# 			delattr(self, name)
-#
-# 		out = super().state_dict(*args, **kwargs)
-#
-# 		for name, value in cache.items():
-# 			setattr(self, name, value)
-#
-# 		return out
+@fig.AutoModifier('generative')
+class Generative(object):
+	def sample_prior(self, N=1):
+		raise NotImplementedError
+
+	def generate(self, N=1, prior=None):
+		if prior is None:
+			prior = self.sample_prior(N)
+		return self(prior)
 
 
+@fig.AutoModifier('encodable')
+class Encodable(object):
+	def encode(self, x): # by default this is just forward pass
+		return self(x)
 
-# class Full_Model(Cacheable, Visualizable, Evaluatable, Trainable_Model): # simple shortcut for subclassing
-# 	pass
+
+@fig.AutoModifier('decodable')
+class Decodable(object): # by default this is just the forward pass
+	def decode(self, q):
+		return self(q)
+
+
+@fig.AutoModifier('invertible')
+class Invertible(object):
+	def inverse(self, *args, **kwargs):
+		raise NotImplementedError
+
 
 

@@ -6,8 +6,8 @@ from . import eval
 
 from . import models
 # from .framework import * # TODO: cleanup
-from foundation.op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
-	Evaluatable, Visualizable
+from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
+	Evaluatable, Visualizable, Function, Optimizable
 
 try:
 	from . import legacy

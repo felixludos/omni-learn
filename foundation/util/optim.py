@@ -145,7 +145,7 @@ except ImportError:
 class Complex_Optimizer(OptimizerBase):
 	def __init__(self, **optims):
 		self.__dict__['optims'] = None
-		super().__init__([{}], None)
+		super().__init__(defaults=None)
 		self.__dict__['optims'] = optims
 		self.group_params()
 		# self._update_groups()
@@ -216,7 +216,7 @@ class Complex_Optimizer(OptimizerBase):
 			return self.optims[item]
 	def __setattr__(self, key, value):
 		# raise NotImplementedError
-		if isinstance(value, Optimizer):
+		if isinstance(value, OptimizerBase):
 			# raise NotImplementedError
 			self.__setitem__(key, value)
 		else:

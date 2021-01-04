@@ -41,8 +41,11 @@ def load_model(A):
 	
 	model.to(model.get_device())
 	
-	print(model)
-	print(optim)
+	if A.pull('_print_model', False):
+		print(model)
+		if A.pull('_print_optim', False):
+			print(optim)
+		print(util.count_parameters(model))
 	
 	path = A.pull('_load-ckpt', None)
 	if path is not None:

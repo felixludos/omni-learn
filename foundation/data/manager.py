@@ -176,15 +176,17 @@ class Splitable(SimpleDataManager):
 			
 			self.split_info = {mode: ratio for mode, ratio in self.split_info.items() if mode not in skip_modes}
 			
-			modes, ratios = zip(*self.split_info.items())
+			if len(self.split_info):
 			
-			splits = self.split(dataset, *ratios, shuffle=self.shuffle_split)
-			
-			for mode, split in zip(modes, splits):
-				self._modes[mode] = split
-			self._modes[self.split_src] = splits[-1]
-			dataset = splits[-1]
-			self.switch_to(self.split_src)
+				modes, ratios = zip(*self.split_info.items())
+				
+				splits = self.split(dataset, *ratios, shuffle=self.shuffle_split)
+				
+				for mode, split in zip(modes, splits):
+					self._modes[mode] = split
+				self._modes[self.split_src] = splits[-1]
+				dataset = splits[-1]
+				self.switch_to(self.split_src)
 		
 		return dataset
 		

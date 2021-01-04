@@ -55,4 +55,6 @@ dataset:
 model:
   _type: model
 
+  _print_model: yes
+  _print_optim: yes
 

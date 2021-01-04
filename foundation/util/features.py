@@ -187,11 +187,9 @@ class Dimensions(Configurable, DimensionBase):
 	
 	def __init__(self, A, din=None, dout=None, **kwargs):
 		if din is None:
-			din = self.din
-		din = A.pull('din', din)
+			din = A.pull('din', self.din)
 		if dout is None:
-			dout = self.dout
-		dout = A.pull('dout', dout)
+			dout = A.pull('dout', self.dout)
 		super().__init__(A, din=din, dout=dout, **kwargs)
 		self.din, self.dout = din, dout
 
