@@ -113,7 +113,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 		return mag / B
 
 	def decode(self, q, **kwargs):
-		return self.decoder(q)
+		return self.decoder(q, **kwargs)
 
 	def preprocess(self, x):
 		return x
@@ -196,12 +196,12 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 class Generative_AE(fm.Generative, Autoencoder):
 
 	def sample_prior(self, N=1):
-		return torch.randn(N, self.latent_dim).to(self.device)
+		return torch.randn(N, self.latent_dim, device=self.device)
 
-	def generate(self, N=1, q=None):
-		if q is None:
-			q = self.sample_prior(N)
-		return self.decode(q)
+	def generate(self, N=1, prior=None):
+		if prior is None:
+			prior = self.sample_prior(N)
+		return self.decode(prior)
 
 
 @fig.Component('vae')

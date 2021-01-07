@@ -45,7 +45,7 @@ def load_model(A):
 		print(model)
 		if A.pull('_print_optim', False):
 			print(optim)
-		print(util.count_parameters(model))
+		print(f'Number of model parameters: {util.count_parameters(model)}')
 	
 	path = A.pull('_load-ckpt', None)
 	if path is not None:

@@ -449,9 +449,10 @@ class Run(Configurable):
 		model.switch_to(mode)
 		records.switch_to(mode)
 		
-		dataset.prep(model=model, records=records)
-		model.prep(dataset=dataset, records=records)
-		records.prep(dataset=dataset, model=model)
+		clock.prep(self)
+		# dataset.prep(model=model, records=records)
+		# model.prep(dataset=dataset, records=records)
+		# records.prep(dataset=dataset, model=model)
 		
 		if mode not in records['total_steps']:
 			records['total_steps'][mode] = 0

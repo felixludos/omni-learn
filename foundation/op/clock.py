@@ -25,6 +25,12 @@ class SimpleClock(Checkpointable, Configurable):
 		self.alerts = OrderedDict()
 		self._info = None
 	
+	def prep(self, info=None):
+		if info is None:
+			info = self._info
+		for idx, (name, alert) in enumerate(self.alerts.items()):
+			alert.prep(idx, info=info)
+	
 	def sort_alerts(self, start_with=None, end_with=None, strict=True):
 		order = OrderedDict()
 		
@@ -147,6 +153,7 @@ class Limited(SimpleClock):
 			n = self.get_remaining()
 		return super().step(info=info, n=n)
 
+
 @fig.AutoModifier('clock/stats')
 class Stats(StatsClient, SimpleClock):
 	# def __init__(self, A, **kwargs):
@@ -204,6 +211,9 @@ class Clock(Timed, Limited):
 
 
 class AlertBase:
+	def prep(self, order, info=None):
+		pass
+	
 	def check(self, tick, info=None):
 		return True
 	

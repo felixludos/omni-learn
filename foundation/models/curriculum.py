@@ -102,17 +102,22 @@ class FunctionScheduler(Scheduler):
 		
 		self.limit = A.pull('limit', '<>stop')
 		
-		self.skew = math.exp(A.pull('skew', 0))
+		self.skew = math.exp(A.pull('skew', 0)) # +/- -> left/right
+		self.kurtosis = 3. ** A.pull('kurtosis', 0) # +/- -> squeeze/stretch middle
 		self.constrain_progress = A.pull('constrain-progress', False)
 	
 	def state_dict(self):
 		data = super().state_dict()
-		data.update({'limit': self.limit, 'skew': self.skew,
+		data.update({'limit': self.limit, 'skew': self.skew, 'kurtosis': self.kurtosis,
 		             'constrain_progress': self.constrain_progress})
 		return data
 	
 	def step(self, x, x0, tick, info=None):
-		progress = (tick / self.limit) ** self.skew
+		progress = (tick / self.limit) #** self.skew
+		progress = 2*progress - 1
+		progress = progress**self.kurtosis if progress >= 0 else -(-progress)**self.kurtosis
+		progress = 0.5*progress + 0.5
+		progress **= self.skew
 		if self.constrain_progress:
 			progress = max(0., min(progress, 1.))
 		val = self._func(progress, x0)
