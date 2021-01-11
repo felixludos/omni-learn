@@ -116,9 +116,9 @@ class MultiLayer(fm.FunctionBase):
 		assert din is not None or dout is not None, 'need some input info'
 
 		in_order = A.pull('in_order', din is not None)
-		force_iter = A.pull('force_iter', True)
+		# force_iter = A.pull('force_iter', True)
 
-		create_layers = A.pull('layers', as_iter=force_iter)
+		create_layers = A.pull('layers', as_iter=True)
 		# create_layers = deepcopy(create_layers)
 		create_layers.set_auto_pull(False)
 

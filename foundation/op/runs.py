@@ -60,7 +60,9 @@ class Run(Configurable):
 	def __init__(self, A, silent=False, **kwargs):
 		super().__init__(A, **kwargs)
 		self.silent = A.pull('silent', silent)
+
 		self.invisible = A.pull('invisible', False)
+
 		
 		A = A.get_root()
 		A = self._find_origin(A)
@@ -71,9 +73,12 @@ class Run(Configurable):
 		self._prep(A)
 		
 		self.purge() # reset payload objs
-	
-	# region Setup
-	
+
+		self.manual_prep()
+
+	def manual_prep(self):
+		pass
+  
 	def __repr__(self):
 		return f'RUN:{self.get_name()}'
 	
@@ -115,6 +120,7 @@ class Run(Configurable):
 		
 		path = A.pull('path', '<>resume', '<>load', None)
 		novel = A.push('novel', path is None, overwrite=False)
+
 		override = A.pull('override', {})
 		
 		if path is not None:
@@ -189,7 +195,6 @@ class Run(Configurable):
 		self.path = path
 	
 	def _load_storage(self, A):
-		
 		self.name = self.path.stem
 
 		num = A.pull('ckpt-num', None, silent=self.silent)
