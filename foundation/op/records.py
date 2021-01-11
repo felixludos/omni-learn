@@ -32,9 +32,9 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 		self._model = None
 		self._dataset = None
 		
-	def prep(self, dataset=None, model=None):
-		self._model = model
-		self._dataset = dataset
+	def prep(self, order, info=None):
+		self._model = info.get_model()
+		self._dataset = info.get_dataset()
 	
 	def _init_info(self, A):
 		info = {

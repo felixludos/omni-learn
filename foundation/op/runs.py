@@ -480,7 +480,7 @@ class Run(Configurable):
 		# self.get_loader(activate=True, mode=mode, infinite=True)
 	
 	def prep_eval(self):
-		
+		raise NotImplementedError
 		A = self.get_config()
 		
 		logger = self.get_logger()
@@ -520,7 +520,7 @@ class Run(Configurable):
 		# self.eval_dataloader = None
 		
 	def evaluate(self, mode=None, dataloader=None):
-
+		raise NotImplementedError
 		if mode is None:
 			mode = self.eval_mode
 		if dataloader is None:

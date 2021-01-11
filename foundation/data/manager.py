@@ -50,9 +50,6 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 		self._active = None
 		self._modes = {}
 	
-	def prep(self, model=None, records=None):
-		pass
-	
 	def _create_mode(self, mode):
 		# self.A.begin()
 		if self.A.contains_nodefault(mode):
@@ -297,10 +294,10 @@ class InfoManager(Checkpointable, Active):
 		super().purge()
 		self._records = None
 	
-	def prep(self, model=None, records=None):
-		super().prep(model=model, records=records)
+	def prep(self, order, info=None):
+		super().prep(order, info=info)
 		
-		self._records = records
+		self._records = info.get_records()
 
 	def _increment_rng(self, seed):
 		epoch_seed = super()._increment_rng(seed)

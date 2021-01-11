@@ -233,9 +233,6 @@ class Trainable(Maintained, HyperParam, Recordable, Optimizable, Function, Alert
 				progress = f'{self.optim_metric}: {metric.val:.3f} ({metric.smooth:.3f})'
 				
 		return progress
-	
-	def prep(self, dataset=None, records=None):
-		pass
 
 	# NOTE: never call an optimizer outside of _step (not in mixinable functions)
 	# NOTE: before any call to an optimizer check with self.train_me()
