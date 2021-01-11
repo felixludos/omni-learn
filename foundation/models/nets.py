@@ -1,17 +1,11 @@
-
-import numpy as np
 import torch
 import torch.nn as nn
-from itertools import zip_longest
-from copy import deepcopy
-import torch.nn.functional as F
 from torch.distributions import Normal as NormalDistribution
-from torch.nn.utils import spectral_norm
-from .. import framework as fm
+# from .. import framework as fm
+from ..op import framework as fm
 
 import omnifig as fig
 
-from .. import util
 from .layers import make_MLP
 
 #################
@@ -20,7 +14,7 @@ from .layers import make_MLP
 
 
 @fig.Component('mlp')
-class MLP(nn.Sequential, fm.Model):
+class MLP(nn.Sequential, fm.FunctionBase):
 	def __init__(self, A):
 		kwargs = {
 			'din': A.pull('input_dim', '<>din'),
@@ -39,7 +33,7 @@ class MLP(nn.Sequential, fm.Model):
 		self.din, self.dout = net.din, net.dout
 
 @fig.Component('multihead')
-class Multihead(fm.Model): # currently, the input dim for each head must be the same (but output can be different) TODO: generalize
+class Multihead(fm.FunctionBase): # currently, the input dim for each head must be the same (but output can be different) TODO: generalize
 	def __init__(self, A):
 		
 		din = A.pull('din')
@@ -101,11 +95,11 @@ class Multihead(fm.Model): # currently, the input dim for each head must be the 
 		return torch.cat(ys, dim=1)
 
 @fig.Component('multilayer') # used for CNNs
-class MultiLayer(fm.Model):
+class MultiLayer(fm.FunctionBase):
 
-	def __init__(self, A=None, layers=None):
+	def __init__(self, A=None, layers=None, **kwargs):
 
-		super().__init__(None, None)
+		super().__init__(A, **kwargs)
 
 		if layers is None:
 			layers = self._create_layers(A)
@@ -179,7 +173,7 @@ class MultiLayer(fm.Model):
 #################
 
 @fig.AutoModifier('normal')
-class Normal(fm.Model):
+class Normal(fm.FunctionBase):
 	def __init__(self, A):
 		super().__init__(A)
 
@@ -235,7 +229,7 @@ class Normal(fm.Model):
 		return NormalDistribution(mu, sigma)
 
 
-class OldNormal(fm.Model):
+class OldNormal(fm.FunctionBase):
 	'''
 	This is a modifier (basically mixin) to turn the parent's output of forward() to a normal distribution.
 

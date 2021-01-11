@@ -10,32 +10,28 @@ import torchvision
 
 # from foundation.old.train.registry import create_component, Component
 from ... import util
-from ..data import Dataset
 
-from ...data import standard_split, Device_Dataset, Info_Dataset, Splitable_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
+from ...data import Dataset, Batchable, Deviced, Image_Dataset
 
 from .transforms import Interpolated
 
-def _get_common_args(A):
+def _get_common_args(A, **kwargs):
 	dataroot = A.pull('dataroot')
 
 	download = A.pull('download', False)
-	mode = A.pull('mode', 'train', silent=True)
+	mode = A.pull('mode', 'train')
 	train = A.pull('train', mode != 'test')
 
-	return dataroot, {'download': download, 'train': train}
+	kwargs['download'] = download
+	kwargs['train'] = train
+
+	return dataroot, kwargs
 
 
-class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Image_Dataset,
-                              Info_Dataset, Batchable_Dataset, util.Simple_Child):
+class Torchvision_Toy_Dataset(Batchable, Deviced, Image_Dataset):
+	available_modes = {'train', 'test'}
 
-	# def __init__(self, dataset=None, dataroot=None, download=True, label=True, label_attr='targets',
-	#              train=True, din=(1,28,28), dout=10, resize=True,
-	#              **kwargs):
-
-
-
-	def __init__(self, dataset, train=True, label_attr=None, din=None, dout=None,
+	def __init__(self, dataset, label_attr=None, din=None, dout=None,
 	             A=None, root=None, **unused):
 		'''
 		Requires dataset object to wrap it (since this is a `util.Simple_Child`).
@@ -56,9 +52,8 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Image_Dataset,
 		# label = A.pull('label', True)
 		# label_attr = A.pull('label_attr', 'targets')
 		#
-		# train = A.pull('train', True)
-		# din = A.pull('din', self.din)
-		# dout = A.pull('dout', 10)
+		# mode = A.pull('mode', 'train')
+		# train = A.pull('train', mode == 'train')
 
 		resize = A.pull('resize', True)
 		C, H, W = self.din
@@ -68,8 +63,8 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Image_Dataset,
 		if label_attr is None:
 			dout = self.din if din is None else din
 
-
-		super().__init__(din=din, dout=dout, root=root, train=train, _parent='dataset')
+		super().__init__(A, din=din, dout=dout, root=root, **unused)
+		self.add_existing_modes('test')
 
 		self.dataset = dataset
 		self.labeled = label_attr is not None
@@ -109,30 +104,13 @@ class Torchvision_Toy_Dataset(Device_Dataset, Testable_Dataset, Image_Dataset,
 			return img, self.labels[item]
 		return img
 
-	def split(self, A):
-		'''
-		Should split the dataset according to info.val_split, and
-		probably support shuffled splitting depending oninfo.shuffle_split
-		:param A: config
-		:return: tuple of "training" datasets
-		'''
-		mode = A.pull('mode', 'train', silent=True)
-		if mode != 'test':
-			mode = 'train'
-
-		datasets = {mode: self}
-
-		if mode == 'test':
-			return datasets
-		return standard_split(datasets, A)
-
 @Dataset('mnist')
 class MNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
 	dout = 10
 
-	def __init__(self, A):
-		dataroot, kwargs = _get_common_args(A)
+	def __init__(self, A, **kwargs):
+		dataroot, kwargs = _get_common_args(A, **kwargs)
 		root = os.path.join(dataroot, 'mnist')
 		dataset = torchvision.datasets.MNIST(root, **kwargs)
 
@@ -146,9 +124,9 @@ class KMNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
 	dout = 10
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 
-		dataroot, kwargs = _get_common_args(A)
+		dataroot, kwargs = _get_common_args(A, **kwargs)
 		root = os.path.join(dataroot, 'kmnist')
 		dataset = torchvision.datasets.KMNIST(root, **kwargs)
 
@@ -162,9 +140,9 @@ class FashionMNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
 	dout = 10
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 
-		dataroot, kwargs = _get_common_args(A)
+		dataroot, kwargs = _get_common_args(A, **kwargs)
 		root = os.path.join(dataroot, 'fmnist')
 		dataset = torchvision.datasets.FashionMNIST(root, **kwargs)
 
@@ -178,9 +156,9 @@ class EMNIST(Torchvision_Toy_Dataset):
 	din = (1, 28, 28)
 	dout = 26
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 
-		dataroot, kwargs = _get_common_args(A)
+		dataroot, kwargs = _get_common_args(A, **kwargs)
 		root = os.path.join(dataroot, 'emnist')
 
 		split = A.pull('group', 'letters')
@@ -245,9 +223,9 @@ class SVHN(Torchvision_Toy_Dataset):
 	din = (3, 32, 32)
 	dout = 10
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 
-		dataroot, kwargs = _get_common_args(A)
+		dataroot, kwargs = _get_common_args(A, **kwargs)
 		root = os.path.join(dataroot, 'svhn')
 
 		split = 'train' if kwargs['train'] else 'test'
@@ -265,9 +243,9 @@ class CIFAR(Torchvision_Toy_Dataset):
 	din = (3, 32, 32)
 	dout = 10
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 
-		dataroot, kwargs = _get_common_args(A)
+		dataroot, kwargs = _get_common_args(A, **kwargs)
 		root = os.path.join(dataroot, 'cifar')
 
 		classes = A.pull('classes', 10)

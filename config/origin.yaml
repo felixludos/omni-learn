@@ -1,76 +1,60 @@
 # parents = [...]
 
 step_device: <>device
-device: 'cuda'
+device: cuda
 num_workers: 0
 seed: 0
 
+#limit: <>budget
+
 run:
-    _type: run
-    allow-missing-mods: True
+  _type: run
+  _mod:
+    inline: 5
+  allow-missing-mods: True
 
-output:
 
-    tblog: true
-    txtlog: false
-    logdate: true
+clock:
+  _type: clock
+  tau: 1
 
-#   save_freq: -1
+validation:
+  _type: run/epoch
+  loader-seed: <>seed
+checkpoint._type: run/checkpoint
+viz._type: run/viz
+print._type: run/print
 
-#    stats_decay: 0.01
-#   print_freq = -1
-#	criterion_args = ['pred', 'y']
+logger:
+  _type: logger
+  tensorboard: true
+  log_dir: <>path
 
-training:
-    epochs: 20
+  use_log_fmts: True
 
-    track_best: true
-#	no_test = true
+stats:
+  _type: stats-manager
+  reset-modes: [val, test]
+
+
+records:
+  _type: records
+  include-zero: True
 
 
 dataset:
-    batch_size: 128
+  _type: dataset
 
-    shuffle: true
-    drop_last: false
+  batch_size: 128
 
-    store_keys: ['din', 'dout']
+  shuffle: true
+  drop_last: false
+
+  store_keys: ['din', 'dout']
 
 model:
+  _type: model
 
-#	_type: mlp
-#	latent_dim: 16
-#   fc: [64, 64]
-
-#    nonlin: 'elu'
-
-#    upsampling: 'bilinear'
-#    downsampling: 'max'
-#
-#    norm_type: 'instance'
-
-    optim_type: 'adam'
-    lr: 1.e-3
-    weight_decay: 0
-    momentum: 0
-    beta1: 0.9
-    beta2: 0.999
-
-
-#optim:
-#    type: 'adam'
-#    lr: 1.e-3
-#    weight_decay: 0
-#    momentum: 0
-#    beta1: 0.9
-#    beta2: 0.999
-
-#	lr_decay:
-#		type: 'factor'
-#		epochs: 10
-#		factor: 0.1
-
-
-
-
+  _print_model: yes
+  _print_optim: yes
 

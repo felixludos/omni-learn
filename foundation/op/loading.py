@@ -1,85 +1,36 @@
-
-import sys, os
-import numpy as np
+from pathlib import Path
 import torch
-import yaml
 
 import omnifig as fig
 
 from .. import util
-from .runs import Run
+from foundation.op.runs import Run
 # from .data import get_loaders
 
 @fig.AutoModifier('torch')
 class Torch(Run):
-	def _load_results(self, ident):
-
-		root = self.save_path
-
-		available = set(os.listdir(self.save_path))
-
-		fixed = ident.split('.')[0]
-		fname = f'{ident}.pth.tar'
-
-		if ident in available:
-			return torch.load(os.path.join(root, ident))
-
-		if fixed in available:
-			return torch.load(os.path.join(root, fixed))
-
-		if fname in available:
-			return torch.load(os.path.join(root, fname))
-
-		raise FileNotFoundError(f'Unknown ident: {ident}')
-
-
-def save_checkpoint(root, model, records=None, steps=None, is_best=False):
 	
-	assert steps is not None or is_best, 'Nothing worth saving'
-	
-	data = {
-		'model_str': str(model),
-		'model_state': model.state_dict(),
+	def _save_results(self, data, path=None, name=None, ext='pth.tar'):
+		if path is None:
+			path = self.get_path()
 		
-		# 'records': records,
-	}
-
-	if steps is not None:
-		if records is not None:
-			rpath = os.path.join(root, f'ckpt-records_{steps}.yaml')
-			with open(rpath, 'w') as f:
-				yaml.dump(records, f)
-				
-		mpath = os.path.join(root, f'ckpt-model_{steps}.pth.tar')
-		torch.save(data, mpath)
-	
-	if is_best:
-		if records is not None:
-			rpath = os.path.join(root, f'ckpt-records_best.yaml')
-			with open(rpath, 'w') as f:
-				yaml.dump(records, f)
+		path = Path(path)
+		if path.is_dir():
+			assert name is not None, 'name is missing'
+			path = path / f'{name}.{ext}'
 		
-		mpath = os.path.join(root, f'ckpt-model_best.pth.tar')
-		torch.save(data, mpath)
-
-
-# def wrap_datasets(*datasets, A=None):
-# 	num_workers = A.pull('dataset.num_workers', 0)
-# 	batch_size = A.pull('dataset.batch_size', 64)
-# 	shuffle = A.pull('dataset.shuffle', True)
-# 	drop_last = A.pull('dataset.drop_last', True)
-#
-# 	return get_loaders(*datasets, batch_size=batch_size, num_workers=num_workers,
-# 	                   shuffle=shuffle, drop_last=drop_last)
-
-
-def get_raw_path(A):
-	path = A.pull('resume', None)
-	loading = False
-	if path is None:
-		path = A.pull('load', None)
-		loading = True
-	return path, loading
+		return torch.save(data, str(path))
+	
+	def _load_results(self, path=None, name=None, ext='pth.tar'):
+		if path is None:
+			path = self.get_path()
+		
+		path = Path(path)
+		if path.is_dir():
+			assert name is not None, 'name is missing'
+			path = path / f'{name}.{ext}'
+			
+		return torch.load(str(path))
 
 
 def respect_config(A):

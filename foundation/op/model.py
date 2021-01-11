@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from .. import util
-from .. import framework as fm
+from . import framework as fm
 
 
 def load_checkpoint(path):  # model parameters - TODO: maybe add more options
@@ -32,44 +32,27 @@ def load_model(A):
 			A.push('_type', model_type, silent=True)
 			A.push('_mod', A.pull('_model_mod', []), silent=True)
 	
-	seed = A.pull('seed')
-	util.set_seed(seed)
+	util.Seed(A)
 	
 	# model = fig.create_component(A)
 	model = A.pull_self()
 	
-	if isinstance(model, fm.Optimizable):
-		model.set_optim(A)
+	optim = model.set_optim(A) if isinstance(model, fm.Optimizable) else None
 	
-	if isinstance(model, fm.Schedulable):
-		model.set_scheduler(A)
+	model.to(model.get_device())
 	
-	device = A.pull('device', 'cpu')
-	if not torch.cuda.is_available():
-		device = 'cpu'
-	model.to(device)
+	if A.pull('_print_model', False):
+		print(model)
+		if A.pull('_print_optim', False):
+			print(optim)
+		print(f'Number of model parameters: {util.count_parameters(model)}')
 	
-	path = A.pull('_load_params', None)
+	path = A.pull('_load-ckpt', None)
 	if path is not None:
-		ckpt = load_checkpoint(path)
-		
-		params = ckpt['model_state']
-		
-		if 'optim' in params:
-			load_optim = A.pull('load_optim_params', True)
-			if not load_optim:
-				del params['optim']
-	
-		if 'scheduler' in params:
-			load_scheduler = A.pull('load_scheduler_params', True)
-			if not load_scheduler:
-				del params['scheduler']
-				
-		strict_load_state = A.pull('strict_load_state', True)
-		
-		model.load_state_dict(params, strict=strict_load_state)
-		
+		model.load_checkpoint(path)
 		print(f'Loaded parameters from {path}')
+	
+	# origin_name = A.pull('__origin_key', None, silent=True)
 	
 	return model
 
@@ -87,7 +70,7 @@ class Viz_Criterion(nn.Module):
 	             allow_grads=False):
 		super().__init__()
 		
-		self.criterion = criterion
+		self.criterion = util.get_loss_type(criterion)
 		self.arg_names = arg_names
 		self.kwarg_names = kwarg_names
 		self.allow_grads = allow_grads
@@ -104,7 +87,7 @@ class Viz_Criterion(nn.Module):
 			return self.criterion(*args, **kwargs)
 
 # @Component('stage') # TODO
-class Stage_Model(fm.Schedulable, fm.Trainable_Model):
+class Stage_Model(fm.Model):
 	def __init__(self, A):
 		stages = A.pull('stages')
 

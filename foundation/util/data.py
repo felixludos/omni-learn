@@ -39,6 +39,10 @@ class make_infinite(DataLoader):
 	
 	def end(self):
 		self.itr = None
+		self.empty()
+	
+	def empty(self):
+		self.cached = None
 	
 	def demand(self, N, extract=None, merge=None):
 		'''
@@ -152,7 +156,7 @@ def to_one_hot(idx, max_idx=None):
 def discretize(input, N, range=None):
 
 	if range is None:
-		range = input.min(), input.max()
+		range = input.min_val(), input.max()
 
 	input = input.clamp(*range)
 	input -= range[0]

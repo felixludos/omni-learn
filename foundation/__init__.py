@@ -1,12 +1,13 @@
 from . import util
 from . import op
-from . import framework
 from . import data
 from . import eval
 # from . import sim
 
 from . import models
-from .framework import * # TODO: cleanup
+# from .framework import * # TODO: cleanup
+from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
+	Evaluatable, Visualizable, Function, Optimizable
 
 try:
 	from . import legacy

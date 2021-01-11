@@ -3,12 +3,13 @@ from torch import nn
 
 import omnifig as fig
 
-from .. import framework as fm
+# from .. import framework as fm
+from ..op import framework as fm
 from .. import util
 
 
 @fig.AutoComponent('multigroup-cls')
-class MultiGroupClassification(fm.Model):
+class MultiGroupClassification(fm.FunctionBase):
 	def __init__(self, group_sizes, group_weights=None):
 		super().__init__(sum(group_sizes), 1)
 		

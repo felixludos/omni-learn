@@ -1,32 +1,13 @@
 
-import sys, os
+import os
 
 import numpy as np
 import torch
 
 import omnifig as fig
 
-from ..data import get_loaders, Info_Dataset, Subset_Dataset, simple_split_dataset, DataLoader, BatchedDataLoader
+# from ..data import get_loaders, Info_Dataset, Subset_Dataset, simple_split_dataset, DataLoader, BatchedDataLoader
 from .. import util
-from ..op.runs import wrap_script
-
-dataset_registry = util.Registry()
-
-
-def register_dataset(name, dataset):
-	cmpn_name = f'dataset/{name}'
-	fig.Component(cmpn_name)(dataset)
-
-	dataset_registry.new(name, cmpn_name)
-
-
-def Dataset(name):
-	def _reg_fn(fn):
-		nonlocal name
-		register_dataset(name, fn)
-		return fn
-	
-	return _reg_fn
 
 
 # FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -98,9 +79,76 @@ def Dataset(name):
 # 		return loaders[0]
 # 	return loaders
 
+# @fig.Component('datamanager')
+# class DataManager(util.Mode):
+# 	def __init__(self, A, mode=None):
+#
+# 		mode_override = mode is not None
+# 		if mode is None:
+# 			mode = 'train'
+# 		mode = A.push('mode', mode, overwrite=mode_override)
+#
+# 		seed = A.pull('dataset_seed', '<>seed', None)
+# 		if seed is not None:
+# 			util.set_seed(seed)
+#
+# 		super().__init__()
+#
+# 		self.seed = seed
+# 		self.mode = mode
+#
+# 		self.purge()
+#
+# 	def purge(self):
+# 		self.datasets = {}
+# 		self.dataloaders = {}
+# 		self.active = None
+#
+# 	def _create_datasets(self, A):
+#
+# 		_type = A.pull('_type', None, silent=True)
+# 		if _type is None or _type == 'dataset':
+# 			name = A.pull('_dataset_type', '<>name')
+#
+# 			if name not in dataset_registry:
+# 				raise Exception(f'No datasets named "{name}" is registered')
+#
+# 			A.push('_type', dataset_registry[name])
+#
+# 			mods = A.pull('_dataset_mod', None, silent=True)
+# 			A.push('_mod', mods, silent=True)
+#
+# 		use_default_dataroot = A.pull('use_default_dataroot', True)
+# 		A.push('dataroot', os.environ['FOUNDATION_DATA_DIR'] if 'FOUNDATION_DATA_DIR' in os.environ
+# 		else util.DEFAULT_DATA_PATH, overwrite=use_default_dataroot)
+#
+# 		dataset = A.pull_self()
+#
+# 	def create_dataset(self):
+#
+# 		pass
+#
+# 	def get_dataset(self, mode='train'):
+#
+# 		pass
+#
+# 	def get_loader(self, mode='train'):
+# 		pass
+#
+# 	def switch_mode(self, mode):
+# 		super().switch_mode(mode)
+#
+# 	def __getattribute__(self, item):
+# 		try:
+# 			return super().__getattribute__(item)
+# 		except AttributeError:
+# 			if self.active is not None:
+# 				return self.active.__getattribute__(item)
 
-@fig.Component('dataset')
-@fig.Script('load-data', description='Load datasets')
+
+
+# @fig.Component('dataset')
+# @fig.Script('load-data', description='Load datasets')
 def load_data(A, mode=None):
 	'''
 	Loads datasets and optionally splits datasets into

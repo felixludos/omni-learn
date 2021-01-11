@@ -7,8 +7,7 @@ import torch
 from torch.nn import functional as F
 
 from foundation import util
-from ..data import Dataset
-from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
+from ...data import Dataset, Deviced, Batchable, Image_Dataset, DatasetBase
 
 from .transforms import Cropped
 
@@ -29,7 +28,7 @@ def _rec_decode(obj):
 	return obj
 
 @Dataset('dsprites')
-class dSprites(Device_Dataset, Info_Dataset, Image_Dataset, Batchable_Dataset):
+class dSprites(Deviced, Batchable, Image_Dataset):
 
 	din = (1, 64, 64)
 	dout = 5
@@ -91,7 +90,7 @@ class dSprites(Device_Dataset, Info_Dataset, Image_Dataset, Batchable_Dataset):
 		return imgs,
 
 @Dataset('3dshapes')
-class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Image_Dataset, Testable_Dataset):
+class Shapes3D(Deviced, Batchable, Image_Dataset):
 
 	din = (3, 64, 64)
 	dout = 6
@@ -186,7 +185,7 @@ class Shapes3D(Info_Dataset, Device_Dataset, Batchable_Dataset, Image_Dataset, T
 
 
 @Dataset('full-celeba') # probably shouldnt be used
-class FullCelebA(Testable_Dataset, Info_Dataset): # TODO: automate downloading and formatting
+class FullCelebA(DatasetBase): # TODO: automate downloading and formatting
 
 	din = (3, 218, 178)
 
@@ -268,7 +267,7 @@ class CelebA(Cropped, FullCelebA):
 
 
 @Dataset('mpi3d')
-class MPI3D(Testable_Dataset, Info_Dataset, Device_Dataset, Batchable_Dataset):
+class MPI3D(Deviced, Batchable):
 
 	din = (3, 64, 64)
 	dout = 7

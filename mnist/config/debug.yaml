@@ -1,43 +1,22 @@
 
-
 _meta.script_name: train
 
-#parents: [cmd]
+parents: [scheduler, mlp, basics]
 
-#resume: test-pycharm_200707-021212
-#
-#override:
-#  eval:
-#    identifier: test
-#    overwrite: True
-#    use_testset: True
 
-#extend: 5000
-
-parents: [demo]
-
-model.net.factors: 1
-
-model:
-  spec_norm: True
-
-#  down: stride
-
-  down: None
-#  norm: batch
-#  nonlin: mish
-
-  net:
-    strides: 2
-#    factors: 1
+#epochs: 5
+budget: 2000
+#budget: 100
+#records.freq: 1
+#model.optim.lr.freq: 1
 
 name: test-pycharm
 
 inline: True
 
-dataset.name: mnist
-
-#output.save_freq: 800
+#model.optim.lr.end: 0.01
+#model.optim.lr.kurtosis: 0.5
+#model.optim.lr.skew: 0.7
 
 
 

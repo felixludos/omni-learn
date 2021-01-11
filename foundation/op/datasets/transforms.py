@@ -10,15 +10,14 @@ from ... import util
 
 from omnifig import AutoModifier, Modification
 
-from ..data import Dataset
-from ...data import Device_Dataset, Info_Dataset, Testable_Dataset, Batchable_Dataset
+from ...data import Dataset, Deviced, DatasetBase, Batchable
 
 @Dataset('concat')
-class Concat(Info_Dataset):
-	def __init__(self, A):
+class Concat(DatasetBase):
+	def __init__(self, A, din=None, dout=None, **kwargs):
 		datasets = A.pull('datasets')
 		assert len(datasets), 'no datasets'
-		super().__init__(datasets[0].din, datasets[0].dout)
+		super().__init__(A, din=datasets[0].din, dout=datasets[0].dout, **kwargs)
 
 		self.cumlens = np.cumsum([len(dataset) for dataset in datasets])
 		self.datasets = datasets
@@ -30,25 +29,14 @@ class Concat(Info_Dataset):
 		idx = bisect_right(self.cumlens, item)
 		return self.datasets[idx][item - int(self.cumlens[int(idx-1)]) if idx > 0 else item]
 
-	def pre_epoch(self, mode, epoch):
-		for dataset in self.datasets:
-			if isinstance(dataset, Info_Dataset):
-				dataset.pre_epoch(mode, epoch)
-
-	def post_epoch(self, mode, epoch, stats=None):
-		for dataset in self.datasets:
-			if isinstance(dataset, Info_Dataset):
-				dataset.post_epoch(mode, epoch, stats=stats)
-
-
 @AutoModifier('cropped')
-class Cropped(Info_Dataset):
+class Cropped(DatasetBase):
 	'''
 	Parent dataset must have a din that is an image
 
 	'''
 
-	def __init__(self, A, crop_size=None):
+	def __init__(self, A, crop_size=None, **kwargs):
 
 		if crop_size is None:
 			crop_size = A.pull('crop_size')
@@ -74,10 +62,11 @@ class Cropped(Info_Dataset):
 		assert len(self.din) == 3 or len(self.din) == 1, 'must be an image dataset'
 
 		din = self.din
+		raise NotImplementedError
 
 		A.din = (self.din[0], *crop_size)
 
-		super().__init__(A)
+		super().__init__(A, **kwargs)
 
 		_, self.cy, self.cx = din
 		self.cy, self.cx = self.cy // 2, self.cx // 2
@@ -92,8 +81,8 @@ class Cropped(Info_Dataset):
 		return (img, *other)
 
 @AutoModifier('interpolated')
-class Interpolated(Info_Dataset):
-	def __init__(self, A, interpolate_size=None, interpolate_mode=None):
+class Interpolated(DatasetBase):
+	def __init__(self, A, interpolate_size=None, interpolate_mode=None, **kwargs):
 
 		if interpolate_size is None:
 			interpolate_size = A.pull('interpolate_size', None)
@@ -112,9 +101,10 @@ class Interpolated(Info_Dataset):
 
 		assert len(self.din) == 3 or len(self.din) == 1, 'must be an image dataset'
 
+		raise NotImplementedError
 		A.din = (self.din[0], *interpolate_size)
 
-		super().__init__(A)
+		super().__init__(A, **kwargs)
 
 		self.interpolate_size = interpolate_size
 		self.interpolate_mode = interpolate_mode
@@ -130,7 +120,7 @@ class Interpolated(Info_Dataset):
 
 
 @AutoModifier('resamplable')
-class Resamplable(Info_Dataset):
+class Resamplable(DatasetBase):
 	def __init__(self, A, budget=None):
 		if budget is None:
 			budget = A.pull('budget', None)
@@ -162,7 +152,7 @@ class Resamplable(Info_Dataset):
 		return super().__getitem__(item)
 
 @AutoModifier('blurred')
-class Blurred(Info_Dataset):
+class Blurred(DatasetBase):
 
 	def __init__(self, config):
 
@@ -194,7 +184,7 @@ class Blurred(Info_Dataset):
 		self.blur.weight.copy_(1).div_(level**2)
 
 		self.done = False
-		if isinstance(self, Device_Dataset):
+		if isinstance(self, Deviced):
 
 			self.blur.to(self.device)
 
@@ -229,7 +219,7 @@ class Blurred(Info_Dataset):
 @Modification('blurred')
 def blurred(dataset, config):
 
-	if not isinstance(dataset, Device_Dataset):
+	if not isinstance(dataset, Deviced):
 		raise NotImplementedError
 
 	level = config.pull('blur-level', 5)

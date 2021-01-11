@@ -16,7 +16,7 @@ from foundation import util
 
 
 @fig.Component('point-enc')
-class PointEncoder(fd.Encodable, fd.Visualizable, fd.Model):
+class PointEncoder(fd.Encodable, fd.Visualizable, fd.FunctionBase):
 
 	def __init__(self, A):
 		in_shape = A.pull('in_shape', '<>din')
@@ -58,7 +58,7 @@ class PointEncoder(fd.Encodable, fd.Visualizable, fd.Model):
 
 
 @fig.AutoComponent('patch-points')
-class Patch_Points(fd.Model):
+class Patch_Points(fd.FunctionBase):
 	'''
 	Converts an image into a set of unordered points where each point is a concat of the pixels of
 	a unique patch of the image.
@@ -139,7 +139,7 @@ def make_pointnet(pin, pout, hidden=None,
 
 
 @fig.Component('point-net')
-class PointNet(fd.Trainable_Model):
+class PointNet(fd.Model):
 	def __init__(self, A):
 
 		pin = A.pull('pin')  # should be the number of channels of the points
@@ -225,7 +225,7 @@ class PointNet(fd.Trainable_Model):
 
 # Abstract modules
 
-class PointNetModule(fd.Model):
+class PointNetModule(fd.FunctionBase):
 	def __init__(self, pin=None, pout=None,
 	             pin1=None, pout1=None, pin2=None, pout2=None):
 		super().__init__(pin, pout)

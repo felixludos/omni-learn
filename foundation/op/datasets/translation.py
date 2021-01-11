@@ -1,13 +1,10 @@
 
 
-from ..data import Dataset
-
-from ...data import standard_split, Device_Dataset, Info_Dataset, Splitable_Dataset, \
-	Testable_Dataset, Batchable_Dataset, Image_Dataset
+from ...data import Dataset, Deviced, Batchable, Image_Dataset
 
 
 @Dataset('unpaired-translation')
-class UnpairedTranslationDataset(Batchable_Dataset, Info_Dataset):
+class UnpairedTranslationDataset(Batchable):
 
 	def __init__(self, A, dataset1=None, dataset2=None, sel_one=None):
 

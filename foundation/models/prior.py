@@ -5,10 +5,10 @@ from torch import nn
 import omnifig as fig
 
 
-from .. import framework as fm
+# from .. import framework as fm
+from ..op import framework as fm
 from .nets import MultiLayer
-from .unsup import Autoencoder
-from .. import util
+
 
 @fig.AutoModifier('prior-tfm') # for the generator
 class PriorTfm:
@@ -33,7 +33,7 @@ class PriorTfm:
 		return q if self.prior_tfm is None else self.prior_tfm(q)
 
 
-class StorablePrior(fm.Model):
+class StorablePrior(fm.FunctionBase):
 	def __init__(self, din=None, dout=None, prior_dim=None):
 		super().__init__(din, dout)
 		self.prior_dim = prior_dim
@@ -58,7 +58,7 @@ class StorablePrior(fm.Model):
 		return torch.randn(N, self.prior_dim, device=self.device)
 
 @fig.Component('adain')
-class AdaIN(StorablePrior, fm.Model):
+class AdaIN(StorablePrior, fm.FunctionBase):
 
 	def __init__(self, A):
 		channels = None
