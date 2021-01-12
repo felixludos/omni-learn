@@ -112,7 +112,7 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 		if not load_memory:
 			raise NotImplementedError
 
-		super().__init__(din=din, dout=dout, train=train)
+		super().__init__(A, din=din, dout=dout, train=train)
 
 		if dataroot is not None: # TODO: automate the downloading and formatting of the dataset (including split)
 			if train is None:

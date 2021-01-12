@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils import spectral_norm
 
+from omnibelt import unspecified_argument
 import omnifig as fig
 
 # from .. import framework as fm
@@ -295,10 +296,9 @@ class PowerLinear(fm.FunctionBase):  # includes powers of input as features
 		raise NotImplementedError
 
 
-@fig.AutoComponent('dense-layer')
-class DenseLayer(fm.FunctionBase):
-	def __init__(self, din, dout, bias=True, nonlin='elu'):
-		super().__init__(din=din, dout=dout)
+class DenseLayerBase(fm.FunctionBase):
+	def __init__(self, din, dout, bias=True, nonlin='elu', **kwargs):
+		super().__init__(din=din, dout=dout, **kwargs)
 
 		seq = []
 
@@ -322,33 +322,106 @@ class DenseLayer(fm.FunctionBase):
 	def forward(self, x):
 		return self.layer(x)
 
+@fig.Component('dense-layer')
+class DenseLayer(fm.Function, DenseLayerBase):
+	def __init__(self, A, din=None, dout=None, bias=None, nonlin=None, **kwargs):
+		
+		if din is None:
+			din = A.pull('din')
+		if dout is None:
+			dout = A.pull('dout')
+		if bias is None:
+			bias = A.pull('bias', True)
+		if nonlin is None:
+			nonlin = A.pull('nonlin', 'elu')
+		
+		super().__init__(A, din=din, dout=dout, bias=bias, nonlin=nonlin, **kwargs)
+
+class ConvLayerBase(fm.FunctionBase):
+	def __init__(self, cin, cout, kernel_size,
+	             padding=None, stride=1, dilation=1, output_padding=0,
+	             unpool=None, pool=None, norm=None, nonlin=None,
+	             residual=False, force_res=False, transpose=False, print_dims=True,
+	             conv_kwargs={}, **kwargs):
+		
+		super().__init__(**kwargs)
+		
+		self.unpool = unpool
+		
+		if transpose:
+			self.conv = nn.ConvTranspose2d(cin, cout, kernel_size=kernel_size, padding=padding,
+			                               stride=stride, dilation=dilation, output_padding=output_padding,
+			                               **conv_kwargs)
+		else:
+			self.conv = nn.Conv2d(cin, cout, kernel_size=kernel_size, padding=padding,
+			                      stride=stride, dilation=dilation, **conv_kwargs)
+		
+		self.pool = pool
+		self.norm = norm
+		self.nonlin = util.get_nonlinearity(nonlin)
+		
+		self.res = force_res or (residual and cin == cout)
+		if self.res and (cin != cout):
+			print('WARNING: residual connections will be partial, because channels dont match')
+		
+		self.print_dims = print_dims
+	
+	def extra_repr(self):
+		msg = ''
+		if self.print_dims:
+			msg += f'{self.din} -> {self.dout}\n'
+		msg += f'residual={self.res}'
+		return msg
+	
+	def forward(self, x):
+		if self.unpool is not None:
+			x = self.unpool(x)
+		c = self.conv(x)
+		if self.res:
+			din, dout = x.size(1), c.size(1)
+			if din > dout:
+				x = c + x.narrow(1, 0, dout)
+			else:
+				if din < dout:
+					B, _, H, W = x.size()
+					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
+				
+				x = c + x
+		else:
+			x = c
+		
+		if self.pool is not None:
+			x = self.pool(x)
+		if self.norm is not None:
+			x = self.norm(x)
+		if self.nonlin is not None:
+			x = self.nonlin(x)
+		return x
+
+
+
+
 @fig.Component('conv-layer')
-class ConvLayer(fm.FunctionBase):
+class ConvLayer(fm.Function, ConvLayerBase):
 
-	def __init__(self, A):
-		# in_shape=None, out_shape=None, channels=None,
-		#
-		# factor=1,
-		#
-		# kernel_size=3, stride=None, padding=None, dilation=None,
-		#
-		# resize=None, norm=None, nonlin='elu', #dropout=None,
-		#
-		# residual=False, force_res=False, **conv_kwargs
+	def __init__(self, A, din=None, dout=None, channels=None,
+	             down=None, up=None, size=None,
+	             **kwargs):
 
-		din = A.pull('in_shape', '<>din', None)
-		channels = A.pull('channels', None)
-		dout = None
+		if din is None:
+			din = A.pull('in_shape', '<>din', None)
+		if channels is None:
+			channels = A.pull('channels', None)
+		# dout = None
 		# if channels is not None:
 		# 	size = A.pull('out_size', '<>size', None)
 		# 	if size is not None:
 		# 		dout = (channels, *size)
-		dout = A.pull('out_shape', '<>dout', dout)
+		if dout is None:
+			dout = A.pull('out_shape', '<>dout', None)
 
 		assert din is not None or dout is not None, 'no input info'
 
-		down, up = None, None
-		size = None
 		if din is not None and dout is not None:
 
 			Cin, Hin, Win = din
@@ -371,26 +444,29 @@ class ConvLayer(fm.FunctionBase):
 				down = val if is_down else None
 				up = None if is_down else val
 		else:
-			down = A.pull('down', down)
+			if down is None:
+				down = A.pull('down', down)
 			if isinstance(down, int):
 				down = down, down
 			assert down is None or (down[0] >= 1 and down[1] >= 1), f'{down}'
-			up = A.pull('up', up) if down is None else None
+			if up is None:
+				up = A.pull('up', up) if down is None else None
 			if isinstance(up, int):
 				up = up, up
 			assert up is None or (up[0] >= 1 and up[1] >= 1), f'{up}'
 			if down is None and up is None:
-				size = A.pull('size', None)
+				if size is None:
+					size = A.pull('size', None)
 				if size is None:
 					down = (1,1)
 
 		pool = None if down is None or (down[0] == 1 and down[1] == 1) \
 			else util.get_pooling(A.pull('pool', None), down)
-		A.begin()
+		# A.begin()
 		A.push('channels', channels, silent=True)
 		unpool = util.get_upsample(A.pull('unpool', None), size=size) if size is not None \
 			else (util.get_upsample(A.pull('unpool', None), up=up, channels=channels) if up is not None else None)
-		A.abort()
+		# A.abort()
 		is_deconv = down is None and size is None and unpool is None
 
 		kernel_size = A.pull('kernel_size', '<>kernel', (4,4) if is_deconv else (3,3))
@@ -481,10 +557,10 @@ class ConvLayer(fm.FunctionBase):
 
 			Hout, Wout = H, W
 
-		A.begin()
+		# A.begin()
 		A.push('channels', Cout, silent=True)
 		norm = util.get_normalization(A.pull('norm', None), Cout)
-		A.abort()
+		# A.abort()
 
 		nonlin = util.get_nonlinearity(A.pull('nonlin', 'elu'))
 
@@ -496,59 +572,13 @@ class ConvLayer(fm.FunctionBase):
 		print_dims = A.pull('print_dims', False)
 		din, dout = (Cin, Hin, Win), (Cout, Hout, Wout)
 
-		super().__init__(din=din, dout=dout)
+		super().__init__(A, din=din, dout=dout,
+		                 cin=Cin, cout=Cout, kernel_size=kernel_size,
+	             padding=padding, stride=stride, dilation=dilation, output_padding=output_padding,
+	             unpool=unpool, pool=pool, norm=norm, nonlin=nonlin,
+	             residual=residual, force_res=force_res, transpose=is_deconv, print_dims=print_dims,
+	             conv_kwargs=conv_kwargs, **kwargs)
 
-		self.unpool = unpool
-
-		if is_deconv:
-			self.conv = nn.ConvTranspose2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
-							  stride=stride, dilation=dilation, output_padding=output_padding,
-										   **conv_kwargs)
-		else:
-			self.conv = nn.Conv2d(Cin, Cout, kernel_size=kernel_size, padding=padding,
-								  stride=stride, dilation=dilation, **conv_kwargs)
-
-		self.pool = pool
-		self.norm = norm
-		self.nonlin = nonlin
-
-		self.res = force_res or (residual and Cin == Cout)
-		if self.res and (Cin != Cout):
-			print('WARNING: residual connections will be partial, because channels dont match')
-
-		self.print_dims = print_dims
-
-	def extra_repr(self):
-		msg = ''
-		if self.print_dims:
-			msg += f'{self.din} -> {self.dout}\n'
-		msg += f'residual={self.res}'
-		return msg
-
-	def forward(self, x):
-		if self.unpool is not None:
-			x = self.unpool(x)
-		c = self.conv(x)
-		if self.res:
-			din, dout = x.size(1), c.size(1)
-			if din > dout:
-				x = c + x.narrow(1, 0, dout)
-			else:
-				if din < dout:
-					B, _, H, W = x.size()
-					x = torch.cat([x, torch.zeros(B, dout - din, H, W, device=x.device)], dim=1)
-
-				x = c + x
-		else:
-			x = c
-
-		if self.pool is not None:
-			x = self.pool(x)
-		if self.norm is not None:
-			x = self.norm(x)
-		if self.nonlin is not None:
-			x = self.nonlin(x)
-		return x
 
 
 @fig.AutoComponent('layer-norm')

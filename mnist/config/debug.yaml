@@ -1,7 +1,7 @@
 
 _meta.script_name: train
 
-parents: [scheduler, mlp, basics]
+parents: [scheduler, conv, basics]
 
 
 #epochs: 5

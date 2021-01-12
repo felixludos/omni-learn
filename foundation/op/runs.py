@@ -628,7 +628,7 @@ class Timed(Run):
 		
 		A = self.get_config()
 		
-		time_limit = A.pull('training.time_limit', None)
+		time_limit = A.pull('time_limit', None)
 		if time_limit is not None:
 			if not self.silent:
 				print(f'SOFT TIME LIMIT: {time_limit:2.2f} hrs')

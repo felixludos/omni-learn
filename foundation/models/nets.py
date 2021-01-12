@@ -95,16 +95,14 @@ class Multihead(fm.FunctionBase): # currently, the input dim for each head must 
 		return torch.cat(ys, dim=1)
 
 @fig.Component('multilayer') # used for CNNs
-class MultiLayer(fm.FunctionBase):
+class MultiLayer(fm.Function):
 
-	def __init__(self, A=None, layers=None, **kwargs):
-
-		super().__init__(A, **kwargs)
+	def __init__(self, A, layers=None, **kwargs):
 
 		if layers is None:
 			layers = self._create_layers(A)
 
-		self.din, self.dout = layers[0].din, layers[-1].dout
+		super().__init__(A, din=layers[0].din, dout=layers[-1].dout, **kwargs)
 
 		self.layers = nn.ModuleList(layers)
 
@@ -116,11 +114,10 @@ class MultiLayer(fm.FunctionBase):
 		assert din is not None or dout is not None, 'need some input info'
 
 		in_order = A.pull('in_order', din is not None)
-		# force_iter = A.pull('force_iter', True)
 
 		create_layers = A.pull('layers', as_iter=True)
-		# create_layers = deepcopy(create_layers)
-		create_layers.set_auto_pull(False)
+		create_layers.set_auto_pull(False)  # prevents layer from being created before din/dout info is updated
+		create_layers.set_reversed(not in_order)
 
 		self._current = din if in_order else dout
 		self._req_key = 'din' if in_order else 'dout'
@@ -173,14 +170,34 @@ class MultiLayer(fm.FunctionBase):
 #################
 
 @fig.AutoModifier('normal')
-class Normal(fm.FunctionBase):
-	def __init__(self, A):
-		super().__init__(A)
+class Normal(fm.Function):
+	def __init__(self, A, **kwargs):
+		
+		change_dout = A.pull('change-dout', True)
+		if change_dout:
+			dout_key = A.pull('dout_key', 'final_dout' if isinstance(self, MultiLayer) else 'dout', silent=True)
+			dout = A.pull(dout_key, None)
+			if dout is not None:
+				
+				if isinstance(dout, int):
+					chn = dout * 2
+					dout = chn
+				
+				else:
+					chn = dout[0]
+					chn = chn * 2
+					dout = (chn, *dout[1:])
+				
+				A.push(dout_key, dout)
+		
+		super().__init__(A, **kwargs)
 
 		dout = self.dout
 		self.full_dout = dout
 
-		split = A.pull('split-out', True)
+		split = change_dout
+		if not change_dout:
+			split = A.pull('split-out', True)
 
 		out = None
 		if split:

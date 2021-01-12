@@ -5,7 +5,7 @@ import torch
 import copy
 import torch.nn as nn
 
-from omnibelt import primitives
+from omnibelt import primitives, InitWall
 
 import omnifig as fig
 
@@ -18,7 +18,7 @@ from itertools import chain
 from .clock import AlertBase
 
 
-class FunctionBase(DimensionBase, DeviceBase, nn.Module):  # any differentiable vector function
+class FunctionBase(DimensionBase, DeviceBase, InitWall, nn.Module):  # any differentiable vector function
 	def __init__(self, din=None, dout=None, device=None, **unused):
 		super().__init__(din=din, dout=dout, device=device, **unused)
 	

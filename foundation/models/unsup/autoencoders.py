@@ -85,7 +85,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		if 'original' in info:
 			X = info.original
-			if X.ndim == 4 and self.viz_rec and 'reconstruction' in info:
+			if X.ndim == 4 and 'rec' in settings and 'reconstruction' in info:
 				B, C, H, W = info.original.shape
 				N = min(B, 8)
 
@@ -209,15 +209,15 @@ class Variational_Autoencoder(Generative_AE):
 
 	def __init__(self, A, **kwargs):
 
-		mod_check = A.pull('mod_check', True)  # make sure encoder outputs a normal distribution
-		if mod_check:
-			mods = A.pull('encoder._mod', None, silent=True)
-			if isinstance(mods, (list, tuple, dict)):
-				if 'normal' not in mods:
-					mods = [*mods, 'normal'] if isinstance(mods, (tuple, list)) else {**mods, 'normal': 10},
-					A.push('encoder._mod', mods, silent=True)
-			else:
-				A.push('encoder._mod.normal', 1)
+		# mod_check = A.pull('mod_check', True)  # make sure encoder outputs a normal distribution
+		# if mod_check:
+		# 	mods = A.pull('encoder._mod', None, silent=True)
+		# 	if isinstance(mods, (list, tuple, dict)):
+		# 		if 'normal' not in mods:
+		# 			mods = [*mods, 'normal'] if isinstance(mods, (tuple, list)) else {**mods, 'normal': 10},
+		# 			A.push('encoder._mod', mods, silent=True)
+		# 	else:
+		# 		A.push('encoder._mod.normal', 1)
 
 		A.push('reg', None)  # already taken care of
 		wt = A.pull('reg-wt', None, silent=True)
