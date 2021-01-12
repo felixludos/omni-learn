@@ -25,6 +25,7 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 		self._info_format = A.pull('info_format', 'yaml')
 		
 		self._log_smooths = A.pull('log-smooth', True)
+		self._log_model_str = A.pull('log-model-str', True)
 		
 		self.purge()
 		
@@ -35,6 +36,11 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 	def prep(self, order, info=None):
 		self._model = info.get_model()
 		self._dataset = info.get_dataset()
+		
+		if self.logger is not None and self._log_model_str:
+			self.log('text', 'model-str', str(self._model))
+			self.log('text', 'model-optim-str', str(self._model.optim))
+
 	
 	def _init_info(self, A):
 		info = {

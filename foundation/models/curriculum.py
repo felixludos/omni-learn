@@ -30,6 +30,9 @@ class Scheduler(util.Value, Savable, Reg, Freq):
 		                                 '' if self.stop is None else self.stop, '' if self.freq is None else self.freq,
 		                                 ('\n    ' + '\n'.join(extra) + '\n') if len(extra) else '')
 	
+	def __str__(self):
+		return repr(self)
+	
 	def check(self, tick, info=None):
 		return super().check(tick, info=info) \
 		       and (self.start is None or tick >= self.start) \
