@@ -10,6 +10,8 @@ import omnifig as fig
 from ...op import framework as fm
 from ... import util
 
+from ..features import Prior, Gaussian
+
 
 @fig.Component('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
@@ -192,11 +194,11 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		return out
 
+class Generative_AE(fm.Generative, Prior, Autoencoder):
 
-class Generative_AE(fm.Generative, Autoencoder):
-
-	def sample_prior(self, N=1):
-		return torch.randn(N, self.latent_dim, device=self.device)
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
+		self.prior_dim = self.latent_dim
 
 	def generate(self, N=1, prior=None):
 		if prior is None:
@@ -205,7 +207,7 @@ class Generative_AE(fm.Generative, Autoencoder):
 
 
 @fig.Component('vae')
-class Variational_Autoencoder(Generative_AE):
+class Variational_Autoencoder(Gaussian, Generative_AE):
 
 	def __init__(self, A, **kwargs):
 

@@ -97,23 +97,26 @@ class Multihead(fm.FunctionBase): # currently, the input dim for each head must 
 @fig.Component('multilayer') # used for CNNs
 class MultiLayer(fm.Function):
 
-	def __init__(self, A, layers=None, **kwargs):
+	def __init__(self, A, layers=None, din=None, dout=None, in_order=None, **kwargs):
 
 		if layers is None:
-			layers = self._create_layers(A)
+			layers = self._create_layers(A, din=din, dout=dout, in_order=in_order)
 
 		super().__init__(A, din=layers[0].din, dout=layers[-1].dout, **kwargs)
 
 		self.layers = nn.ModuleList(layers)
 
-	def _create_layers(self, A):
+	def _create_layers(self, A, din=None, dout=None, in_order=None):
 
-		din = A.pull('final_din', '<>din', None)
-		dout = A.pull('final_dout', '<>dout', None)
+		if din is None:
+			din = A.pull('final_din', '<>din', None)
+		if dout is None:
+			dout = A.pull('final_dout', '<>dout', None)
 
 		assert din is not None or dout is not None, 'need some input info'
 
-		in_order = A.pull('in_order', din is not None)
+		if in_order is None:
+			in_order = A.pull('in_order', din is not None)
 
 		create_layers = A.pull('layers', as_iter=True)
 		create_layers.set_auto_pull(False)  # prevents layer from being created before din/dout info is updated

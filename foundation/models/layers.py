@@ -409,7 +409,7 @@ class ConvLayer(fm.Function, ConvLayerBase):
 	             **kwargs):
 
 		if din is None:
-			din = A.pull('in_shape', '<>din', None)
+			din = A.pull('in-shape', '<>din', None)
 		if channels is None:
 			channels = A.pull('channels', None)
 		# dout = None
@@ -418,7 +418,7 @@ class ConvLayer(fm.Function, ConvLayerBase):
 		# 	if size is not None:
 		# 		dout = (channels, *size)
 		if dout is None:
-			dout = A.pull('out_shape', '<>dout', None)
+			dout = A.pull('out-shape', '<>dout', None)
 
 		assert din is not None or dout is not None, 'no input info'
 
