@@ -45,15 +45,15 @@ class StyleLayer(Function):
 	def process_content(self, content):
 		return content
 
-	def infuse(self, content, style):
+	def infuse(self, content, style, **kwargs):
 		raise NotImplementedError
 
-	def forward(self, content, style=None):
+	def forward(self, content, style=None, **kwargs):
 
 		style = self.process_style(style)
 		content = self.process_content(content)
 
-		return self.infuse(content, style)
+		return self.infuse(content, style, **kwargs)
 
 class PriorStyleLayer(Prior, StyleLayer):
 
@@ -62,10 +62,10 @@ class PriorStyleLayer(Prior, StyleLayer):
 		if style_dim is None:
 			self.prior_dim = self.style_dim
 
-	def forward(self, content, style=None):
+	def forward(self, content, style=None, **kwargs):
 		if style is None and self._style is None:
 			self.cache_style(self.sample_prior(content.size(0)))
-		return super().forward(content, style=style)
+		return super().forward(content, style=style, **kwargs)
 
 @fig.AutoModifier('gaussian-style')
 class Gaussian(Gaussian, PriorStyleLayer):
@@ -103,9 +103,9 @@ class StyleSharing(StyleLayer, MultiLayer):
 		styles = [style] * len(self.style_layers) if self.style_dims is None else style.split(self.style_dims, dim=1)
 		for layer, style in zip(self.style_layers, styles):
 			layer.cache_style(style)
+		return styles
 
-
-	def infuse(self, content, style):
+	def infuse(self, content, style, **unused):
 
 		self.share_style(style)
 		
