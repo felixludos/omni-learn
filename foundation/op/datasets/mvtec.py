@@ -131,7 +131,7 @@ class MVTec_Anomaly_Detection(Batchable):
         'metal_nut', 'tile', 'wood', 'capsule', 'hazelnut', 'pill','toothbrush', 'zipper'}
 	GREYSCALES = {'screw', 'grid', 'zipper'}
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 	
 		dataroot = Path(A.pull('dataroot')) / 'mvtec'
 		
@@ -186,7 +186,7 @@ class MVTec_Anomaly_Detection(Batchable):
 		C = 1 if cat in self.GREYSCALES else 3
 		din = (C, 1024, 1024) if size is None else (C, size, size)
 		dout = din
-		super().__init__(din, dout)
+		super().__init__(A, din=din, dout=dout, **kwargs)
 		
 		raw = hf.File(path, 'r')
 		

@@ -26,7 +26,7 @@ def load_model(A):
 	if raw_type == 'model':
 		model_type = A.pull('_model_type', None, silent=True)
 		if model_type is None:
-			assert A.contains_no_default('model')
+			assert A.contains_nodefault('model')
 			A = A.sub('model')
 		else:
 			A.push('_type', model_type, silent=True)

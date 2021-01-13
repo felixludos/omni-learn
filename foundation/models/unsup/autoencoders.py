@@ -15,7 +15,7 @@ from ..features import Prior, Gaussian
 
 @fig.Component('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
-	def __init__(self, A, encoder=None, decoder=None, **other):
+	def __init__(self, A, encoder=None, decoder=None, din=None, dout=None, **other):
 
 		if encoder is None:
 			encoder = A.pull('encoder')

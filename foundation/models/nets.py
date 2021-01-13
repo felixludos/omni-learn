@@ -4,6 +4,7 @@ from torch.distributions import Normal as NormalDistribution
 # from .. import framework as fm
 from ..op import framework as fm
 
+from omnibelt import InitWall, unspecified_argument
 import omnifig as fig
 
 from .layers import make_MLP
@@ -12,25 +13,54 @@ from .layers import make_MLP
 # region General
 #################
 
+class MLPBase(fm.FunctionBase, InitWall, nn.Sequential):
+	def __init__(self, din, dout, hidden=None, initializer=None,
+	             nonlin='elu', output_nonlin=None,
+	             bias=True, output_bias=None, make_kwargs={}, _req_args=(), **kwargs):
+
+		assert len(_req_args) == 0, str(_req_args)
+
+		net = make_MLP(din=din, dout=dout, hidden=hidden, initializer=initializer,
+		               nonlin=nonlin, output_nonlin=output_nonlin,
+		               bias=bias, output_bias=output_bias, **make_kwargs)
+		super().__init__(din=net.din, dout=net.dout, _req_args=tuple(net), **kwargs)
 
 @fig.Component('mlp')
-class MLP(nn.Sequential, fm.FunctionBase):
-	def __init__(self, A):
-		kwargs = {
-			'din': A.pull('input_dim', '<>din'),
-			'dout': A.pull('output_dim', '<>dout'),
-			'hidden': A.pull('hidden_dims', '<>hidden_fc', '<>hidden', []),
-			'nonlin': A.pull('nonlin', 'elu'),
-			'output_nonlin': A.pull('output_nonlin', '<>out_nonlin', None),
-			'logify_in': A.pull('logify', False),
-			'unlogify_out': A.pull('unlogify', False),
-			'bias': A.pull('bias', True),
-			'output_bias': A.pull('output_bias', '<>out_bias', None),
-		}
+class MLP(fm.Function, MLPBase):
+	def __init__(self, A, din=unspecified_argument, dout=unspecified_argument,
+	             hidden=unspecified_argument, initializer=unspecified_argument,
+	             nonlin=unspecified_argument, output_nonlin=unspecified_argument,
+	             bias=unspecified_argument, output_bias=unspecified_argument,
+	             make_kwargs=unspecified_argument, **kwargs):
 
-		net = make_MLP(**kwargs)
-		super().__init__(*net)
-		self.din, self.dout = net.din, net.dout
+		# region fill in args
+
+		if din is unspecified_argument:
+			din = A.pull('input_dim', '<>din')
+		if dout is unspecified_argument:
+			dout = A.pull('output_dim', '<>dout')
+		if hidden is unspecified_argument:
+			hidden = A.pull('hidden_dims', '<>hidden_fc', '<>hidden', None)
+		if initializer is unspecified_argument:
+			initializer = A.pull('initializer', None)
+		if nonlin is unspecified_argument:
+			nonlin = A.pull('nonlin', 'elu')
+		if output_nonlin is unspecified_argument:
+			output_nonlin = A.pull('output_nonlin', '<>out_nonlin', None)
+		if bias is unspecified_argument:
+			bias = A.pull('bias', True)
+		if output_bias is unspecified_argument:
+			output_bias = A.pull('output_bias', '<>out_bias', None)
+		if make_kwargs is unspecified_argument:
+			make_kwargs = A.pull('make_kwargs', {})
+
+		# endregion
+
+		super().__init__(A, din=din, dout=dout,
+		                 hidden=hidden, initializer=initializer,
+		                 nonlin=nonlin, output_nonlin=output_nonlin,
+		                 bias=bias, output_bias=output_bias,
+		                 make_kwargs=make_kwargs, **kwargs)
 
 @fig.Component('multihead')
 class Multihead(fm.FunctionBase): # currently, the input dim for each head must be the same (but output can be different) TODO: generalize
@@ -171,82 +201,6 @@ class MultiLayer(fm.Function):
 #################
 # region Behavior
 #################
-
-@fig.AutoModifier('normal')
-class Normal(fm.Function):
-	def __init__(self, A, **kwargs):
-		
-		change_dout = A.pull('change-dout', True)
-		if change_dout:
-			dout_key = A.pull('dout_key', 'final_dout' if isinstance(self, MultiLayer) else 'dout', silent=True)
-			dout = A.pull(dout_key, None)
-			if dout is not None:
-				
-				if isinstance(dout, int):
-					chn = dout * 2
-					dout = chn
-				
-				else:
-					chn = dout[0]
-					chn = chn * 2
-					dout = (chn, *dout[1:])
-				
-				A.push(dout_key, dout)
-		
-		super().__init__(A, **kwargs)
-
-		dout = self.dout
-		self.full_dout = dout
-
-		split = change_dout
-		if not change_dout:
-			split = A.pull('split-out', True)
-
-		out = None
-		if split:
-
-			if isinstance(dout, int):
-				assert dout % 2 == 0
-				chn = dout // 2
-				dout = chn
-
-			else:
-				chn = dout[0]
-				assert chn % 2 == 0
-				chn = chn // 2
-				dout = (chn, *dout[1:])
-
-		else:
-
-			if isinstance(dout, int):
-				chn = dout
-
-				out = nn.Linear(chn, chn*2)
-
-				# A.push('out-layer._type', 'dense-layer', silent=True)
-				# A.push('')
-
-			else:
-				chn = dout[0]
-
-				out = nn.Conv2d(chn, chn*2, kernel_size=1)
-
-				# A.push('out-layer._type', 'conv-layer', silent=True)
-
-		self.normal_layer = out
-		self.width = chn
-		self.dout = dout
-
-	def forward(self, *args, **kwargs):
-
-		x = super().forward(*args, **kwargs)
-
-		if self.normal_layer is not None:
-			x = self.normal_layer(x)
-
-		mu, sigma = x.narrow(1, 0, self.width), x.narrow(1, self.width, self.width).exp()
-
-		return NormalDistribution(mu, sigma)
 
 
 class OldNormal(fm.FunctionBase):

@@ -627,26 +627,26 @@ class Timed(Run):
 		super().startup()
 		
 		A = self.get_config()
-		
+
 		time_limit = A.pull('time_limit', None)
 		if time_limit is not None:
 			if not self.silent:
 				print(f'SOFT TIME LIMIT: {time_limit:2.2f} hrs')
-			self.train_state.start_time = time.time()
+			self.timer_start = time.time()
 			time_limit = 3600 * time_limit
 		
-			self.train_state.time_limit_exit_code = A.pull('time_limit_exit_code', 3)
+			self.timer_exit_code = A.pull('time_limit_exit_code', 3)
 		
-		self.train_state.time_limit = time_limit
+		self.timer_limit = time_limit
 
 	def save_checkpoint(self, save_model=True):
 		super().save_checkpoint(save_model=save_model)
 		
-		time_limit = self.train_state.time_limit
+		time_limit = self.timer_limit
 		if time_limit is not None:
-			start_time = self.train_state.start_time
+			start_time = self.timer_start
 			if (time.time() - start_time) > time_limit:
-				self.exit_run('timelimit reached', code=self.train_state.time_limit_exit_code)
+				self.exit_run('timelimit reached', code=self.timer_exit_code)
 			
 
 		
