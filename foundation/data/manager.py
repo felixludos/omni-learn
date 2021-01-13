@@ -4,7 +4,7 @@ from pathlib import Path
 import random
 import numpy as np
 import torch
-from torch.utils.data import Dataset as PytorchDataset, DataLoader
+from torch.utils.data import Dataset as PytorchDataset, DataLoader, RandomSampler
 import h5py as hf
 
 from omnibelt import save_yaml, load_yaml
@@ -138,7 +138,19 @@ class Loadable(SimpleDataManager):
 		# 	else:
 		# 		# print('Using batched data loader')
 		# 		loader_cls = BatchedDataLoader
-		
+
+		if len(dataset) > 1e9:
+			generator = settings.get('generator', None)
+			seed = settings.get('seed', None)
+			shuffle = settings.get('shuffle', False)
+			if shuffle:
+				if generator is None and seed is not None:
+					generator = torch.Generator()
+					generator.manual_seed(seed)
+					settings['generator'] = generator
+				settings['sampler'] = RandomSampler(dataset, replacement=True, generator=generator)
+				settings['shuffle'] = False
+
 		loader = loader_cls(dataset, **settings)
 		
 		if infinite is None:

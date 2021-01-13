@@ -141,6 +141,65 @@ def batches(iterable, n): # batches an iterable (batches are not lazy)
 		else:
 			break
 
+
+def fill_in(src, new, locs, add=True, inplace=False):
+	'''fill in `new` in `src` at pixel coords `locs` (B,2) (batched)'''
+
+	squeeze = False
+	if len(src.shape) == 3:
+		B, H, W = src.shape
+		C = 1
+		squeeze = True
+		src.unsqueeze(1)
+		if len(new.shape) == 3:
+			new = new.unsqueeze(1)
+	else:
+		assert len(src.shape) == 4
+
+		B, C, H, W = src.shape
+
+		if C != 1:
+			raise NotImplementedError
+
+	U, V = new.shape[-2:]
+
+	u, v = locs.t()
+
+	vals = new.view(-1)
+	src = src.view(-1)
+
+	shift = torch.arange(0, U * V).fmod(V).eq(0)
+	shift[0] = 0
+	shift = shift.int().mul(W - V).cumsum(0)
+
+	pos = torch.arange(U * V * C).unsqueeze(0)
+
+	idx = u * W + v
+
+	inds = (shift + pos + (H * W * C * torch.arange(B) + idx).unsqueeze(1)).view(-1)
+
+	if inplace:
+
+		if add:
+			src.index_add_(0, inds, vals)
+		else:
+			src.index_copy_(0, inds, vals)
+		out = src
+
+	else:
+
+		if add:
+			out = src.index_add(0, inds, vals)
+		else:
+			out = src.index_copy(0, inds, vals)
+
+		out = out.view(B, C, H, W)
+
+	if squeeze:
+		out.squeeze(1)
+	return out
+
+
 def to_one_hot(idx, max_idx=None):
 	if max_idx is None:
 		max_idx = idx.max()
