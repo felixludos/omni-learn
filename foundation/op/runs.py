@@ -63,13 +63,12 @@ class Run(Configurable):
 
 		self.invisible = A.pull('invisible', False)
 
-		
 		A = A.get_root()
 		A = self._find_origin(A)
 		
 		if not self.invisible:
 			self._setup_storage(A)
-		
+
 		self._prep(A)
 		
 		self.purge() # reset payload objs
@@ -137,7 +136,7 @@ class Run(Configurable):
 			config_path = path / 'config.yaml'
 			
 			if not self.silent:
-				print(f'Loading Config: {config_path}')
+				print(f'Loading Config (for run): {config_path}')
 			
 			load_A = fig.get_config(str(config_path))
 			if novel:

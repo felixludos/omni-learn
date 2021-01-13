@@ -28,7 +28,9 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 		
 		default_mode = A.pull('default_mode', '<>mode', 'train')
 		A.push('mode', default_mode, overwrite=False, silent=True)
-		
+
+		aliases = A.pull('mode-aliases', {})
+
 		super().__init__(A, **kwargs)
 
 		self._default_mode = default_mode
@@ -40,7 +42,9 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 			raise NotImplementedError
 		self.A.push('_type', cmpn_name, silent=True)
 		self.A.push('_mod', mods, silent=True)
-		
+
+		self._mode_aliases = aliases
+
 		self.purge()
 			
 	def startup(self, A=None):
@@ -51,6 +55,7 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 		self._modes = {}
 	
 	def _create_mode(self, mode):
+
 		# self.A.begin()
 		if self.A.contains_nodefault(mode):
 			self.A.update(self.A.sub(mode))
@@ -60,14 +65,20 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 		
 		self._modes[mode] = dataset
 		return dataset
-	
+
+	def _find_active(self, mode):
+		if mode in self._modes:
+			return self._modes[mode]
+		elif mode in self._mode_aliases:
+			return self._find_active(self._mode_aliases[mode])
+		return self._create_mode(mode)
+
 	def switch_to(self, mode):
 		if mode is None:
 			mode = self._default_mode
 
 		super().switch_to(mode)
-		self._active = self._modes[mode] if mode in self._modes else self._create_mode(mode)
-	
+		self._active = self._find_active(mode)
 	def get_data(self, mode=None):
 		if mode is not None:
 			self.switch_to(mode)

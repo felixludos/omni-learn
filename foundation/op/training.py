@@ -48,8 +48,8 @@ class Epoch(RunEvent):
 		self.records = records
 	
 		self.step_limit = step_limit
-		if self.step_limit is not None:
-			raise NotImplementedError
+		# if self.step_limit is not None:
+		# 	raise NotImplementedError
 		
 		self.print_results = print_results
 		self.pbar = pbar
@@ -143,6 +143,8 @@ class Epoch(RunEvent):
 		
 		loader = dataset.get_loader(infinite=False, seed=self.loader_seed)
 		N = len(loader)
+		if self.step_limit is not None and N > self.step_limit:
+			N = self.step_limit
 		loader = enumerate(loader)
 		if self.pbar is not None:
 			self.pbar.pause()
