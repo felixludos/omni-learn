@@ -360,7 +360,10 @@ class ConvLayerBase(fm.FunctionBase):
 		self.norm = norm
 		self.nonlin = util.get_nonlinearity(nonlin)
 		
-		self.res = force_res or (residual and cin == cout)
+		self.res = (force_res or (residual and cin == cout)) \
+		           and (self.conv.stride[0] == self.conv.stride[1] == 1)
+		if force_res and not self.res:
+			print(f'WARNING: cant use residual due to stride {stride}')
 		if self.res and (cin != cout):
 			print('WARNING: residual connections will be partial, because channels dont match')
 		
@@ -405,7 +408,7 @@ class ConvLayerBase(fm.FunctionBase):
 class ConvLayer(fm.Function, ConvLayerBase):
 
 	def __init__(self, A, din=None, dout=None, channels=None,
-	             down=None, up=None, size=None,
+	             down=None, up=None, size=None, transpose=None,
 	             **kwargs):
 
 		if din is None:
@@ -419,6 +422,9 @@ class ConvLayer(fm.Function, ConvLayerBase):
 		# 		dout = (channels, *size)
 		if dout is None:
 			dout = A.pull('out-shape', '<>dout', None)
+			
+		if transpose is None:
+			transpose = A.pull('transpose', None)
 
 		assert din is not None or dout is not None, 'no input info'
 
@@ -449,27 +455,38 @@ class ConvLayer(fm.Function, ConvLayerBase):
 			if isinstance(down, int):
 				down = down, down
 			assert down is None or (down[0] >= 1 and down[1] >= 1), f'{down}'
-			if up is None:
-				up = A.pull('up', up) if down is None else None
+			if up is None and transpose is not False:
+				up = A.pull('up', up) #if down is None else None
 			if isinstance(up, int):
 				up = up, up
+			if down is None and up is not None and up[0] == up[1] == 1 and transpose is None:
+				down = up
+				up = None
 			assert up is None or (up[0] >= 1 and up[1] >= 1), f'{up}'
 			if down is None and up is None:
 				if size is None:
 					size = A.pull('size', None)
 				if size is None:
 					down = (1,1)
+					
+			if down is not None and up is not None:
+				down = down if not transpose else None
+				up = up if transpose else None
 
-		pool = None if down is None or (down[0] == 1 and down[1] == 1) \
+		pool = None if down is None or (down[0] == down[1] == 1) \
 			else util.get_pooling(A.pull('pool', None), down)
 		# A.begin()
 		A.push('channels', channels, silent=True)
 		unpool = util.get_upsample(A.pull('unpool', None), size=size) if size is not None \
-			else (util.get_upsample(A.pull('unpool', None), up=up, channels=channels) if up is not None else None)
+			else (util.get_upsample(A.pull('unpool', None), up=up, channels=channels)
+			      if up is not None and (up[0] > 1 or up[1] > 1) else None)
 		# A.abort()
-		is_deconv = down is None and size is None and unpool is None
+		if transpose: # make sure transpose is valid
+			transpose = down is None or up is not None
+		is_deconv = size is None and unpool is None and (transpose or (up is not None and down is None))
+		# is_deconv = down is None and size is None and unpool is None
 
-		kernel_size = A.pull('kernel_size', '<>kernel', (4,4) if is_deconv else (3,3))
+		kernel_size = A.pull('kernel_size', '<>kernel', (3+up[0]-1, 3+up[1]-1) if is_deconv else (3,3)) # TODO: check condition for larger default kernel for deconvs
 		if kernel_size is None:
 			kernel_size = (4,4) if is_deconv else (3,3)
 		if isinstance(kernel_size, int):
