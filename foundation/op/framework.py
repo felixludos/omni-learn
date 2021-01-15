@@ -41,8 +41,8 @@ class HyperParam(Function):
 		self._hparams = set()
 	
 	def register_hparam(self, name, val):
-		if not isinstance(val, util.ValueBase):
-			val = util.ValueBase(val)
+		# if not isinstance(val, util.ValueBase):
+		# 	val = util.ValueBase(val)
 		self._hparams.add(name)
 		self.register_attr(name, val)
 		
