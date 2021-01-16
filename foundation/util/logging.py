@@ -39,8 +39,14 @@ class Logger(object):
 	def set_step(self, step):
 		self.global_step = step
 
-	def set_tag_format(self, fmt):
+	def get_step(self):
+		return self.global_step
+
+	def set_tag_format(self, fmt=None):
 		self.tag_fmt = fmt
+		
+	def get_tag_format(self):
+		return self.tag_fmt
 
 	def add_hparams(self, param_dict, metrics={}):
 		self.tblog.add_hparams(param_dict, metrics)

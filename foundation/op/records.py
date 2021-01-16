@@ -12,9 +12,12 @@ from .clock import Freq
 from .. import util
 from ..util.features import Configurable, Switchable, Checkpointable, Seed
 
-
-class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
+@fig.Component('records')
+class Records(Freq, Switchable, Seed, Configurable, dict):
 	def __init__(self, A, **kwargs):
+
+		ckpt = A.pull('_load-ckpt', None, silent=True)
+		
 		super().__init__(A, **kwargs)
 		
 		self.update(self._init_info(A))
@@ -26,6 +29,9 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 		
 		self._log_smooths = A.pull('log-smooth', True)
 		self._log_model_str = A.pull('log-model-str', True)
+		
+		if ckpt is not None:
+			self.load_checkpoint(ckpt)
 		
 		self.purge()
 		
@@ -75,23 +81,34 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 	def activate(self, tick, info=None):
 		self.step(tick)
 		
-	def step(self, num=None):
+	def step(self, num=None, fmt=None):
 		
 		if self.logger is not None:
 			if num is not None:
 				self.set_step(num)
 			
-			display = self.stats.smooths() if self._log_smooths else self.stats.vals()
+			display = self.stats.smooths(fmt=fmt) if self._log_smooths else self.stats.vals(fmt=fmt)
 			
 			for name, val in display.items():
 				self.log('scalar', name, val)
 		
+	def set_fmt(self, fmt=None):
+		if self.logger is not None:
+			self.logger.set_tag_format(fmt)
+	
+	def get_fmt(self):
+		if self.logger is not None:
+			return self.logger.get_tag_format()
 		
 	def set_step(self, tick):
 		if self.logger is not None:
 			self.logger.set_step(tick)
 		if self.stats is not None:
 			self.stats.set_step(tick)
+		
+	def get_step(self):
+		if self.logger is not None:
+			self.logger.get_step()
 		
 	def log(self, data_type, tag, *args, global_step=None, **kwargs):
 		if self.logger is not None:
@@ -152,27 +169,33 @@ class SimpleRecords(Freq, Switchable, Seed, Configurable, dict):
 		if stats:
 			self.export_stats(path)
 	
-
-class Checkpointed(Checkpointable, SimpleRecords):
-
-	def __init__(self, A, **kwargs):
-		
-		ckpt = A.pull('_load-ckpt', None, silent=True)
-		
-		super().__init__(A, **kwargs)
-		
-		if ckpt is not None:
-			self.load_checkpoint(ckpt)
-	
 	def checkpoint(self, path, ident=None):
 		self.export(path)
-		
+	
 	def load_checkpoint(self, path, ident=None):
 		self.import_(path)
 
 
-@fig.Component('records')
-class Records(Checkpointed, SimpleRecords):
-	pass
+# class Checkpointed(Checkpointable, SimpleRecords):
+#
+# 	def __init__(self, A, **kwargs):
+#
+# 		ckpt = A.pull('_load-ckpt', None, silent=True)
+#
+# 		super().__init__(A, **kwargs)
+#
+# 		if ckpt is not None:
+# 			self.load_checkpoint(ckpt)
+#
+# 	def checkpoint(self, path, ident=None):
+# 		self.export(path)
+#
+# 	def load_checkpoint(self, path, ident=None):
+# 		self.import_(path)
+#
+#
+# @fig.Component('records')
+# class Records(Checkpointed, SimpleRecords):
+# 	pass
 
 

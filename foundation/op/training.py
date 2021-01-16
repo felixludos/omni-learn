@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 
+from omnibelt import unspecified_argument
+
 import omnifig as fig
 
 from foundation.op.framework import Recordable, Evaluatable
@@ -12,7 +14,7 @@ from .. import util
 # from .loading import load_config, load_records, setup_logging, setup_records, \
 # 	wrap_datasets, wrap_transaction, save_checkpoint
 from .loading import respect_config
-from .evaluation import eval_model
+# from .evaluation import evaluate
 from .clock import Freq, Reg
 from .framework import Visualizable
 
@@ -29,7 +31,10 @@ class RunEvent(Freq):
 class Epoch(RunEvent):
 	def __init__(self, A, **kwargs):
 		step_limit = A.pull('step-limit', None)
-		pbar = A.pull('pbar', None)
+		inline = A.pull('inline', False)
+		pbar = None
+		if inline:
+			pbar = A.pull('pbar', None)
 		mode = A.pull('mode', 'val')
 		print_results = A.pull('print_metric', True)
 		fixed_loader_seed = A.pull('loader-seed', None)
@@ -62,6 +67,9 @@ class Epoch(RunEvent):
 		
 	def get_mode(self):
 		return self.get_name()
+	
+	def set_mode(self, mode):
+		self.mode = mode
 	
 	@staticmethod
 	def pre_epoch(mode, dataset, model, records=None):
@@ -103,7 +111,7 @@ class Epoch(RunEvent):
 		return out
 
 	@staticmethod
-	def epoch_end(dataset, model, records, batch, out):
+	def epoch_end(dataset, model, records=None, batch=None, out=None):
 		
 		if out is not None and records is not None:
 			records.step()
@@ -114,30 +122,36 @@ class Epoch(RunEvent):
 		meter = model.get_metric()
 		
 		mode = model.get_mode()
-		ep = records['total_epochs'][mode] + 1
-		print(f'{mode} ({ep}) {name}: {meter.avg:.4f} (min={meter.min:.4f}, max={meter.max:.4f})')
-			
-
-	def run_epoch(self, dataset=None, model=None, records=None,
-	              pre_epoch=None, step_fn=None, epoch_end=None, post_epoch=None):
+		title = mode
+		if records is not None:
+			ep = records['total_epochs'].get(mode, 0) + 1
+			title = f'{mode} ({ep})'
+		print(f'{title} {name}: {meter.avg:.4f} (min={meter.min:.4f}, max={meter.max:.4f})')
 		
-		if pre_epoch is None:
+
+	def run_epoch(self, dataset=unspecified_argument, model=unspecified_argument, records=unspecified_argument,
+	              pre_epoch=unspecified_argument, step_fn=unspecified_argument,
+	              epoch_end=unspecified_argument, post_epoch=unspecified_argument):
+		
+		# region fill in missing args
+		
+		if pre_epoch is unspecified_argument:
 			pre_epoch = self.pre_epoch
-		if step_fn is None:
+		if step_fn is unspecified_argument:
 			step_fn = self.epoch_step
-		if epoch_end is None:
+		if epoch_end is unspecified_argument:
 			epoch_end = self.epoch_end
-		if post_epoch is None:
+		if post_epoch is unspecified_argument:
 			post_epoch = self.post_epoch
 		
-		if dataset is None:
+		if dataset is unspecified_argument:
 			dataset = self.dataset
-		if model is None:
+		if model is unspecified_argument:
 			model = self.model
-		if records is None:
+		if records is unspecified_argument:
 			records = self.records
 		
-		prev_mode = model.get_mode()
+		# endregion
 		
 		pre_epoch(self.mode, dataset, model, records)
 		
@@ -147,10 +161,13 @@ class Epoch(RunEvent):
 			N = self.step_limit
 		loader = enumerate(loader)
 		if self.pbar is not None:
-			self.pbar.pause()
 			loader = self.pbar(loader, limit=N)
 		
-		ep = self.records['total_epochs'][self.mode]+1
+		if records is not None:
+			ep = records['total_epochs'].get(self.mode,0) + 1
+			title = f'{self.mode}:{ep}'
+		else:
+			title = self.mode
 		
 		batch, out = None, None
 		for i, batch in loader:
@@ -158,7 +175,7 @@ class Epoch(RunEvent):
 			
 			if self.pbar is not None:
 				progress = model.get_description()
-				self.pbar.set_description(f'{self.mode}:{ep} {progress}')
+				self.pbar.set_description(f'{title} {progress}')
 			
 			if self.step_limit is not None and i >= self.step_limit:
 				break
@@ -166,18 +183,12 @@ class Epoch(RunEvent):
 		if self.pbar is not None:
 			self.pbar.reset()
 		
-		if records is not None:
-			epoch_end(dataset, model, records, batch, out)
+		epoch_end(dataset, model, records, batch, out)
 		
 		post_epoch(self.mode, dataset, model, records)
 		
-		if self.pbar is not None:
-			self.pbar.unpause()
+		return batch, out
 		
-		dataset.switch_to(prev_mode)
-		model.switch_to(prev_mode)
-		if records is not None:
-			records.switch_to(prev_mode)
 	
 	def activate(self, tick=None, info=None):
 		
@@ -191,7 +202,20 @@ class Epoch(RunEvent):
 		if records is not None:
 			records.set_step(tick)
 		
+		prev_mode = model.get_mode()
+		
+		if self.pbar is not None:
+			self.pbar.pause()
+		
 		self.run_epoch(dataset, model, records)
+		
+		if self.pbar is not None:
+			self.pbar.unpause()
+		
+		dataset.switch_to(prev_mode)
+		model.switch_to(prev_mode)
+		if records is not None:
+			records.switch_to(prev_mode)
 	
 @fig.Component('run/checkpoint')
 class Checkpointer(RunEvent):

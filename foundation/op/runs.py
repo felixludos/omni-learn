@@ -313,7 +313,7 @@ class Run(Configurable):
 	def get_loader(self, mode=None, **kwargs):
 		return self.get_dataset().get_loader(mode, **kwargs)
 	
-	def get_results(self, ident, remove_ext=True): # you must specify which results (ident used when results were created)
+	def get_results(self, ident, path=None, remove_ext=True): # you must specify which results (ident used when results were created)
 		
 		if ident in self.results:
 			return self.results[ident]
@@ -323,9 +323,18 @@ class Run(Configurable):
 		if fixed in self.results:
 			return self.results[fixed]
 
-		self.results[fixed] = self._load_results(ident)
+		self.results[fixed] = self._load_results(name=ident, path=path)
 
 		return self.results[fixed]
+
+	def update_results(self, ident, data, path=None, remove_ext=True):
+
+		fixed = ident.split('.')[0] if remove_ext else ident
+
+		self._save_results(data, name=fixed, path=path)
+		
+		if fixed in self.results:
+			self.results[fixed] = data
 
 	# endregion
 	
@@ -483,67 +492,87 @@ class Run(Configurable):
 		# self.loader = None
 		# self.get_loader(activate=True, mode=mode, infinite=True)
 	
-	def prep_eval(self):
-		raise NotImplementedError
-		A = self.get_config()
+	
+	def evaluate(self, ident='eval', config=None,
+	             evaluation=None, store_batch=True, overwrite=False, path=None):
 		
-		logger = self.get_logger()
+		if config is None:
+			config = self.get_config().sub('eval')
 		
-		use_testset = A.pull('eval.use_testset', False)
+		if config is not None:
+			ident = config.push('ident', ident, overwrite=False)
+		assert ident is not None, 'No ident specified'
 		
-		if not self.silent and use_testset:
-			print('Using the testset')
-		elif not self.silent:
-			print('NOT using the testset (val instead)')
-		
-		total_steps = self.get_total_steps()
-		
-		if not self.silent:
-			print(f'Loaded best model, trained for {total_steps} iterations')
-
-		self.eval_identifier = A.push('eval.identifier', 'eval')
-
-		logger.set_step(total_steps)
-		logger.set_tag_format('{}/{}'.format(self.eval_identifier, '{}'))
-
-		root = self.get_save_path()
-		assert root is not None, 'Apparently no save_dir was found'
-		
-		self.results_path = os.path.join(root, f'{self.eval_identifier}.pth.tar')
-		overwrite = A.pull('eval.overwrite', False)
-		if not self.silent and os.path.isfile(self.results_path) and not overwrite:
-			print('WARNING: will not overwrite results, so skipping evaluation')
-			raise NoOverwriteError
-
-		self.eval_mode = A.push('eval.mode', 'test' if use_testset else 'val', overwrite=False)
-
-		self.get_datasets(self.eval_mode)
-		datasets = self.get_datasets()
-		self.get_model().prep(datasets)
-
-		# self.eval_dataloader = None
-		
-	def evaluate(self, mode=None, dataloader=None):
-		raise NotImplementedError
-		if mode is None:
-			mode = self.eval_mode
-		if dataloader is None:
-			dataloader = self.get_loaders(mode)
-		if dataloader is None:
-			dataloader = self.get_loaders('train')
-
+		if path is None:
+			path = self.get_path()
+		if path is not None:
+			path = Path(path)
+			print(f'Will save results to {str(path)}')
+			
+		dataset = self.get_dataset()
 		model = self.get_model()
-
-		model.eval()
-
-		results = model.evaluate(dataloader, logger=self.get_logger(),
-		                         A=self.get_config().sub('eval'), run=self)
-
-		if results is not None:
-			ident = self.eval_identifier
-			self.save_results(ident, results)
-
-		return results
+		records = self.get_records()
+		
+		N = self.get_clock().get_time()
+		fmt = '{}/{}'.format(ident, '{}')
+		if config is not None:
+			fmt = config.pull('log-fmt', fmt)
+			
+		_records_info = records.get_fmt(), records.get_step()
+		records.set_fmt(fmt)
+		records.set_step(N)
+		
+		if 'evaluations' not in records:
+			records['evaluations'] = {}
+		if ident not in records['evaluations']:
+			records['evaluations'][ident] = []
+		if N in records['evaluations'][ident]:
+			overwrite = overwrite if config is None else config.pull('overwrite', False)
+			if not overwrite:
+				print(f'Already evaluated "{ident}" after {N} steps, and overwrite is False')
+				results = None
+				if config is not None and config.pull('load-results', False):
+					results = self.get_results(ident)
+				return results
+			print(f'Overwriting {ident} at step {N}')
+		else:
+			records['evaluations'][ident].append(N)
+		
+		if evaluation is None and config is not None:
+			evaluation = config.pull('evaluation', None)
+		
+		batch, out = None, None
+		if evaluation is not None:
+			evaluation.set_mode(ident)
+			batch, out = evaluation.run_epoch(dataset=dataset, model=model, records=None)
+		
+			self.batch = batch
+			self.output = out
+		
+		try:
+			model.evaluate(self)
+		except AttributeError:
+			pass
+		
+		records.step()
+		if out is not None:
+			try:
+				model.visualize(out, records)
+			except AttributeError:
+				pass
+		fmt, N = _records_info
+		records.set_fmt(fmt)
+		records.set_step(N)
+		
+		store_batch = store_batch if config is None else config.pull('store_batch', store_batch)
+		if store_batch:
+			out['batch'] = batch
+		if path is not None:
+			self.update_results(ident, out, path=path)
+			records.checkpoint(path)
+		
+		return out
+		
 		
 	def exit_run(self, cause, code=None, checkpoint=True):
 		

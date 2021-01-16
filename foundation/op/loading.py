@@ -7,8 +7,9 @@ from .. import util
 from foundation.op.runs import Run
 # from .data import get_loaders
 
-@fig.AutoModifier('torch')
-class Torch(Run):
+# @fig.AutoModifier('torch')
+@fig.Component('run')
+class TorchRun(Run):
 	
 	def _save_results(self, data, path=None, name=None, ext='pth.tar'):
 		if path is None:
@@ -37,7 +38,7 @@ def respect_config(A):
 	device = A.push('device', 'cpu', overwrite=not torch.cuda.is_available())
 	
 	cudnn_det = A.pull('cudnn_det', False)
-	if 'cuda' in device and cudnn_det:
+	if 'cuda' in device:
 		torch.backends.cudnn.deterministic = cudnn_det
 	
 	A.push('seed', util.gen_random_seed(), overwrite=False, silent=True)

@@ -21,9 +21,20 @@ clock:
 validation:
   _type: run/epoch
   loader-seed: <>seed
+  mode: val
 checkpoint._type: run/checkpoint
 viz._type: run/viz
 print._type: run/print
+
+
+evaluation:
+  _type: run/epoch
+  loader-seed: <>seed
+
+
+records:
+  _type: records
+  include-zero: True
 
 logger:
   _type: logger
@@ -35,11 +46,6 @@ logger:
 stats:
   _type: stats-manager
   reset-modes: [val, test]
-
-
-records:
-  _type: records
-  include-zero: True
 
 
 dataset:

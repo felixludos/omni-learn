@@ -120,11 +120,11 @@ class Visualizable(Recordable):
 
 class Evaluatable(Recordable): # TODO: maybe not needed
 
-	def evaluate(self, loader, records=None):
+	def evaluate(self, info):
 		# self._eval_counter += 1
-		return self._evaluate(loader, records=records)
+		return self._evaluate(info)
 
-	def _evaluate(self, loader, records=None):
+	def _evaluate(self, info):
 		pass # by default eval does nothing
 	# 	raise NotImplementedError
 
