@@ -70,7 +70,8 @@ transforms:
     flip_h: True
 
   wood:
-    rot: True
+#    rot: True
+    rot_90: True
     offset: <>offset-mag
     scale: <>scale-mag
     flip: 0.5
