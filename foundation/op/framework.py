@@ -49,10 +49,12 @@ class HyperParam(Function):
 	def state_dict(self, *args, **kwargs):
 		state = super().state_dict(*args, **kwargs)
 		state['hparams'] = list(self._hparams)
+		return state
 		
 	def load_state_dict(self, state_dict, strict=True):
 		if strict:
-			assert len(self._hparams) == len(state_dict['hparams']) == len(self._hparams*set(state_dict['hparams']))
+			assert len(self._hparams) == len(state_dict['hparams']) \
+			       == len(self._hparams.intersection(set(state_dict['hparams'])))
 		return super().load_state_dict(state_dict, strict=strict)
 	
 	def get_hparams(self):
@@ -121,12 +123,10 @@ class Visualizable(Recordable):
 class Evaluatable(Recordable): # TODO: maybe not needed
 
 	def evaluate(self, info):
-		# self._eval_counter += 1
 		return self._evaluate(info)
 
 	def _evaluate(self, info):
 		pass # by default eval does nothing
-	# 	raise NotImplementedError
 
 
 @fig.AutoModifier('optim')

@@ -1,5 +1,6 @@
 
 import sys, os
+import time
 
 import torch
 import omnifig as fig
@@ -24,45 +25,7 @@ class Simple_Model(fd.Model):
 	def forward(self, x):
 		return self.net(x)
 
-	def _evaluate(self, info):
-		
-		results = {}
-		
-		logger = info.logger
-		
-		A = info._A
-		device = A.pull('device', 'cpu')
-		
-		loader = iter(info.testloader)
-		total = 0
-		
-		batch = next(loader)
-		batch = util.to(batch, device)
-		total += batch.size(0)
-		
-		with torch.no_grad():
-			out = self.test(batch)
-		
-		if isinstance(self, fd.Visualizable):
-			self.visualize(out, logger)
-		
-		results['out'] = out
-		
-		for batch in loader:  # complete loader for stats
-			batch = util.to(batch, device)
-			total += batch.size(0)
-			with torch.no_grad():
-				self.test(batch)
-		
-		results['stats'] = self.stats.export()
-		display = self.stats.avgs()  # if smooths else stats.avgs()
-		for k, v in display.items():
-			logger.log('scalar', k, v)
-		results['stats_num'] = total
-		
-		return results
-
-	def _visualize(self, info, logger):
+	def _visualize(self, info, records):
 		
 		x, y, pred  = info.x, info.y, info.pred
 		N = 24
@@ -71,8 +34,7 @@ class Simple_Model(fd.Model):
 		
 		fg, ax = util.show_imgs(x[:N], titles=guess[:N].tolist())
 		
-		logger.log('figure', 'samples', fg)
-
+		records.log('figure', 'samples', fg)
 
 	def _step(self, batch, out=None):
 		if out is None:
@@ -102,12 +64,6 @@ class Simple_Model(fd.Model):
 
 		return out
 
-@fig.Script('test')
-def _test(A):
-	
-	run = A.pull('run')
-	
-	pass
 
 
 if __name__ == '__main__':

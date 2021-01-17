@@ -27,7 +27,6 @@ class RunNotFoundError(Exception):
 
 
 
-
 class Validation_Flag(Exception):
 	pass
 
@@ -36,6 +35,7 @@ class Checkpoint_Flag(Exception):
 
 class NoOverwriteError(Exception):
 	pass
+
 
 @fig.Script('load-run', description='Load a new or existing run') # the script just loads a run
 def load_run(A):
@@ -476,6 +476,7 @@ class Run(Configurable):
 			
 		# sync clock
 		
+		print(records['total_steps'][mode])
 		clock.set_time(records['total_steps'][mode])
 		clock.sort_alerts(end_with=['save', 'print'], strict=False)
 		
@@ -538,40 +539,48 @@ class Run(Configurable):
 		else:
 			records['evaluations'][ident].append(N)
 		
+		store_batch = store_batch if config is None else config.pull('store_batch', store_batch)
+		
 		if evaluation is None and config is not None:
 			evaluation = config.pull('evaluation', None)
 		
-		batch, out = None, None
+		batch, output = None, None
 		if evaluation is not None:
 			evaluation.set_mode(ident)
-			batch, out = evaluation.run_epoch(dataset=dataset, model=model, records=None)
+			def step(_batch, step, _records=None):
+				nonlocal output, batch
+				out = evaluation.epoch_step(_batch, step)
+				if output is None:
+					try:
+						model.visualize(out, records)
+					except AttributeError:
+						pass
+					batch = _batch
+					output = out
+				return out
+			
+			evaluation.run_epoch(dataset=dataset, model=model, records=None, step_fn=step)
 		
 			self.batch = batch
-			self.output = out
+			self.output = output
 		
 		try:
 			model.evaluate(self)
 		except AttributeError:
 			pass
 		
-		records.step()
-		if out is not None:
-			try:
-				model.visualize(out, records)
-			except AttributeError:
-				pass
+		records.step(fmt=fmt)
 		fmt, N = _records_info
 		records.set_fmt(fmt)
 		records.set_step(N)
 		
-		store_batch = store_batch if config is None else config.pull('store_batch', store_batch)
-		if store_batch:
-			out['batch'] = batch
+		if store_batch and output is not None:
+			output['batch'] = batch
 		if path is not None:
-			self.update_results(ident, out, path=path)
+			self.update_results(ident, output, path=path)
 			records.checkpoint(path)
 		
-		return out
+		return output
 		
 		
 	def exit_run(self, cause, code=None, checkpoint=True):

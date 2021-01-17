@@ -58,6 +58,9 @@ dataset:
 
   store_keys: ['din', 'dout']
 
+  mode-aliases:
+    eval: val
+
 model:
   _type: model
 

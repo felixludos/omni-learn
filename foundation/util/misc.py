@@ -113,7 +113,10 @@ class Progress_Bar(Singleton):
 	
 	def reset(self):
 		if self.pbar is not None:
-			self.pbar.close()
+			try:
+				self.pbar.close()
+			except TypeError:
+				pass
 			print('\r', end='')
 		self.pbar = None
 		self.pbariter = None

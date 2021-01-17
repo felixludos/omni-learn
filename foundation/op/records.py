@@ -86,8 +86,12 @@ class Records(Freq, Switchable, Seed, Configurable, dict):
 		if self.logger is not None:
 			if num is not None:
 				self.set_step(num)
+			if self._use_fmt and fmt is None:
+				fmt = '{}/{}'.format('{}', self.get_mode())
+			if fmt is not None:
+				self.set_fmt(fmt)
 			
-			display = self.stats.smooths(fmt=fmt) if self._log_smooths else self.stats.vals(fmt=fmt)
+			display = self.stats.smooths() if self._log_smooths else self.stats.vals()
 			
 			for name, val in display.items():
 				self.log('scalar', name, val)
@@ -112,8 +116,6 @@ class Records(Freq, Switchable, Seed, Configurable, dict):
 		
 	def log(self, data_type, tag, *args, global_step=None, **kwargs):
 		if self.logger is not None:
-			if self._use_fmt:
-				tag = f'{tag}/{self.get_mode()}'
 			self.logger.add(data_type, tag, *args, global_step=global_step, **kwargs)
 		
 	def switch_to(self, mode='train'):
@@ -122,7 +124,6 @@ class Records(Freq, Switchable, Seed, Configurable, dict):
 			self.stats.switch_to(mode)
 		
 	def prep_checkpoint(self, tick):
-		
 		self['checkpoint'] = tick
 	
 	# region File I/O

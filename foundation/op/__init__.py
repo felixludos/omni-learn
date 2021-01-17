@@ -6,7 +6,7 @@ from .model import load_model
 from .evaluation import evaluate
 from .training import iterative_training
 from .report import get_report
-from .loading import TorchRun
+from .loading import Torch_Run
 from . import extensions
 from .report import get_report
 from . import records

@@ -13,7 +13,8 @@ def evaluate(A=None, run=None):
 	Use argument "use_testset" to evaluate on test set
 	'''
 	
-	respect_config(A)
+	if A is not None:
+		respect_config(A)
 	
 	ret_run = False
 	if run is None:
@@ -26,7 +27,7 @@ def evaluate(A=None, run=None):
 
 	results = run.evaluate()
 	
-	ret_run = A.pull('ret_run', ret_run)
+	ret_run = A.pull('ret_run', ret_run, silent=True)
 	if ret_run:
 		return results, run
 	return results

@@ -9,7 +9,7 @@ from foundation.op.runs import Run
 
 # @fig.AutoModifier('torch')
 @fig.Component('run')
-class TorchRun(Run):
+class Torch_Run(Run):
 	
 	def _save_results(self, data, path=None, name=None, ext='pth.tar'):
 		if path is None:

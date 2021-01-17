@@ -14,7 +14,7 @@ from .. import util
 # from .loading import load_config, load_records, setup_logging, setup_records, \
 # 	wrap_datasets, wrap_transaction, save_checkpoint
 from .loading import respect_config
-# from .evaluation import evaluate
+from .evaluation import evaluate
 from .clock import Freq, Reg
 from .framework import Visualizable
 
@@ -378,9 +378,11 @@ def iterative_training(A=None, run=None):
 	
 	run.take_steps(complete=True)
 	
-	# include_eval = A.pull('eval-after-training', True)
-	# if include_eval:
-	# 	eval_model(A, run=run)
+	include_eval = A.pull('include-eval', True)
+	if include_eval:
+		evaluate(A=None, run=run)
+	
+	print(f'Completed {run.get_name()}')
 	
 	return run
 
