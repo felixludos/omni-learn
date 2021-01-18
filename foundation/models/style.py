@@ -28,7 +28,8 @@ class StyleLayer(Function):
 		return self.style_dim
 
 	def cache_style(self, style):
-		self._style = style
+		if self._style is None:
+			self._style = style
 
 	def process_style(self, style):
 
