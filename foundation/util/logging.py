@@ -16,7 +16,10 @@ class Logger(object):
 
 		self.tblog = None
 		if tensorboard:
-			self.tblog = SummaryWriter(log_dir=log_dir, **kwargs)
+			try:
+				self.tblog = SummaryWriter(log_dir=log_dir, **kwargs)
+			except:
+				self.tblog = None
 
 		self.txtlog = None
 		if txt:

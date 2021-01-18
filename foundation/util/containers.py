@@ -149,7 +149,10 @@ class TrackedAttrs(Statelike, Cached):
 			try:
 				val = getattr(self, name)
 			except AttributeError:
-				missing_attrs.append(name)
+				if data is not None:
+					missing_attrs.append(name)
+				else:
+					setattr(self, name, None)
 			else:
 				if isinstance(val, Statelike):
 					val.load_state_dict(data)
@@ -162,7 +165,7 @@ class TrackedAttrs(Statelike, Cached):
 			                               if 'parameters' in state_dict
 			                               else state_dict, strict=strict)
 		except AttributeError:
-			pass
+			raise
 	
 	def __setattr__(self, key, value):
 		if isinstance(value, Statelike):

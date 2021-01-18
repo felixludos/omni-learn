@@ -92,7 +92,7 @@ class Savable(Checkpointable, Function):
 			path = Path(path)
 			if path.is_dir():
 				path = path / f'{ident}.pth.tar'
-			data = torch.load(str(path))
+			data = torch.load(str(path), map_location=self.get_device())
 		else:
 			data = _data
 		self.load_state_dict(data['model_state'], strict=self._strict_load_state)
