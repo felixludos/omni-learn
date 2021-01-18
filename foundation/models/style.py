@@ -30,6 +30,8 @@ class StyleLayer(Function):
 	def cache_style(self, style):
 		if self._style is None:
 			self._style = style
+		else:
+			print('skipped style')
 
 	def process_style(self, style):
 
@@ -109,7 +111,7 @@ class StyleSharing(StyleLayer, MultiLayer):
 	def infuse(self, content, style, **unused):
 
 		self.share_style(style)
-		
+
 		# run forward pass through all layers starting with "root"
 		return super(StyleLayer, self).forward(content)
 
