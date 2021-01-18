@@ -72,9 +72,11 @@ transforms:
   wood:
 #    rot: True
     rot_90: True
+    flip_w: True
+    flip_h: True
     offset: <>offset-mag
     scale: <>scale-mag
-    flip: 0.5
+#    flip: 0.5
 
   zipper: # greyscale
     flip_h: True
