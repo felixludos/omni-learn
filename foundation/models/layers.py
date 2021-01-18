@@ -322,6 +322,7 @@ class DenseLayerBase(fm.FunctionBase):
 	def forward(self, x):
 		return self.layer(x)
 
+
 @fig.Component('dense-layer')
 class DenseLayer(fm.Function, DenseLayerBase):
 	def __init__(self, A, din=None, dout=None, bias=None, nonlin=None, **kwargs):
@@ -336,6 +337,7 @@ class DenseLayer(fm.Function, DenseLayerBase):
 			nonlin = A.pull('nonlin', 'elu')
 		
 		super().__init__(A, din=din, dout=dout, bias=bias, nonlin=nonlin, **kwargs)
+
 
 class ConvLayerBase(fm.FunctionBase):
 	def __init__(self, cin, cout, kernel_size,
@@ -415,11 +417,6 @@ class ConvLayer(fm.Function, ConvLayerBase):
 			din = A.pull('in-shape', '<>din', None)
 		if channels is None:
 			channels = A.pull('channels', None)
-		# dout = None
-		# if channels is not None:
-		# 	size = A.pull('out_size', '<>size', None)
-		# 	if size is not None:
-		# 		dout = (channels, *size)
 		if dout is None:
 			dout = A.pull('out-shape', '<>dout', None)
 			
@@ -597,6 +594,59 @@ class ConvLayer(fm.Function, ConvLayerBase):
 	             conv_kwargs=conv_kwargs, **kwargs)
 
 
+class ExpandedConvLayer(ConvLayer):
+	def __init__(self, A, din=None, dout=None, channels=None, extra_channels=0, **kwargs):
+		if din is None:
+			din = A.pull('in-shape', '<>din', None)
+		if channels is None:
+			channels = A.pull('channels', None)
+		if dout is None:
+			dout = A.pull('out-shape', '<>dout', None)
+		
+		assert din is not None or dout is not None, 'no input info'
+		
+		if din is not None and dout is not None:
+			Cin, Hin, Win = din
+			Cout, Hout, Wout = dout
+			if channels is None:
+				channels = Cout
+		
+		if din is not None:
+			Cin, Hin, Win = din
+			Cin += extra_channels
+			din = Cin, Hin, Win
+		else:
+			if channels is None:
+				channels = dout[0]
+			channels += extra_channels
+		
+		super().__init__(A, din=din, dout=dout, channels=channels, **kwargs)
+		
+	def preprocess(self, x):
+		return x
+		
+	def forward(self, x):
+		x = self.preprocess(x)
+		return super().forward(x)
+	
+	
+@fig.Component('coord-conv-layer')
+class CoordConvLayer(ExpandedConvLayer):
+	def __init__(self, A, din=None, dout=None, channels=None, extra_channels=0, **kwargs):
+		super().__init__(A, din=din, dout=dout, channels=channels,
+		                 extra_channels=extra_channels+2, **kwargs)
+		
+		C, H, W = self.din
+		Hax = torch.linspace(0, 1, H)
+		Wax = torch.linspace(0, 1, W)
+		coords = torch.stack(torch.meshgrid(Hax, Wax), 0)
+		self.register_buffer('coords', coords)
+	
+	def preprocess(self, x):
+		x = super().preprocess(x)
+		coords = self.coords.unsqueeze(0).expand(x.size(0), *self.coords.shape)
+		return torch.cat([x, coords], 1)
+
 
 @fig.AutoComponent('layer-norm')
 class LayerNorm(fm.FunctionBase):
@@ -607,6 +657,7 @@ class LayerNorm(fm.FunctionBase):
 
 	def forward(self, x):
 		return self.norm(x)
+
 
 @fig.AutoComponent('interpolate')
 class Interpolate(fm.FunctionBase):

@@ -7,7 +7,7 @@ _meta.script_name: train
 #parents: [scheduler, conv, basics]
 parents: [ conv, basics ]
 
-
+model.net.layer_type: coord-conv-layer
 
 #epochs: 5
 budget: 2000

@@ -1,5 +1,6 @@
 from .layers import make_MLP, batched_grouped_linear, Reshaper, Recurrence, \
-	FourierLayer, DenseLayer, ConvLayer, Interpolate, LayerNorm, Invertible
+	FourierLayer, DenseLayer, ConvLayer, Interpolate, LayerNorm, Invertible, \
+	ExpandedConvLayer, CoordConvLayer
 from .nets import MLP, Multihead, MultiLayer
 from .criterion import MultiGroupClassification, Feature_Match
 # from .prior import PriorTfm, StorablePrior, AdaIN, StyleModel
