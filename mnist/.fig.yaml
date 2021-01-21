@@ -1,6 +1,6 @@
-name: mnist-example
-author: Workerbee
-
-related: ['foundation']
-
+#name: mnist-example
+#author: Workerbee
+#
+#related: ['foundation']
+#
 src: 'main.py'

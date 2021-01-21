@@ -199,61 +199,6 @@ class MultiLayer(fm.Function):
 
 # endregion
 #################
-# region Behavior
-#################
-
-
-class OldNormal(fm.FunctionBase):
-	'''
-	This is a modifier (basically mixin) to turn the parent's output of forward() to a normal distribution.
-
-	'''
-
-	def __init__(self, A, latent_dim=None):
-		if latent_dim is None:
-			dout = A.pull('latent_dim', '<>dout')
-
-		if isinstance(dout, tuple):
-			cut, *rest = dout
-			full_dout = cut*2, *rest
-		else:
-			cut = dout
-			full_dout = dout*2
-
-		_dout, _latent_dim = A.pull('dout', None, silent=True), A.pull('latent_dim', None, silent=True)
-		A.push('dout', full_dout, silent=True)
-		A.push('latent_dim', full_dout, silent=True) # temporarily change
-
-		min_log_std = A.pull('min_log_std', None)
-
-		super().__init__(A)
-
-		# reset config to correct terms
-		if _dout is not None:
-			A.push('dout', _dout, silent=True)
-		if _latent_dim is not None:
-			A.push('latent_dim', _latent_dim, silent=True)
-		self.latent_dim = dout
-		self.dout = dout
-
-		self.cut = cut
-		self.full_dout = full_dout
-
-		self.min_log_std = min_log_std
-
-	def forward(self, *args, **kwargs):
-
-		q = super().forward(*args, **kwargs)
-
-		mu, logsigma = q.narrow(1, 0, self.cut), q.narrow(1, self.cut, self.cut)
-
-		if self.min_log_std is not None:
-			logsigma = logsigma.clamp(min=self.min_log_std)
-
-		return NormalDistribution(loc=mu, scale=logsigma.exp())
-
-# endregion
-#################
 
 
 
