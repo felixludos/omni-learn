@@ -1,8 +1,10 @@
 
 py_info: 'foundation/_info.py'
 
+
+
 src:
-  - startup.py
+#  - startup.py
   - foundation/op/runs.py
   - foundation/op/report.py
   - foundation/op/status.py
