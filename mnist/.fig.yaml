@@ -3,4 +3,4 @@
 #
 #related: ['foundation']
 #
-init: 'main.py'
+src: 'main.py'
