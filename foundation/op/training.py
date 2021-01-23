@@ -127,6 +127,7 @@ class Epoch(RunEvent):
 			ep = records['total_epochs'].get(mode, 0) + 1
 			title = f'{mode} ({ep})'
 		print(f'{title} {name}: {meter.avg:.4f} (min={meter.min:.4f}, max={meter.max:.4f})')
+		print()
 		
 
 	def run_epoch(self, dataset=unspecified_argument, model=unspecified_argument, records=unspecified_argument,
