@@ -94,7 +94,15 @@ class Normal(Function):
 		change_dout = A.pull('change-dout', True)
 		if change_dout:
 			dout_key = A.pull('_dout_key', None)
-			dout = A.pull('_dout', '<>dout', None) if dout_key is None else A.pull(dout_key)
+			if dout_key is None:
+				dout = A.pull('_dout', None)
+				if dout is not None:
+					dout_key = '_dout'
+				else:
+					dout = A.pull('dout')
+			else:
+				dout = A.pull(dout_key)
+			
 			if dout is not None:
 
 				if isinstance(dout, int):
@@ -107,8 +115,8 @@ class Normal(Function):
 					dout = (chn, *dout[1:])
 				
 				if dout_key is None:
-					A.push('_dout', dout)
-					A.push('dout', dout, silent=True)
+					A.push('dout', dout)
+					# A.push('dout', dout, silent=True)
 				else:
 					A.push(dout_key, dout, silent=True)
 
