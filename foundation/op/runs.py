@@ -502,6 +502,8 @@ class Run(Configurable):
 		
 		if config is not None:
 			ident = config.push('ident', ident, overwrite=False)
+			mode = config.pull('mode', 'val')
+			# mode = config.push('mode', 'val', overwrite=False)
 		assert ident is not None, 'No ident specified'
 		
 		if path is None:
@@ -513,6 +515,10 @@ class Run(Configurable):
 		dataset = self.get_dataset()
 		model = self.get_model()
 		records = self.get_records()
+		
+		dataset.switch_to(mode)
+		model.switch_to(mode)
+		records.switch_to(mode)
 		
 		N = self.get_clock().get_time()
 		fmt = '{}/{}'.format(ident, '{}')
@@ -546,7 +552,7 @@ class Run(Configurable):
 		
 		batch, output = None, None
 		if evaluation is not None:
-			evaluation.set_mode(ident)
+			evaluation.set_mode(mode)
 			def step(_batch, step, _records=None):
 				nonlocal output, batch
 				out = evaluation.epoch_step(_batch, step)
@@ -565,9 +571,14 @@ class Run(Configurable):
 			self.output = output
 		
 		try:
-			model.evaluate(self)
+			eval_out = model.evaluate(self, config=config)
 		except AttributeError:
 			pass
+		else:
+			if output is None:
+				output = eval_out
+			elif eval_out is not None:
+				output.update(eval_out)
 		
 		records.step(fmt=fmt)
 		fmt, N = _records_info
@@ -629,7 +640,7 @@ class Inline(Run):
 		super()._take_step()
 		
 		if self.pbar is not None:
-			self.pbar.update(self.get_inline_description())
+			self.pbar.update(desc=self.get_inline_description())
 	
 	def get_inline_description(self):
 		

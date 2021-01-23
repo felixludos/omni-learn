@@ -95,13 +95,12 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 	din = (3, 64, 64)
 	dout = 6
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 
-		dataroot = A.pull('dataroot', None)
 		root = None
 
 		load_memory = A.pull('load_memory', True)
-		train = A.pull('train', True)
+		mode = A.pull('mode', None)
 		labeled = A.pull('labeled', False)
 		label_type = A.pull('label_type', 'class')
 		noise = A.pull('noise', None)
@@ -112,19 +111,24 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 		if not load_memory:
 			raise NotImplementedError
 
-		super().__init__(A, din=din, dout=dout, train=train)
+		super().__init__(A, din=din, dout=dout, **kwargs)
+		
+		dataroot = self.root
+		
+		if dataroot is None:
+			raise NotImplementedError
 
 		if dataroot is not None: # TODO: automate the downloading and formatting of the dataset (including split)
-			if train is None:
+			if mode is None:
 				file_name = '3dshapes.h5'
 				print('WARNING: using full dataset (train+test)')
-			elif train:
-				file_name = '3dshapes_train.h5'
-			else:
+			elif mode == 'test':
 				file_name = '3dshapes_test.h5'
+			else:
+				file_name = '3dshapes_train.h5'
 
-			root = os.path.join(dataroot, '3dshapes')
-			with hf.File(os.path.join(root, file_name), 'r') as data:
+			root = dataroot / '3dshapes'
+			with hf.File(str(root / file_name), 'r') as data:
 
 				images = data['images']
 				images = torch.from_numpy(images[()]).permute(0,3,1,2)#.float().div(255)

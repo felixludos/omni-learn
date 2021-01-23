@@ -122,7 +122,7 @@ class TrackedAttrs(Statelike, Cached):
 		if update:
 			setattr(self, name, data)
 	
-	def state_dict(self, *args, **kwargs):
+	def state_dict(self, *args, **kwargs): # TODO: prevent overlapping parameters collection
 		volatile = self.volatile
 		self.volatile = None
 		

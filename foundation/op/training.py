@@ -325,6 +325,7 @@ class Checkpointer(RunEvent):
 		
 		self._limit_checkpoints(root)
 		
+		
 @fig.Component('run/viz')
 class VizStep(RunEvent):
 	def __init__(self, A, **kwargs):
@@ -350,6 +351,7 @@ class VizStep(RunEvent):
 			if records is not None:
 				records.set_step(tick)
 			model.visualize(out, records)
+
 
 @fig.Component('run/print')
 class PrintStep(RunEvent):

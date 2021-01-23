@@ -26,11 +26,10 @@ checkpoint._type: run/checkpoint
 viz._type: run/viz
 print._type: run/print
 
-
 evaluation:
   _type: run/epoch
   loader-seed: <>seed
-
+  mode: <>eval.mode
 
 records:
   _type: records

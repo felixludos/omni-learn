@@ -32,6 +32,22 @@ class Function(Switchable, TrackedAttrs, Dimensions, Deviced, Configurable, Func
 		else:
 			self.eval()
 	
+	def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+		
+		super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs)
+	
+		if len(unexpected_keys): # because pytorch doesn't like persistent buffers that are None
+			persistent_buffers = {k: v for k, v in self._buffers.items() if k not in self._non_persistent_buffers_set}
+			for name, val in persistent_buffers.items():
+				if val is None:
+					key = prefix + name
+					if key in unexpected_keys:
+						setattr(self, name, state_dict[key])
+						unexpected_keys.remove(key)
+				
+	
 	def get_hparams(self):
 		return {}
 
@@ -122,11 +138,13 @@ class Visualizable(Recordable):
 
 class Evaluatable(Recordable): # TODO: maybe not needed
 
-	def evaluate(self, info):
-		return self._evaluate(info)
+	def evaluate(self, info, config=None):
+		if config is None:
+			config = info.get_config()
+		return self._evaluate(info, config)
 
-	def _evaluate(self, info):
-		pass # by default eval does nothing
+	def _evaluate(self, info, config):
+		return util.TensorDict() # by default eval does nothing
 
 
 @fig.AutoModifier('optim')
@@ -180,9 +198,9 @@ class Optimizable(Function):
 		self.optim.step()
 
 	def load_state_dict(self, state_dict, strict=True):
+		super().load_state_dict(state_dict['model'], strict=strict)
 		if self.optim is not None and 'optim' in state_dict:
 			self.optim.load_state_dict(state_dict['optim'])
-		super().load_state_dict(state_dict['model'], strict=strict)
 
 	def state_dict(self, *args, **kwargs):
 		state_dict = {

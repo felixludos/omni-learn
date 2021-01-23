@@ -63,6 +63,16 @@ class Deviced(util.Deviced, DatasetBase): # Full dataset is in memory, so it can
 
 
 
+class MissingFIDStatsError(Exception):
+	def __init__(self, root, dim, modes, available=None):
+		msg = f'no fid stats (dim={dim}, modes={modes}) found in: {root}'
+		if available is not None:
+			msg = msg + f' - available: {available}'
+		super().__init__(msg)
+		self.root = root
+		self.modes = modes
+		self.dim = dim
+		self.available = available
 
 
 class Image_Dataset(DatasetBase):
@@ -72,19 +82,19 @@ class Image_Dataset(DatasetBase):
 		super().__init__(A, **other)
 		self.root = Path(dataroot) if dataroot is not None else None
 
-	def get_fid_stats(self, mode, dim):
+	def get_fid_stats(self, dim, *modes):
+		available = None
 		if self.root is not None:
 			path = self.root / 'fid_stats.h5'
-	
 			if path.is_file():
 				with hf.File(path, 'r') as f:
-					key = f'{mode}_{dim}'
-					if f'{key}_mu' in f:
-						return f[f'{key}_mu'][()], f[f'{key}_sigma'][()]
-					else:
-						raise Exception(f'{key} not found: {str(f.keys())}')
+					available = f.keys()
+					for mode in modes:
+						key = f'{mode}_{dim}'
+						if f'{key}_mu' in f:
+							return f[f'{key}_mu'][()], f[f'{key}_sigma'][()]
 	
-			raise Exception(f'no fid stats file found in: {self.root}')
+		raise MissingFIDStatsError(self.root, dim, modes, available)
 
 
 class List_Dataset(DatasetBase):

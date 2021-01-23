@@ -19,11 +19,24 @@ class AlertNotFoundError(Exception):
 
 @fig.Component('clock/simple')
 class SimpleClock(Checkpointable, Configurable):
-	def __init__(self, A, **kwargs):
+	def __init__(self, A, skip_load=None, **kwargs):
+		
+		if skip_load is None:
+			skip_load = A.pull('skip_load', False)
+		
+		ckpt = None
+		if not skip_load:
+			ckpt = A.pull('_load-ckpt', None)
+		
 		super().__init__(A, **kwargs)
 		self.ticks = 0
 		self.alerts = OrderedDict()
 		self._info = None
+		
+		self._skip_load = None
+		
+		if ckpt is not None:
+			self.load_checkpoint(ckpt)
 	
 	def prep(self, info=None):
 		if info is None:
@@ -78,16 +91,18 @@ class SimpleClock(Checkpointable, Configurable):
 			if isinstance(alert, Savable):
 				states[name] = alert.state_dict()
 			
-		if len(states):
-			save_json(states, path)
+		save_json({'time': self.get_time(), 'alert_states': states}, path)
 	
 	def load_checkpoint(self, path, ident='clock'):
 		
 		path = Path(path) / f'{ident}.json'
 		
 		if path.is_file():
-			states = load_json(path)
-		
+			data = load_json(path)
+			
+			self.ticks = data['time']
+			
+			states = data['alert_states']
 			for name, state in states.items():
 				if name in self.alerts:
 					self.alerts[name].load_state_dict(state)

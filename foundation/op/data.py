@@ -146,83 +146,92 @@ from .. import util
 # 				return self.active.__getattribute__(item)
 
 
+@fig.Script('load-data')
+def load_data(A):
+	
+	info = A.pull('dataset', None, raw=True)
+	if info is not None:
+		A = info
+		
+	return A.pull_self()
+
 
 # @fig.Component('dataset')
 # @fig.Script('load-data', description='Load datasets')
-def load_data(A, mode=None):
-	'''
-	Loads datasets and optionally splits datasets into
-	training, validation, and testing sets.
-	'''
-
-	_type = A.pull('_type', None, silent=True)
-	if _type is None or _type == 'dataset':
-		name = A.pull('_dataset_type', '<>name')
-		
-		if name not in dataset_registry:
-			raise Exception(f'No datasets named "{name}" is registered')
-		
-		A.push('_type', dataset_registry[name])
-
-		mods = A.pull('_dataset_mod', None, silent=True)
-		A.push('_mod', mods, silent=True)
-	
-	# dataroot = A.pull('dataset.dataroot', None)
-	
-	
-	use_default_dataroot = A.pull('use_default_dataroot', True)
-	A.push('dataroot', os.environ['FOUNDATION_DATA_DIR'] if 'FOUNDATION_DATA_DIR' in os.environ
-	                  else util.DEFAULT_DATA_PATH, overwrite=use_default_dataroot)
-	
-	mode_override = mode is not None
-	if mode is None:
-		mode = 'train'
-	mode = A.push('mode', mode, overwrite=mode_override)
-	
-	seed = A.pull('seed', None)
-	if seed is not None:
-		util.set_seed(seed)
-	
-	dataset = A.pull_self()
-	# dataset = fig.create_component(A)
-	
-	# TODO: all of the below should be done in the dataset contructor
-	# region Move into dataset constructor
-	device = A.pull('device', 'cpu')
-	try:
-		dataset.to(device)
-		print(f'Dataset moved to {device}')
-	except AttributeError:
-		pass
-	except RuntimeError:
-		print(f'Not enough memory to move dataset to {device}')
-	
-	if not isinstance(dataset, Info_Dataset):
-		print('WARNING: it is strongly recommended for all datasets to be subclasses '
-		      'of foundation.data.collectors.Info_Dataset, this dataset is not.')
-	
-	try:
-		A.push('din', dataset.din)
-		A.push('dout', dataset.dout)
-	except AttributeError as e:
-		print('WARNING: Dataset does not have a "din" and "dout"')
-		raise e
-	
-	# endregion
-
-	try:
-		datasets = dataset.split(A)  # should check mode to to know to categorize
-	except AttributeError:
-		datasets = {mode: dataset}
-
-	if datasets is None:
-		datasets = {mode: dataset}
-
-	dataset_only = A.pull('dataset-only', True)
-	if dataset_only and len(datasets) == 1:
-		return datasets.get(mode, datasets)
-
-	return datasets
+# def load_data(A, mode=None):
+# 	'''
+# 	Loads datasets and optionally splits datasets into
+# 	training, validation, and testing sets.
+# 	'''
+#
+# 	_type = A.pull('_type', None, silent=True)
+# 	if _type is None or _type == 'dataset':
+# 		name = A.pull('_dataset_type', '<>name')
+#
+# 		if name not in dataset_registry:
+# 			raise Exception(f'No datasets named "{name}" is registered')
+#
+# 		A.push('_type', dataset_registry[name])
+#
+# 		mods = A.pull('_dataset_mod', None, silent=True)
+# 		A.push('_mod', mods, silent=True)
+#
+# 	# dataroot = A.pull('dataset.dataroot', None)
+#
+#
+# 	use_default_dataroot = A.pull('use_default_dataroot', True)
+# 	A.push('dataroot', os.environ['FOUNDATION_DATA_DIR'] if 'FOUNDATION_DATA_DIR' in os.environ
+# 	                  else util.DEFAULT_DATA_PATH, overwrite=use_default_dataroot)
+#
+# 	mode_override = mode is not None
+# 	if mode is None:
+# 		mode = 'train'
+# 	mode = A.push('mode', mode, overwrite=mode_override)
+#
+# 	seed = A.pull('seed', None)
+# 	if seed is not None:
+# 		util.set_seed(seed)
+#
+# 	dataset = A.pull_self()
+# 	# dataset = fig.create_component(A)
+#
+# 	# TODO: all of the below should be done in the dataset contructor
+# 	# region Move into dataset constructor
+# 	device = A.pull('device', 'cpu')
+# 	try:
+# 		dataset.to(device)
+# 		print(f'Dataset moved to {device}')
+# 	except AttributeError:
+# 		pass
+# 	except RuntimeError:
+# 		print(f'Not enough memory to move dataset to {device}')
+#
+# 	if not isinstance(dataset, Info_Dataset):
+# 		print('WARNING: it is strongly recommended for all datasets to be subclasses '
+# 		      'of foundation.data.collectors.Info_Dataset, this dataset is not.')
+#
+# 	try:
+# 		A.push('din', dataset.din)
+# 		A.push('dout', dataset.dout)
+# 	except AttributeError as e:
+# 		print('WARNING: Dataset does not have a "din" and "dout"')
+# 		raise e
+#
+# 	# endregion
+#
+# 	try:
+# 		datasets = dataset.split(A)  # should check mode to to know to categorize
+# 	except AttributeError:
+# 		datasets = {mode: dataset}
+#
+# 	if datasets is None:
+# 		datasets = {mode: dataset}
+#
+# 	dataset_only = A.pull('dataset-only', True)
+# 	if dataset_only and len(datasets) == 1:
+# 		return datasets.get(mode, datasets)
+#
+# 	return datasets
 
 
 @fig.Modification('subset')

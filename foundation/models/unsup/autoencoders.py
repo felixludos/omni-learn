@@ -231,7 +231,7 @@ class Variational_Autoencoder(Gaussian, Generative_AE):
 
 	def decode(self, q):
 		if isinstance(q, distrib.Distribution):
-			q = q.rsample()
+			q = q.rsample() if self.training else q.mean
 		return super().decode(q)
 
 	def regularize(self, q):

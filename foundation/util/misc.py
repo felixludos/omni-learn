@@ -71,7 +71,7 @@ class Progress_Bar(Singleton):
 			self.init_pbar(**self.pause_state)
 			self.pause_state = None
 	
-	def init_pbar(self, itr=None, limit=None, initial=0, desc=None, **kwargs):
+	def init_pbar(self, itr=None, limit=None, initial=0, desc=None, total=None, **kwargs):
 		self.reset()
 		if self._pbar_cls is not None:
 			if itr is not None:
@@ -81,14 +81,16 @@ class Progress_Bar(Singleton):
 					pass
 			if limit is None:
 				limit = self.default_limit
-			self._limit = limit
+			if total is None:
+				total = limit
+			self._limit = total
 			self._val = initial
 			self._desc = desc
-			self.pbar = self._pbar_cls(itr, total=limit, initial=initial, desc=desc, **kwargs)
+			self.pbar = self._pbar_cls(itr, total=total, initial=initial, desc=desc, **kwargs)
 			# if itr is not None:
 			# 	self.pbariter = iter(self.pbar)
 	
-	def update(self, desc=None, n=1):
+	def update(self, n=1, desc=None):
 		if self.pbar is not None:
 			self._desc = desc
 			self._val += n
@@ -99,8 +101,8 @@ class Progress_Bar(Singleton):
 			else:
 				self.pbar.update(n=n)
 	
-	def __call__(self, itr, **kwargs):
-		self.init_pbar(itr, **kwargs)
+	def __call__(self, itr=None, **kwargs):
+		self.init_pbar(itr=itr, **kwargs)
 		return self
 	
 	def __iter__(self):
@@ -110,6 +112,9 @@ class Progress_Bar(Singleton):
 	
 	def __next__(self):
 		return self.update()
+	
+	def close(self):
+		self.reset()
 	
 	def reset(self):
 		if self.pbar is not None:
