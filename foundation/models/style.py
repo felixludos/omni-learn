@@ -11,18 +11,13 @@ from .. import util
 
 from .features import Prior, Gaussian, Uniform
 
-
-class StyleLayer(Function):
+class StyleFusionLayer(Function):
 	def __init__(self, A, style_dim=None, **kwargs):
 
 		if style_dim is None:
 			style_dim = A.pull('style-dim', None)
-
-		ret_style = A.pull('ret_style', False)
-
+			
 		super().__init__(A, **kwargs)
-
-		self._ret_style = ret_style
 
 		self.style_dim = style_dim
 		self.register_buffer('_style', None)
@@ -63,56 +58,7 @@ class StyleLayer(Function):
 		return self.infuse(content, style, **kwargs)
 
 
-class StyleExtractor(Function):
-	def __init__(self, A, style_dim=None, **kwargs):
-		if style_dim is None:
-			style_dim = A.pull('style-dim', None)
-
-		super().__init__(A, **kwargs)
-
-		self.style_dim = style_dim
-		self.register_buffer('_style', None)
-		
-	def get_style_dim(self):
-		return self.style_dim
-	
-	def process_style(self, style):
-		return style
-	
-	def process_content(self, content):
-		return content
-	
-	def clear_style(self):
-		self.cache_style(None)
-	
-	def cache_style(self, style):
-		self._style = style
-		
-	def collect_style(self):
-		style = self._style
-		self._style = None
-		return style
-	
-	def extract(self, inp, **unused):
-		raise NotImplementedError
-	
-	def forward(self, inp, ret_style=None, ret_content=None, **kwargs):
-		if ret_style is None:
-			ret_style = self._ret_style
-		
-		content, style = self.extract(inp, **kwargs)
-		
-		content = self.process_content(content)
-		style = self.process_style(style)
-
-		if ret_style:
-			return content, style
-		
-		self.cache_style(style)
-		return content
-		
-
-class PriorStyleLayer(Prior, StyleLayer):
+class PriorStyleFusionLayer(Prior, StyleFusionLayer):
 
 	def __init__(self, A, style_dim=None, **kwargs):
 		super().__init__(A, style_dim=style_dim, prior_dim=style_dim, **kwargs)
@@ -126,13 +72,83 @@ class PriorStyleLayer(Prior, StyleLayer):
 
 
 @fig.AutoModifier('gaussian-style')
-class Gaussian(Gaussian, PriorStyleLayer):
+class Gaussian(Gaussian, PriorStyleFusionLayer):
 	pass
 
 @fig.AutoModifier('uniform-style')
-class Uniform(Uniform, PriorStyleLayer):
+class Uniform(Uniform, PriorStyleFusionLayer):
 	pass
 
+
+class StyleExtractorLayer(Function):
+	def __init__(self, A, style_dim=None, ret_content=None, ret_style=None, **kwargs):
+		if style_dim is None:
+			style_dim = A.pull('style-dim', None)
+
+		if ret_content is None:
+			ret_content = A.pull('ret_content', True)
+		if ret_style is None:
+			ret_style = A.pull('ret_style', False)
+
+		super().__init__(A, **kwargs)
+
+		self.style_dim = style_dim
+		self.register_buffer('_style', None)
+		self.register_buffer('_content', None)
+		
+		self._ret_style = ret_style
+		self._ret_content = ret_content
+		
+	def get_style_dim(self):
+		return self.style_dim
+	
+	def process_style(self, style):
+		return style
+	
+	def process_content(self, content):
+		return content
+	
+	def clear_cache(self, content=True, style=True):
+		if content:
+			self.cache_content()
+		if style:
+			self.cache_style()
+	
+	def cache_style(self, style=None):
+		self._style = style
+		
+	def cache_content(self, content=None):
+		self._content = content
+		
+	def collect_style(self):
+		style = self._style
+		self._style = None
+		return style
+	
+	def extract(self, inp, **unused):
+		raise NotImplementedError
+	
+	def forward(self, inp, ret_style=None, ret_content=None, **kwargs):
+		if ret_style is None:
+			ret_style = self._ret_style
+		if ret_content is None:
+			ret_content = self._ret_content
+		
+		content, style = self.extract(inp, **kwargs)
+		
+		content = self.process_content(content)
+		style = self.process_style(style)
+
+		if ret_content and ret_style:
+			return content, style
+		
+		if ret_style:
+			self.cache_content(content)
+			return style
+		
+		self.cache_style(style)
+		return content
+		
 
 class StyleMultiLayer(MultiLayer):
 	
@@ -142,15 +158,15 @@ class StyleMultiLayer(MultiLayer):
 			layer.clear_style()
 
 
-@fig.Component('style-sharer')
-class StyleSharing(StyleLayer, StyleMultiLayer):
+@fig.Component('style-fusion')
+class StyleFusion(StyleFusionLayer, StyleMultiLayer):
 	def __init__(self, A, **kwargs):
 
 		split_style = A.pull('split-style', False)
 
 		super().__init__(A, **kwargs)
 
-		self.style_layers = [layer for layer in self.layers if isinstance(layer, StyleLayer)]
+		self.style_layers = [layer for layer in self.layers if isinstance(layer, StyleFusionLayer)]
 
 		style_dims = None
 		if split_style:
@@ -177,19 +193,19 @@ class StyleSharing(StyleLayer, StyleMultiLayer):
 		self.share_style(style)
 
 		# run forward pass through all layers starting with "root"
-		return super(StyleLayer, self).forward(content)
+		return super(StyleFusionLayer, self).forward(content)
 
 
 
-@fig.Component('style-collector')
-class StyleCollector(StyleExtractor, StyleMultiLayer):
+@fig.Component('style-extractor')
+class StyleExtractor(StyleExtractorLayer, StyleMultiLayer):
 	def __init__(self, A, **kwargs):
 
 		merge_style = A.pull('merge-style', True)
 		
 		super().__init__(A, **kwargs)
 		
-		self.style_layers = [layer for layer in self.layers if isinstance(layer, StyleExtractor)]
+		self.style_layers = [layer for layer in self.layers if isinstance(layer, StyleExtractorLayer)]
 		self.merge_style = merge_style
 		
 		
@@ -205,7 +221,7 @@ class StyleCollector(StyleExtractor, StyleMultiLayer):
 	
 	def extract(self, inp, **unused):
 		
-		content = super(StyleExtractor, self).forward(inp)
+		content = super(StyleExtractorLayer, self).forward(inp)
 		style = self.collect_style()
 		
 		return content, style

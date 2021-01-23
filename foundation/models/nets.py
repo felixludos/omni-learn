@@ -36,9 +36,9 @@ class MLP(fm.Function, MLPBase):
 		# region fill in args
 
 		if din is unspecified_argument:
-			din = A.pull('input_dim', '<>din')
+			din = A.pull('_din', '<>din')
 		if dout is unspecified_argument:
-			dout = A.pull('output_dim', '<>dout')
+			dout = A.pull('_dout', '<>dout')
 		if hidden is unspecified_argument:
 			hidden = A.pull('hidden_dims', '<>hidden_fc', '<>hidden', None)
 		if initializer is unspecified_argument:
@@ -139,18 +139,14 @@ class MultiLayer(fm.Function):
 	def _create_layers(self, A, din=None, dout=None, in_order=None):
 
 		if din is None:
-			din = A.pull('final_din', '<>din', None)
+			din = A.pull('_din', '<>din', None)
 		if dout is None:
-			dout = A.pull('final_dout', '<>dout', None)
+			dout = A.pull('_dout', '<>dout', None)
 
 		assert din is not None or dout is not None, 'need some input info'
 
 		if in_order is None:
 			in_order = A.pull('in_order', din is not None)
-
-		create_layers = A.pull('layers', as_iter=True)
-		create_layers.set_auto_pull(False)  # prevents layer from being created before din/dout info is updated
-		create_layers.set_reversed(not in_order)
 
 		self._current = din if in_order else dout
 		self._req_key = 'din' if in_order else 'dout'
@@ -159,20 +155,29 @@ class MultiLayer(fm.Function):
 
 		pre, post = ('first', 'last') if in_order else ('last', 'first')
 
-		pre_layer = self._create_layer(A.sub(pre)) if pre in A else None
+		pre_layer_info = A.pull(pre, None, raw=True)
+		pre_layer = None if pre_layer_info is None else self._create_layer(pre_layer_info)
 
-		mid = [self._create_layer(layer) for layer in create_layers]
+		mid = []
+		create_layers = A.pull('layers', None, as_iter=True)
+		if create_layers is not None:
+			create_layers.set_auto_pull(False)  # prevents layer from being created before din/dout info is updated
+			create_layers.set_reversed(not in_order)
+	
+			mid = [self._create_layer(layer) for layer in create_layers]
 
 		post_layer = None
-		if end is not None or post in A:
-			if post not in A:
+		post_layer_info = A.pull(post, None, raw=True)
+		if end is not None or post_layer_info is not None:
+			if post_layer_info is None:
 				A.push('output_nonlin', None)
-			mytype = A.push((post, '_type'), 'dense-layer', silent=True, overwrite=False)
+				post_layer_info = A.sub(post)
+			mytype = post_layer_info.push('_type', 'dense-layer', silent=True, overwrite=False)
 			if end is not None:
-				A.push((post, self._find_key), end, silent=True)
+				post_layer_info.push(self._find_key, end, silent=True)
 			if mytype == 'dense-layer' and in_order:
-				A.push((post, 'nonlin'), '<>output_nonlin', silent=False, overwrite=False)
-			post_layer = self._create_layer(A.sub(post), empty_find=end is None)
+				post_layer_info.push('nonlin', '<>output_nonlin', silent=False, overwrite=False)
+			post_layer = self._create_layer(post_layer_info, empty_find=end is None)
 
 		layers = []
 		if pre_layer is not None:

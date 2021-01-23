@@ -88,11 +88,13 @@ class Transformed(Prior):
 @fig.AutoModifier('normal')
 class Normal(Function):
 	def __init__(self, A, **kwargs):
+		
+		dout = None
 
 		change_dout = A.pull('change-dout', True)
 		if change_dout:
-			dout_key = A.pull('dout_key', 'final_dout' if isinstance(self, MultiLayer) else 'dout', silent=True)
-			dout = A.pull(dout_key, None)
+			dout_key = A.pull('_dout_key', None)
+			dout = A.pull('_dout', '<>dout', None) if dout_key is None else A.pull(dout_key)
 			if dout is not None:
 
 				if isinstance(dout, int):
@@ -103,12 +105,17 @@ class Normal(Function):
 					chn = dout[0]
 					chn = chn * 2
 					dout = (chn, *dout[1:])
-
-				A.push(dout_key, dout)
+				
+				if dout_key is None:
+					A.push('_dout', dout)
+					A.push('dout', dout, silent=True)
+				else:
+					A.push(dout_key, dout, silent=True)
 
 		super().__init__(A, **kwargs)
-
-		dout = self.dout
+		
+		if dout is None:
+			dout = self.dout
 		self.full_dout = dout
 
 		split = change_dout

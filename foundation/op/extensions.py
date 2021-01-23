@@ -34,7 +34,7 @@ def _process_single(term, A):
 @fig.Component('expr')
 def _config_expression(A):  # TODO: boolean ops
 
-	red = A.pull('_reduce', '+', silent=True)
+	red = A.pull('_reduce', '<>_op', '+', silent=True)
 
 	terms = A.pull('_terms', '<>_term', silent=True)
 
