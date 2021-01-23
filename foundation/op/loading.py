@@ -41,7 +41,7 @@ def respect_config(A):
 	if 'cuda' in device:
 		torch.backends.cudnn.deterministic = cudnn_det
 	
-	A.push('seed', util.gen_random_seed(), overwrite=False, silent=True)
+	A.push('seed', util.gen_random_seed(), overwrite=False, silent=False)
 	
 #
 # @fig.Script('load_config')
