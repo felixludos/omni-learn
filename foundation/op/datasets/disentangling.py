@@ -67,7 +67,7 @@ class dSprites(Deviced, Batchable, Image_Dataset):
 			self.register_buffer('images', images)
 
 			if label_type is not None:
-				if label_type == 'values':
+				if label_type == 'value':
 					labels = torch.from_numpy(data['latents_values'][:,1:]).float()
 				else:
 					labels = torch.from_numpy(data['latents_classes'][:,1:]).int()
@@ -194,11 +194,21 @@ class FullCelebA(DatasetBase): # TODO: automate downloading and formatting
 
 	din = (3, 218, 178)
 
-	def __init__(self, A, resize=unspecified_argument, **kwargs):
+	ATTRIBUTES = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
+	              'Bald', 'Bangs', 'Big_Lips', 'Big_Nose', 'Black_Hair', 'Blond_Hair',
+	              'Blurry', 'Brown_Hair', 'Bushy_Eyebrows', 'Chubby', 'Double_Chin',
+	              'Eyeglasses', 'Goatee', 'Gray_Hair', 'Heavy_Makeup', 'High_Cheekbones',
+	              'Male', 'Mouth_Slightly_Open', 'Mustache', 'Narrow_Eyes', 'No_Beard',
+	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
+	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
+	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young',]
+
+	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, **kwargs):
 
 		dataroot = A.pull('dataroot') # force to load data here.
 
-		label_type = A.pull('label_type', None)
+		if label_type is unspecified_argument:
+			label_type = A.pull('label_type', None)
 
 		mode = A.pull('mode', 'train')
 		if resize is unspecified_argument:
@@ -241,6 +251,12 @@ class FullCelebA(DatasetBase): # TODO: automate downloading and formatting
 
 		self.resize = resize
 
+	def get_attribute_key(self, idx):
+		try:
+			return self.ATTRIBUTES[idx]
+		except IndexError:
+			pass
+
 	def __len__(self):
 		return len(self.images)
 
@@ -261,13 +277,11 @@ class FullCelebA(DatasetBase): # TODO: automate downloading and formatting
 
 @Dataset('celeba')
 class CelebA(Cropped, FullCelebA):
-	def __init__(self, A):
+	def __init__(self, A, resize=None, crop_size=128, **kwargs):
 		# raise NotImplementedError('doesnt work since FullCelebA automatically resizes to (256,256)')
-		crop_size = A.pull('crop_size', 128) # essentially sets this as the default
+		crop_size = A.pull('crop_size', crop_size) # essentially sets this as the default
 
-		A.resize = None
-
-		super().__init__(A, resize=None, crop_size=crop_size)
+		super().__init__(A, resize=resize, crop_size=crop_size, **kwargs)
 
 
 @Dataset('mpi3d')

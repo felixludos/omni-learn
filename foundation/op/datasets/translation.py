@@ -4,23 +4,24 @@ from ...data import Dataset, Deviced, Batchable, Image_Dataset
 
 
 @Dataset('unpaired-translation')
-class UnpairedTranslationDataset(Batchable, Image_Dataset):
-
-	def __init__(self, A, dataset1=None, dataset2=None, sel_one=None, **kwargs):
-
-		mode = A.pull('mode', 'train')
+class UnpairedTranslationDataset(Image_Dataset):
+	def __init__(self, A, dataset1=None, dataset2=None, sel_one=None, swap=None, **kwargs):
 
 		if dataset1 is None:
 			dataset1 = A.pull('dataset1')
-			if type(dataset1) == dict:
-				dataset1 = dataset1[mode]
 		if dataset2 is None:
 			dataset2 = A.pull('dataset2')
-			if type(dataset2) == dict:
-				dataset2 = dataset2[mode]
 
 		if sel_one is None:
 			sel_one = A.pull('sel-first', True)
+
+		if swap is None:
+			swap = A.pull('swap', False)
+
+		if swap:
+			dataset1, dataset2 = dataset2, dataset1
+
+		print(f'Sizes: {len(dataset1)} vs {len(dataset2)}')
 
 		super().__init__(A, din=dataset1.din, dout=dataset2.din, **kwargs)
 
@@ -34,6 +35,24 @@ class UnpairedTranslationDataset(Batchable, Image_Dataset):
 
 	def __len__(self):
 		return len(self.dataset1) * len(self.dataset2)
+
+	def __getitem__(self, item):
+
+		idx1 = item // len(self.dataset2)
+		idx2 = item % len(self.dataset2)
+
+		b1 = self.dataset1[idx1]
+		b2 = self.dataset2[idx2]
+
+		if self.select_first and isinstance(b1, (list, tuple)):
+			b1 = b1[0]
+			b2 = b2[0]
+
+		return (b1, b2)
+
+
+@Dataset('batched-unpaired-translation')
+class BatchedUnpairedTranslationDataset(Batchable, UnpairedTranslationDataset):
 
 	def __getitem__(self, item):
 

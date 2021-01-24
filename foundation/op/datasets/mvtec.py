@@ -134,7 +134,9 @@ class MVTec_Anomaly_Detection(Batchable):
 	def __init__(self, A, **kwargs):
 	
 		dataroot = Path(A.pull('dataroot')) / 'mvtec'
-		
+
+		mode = A.pull('mode', 'train')
+
 		size = A.pull('size', None)
 		
 		dirname = 'full' if size is None else f'size{size}'
@@ -152,9 +154,11 @@ class MVTec_Anomaly_Detection(Batchable):
 		
 		cat = A.pull('cat', 'random')
 		if cat == 'random':
-			cat = random.choice(self.CATEGORIES)
+			cat = random.choice(list(self.CATEGORIES))
 
-
+		ratio = A.pull('ratio', None)
+		if ratio is not None:
+			assert 0 < ratio <= 1, f'bad ratio: {ratio}'
 
 		path = [c for c in droot.glob('*.h5') if cat == c.stem][0]
 		
@@ -207,17 +211,27 @@ class MVTec_Anomaly_Detection(Batchable):
 		images = []
 		masks = [] if include_mask else None
 		labels = [] if include_class else None
+		idents = []
 		for key in uses:
-			imgs = raw[key][()]
+			N = len(raw[key])
+			if ratio is None:
+				sel = ()
+			elif mode == 'test':
+				sel = slice(int(-N*(1-ratio)),None)
+			else:
+				sel = slice(int(N*ratio))
+
+			imgs = raw[key][sel]
 			# print(key, imgs.shape)
 			images.extend(imgs)
 			if labels is not None:
 				labels.extend([1 if 'test_' in key else 0]*len(imgs))
 			ident = '_'.join(key.split('_')[1:])
+			idents.append(ident)
 			if masks is not None:
 				if 'test_' in key and ident != 'good':
 					ident = f'mask_{ident}'
-					masks.extend(raw[ident][()])
+					masks.extend(raw[ident][sel])
 				else:
 					masks.extend([np.zeros((H,W))]*len(imgs))
 		
@@ -246,6 +260,7 @@ class MVTec_Anomaly_Detection(Batchable):
 		self.masks = masks
 		self.labels = labels
 		self.uses = uses
+		self.idents = idents
 
 		self.augmenter = augmenter
 		self.augment_factor = augment_factor
