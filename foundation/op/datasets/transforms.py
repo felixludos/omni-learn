@@ -62,9 +62,8 @@ class Cropped(DatasetBase):
 		assert len(self.din) == 3 or len(self.din) == 1, 'must be an image dataset'
 
 		din = self.din
-		raise NotImplementedError
-
-		A.din = (self.din[0], *crop_size)
+		
+		self.din = (self.din[0], *crop_size)
 
 		super().__init__(A, **kwargs)
 

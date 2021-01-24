@@ -4,6 +4,7 @@ import pickle
 import h5py as hf
 import numpy as np
 import torch
+from omnibelt import unspecified_argument
 from torch.nn import functional as F
 
 from foundation import util
@@ -193,14 +194,15 @@ class FullCelebA(DatasetBase): # TODO: automate downloading and formatting
 
 	din = (3, 218, 178)
 
-	def __init__(self, A):
+	def __init__(self, A, resize=unspecified_argument, **kwargs):
 
 		dataroot = A.pull('dataroot') # force to load data here.
 
 		label_type = A.pull('label_type', None)
 
-		train = A.pull('train', True)
-		resize = A.pull('resize', (256, 256))
+		mode = A.pull('mode', 'train')
+		if resize is unspecified_argument:
+			resize = A.pull('resize', (256, 256))
 
 		din = A.pull('din', self.din)
 
@@ -226,11 +228,9 @@ class FullCelebA(DatasetBase): # TODO: automate downloading and formatting
 		if resize is not None: # TODO: use Interpolated as modifier
 			din = 3, *resize
 
+		super().__init__(A, din=din, dout=dout, **kwargs)
 
-
-		super().__init__(din=din, dout=dout, train=train,)
-
-		name = 'celeba_train.h5' if train else 'celeba_test.h5'
+		name = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
 
 		with hf.File(os.path.join(dataroot, 'celeba', name), 'r') as f:
 			self.images = f['images'][()] # encoded as str
@@ -267,7 +267,7 @@ class CelebA(Cropped, FullCelebA):
 
 		A.resize = None
 
-		super().__init__(A, crop_size=crop_size)
+		super().__init__(A, resize=None, crop_size=crop_size)
 
 
 @Dataset('mpi3d')
