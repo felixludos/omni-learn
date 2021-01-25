@@ -190,7 +190,7 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 
 
 @Dataset('full-celeba') # probably shouldnt be used
-class FullCelebA(DatasetBase): # TODO: automate downloading and formatting
+class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
 
 	din = (3, 218, 178)
 
@@ -285,16 +285,16 @@ class CelebA(Cropped, FullCelebA):
 
 
 @Dataset('mpi3d')
-class MPI3D(Deviced, Batchable):
+class MPI3D(Deviced, Batchable, Image_Dataset):
 
 	din = (3, 64, 64)
 	dout = 7
 
-	def __init__(self, A):
+	def __init__(self, A, **kwargs):
 
 		dataroot = A.pull('dataroot', None)
 
-		train = A.pull('train', True)
+		mode = A.pull('mode', 'train')
 		labeled = A.pull('labeled', False)
 
 		din = A.pull('din', self.din)
@@ -302,9 +302,11 @@ class MPI3D(Deviced, Batchable):
 
 		cat = A.pull('category', 'toy')
 
-		assert cat in {'toy', 'realistic', 'real', 'complex'}, 'invalid category: {}'.format(cat)
+		assert cat in {'toy', 'sim', 'realistic', 'real', 'complex'}, 'invalid category: {}'.format(cat)
+		if cat == 'sim':
+			cat = 'realistic'
 
-		super().__init__(din=din, dout=dout, train=train)
+		super().__init__(A, din=din, dout=dout, **kwargs)
 		
 		myroot = os.path.join(dataroot, 'mpi3d')
 		fid_name = f'mpi3d_{cat}_stats_fid.pkl'
@@ -349,8 +351,8 @@ class MPI3D(Deviced, Batchable):
 
 		self.labeled = labeled
 
-		fname = 'mpi3d_{}_{}.h5'.format(cat, 'full' if train is None else ('train' if train else 'test'))
-		if train is None:
+		fname = 'mpi3d_{}_{}.h5'.format(cat, 'full' if mode is None else ('test' if mode != 'train' else 'train'))
+		if mode is None:
 			fname = 'mpi3d_{}.npz'.format(cat)
 			print('WARNING: using full dataset (train+test)')
 			images = np.load(os.path.join(dataroot, 'mpi3d', fname))['images']

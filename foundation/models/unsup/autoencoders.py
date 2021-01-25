@@ -235,7 +235,7 @@ class Variational_Autoencoder(Gaussian, Generative_AE):
 		return super().decode(q)
 
 	def regularize(self, q):
-		return util.standard_kl(q).sum()
+		return util.standard_kl(q).sum() / q.loc.size(0)
 
 
 @fig.Component('wae')
@@ -247,7 +247,7 @@ class Wasserstein_Autoencoder(Generative_AE):  # MMD
 	def regularize(self, q, p=None):
 		if p is None:
 			p = self.sample_prior(q.size(0))
-		return util.MMD(p, q).sum()
+		return util.MMD(p, q).sum() / q.size(0)
 
 
 
