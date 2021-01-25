@@ -39,11 +39,10 @@ class NoOverwriteError(Exception):
 
 @fig.Script('load-run', description='Load a new or existing run') # the script just loads a run
 def load_run(A):
-	try:
+	
+	if 'run' in A:
 		A = A.sub('run')
-	except fig.MissingParameterError:
-		pass
-
+	
 	A.push('_type', 'run', overwrite=False)
 
 	return A.pull_self()

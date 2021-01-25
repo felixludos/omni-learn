@@ -146,14 +146,16 @@ from .. import util
 # 				return self.active.__getattribute__(item)
 
 
-@fig.Script('load-data')
-def load_data(A):
-	
-	info = A.pull('dataset', None, raw=True)
-	if info is not None:
-		A = info
-		
-	return A.pull_self()
+# @fig.Script('load-data')
+# def load_data(A):
+#
+# 	info = A.pull('dataset', None, raw=True)
+# 	if info is None:
+# 		A.push('_type', 'dataset', silent=True)
+# 	else:
+# 		A = info
+#
+# 	return A.pull_self()
 
 
 # @fig.Component('dataset')

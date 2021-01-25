@@ -101,7 +101,7 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 		root = None
 
 		load_memory = A.pull('load_memory', True)
-		mode = A.pull('mode', None)
+		mode = A.pull('mode', 'full')
 		labeled = A.pull('labeled', False)
 		label_type = A.pull('label_type', 'class')
 		noise = A.pull('noise', None)
@@ -120,7 +120,7 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 			raise NotImplementedError
 
 		if dataroot is not None: # TODO: automate the downloading and formatting of the dataset (including split)
-			if mode is None:
+			if mode == 'full':
 				file_name = '3dshapes.h5'
 				print('WARNING: using full dataset (train+test)')
 			elif mode == 'test':

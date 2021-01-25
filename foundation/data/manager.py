@@ -369,8 +369,19 @@ class InfoManager(Checkpointable, Active):
 		
 
 
-@fig.Component('dataset')
 @fig.Script('load-data', description='Load datasets')
+def load_data(A):
+
+	info = A.pull('dataset', None, raw=True)
+	if info is None:
+		A.push('_type', 'dataset', silent=True)
+	else:
+		A = info
+
+	return A.pull_self()
+
+
+@fig.Component('dataset')
 class DataManager(InfoManager, Splitable, SimpleDataManager):
 	def __init__(self, A, **kwargs):
 		A.push('dataroot', os.environ.get('FOUNDATION_DATA_DIR', 'local_data'), overwrite=False)
