@@ -97,8 +97,8 @@ def plot_vec_fn(f, din=None, dim=None, lim=(-5, 5), N=1000, figax=None):
 	return fig, ax
 
 def plot_distribs(pts, figax=None, figsize=(6, 6), lim_y=None,
-                  scale='count', inner='box', gridsize=100, cut=None, split=False,
-                  color=None, palette=None, hue=None, **kwargs):
+				  scale='count', inner='box', gridsize=100, cut=None, split=False,
+				  color=None, palette=None, hue=None, **kwargs):
 	Xs = np.arange(pts.shape[-1]) + 1
 	inds = np.stack([Xs] * pts.shape[0])
 	
@@ -121,8 +121,8 @@ def plot_distribs(pts, figax=None, figsize=(6, 6), lim_y=None,
 		kwargs['cut'] = cut
 	
 	sns.violinplot(x='x', y='y', hue=hue,
-	               data=df, split=split, color=color, palette=palette,
-	               scale=scale, inner=inner, gridsize=gridsize, **kwargs)
+				   data=df, split=split, color=color, palette=palette,
+				   scale=scale, inner=inner, gridsize=gridsize, **kwargs)
 	if lim_y is not None:
 		plt.ylim(-lim_y, lim_y)
 	# plt.title('Distributions of Latent Dimensions')
@@ -135,9 +135,9 @@ def plot_distribs(pts, figax=None, figsize=(6, 6), lim_y=None,
 	return fig, ax
 
 def plot_parallel_coords(samples, categories=None, dim_names=None,
-                         cat_styles=None, cat_names=None, include_legend=True,
-                         mins=None, maxs=None,
-                         figax=None, figsize=(8, 5), **default_style):
+						 cat_styles=None, cat_names=None, include_legend=True,
+						 mins=None, maxs=None,
+						 figax=None, figsize=(8, 5), **default_style):
 	'''
 	samples: (N,D)
 	categories: (N,)
@@ -147,7 +147,7 @@ def plot_parallel_coords(samples, categories=None, dim_names=None,
 	from sklearn import datasets
 	iris = datasets.load_iris()
 	plot_parallel_coords(iris.data, dim_names=iris.feature_names,
-	                     categories=[iris.target_names[i] for i in iris.target])
+						 categories=[iris.target_names[i] for i in iris.target])
 
 	'''
 	N, D = samples.shape
@@ -234,7 +234,7 @@ def plot_parallel_coords(samples, categories=None, dim_names=None,
 	for j in range(ys.shape[0]):
 		# create bezier curves
 		verts = list(zip([x for x in np.linspace(0, len(ys) - 1, len(ys) * 3 - 2, endpoint=True)],
-		                 np.repeat(zs[j, :], 3)[1:-1]))
+						 np.repeat(zs[j, :], 3)[1:-1]))
 		codes = [Path.MOVETO] + [Path.CURVE4 for _ in range(len(verts) - 1)]
 		path = Path(verts, codes)
 		
@@ -255,18 +255,18 @@ def plot_parallel_coords(samples, categories=None, dim_names=None,
 	
 	if include_legend:
 		host.legend([legend_handles[c] for c in classes], classes,
-		            loc='lower center', bbox_to_anchor=(0.5, -0.18),
-		            ncol=len(classes), fancybox=True, shadow=True)
+					loc='lower center', bbox_to_anchor=(0.5, -0.18),
+					ncol=len(classes), fancybox=True, shadow=True)
 	
 	return fig, host
 	
 
 def show_imgs(imgs, titles=None, H=None, W=None,
-              figsize=None, scale=1,
+			  figsize=None, scale=1,
 			  reverse_rows=False, grdlines=False,
 			  channel_first=None,
 			  imgroot=None, params={},
-              savepath=None, dpi=96, autoclose=True, savescale=1,
+			  savepath=None, dpi=96, autoclose=True, savescale=1,
 			  adjust={}, border=0., between=0.01):
 
 	if isinstance(imgs, str):
@@ -290,7 +290,7 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 		# print(channel_first, shape)
 		
 		if len(shape) == 2 or (len(shape) == 3 and ((shape[0] in {1,3,4} and channel_first)
-		                          or (shape[-1] in {1,3,4} and not channel_first))):
+								  or (shape[-1] in {1,3,4} and not channel_first))):
 			imgs = [imgs]
 		elif len(shape) == 4:
 			if channel_first:
@@ -361,6 +361,25 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 	
 	return fg, axes
 
+
+def plot_mat(M, val_fmt=None, figax=None, **kwargs):
+	if figax is None:
+		figax = plt.subplots()
+	fg, ax = figax
+	plt.sca(ax)
+	if isinstance(M, torch.Tensor):
+		M = M.cpu().detach().numpy()
+	if len(M.shape) == 1:
+		M = M.reshape(1,-1)
+	plt.matshow(M, False, **kwargs)
+	eps = 0.03
+	plt.subplots_adjust(eps,eps,1-eps,1-eps)
+	if val_fmt is not None:
+		if isinstance(val_fmt, int):
+			val_fmt = f'.{val_fmt}f'
+		fmt = '{:' + val_fmt + '}'
+		for (i, j), z in np.ndenumerate(M):
+			ax.text(j, i, fmt.format(z), ha='center', va='center')
 
 
 def play_back(imgs, figax=None, batch_first=True): # imgs is numpy: either (seq, H, W, C) or (batch, seq, H, W, C)
@@ -610,7 +629,7 @@ class Pretty_Formatter(object):
 		if type(line) == list:
 			ind = self._indent(indent+1)
 			lines = [self._flatten((l,) if type(l) == str else l, indent=indent+1)
-			                for l in line]
+							for l in line]
 			start = ind.join(lines[:-1])
 			ret = self._indent(indent)
 			start += ret + lines[-1]

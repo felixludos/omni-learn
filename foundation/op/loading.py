@@ -11,6 +11,11 @@ from foundation.op.runs import Run
 @fig.Component('run')
 class Torch_Run(Run):
 	
+	def has_results(self, ident, path=None, ext=None):
+		if ext is None:
+			ext = 'pth.tar'
+		return super().has_results(ident, path=path, ext=ext)
+	
 	def _save_results(self, data, path=None, name=None, ext='pth.tar'):
 		if path is None:
 			path = self.get_path()
@@ -35,7 +40,8 @@ class Torch_Run(Run):
 
 
 def respect_config(A):
-	device = A.push('device', 'cpu', overwrite=not torch.cuda.is_available())
+	device = A.push('device', 'cuda' if torch.cuda.is_available() else 'cpu',
+	                overwrite=not torch.cuda.is_available())
 	
 	cudnn_det = A.pull('cudnn_det', False)
 	if 'cuda' in device:

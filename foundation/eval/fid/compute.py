@@ -14,15 +14,15 @@ import torch
 from ... import util
 from .fid import compute_inception_stat, load_inception_model
 
-@fig.Script('compute-fid', description='Comppute an FID stat for a dataset')
+@fig.Script('compute-fid', description='Compute an FID stat for a dataset')
 def compute_fid(A):
 
 	device = A.push('device', 'cuda' if torch.cuda.is_available() else 'cpu', overwrite=False)
 
-	fid_dim = A.pull('fid-dim', 2048)
+	fid_dim = A.pull('fid-dim', '<>dim', 2048)
 	assert fid_dim in {64, 192, 768, 2048}, f'invalid dim: {fid_dim}'
 
-	n_samples = A.pull('n-samples', 50000)
+	n_samples = A.pull('n-samples', '<>n_samples', 50000)
 
 	mode = A.push('mode', 'train', overwrite=False)
 
@@ -31,10 +31,13 @@ def compute_fid(A):
 	out_path = A.pull('save-path', '<>out-path', '<>out', None)
 
 	if out_path is None:
+		ident = A.pull('ident', None)
+		ident = 'fid_stats.h5' if ident is None else f'{ident}_fid_stats.h5'
+		
 		dataroot = A.pull('root', '<>dataset.dataroot', None)
 		name = A.pull('name', '<>dataset.name', dataset.__class__.__name__)
 		if '.h5' not in name:
-			name = os.path.join(name, 'fid_stats.h5')
+			name = os.path.join(name, ident)
 		out_path = os.path.join(dataroot, name)
 
 	print(f'Will save to {out_path}')
@@ -60,22 +63,22 @@ def compute_fid(A):
 	inception_model = load_inception_model(dim=fid_dim, device=device)
 	print('done')
 
-	loader = dataset.to_loader(A.sub('dataset'))
+	loader = dataset.get_loader(infinite=True)
 	
-	def _extract(batch):
-		if isinstance(batch, torch.Tensor):
-			return batch
-		elif isinstance(batch, (list, tuple)):
-			return batch[0]
-		elif isinstance(batch, dict):
-			return batch['x']
-		return batch
-	
-	true_loader = util.make_infinite(loader, extractor=_extract)
 	def true_fn(N):
-		return util.to(true_loader.demand(N), device)[0]
+		
+		batch = loader.demand(N)
 
-	batch_size = loader.get_batch_size()
+		if isinstance(batch, torch.Tensor):
+			imgs = batch
+		elif isinstance(batch, (list, tuple)):
+			imgs = batch[0]
+		elif isinstance(batch, dict):
+			imgs = batch['x']
+			
+		return imgs.to(device)
+	
+	batch_size = dataset.get_batch_size()
 
 	print('Computing dataset (gt) fid stats')
 

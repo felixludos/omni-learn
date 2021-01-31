@@ -41,7 +41,8 @@ def load_model(A):
 	
 	model.to(model.get_device())
 	
-	if A.pull('_print_model', False):
+	print_model = A.pull('_print_model', False)
+	if print_model:
 		print(model)
 		if A.pull('_print_optim', False):
 			print(optim)
@@ -50,7 +51,8 @@ def load_model(A):
 	path = A.pull('_load-ckpt', None)
 	if path is not None:
 		model.load_checkpoint(path)
-		print(f'Loaded parameters from {path}')
+		if print_model:
+			print(f'Loaded parameters from {path}')
 	
 	# origin_name = A.pull('__origin_key', None, silent=True)
 	

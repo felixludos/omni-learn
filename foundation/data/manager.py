@@ -23,7 +23,7 @@ from ..op.clock import AlertBase
 class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Deviced):
 	def __init__(self, A, mode='train', **kwargs):
 		
-		name = A.pull('_dataset_type', '<>ident', '<>name')
+		name = A.pull('_dataset_type', '<>name')
 		mods = A.pull('_dataset_mod', [])
 		
 		default_mode = A.pull('default_mode', '<>mode', mode)
@@ -48,8 +48,8 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 		self.purge()
 			
 	def startup(self, A=None):
-		mode = self.get_mode()
-		return self.get_data(self.get_mode())
+		mode = self._default_mode
+		return self.get_data(mode)
 
 	def purge(self):
 		self._active = None
@@ -134,6 +134,9 @@ class Loadable(SimpleDataManager):
 	def get_loader(self, mode=None, **kwargs):
 		dataset = self.get_data(mode=mode)
 		return self.to_loader(dataset, **kwargs)
+	
+	def get_batch_size(self):
+		return self._loader_settings.get('batch_size', None)
 	
 	def to_loader(self, dataset, infinite=None, extractor=None, **updates):
 		settings = self._loader_settings.copy()

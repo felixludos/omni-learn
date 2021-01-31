@@ -1,5 +1,5 @@
 import os
-
+from pathlib import Path
 import pickle
 import h5py as hf
 import numpy as np
@@ -96,13 +96,15 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 	din = (3, 64, 64)
 	dout = 6
 
-	def __init__(self, A, **kwargs):
+	def __init__(self, A, mode=None, labeled=None, **kwargs):
 
 		root = None
 
 		load_memory = A.pull('load_memory', True)
-		mode = A.pull('mode', 'full')
-		labeled = A.pull('labeled', False)
+		if mode is None:
+			mode = A.pull('mode', 'full')
+		if labeled is None:
+			labeled = A.pull('labeled', False)
 		label_type = A.pull('label_type', 'class')
 		noise = A.pull('noise', None)
 
@@ -203,14 +205,15 @@ class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
 	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
 	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young',]
 
-	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, **kwargs):
+	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None, **kwargs):
 
 		dataroot = A.pull('dataroot') # force to load data here.
 
 		if label_type is unspecified_argument:
 			label_type = A.pull('label_type', None)
 
-		mode = A.pull('mode', 'train')
+		if mode is None:
+			mode = A.pull('mode', 'train')
 		if resize is unspecified_argument:
 			resize = A.pull('resize', (256, 256))
 
@@ -239,7 +242,7 @@ class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
 			din = 3, *resize
 
 		super().__init__(A, din=din, dout=dout, **kwargs)
-
+		self.root = Path(dataroot) / 'celeba'
 		name = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
 
 		with hf.File(os.path.join(dataroot, 'celeba', name), 'r') as f:
@@ -251,6 +254,11 @@ class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
 
 		self.resize = resize
 
+	def get_factor_sizes(self):
+		return [2]*len(self.ATTRIBUTES)
+	def get_factor_order(self):
+		return self.ATTRIBUTES
+	
 	def get_attribute_key(self, idx):
 		try:
 			return self.ATTRIBUTES[idx]
@@ -290,11 +298,12 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 	din = (3, 64, 64)
 	dout = 7
 
-	def __init__(self, A, **kwargs):
+	def __init__(self, A, mode=None, fid_ident=None, **kwargs):
 
 		dataroot = A.pull('dataroot', None)
 
-		mode = A.pull('mode', 'train')
+		if mode is None:
+			mode = A.pull('mode', 'train')
 		labeled = A.pull('labeled', False)
 
 		din = A.pull('din', self.din)
@@ -306,19 +315,20 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 		if cat == 'sim':
 			cat = 'realistic'
 
-		super().__init__(A, din=din, dout=dout, **kwargs)
+		super().__init__(A, din=din, dout=dout, fid_ident=cat, **kwargs)
 		
 		myroot = os.path.join(dataroot, 'mpi3d')
-		fid_name = f'mpi3d_{cat}_stats_fid.pkl'
-		if fid_name in os.listdir(myroot):
-			
-			p = pickle.load(open(os.path.join(myroot, fid_name), 'rb'))
-			
-			self.fid_stats = p['m'], p['sigma']
-			
-			print('Found FID Stats')
-		else:
-			print('WARNING: Unable to load FID stats for this dataset')
+		self.root = Path(myroot)
+		# fid_name = f'mpi3d_{cat}_stats_fid.pkl'
+		# if fid_name in os.listdir(myroot):
+		#
+		# 	p = pickle.load(open(os.path.join(myroot, fid_name), 'rb'))
+		#
+		# 	self.fid_stats = p['m'], p['sigma']
+		#
+		# 	print('Found FID Stats')
+		# else:
+		# 	print('WARNING: Unable to load FID stats for this dataset')
 
 		self.factor_order = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
 		                     'horizonal_axis', 'vertical_axis']
@@ -351,7 +361,7 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 
 		self.labeled = labeled
 
-		fname = 'mpi3d_{}_{}.h5'.format(cat, 'full' if mode is None else ('test' if mode != 'train' else 'train'))
+		fname = f'mpi3d_{cat}_{mode}.h5'
 		if mode is None:
 			fname = 'mpi3d_{}.npz'.format(cat)
 			print('WARNING: using full dataset (train+test)')
@@ -376,7 +386,7 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 	def get_label(self, inds):
 		try:
 			len(inds)
-			inds = inds.reshape(-1,1)
+			inds = inds.view(-1,1)
 		except TypeError:
 			pass
 
@@ -391,7 +401,7 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 	def __getitem__(self, idx):
 		imgs = self.images[idx].float().div(255)
 		if self.labeled:
-			labels = self.get_label(self.indices[idx].numpy())
+			labels = self.get_label(self.indices[idx])
 			return imgs, labels
 		return imgs,
 

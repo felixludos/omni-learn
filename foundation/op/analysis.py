@@ -6,6 +6,8 @@ import torch
 import yaml
 from torch import multiprocessing as mp
 
+import omnifig as fig
+
 from bisect import bisect_left
 
 from foundation import util
@@ -75,254 +77,39 @@ class Visualization(object): # wriapper
 			raise Exception('Unknown obj: {}'.format(type(self.obj)))
 
 
-
-class Run(util.adict):
-
-	def clear(self):
-		if 'state' in self:
-			del self.state
-			torch.cuda.empty_cache()
-
-	def reset(self, state=None):
-		self.clear()
-
-		if state is None:
-			state = util.adict()
-
-		if 'ckpt_path' not in state:
-			state.ckpt_path = self.ckpt_path
-
-		self.state = state
-		return state
-
-	def load(self, **kwargs):
-		if 'state' not in self:
-			self.reset()
-
-		self._manager._load_fn(self.state, **kwargs)
-
-	def load_into(self, name, key=None):
-		if key is None:
-			key = name.split('.')[0]
-		if key not in self:
-			path = os.path.join(self.path, name)
-			if not os.path.isfile(path):
-				print('{} not found in: {}'.format(name, self.name))
-			else:
-				self[key] = torch.load(path)
-
-	def load_config(self, force=False, clear_info=False, excluded_info=[]):
-		if 'config' not in self or force:
-			
-			fname = os.path.join(self.path, 'config.yml')
-			
-			if not os.path.isfile(fname):
-				print('{} has no config'.format(self.name))
-				return
-			
-			config = get_config(fname)
-			
-			if clear_info:
-				del self.config.info
-			elif 'info' in config:
-				
-				for k, v in config.info.items():
-					if k in excluded_info:
-						pass
-					elif 'dataset_type' == k:
-						new = v
-						# if 'dataset' in self.meta:
-						# 	assert self.meta.dataset == new, '{} vs {}'.format(self.meta.dataset, new)
-						self.meta.dataset = new
-					elif 'model_type' == k:
-						new = v
-						# if 'model' in self.meta:
-						# 	assert self.meta.model == new, '{} vs {}'.format(self.meta.model, new)
-						self.meta.model = new
-					elif 'history' == k:
-						self.meta.history = config.info.history
-					elif 'date' == k:
-						new = tuple(v.split('-'))
-						# if 'date' in self.meta:
-						# 	assert self.meta.date == new, '{} vs {}'.format(self.meta.date, new)
-						self.meta.date = new
-					else:
-						self.meta[k] = v
-			if 'job' in config:
-				self.meta.job = config.job.num, config.job.ID, config.job.ps
-			
-			try:
-				base = get_base_config(config)
-			except Exception:
-				# print('WARNING: loading base failed')
-				base = None
-			
-			if base is None:
-				print('{} has no base'.format(self.name))
-				return
-			
-			self.config = config
-			self.base = base
-
-	def __str__(self):
-		return self.name
-	def __repr__(self):
-		return 'Run({})'.format(self.name)
-
-	def run(self, **kwargs):
-		self._manager._run_model_fn(self.state, **kwargs)
-
-	def evaluate(self, force=False, pbar=None):
-
-		jobs = self._manager._eval_fns.items()
-		# if pbar is not None:
-		# 	jobs = pbar(jobs, total=len(self._manager._eval_fns))
-
-		if 'evals' not in self.state:
-			self.state.evals = {}
-		results = self.state.evals
-
-		for k, fn in jobs:
-			if k not in results or force:
-				print('--- Evaluating: {}'.format(k))
-				start = time.time()
-				# if pbar is not None:
-				# 	jobs.set_description('EVAL: {}'.format(k))
-				results[k] = fn(self.state, pbar=pbar)
-				print('... took: {:3.2f}'.format(time.time() - start))
-			print('{}: {}\n'.format(k, results[k]))
-
-		# self.state.evals = results
-		return results
-
-	def visualize(self, pbar=None):
-
-		jobs = self._manager._viz_fns.items()
-		if pbar is not None:
-			jobs = pbar(jobs, total=len(self._manager._viz_fns))
-
-		results = {}
-		for k, fn in jobs:
-			start = time.time()
-			if pbar is None:
-				print('--- Visualizing: {}'.format(k))
-			else:
-				jobs.set_description('VIZ: {}'.format(k))
-
-			results[k] = [Visualization(fig) for fig in fn(self.state, pbar=pbar)]
-
-			if pbar is None:
-				print('... took: {:3.2f}\n'.format(time.time() - start))
-
-		if pbar is not None:
-			jobs.close()
-
-		self.state.figs = results
-		return results
-
-	def save(self,  save_dir=None, fmtdir='{}', overwrite=False, append_ckpt=True,
-	         include_checkpoint=True, include_config=True, include_original=True, include_results=True,
-	         img_ext='png', vid_ext='mp4'):
-
-		if save_dir is None:
-			save_dir = self._manager.save_dir
-
-		name = self.name
-		if append_ckpt and 'ckpt' in self.meta and 'ckpt' not in name:
-			num = self.meta.ckpt
-			name = '{}_ckpt{}'.format(name, num)
-
-		save_path = os.path.join(save_dir, fmtdir.format(name))
-
-		print('Saving results to: {}'.format(save_path))
-
-		try:
-			if overwrite:
-				util.create_dir(save_path)
-			else:
-				os.makedirs(save_path)
-		except FileExistsError:
-			print('ERROR: File already exists, you can overwrite using the "overwrite" arg')
-		else:
-			if include_checkpoint:
-				src = self.ckpt_path
-				dest = os.path.join(save_path, 'model.pth.tar')
-				shutil.copyfile(src, dest)
-				print('\tModel saved')
-			if include_config:
-				src = os.path.join(self.path, 'config.yml')
-				dest = os.path.join(save_path, 'config.yml')
-				shutil.copyfile(src, dest)
-				print('\tConfig saved')
-			if include_original:
-				with open(os.path.join(save_path, 'original_ckpt_path.txt'), 'w') as f:
-					f.write(self.ckpt_path)
-
-			if 'state' in self:
-				if 'figs' in self.state:
-					for name, figs in self.state.figs.items():
-						if len(figs) == 1:
-							path = os.path.join(save_path, name)
-							figs[0].save(path, img_ext=img_ext, vid_ext=vid_ext)
-						else:
-							for i, fig in enumerate(figs):
-								path = os.path.join(save_path, '{}{}'.format(name, str(i).zfill(3)))
-								fig.save(path, img_ext=img_ext, vid_ext=vid_ext)
-
-					print('\tVisualization saved')
-
-				if 'evals' in self.state:
-					with open(os.path.join(save_path, 'eval.txt'), 'w') as f:
-						for k,v in self.state.evals.items():
-							f.write('{} : {}\n'.format(k,str(v)))
-					torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
-					print('\tEvaluation saved')
-
-				if include_results and 'results' in self.state:
-					torch.save(self.state.results, os.path.join(save_path, 'results.pth.tar'))
-					print('\tResults saved: {}'.format(', '.join(map(str, self.state.results.keys()))))
-
-		return save_path
-
-
 class Run_Manager(object):
-	def __init__(self, root=None, recursive=False, tbout=None, limit=None,
-	             default_complete=100, save_dir=None,
-	             load_fn=None, run_model_fn=None, viz_fns={}, eval_fns={}):
-		self._load_fn = load_fn
-		self._run_model_fn = run_model_fn
-		self._viz_fns = viz_fns
-		self._eval_fns = eval_fns
-
-		self.default_complete = default_complete
-		self.save_dir = save_dir
-
-		if root is None:
-			assert 'FOUNDATION_SAVE_DIR' in os.environ, 'no path provided, and no default save dir set'
-			root = os.environ['FOUNDATION_SAVE_DIR']
-
-		self.master_root = root
-		self.recursive = recursive
-
-		self._protected_keys = {'name', 'info', 'job', 'save_dir'}
-		self._extended_protected_keys = {
-			'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
-		}
-
-		self.tbout = tbout
-		if self.tbout is not None:
-			util.create_dir(self.tbout)
-			print('{} is available to view runs on tensorboard'.format(self.tbout))
-		self.tb = None
-
-		# self.refresh(limit=limit)
-		self._find_runs(limit=limit)
-		print('Found {} runs'.format(len(self.full_info)))
-
-		self.set_active()
-		self._parse_names()
-
-		self.selections = {}
+	def __init__(self, names, root=None, override=None, pbar=None):
+		
+		self._names = names
+		self._root = root
+		self._override = override
+		self._pbar = pbar
+		
+		self._load_runs()
+		
+	def reset(self):
+		self._runs = []
+		self.active = self._runs
+		
+	def _load_runs(self):
+		self.reset()
+		kwargs = {}
+		if self._root is not None:
+			kwargs['root'] = str(self._root)
+		if self._override is not None:
+			kwargs['override'] = self._override.copy()
+		todo = [None]*len(self._names), self._names
+		if isinstance(self._names, dict):
+			todo = self._names.items()
+		todo = todo if self._pbar is None else self._pbar(todo)
+		for title, name in todo:
+			load_config = fig.get_config(load=name, **kwargs)
+			load_config.set_silent(True)
+			run = fig.run('load-run', load_config)
+			if title is not None:
+				run.ident = title
+			self._runs.append(run)
+		self.active = self._runs.copy()
 
 	def __len__(self):
 		return len(self.active)
@@ -346,6 +133,9 @@ class Run_Manager(object):
 		fn is a callable taking one run as input
 		'''
 
+		if pbar is None:
+			pbar = self._pbar
+
 		outs = []
 
 		seq = self.active if pbar is None else pbar(self.active)
@@ -356,7 +146,7 @@ class Run_Manager(object):
 				outs.append(out)
 			except Exception as e:
 				if safe:
-					print('{} failed'.format(run.name))
+					print('{} failed'.format(run.get_name()))
 					traceback.print_exc()
 				else:
 					raise e
@@ -377,35 +167,31 @@ class Run_Manager(object):
 		return util.make_ghost(Run, _execute)
 
 	def clear_run_cache(self, **kwargs):
-		self.map(lambda run: run.clear(), **kwargs)
+		self.map(lambda run: run.purge(), **kwargs)
 
-	def load_into(self, name, key=None, **kwargs):
+	def load_results(self, ident, load_kwargs={}, **kwargs):
+		return self.map(lambda run: run.get_results(ident, **load_kwargs), **kwargs)
 
-		if key is None:
-			key = name.split('.')[0]
-
-		self.map(lambda r: r.load_into(name, key=key), **kwargs)
-
-	def stats_dataframe(self): # gets all stats
-
-		data = []
-
-		keys = None
-
-		for run in self.active:
-			if 'stats' in run:
-				if keys is None:
-					keys = list(run.stats.keys())
-
-				row = [run.stats[key] for key in keys]
-
-				data.append(row)
-
-		if keys is None:
-			print('No stats found')
-			return None
-
-		return pd.DataFrame(data, columns=keys)
+	# def stats_dataframe(self): # gets all stats
+	#
+	# 	data = []
+	#
+	# 	keys = None
+	#
+	# 	for run in self.active:
+	# 		if 'stats' in run:
+	# 			if keys is None:
+	# 				keys = list(run.stats.keys())
+	#
+	# 			row = [run.stats[key] for key in keys]
+	#
+	# 			data.append(row)
+	#
+	# 	if keys is None:
+	# 		print('No stats found')
+	# 		return None
+	#
+	# 	return pd.DataFrame(data, columns=keys)
 
 
 
@@ -440,173 +226,78 @@ class Run_Manager(object):
 
 		return figax
 
-	def _parse_names(self, get_model=None, get_dataset=None, get_date=None, get_job=None, get_ckpt=None):
-		for run in self.active:
 
-			run.meta = util.adict()
+	# def prep_info(self, checkpoint=None, load_last=True, clear_info=False, force=False, name=None):
+	#
+	# 	self.select_checkpoint(checkpoint=checkpoint, load_last=load_last, force=force, name=name)
+	# 	self.load_configs(force=force, clear_info=clear_info)
 
-			try:
-				terms = run.name.split('_')
-
-				if len(terms) == 3:
-					nature, job, date = terms
-					ckpt = None
-				elif len(terms) == 4 and terms[3][:4]=='ckpt':
-					nature, job, date, ckpt = terms
-				else:
-					assert False
-
-				terms = nature.split('-')
-				if len(terms) > 2:
-					terms = '-'.join(terms[:-1]), terms[-1]
-				run.meta.dataset, run.meta.model = terms
-
-				run.meta.job = tuple(job.split('-'))
-				assert len(run.meta.job) == 3
-
-				run.meta.date = tuple(date.split('-'))
-				assert len(run.meta.date) == 2
-
-				if ckpt is not None:
-					run.meta.ckpt = int(ckpt[4:])
-
-
-			except (AssertionError, ValueError) as e:
-				# raise e
-				print('Auto parsing failed with: {}'.format(run.name))
-				pass
-
-			if get_model is not None:
-				run.meta.model = get_model(run.name)
-
-			if get_dataset is not None:
-				run.meta.dataset = get_dataset(run.name)
-
-			if get_date is not None:
-				run.meta.date = get_date(run.name)
-
-			if get_job is not None:
-				run.meta.job = get_job(run.name)
-
-			if get_ckpt is not None:
-				run.meta.ckpt = get_ckpt(run.name)
-
-	def _find_runs(self, path='', limit=None):
-		self.full_info = []
-
-		root = os.path.join(self.master_root, path)
-		for name in sorted(os.listdir(root)):
-			run_name = os.path.join(path, name)
-			run_path = os.path.join(self.master_root, run_name)
-
-			if os.path.isdir(run_path):
-				if 'config.yml' in os.listdir(run_path):
-					try:
-						run = Run(name=run_name, path=run_path, _manager=self)
-						# run.progress = len([cn for cn in os.listdir(run_path) if '.pth.tar' in cn])
-					except FileNotFoundError:
-						pass
-					else:
-						self.full_info.append(run)
-
-			elif self.recursive:
-				self._find_runs(run_name, limit=limit)
-
-			if limit is not None and len(self.full_info) >= limit:
-				break
-
-	# def show_incomplete(self, complete=None):
-	# 	self._check_incomplete(complete=complete, show=True)
-
-	# def _check_incomplete(self, complete=None, show=False, negate=False): # more like "check_progress" - for complete and incomplete
-	# 	done = []
+	# def select_checkpoint(self, checkpoint=None, load_last=True, force=False, name=None):
+	#
+	# 	note = ('last' if load_last else 'best') if checkpoint is None else checkpoint
+	# 	print('Selecting checkpoint: {}'.format(note))
+	#
+	# 	valid = []
+	#
 	# 	for run in self.active:
-	# 		req = complete
-	# 		if req is None:
-	# 			req = run.config.training.epochs if 'config' in run else self.default_complete
+	# 		if 'ckpt_path' not in run or force:
 	#
-	# 		if run.progress < req:
-	# 			if show:
-	# 				print('{:>3}/{:<3} {}'.format(run.progress, req, run.name))
-	# 			if not negate:
-	# 				done.append(run)
-	# 		elif negate:
-	# 			done.append(run)
+	# 			if name is None:
 	#
-	# 	return done
-
-
-	def prep_info(self, checkpoint=None, load_last=True, clear_info=False, force=False, name=None):
-
-		self.select_checkpoint(checkpoint=checkpoint, load_last=load_last, force=force, name=name)
-		self.load_configs(force=force, clear_info=clear_info)
-
-	def select_checkpoint(self, checkpoint=None, load_last=True, force=False, name=None):
-
-		note = ('last' if load_last else 'best') if checkpoint is None else checkpoint
-		print('Selecting checkpoint: {}'.format(note))
-
-		valid = []
-
-		for run in self.active:
-			if 'ckpt_path' not in run or force:
-
-				if name is None:
-
-					if checkpoint is None:
-						ckpt_path = find_checkpoint(run.path, load_last=load_last)
-					else:
-						ckpt_path = os.path.join(run.path, 'checkpoint_{}.pth.tar'.format(checkpoint))
-
-					name_req = 'checkpoint_'
-				else:
-					name_req = name
-					ckpt_path = os.path.join(run.path, name)
-
-				if name_req not in ckpt_path or not os.path.isfile(ckpt_path):
-					print('{} has no checkpoint'.format(run.name))
-					continue
-
-				run.ckpt_path = ckpt_path
-
-				ckpt_name = os.path.basename(run.ckpt_path)
-
-				if name is None:
-					try:
-						ckpt_num = int(ckpt_name.split('_')[-1].split('.')[0])
-						run.meta.ckpt = ckpt_num
-					except ValueError as e:
-						print(run.ckpt_path, ckpt_name)
-						raise e
-
-			valid.append(run)
-
-		self.set_active(valid)
-
-	def load_records(self, pbar=None, force=False):
-
-		runs = self.active
-		if pbar is not None:
-			runs = pbar(runs)
-			runs.set_description('Loading records')
-
-		for run in runs:
-			if 'records' not in run or force:
-				ckpt = torch.load(run.ckpt_path)
-				run.records = ckpt['records']
-
-
-	def load_configs(self, force=False, clear_info=False, excluded_info=[],
-	                 update_active=True, **kwargs):
-		
-		excluded_info = set(excluded_info)
-		
-		self.map(lambda r: r.load_config(force=force, clear_info=clear_info, excluded_info=excluded_info), **kwargs)
-
-		if update_active:
-			valid = [run for run in self.active if 'config' in run]
-			self.set_active(valid)
-		print('Loaded configs')
+	# 				if checkpoint is None:
+	# 					ckpt_path = find_checkpoint(run.path, load_last=load_last)
+	# 				else:
+	# 					ckpt_path = os.path.join(run.path, 'checkpoint_{}.pth.tar'.format(checkpoint))
+	#
+	# 				name_req = 'checkpoint_'
+	# 			else:
+	# 				name_req = name
+	# 				ckpt_path = os.path.join(run.path, name)
+	#
+	# 			if name_req not in ckpt_path or not os.path.isfile(ckpt_path):
+	# 				print('{} has no checkpoint'.format(run.name))
+	# 				continue
+	#
+	# 			run.ckpt_path = ckpt_path
+	#
+	# 			ckpt_name = os.path.basename(run.ckpt_path)
+	#
+	# 			if name is None:
+	# 				try:
+	# 					ckpt_num = int(ckpt_name.split('_')[-1].split('.')[0])
+	# 					run.meta.ckpt = ckpt_num
+	# 				except ValueError as e:
+	# 					print(run.ckpt_path, ckpt_name)
+	# 					raise e
+	#
+	# 		valid.append(run)
+	#
+	# 	self.set_active(valid)
+	#
+	# def load_records(self, pbar=None, force=False):
+	#
+	# 	runs = self.active
+	# 	if pbar is not None:
+	# 		runs = pbar(runs)
+	# 		runs.set_description('Loading records')
+	#
+	# 	for run in runs:
+	# 		if 'records' not in run or force:
+	# 			ckpt = torch.load(run.ckpt_path)
+	# 			run.records = ckpt['records']
+	#
+	#
+	# def load_configs(self, force=False, clear_info=False, excluded_info=[],
+	#                  update_active=True, **kwargs):
+	#
+	# 	excluded_info = set(excluded_info)
+	#
+	# 	self.map(lambda r: r.load_config(force=force, clear_info=clear_info, excluded_info=excluded_info), **kwargs)
+	#
+	# 	if update_active:
+	# 		valid = [run for run in self.active if 'config' in run]
+	# 		self.set_active(valid)
+	# 	print('Loaded configs')
 
 	def set_active(self, active=None):
 		if active is None:
@@ -1036,109 +727,319 @@ class Run_Manager(object):
 			run.link = link_path
 
 
-def compare_config(base, other=None, bi=False, ignore_keys=None):
-	# vs_default = False
+# class Run(util.adict):
+#
+# 	def clear(self):
+# 		if 'state' in self:
+# 			del self.state
+# 			torch.cuda.empty_cache()
+#
+# 	def reset(self, state=None):
+# 		self.clear()
+#
+# 		if state is None:
+# 			state = util.adict()
+#
+# 		if 'ckpt_path' not in state:
+# 			state.ckpt_path = self.ckpt_path
+#
+# 		self.state = state
+# 		return state
+#
+# 	def load(self, **kwargs):
+# 		if 'state' not in self:
+# 			self.reset()
+#
+# 		self._manager._load_fn(self.state, **kwargs)
+#
+# 	def load_into(self, name, key=None):
+# 		if key is None:
+# 			key = name.split('.')[0]
+# 		if key not in self:
+# 			path = os.path.join(self.path, name)
+# 			if not os.path.isfile(path):
+# 				print('{} not found in: {}'.format(name, self.name))
+# 			else:
+# 				self[key] = torch.load(path)
+#
+# 	def load_config(self, force=False, clear_info=False, excluded_info=[]):
+# 		if 'config' not in self or force:
+#
+# 			fname = os.path.join(self.path, 'config.yml')
+#
+# 			if not os.path.isfile(fname):
+# 				print('{} has no config'.format(self.name))
+# 				return
+#
+# 			config = get_config(fname)
+#
+# 			if clear_info:
+# 				del self.config.info
+# 			elif 'info' in config:
+#
+# 				for k, v in config.info.items():
+# 					if k in excluded_info:
+# 						pass
+# 					elif 'dataset_type' == k:
+# 						new = v
+# 						# if 'dataset' in self.meta:
+# 						# 	assert self.meta.dataset == new, '{} vs {}'.format(self.meta.dataset, new)
+# 						self.meta.dataset = new
+# 					elif 'model_type' == k:
+# 						new = v
+# 						# if 'model' in self.meta:
+# 						# 	assert self.meta.model == new, '{} vs {}'.format(self.meta.model, new)
+# 						self.meta.model = new
+# 					elif 'history' == k:
+# 						self.meta.history = config.info.history
+# 					elif 'date' == k:
+# 						new = tuple(v.split('-'))
+# 						# if 'date' in self.meta:
+# 						# 	assert self.meta.date == new, '{} vs {}'.format(self.meta.date, new)
+# 						self.meta.date = new
+# 					else:
+# 						self.meta[k] = v
+# 			if 'job' in config:
+# 				self.meta.job = config.job.num, config.job.ID, config.job.ps
+#
+# 			try:
+# 				base = get_base_config(config)
+# 			except Exception:
+# 				# print('WARNING: loading base failed')
+# 				base = None
+#
+# 			if base is None:
+# 				print('{} has no base'.format(self.name))
+# 				return
+#
+# 			self.config = config
+# 			self.base = base
+#
+# 	def __str__(self):
+# 		return self.name
+#
+# 	def __repr__(self):
+# 		return 'Run({})'.format(self.name)
+#
+# 	def run(self, **kwargs):
+# 		self._manager._run_model_fn(self.state, **kwargs)
+#
+# 	def evaluate(self, force=False, pbar=None):
+#
+# 		jobs = self._manager._eval_fns.items()
+# 		# if pbar is not None:
+# 		# 	jobs = pbar(jobs, total=len(self._manager._eval_fns))
+#
+# 		if 'evals' not in self.state:
+# 			self.state.evals = {}
+# 		results = self.state.evals
+#
+# 		for k, fn in jobs:
+# 			if k not in results or force:
+# 				print('--- Evaluating: {}'.format(k))
+# 				start = time.time()
+# 				# if pbar is not None:
+# 				# 	jobs.set_description('EVAL: {}'.format(k))
+# 				results[k] = fn(self.state, pbar=pbar)
+# 				print('... took: {:3.2f}'.format(time.time() - start))
+# 			print('{}: {}\n'.format(k, results[k]))
+#
+# 		# self.state.evals = results
+# 		return results
+#
+# 	def visualize(self, pbar=None):
+#
+# 		jobs = self._manager._viz_fns.items()
+# 		if pbar is not None:
+# 			jobs = pbar(jobs, total=len(self._manager._viz_fns))
+#
+# 		results = {}
+# 		for k, fn in jobs:
+# 			start = time.time()
+# 			if pbar is None:
+# 				print('--- Visualizing: {}'.format(k))
+# 			else:
+# 				jobs.set_description('VIZ: {}'.format(k))
+#
+# 			results[k] = [Visualization(fig) for fig in fn(self.state, pbar=pbar)]
+#
+# 			if pbar is None:
+# 				print('... took: {:3.2f}\n'.format(time.time() - start))
+#
+# 		if pbar is not None:
+# 			jobs.close()
+#
+# 		self.state.figs = results
+# 		return results
+#
+# 	def save(self, save_dir=None, fmtdir='{}', overwrite=False, append_ckpt=True,
+# 	         include_checkpoint=True, include_config=True, include_original=True, include_results=True,
+# 	         img_ext='png', vid_ext='mp4'):
+#
+# 		if save_dir is None:
+# 			save_dir = self._manager.save_dir
+#
+# 		name = self.name
+# 		if append_ckpt and 'ckpt' in self.meta and 'ckpt' not in name:
+# 			num = self.meta.ckpt
+# 			name = '{}_ckpt{}'.format(name, num)
+#
+# 		save_path = os.path.join(save_dir, fmtdir.format(name))
+#
+# 		print('Saving results to: {}'.format(save_path))
+#
+# 		try:
+# 			if overwrite:
+# 				util.create_dir(save_path)
+# 			else:
+# 				os.makedirs(save_path)
+# 		except FileExistsError:
+# 			print('ERROR: File already exists, you can overwrite using the "overwrite" arg')
+# 		else:
+# 			if include_checkpoint:
+# 				src = self.ckpt_path
+# 				dest = os.path.join(save_path, 'model.pth.tar')
+# 				shutil.copyfile(src, dest)
+# 				print('\tModel saved')
+# 			if include_config:
+# 				src = os.path.join(self.path, 'config.yml')
+# 				dest = os.path.join(save_path, 'config.yml')
+# 				shutil.copyfile(src, dest)
+# 				print('\tConfig saved')
+# 			if include_original:
+# 				with open(os.path.join(save_path, 'original_ckpt_path.txt'), 'w') as f:
+# 					f.write(self.ckpt_path)
+#
+# 			if 'state' in self:
+# 				if 'figs' in self.state:
+# 					for name, figs in self.state.figs.items():
+# 						if len(figs) == 1:
+# 							path = os.path.join(save_path, name)
+# 							figs[0].save(path, img_ext=img_ext, vid_ext=vid_ext)
+# 						else:
+# 							for i, fig in enumerate(figs):
+# 								path = os.path.join(save_path, '{}{}'.format(name, str(i).zfill(3)))
+# 								fig.save(path, img_ext=img_ext, vid_ext=vid_ext)
+#
+# 					print('\tVisualization saved')
+#
+# 				if 'evals' in self.state:
+# 					with open(os.path.join(save_path, 'eval.txt'), 'w') as f:
+# 						for k, v in self.state.evals.items():
+# 							f.write('{} : {}\n'.format(k, str(v)))
+# 					torch.save(self.state.evals, os.path.join(save_path, 'eval.pth.tar'))
+# 					print('\tEvaluation saved')
+#
+# 				if include_results and 'results' in self.state:
+# 					torch.save(self.state.results, os.path.join(save_path, 'results.pth.tar'))
+# 					print('\tResults saved: {}'.format(', '.join(map(str, self.state.results.keys()))))
+#
+# 		return save_path
 
-	protected_keys = {'name', 'info', 'job', 'save_dir'}
-	if other is None:
-
-		protected_keys.update({
-		'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
-		})
-
-		if 'history' not in base.info:
-			raise Exception('Unable to load default - no history found')
-
-		other = base
-		base = get_base_config(base)
-
-	if ignore_keys is not None:
-		protected_keys.update(ignore_keys)
-
-	diffs = ConfigDict()#util.NS()
-	_compare_configs(base, other, diffs=diffs, protected_keys=protected_keys)
-
-	if bi:
-		adiffs = ConfigDict()#util.NS()
-		_compare_configs(other, base, diffs=adiffs, protected_keys=protected_keys)
-		return diffs, adiffs
-
-	return diffs
-
-def get_base_config(base):
-	if 'info' in base and 'history' in base.info:
-		return parse_config(base.info.history)
-
-def _compare_configs(base, other, diffs, protected_keys=None):
-
-	for k,v in base.items():
-
-		if k in protected_keys:
-			pass
-		elif k not in other:
-			diffs[k] = '__removed__'
-		elif isinstance(v, ConfigDict):
-			_compare_configs(v, other[k], diffs=diffs[k], protected_keys=protected_keys)
-			if len(diffs[k]) == 0:
-				del diffs[k]
-		elif v != other[k]:
-			diffs[k] = other[k]
-
-	for k,v in other.items():
-		if k not in protected_keys and k not in base:
-			diffs[k] = v
-
-
-
-def render_format(raw, unfolded=False):
-	unfolded = True
-	if isinstance(raw, set):
-		itr = dict()
-		for i, el in enumerate(raw):
-			itr['s{}'.format(i)] = render_format(el, unfolded)
-		return itr
-	elif isinstance(raw, dict):
-		return dict((str(k), render_format(v, unfolded)) for k, v in raw.items())
-	elif isinstance(raw, list):
-		return list(render_format(el) for el in raw)
-		itr = dict()
-		for i, el in enumerate(raw):
-			itr['l{}'.format(i)] = render_format(el, unfolded)
-		return itr
-	elif isinstance(raw, tuple):
-		return list(render_format(el) for el in raw)
-		itr = dict()
-		for i, el in enumerate(raw):
-			itr['t{}'.format(i)] = render_format(el, unfolded)
-		return itr
-	return str(raw)
-
-
-import uuid
-from IPython.display import display_javascript, display_html
-
-
-class render_dict(object):
-	def __init__(self, json_data):
-		self.json_str = render_format(json_data)
-
-		# if isinstance(json_data, dict):
-		#     self.json_str = json_data
-		#     #self.json_str = json.dumps(json_data)
-		# else:
-		#     self.json_str = json
-		self.uuid = str(uuid.uuid4())
-
-	def _ipython_display_(self):
-		display_html('<div id="{}" style="height: 600px; width:100%;"></div>'.format(self.uuid),
-		             raw=True
-		             )
-		display_javascript("""
-		require(["https://rawgit.com/caldwell/renderjson/master/renderjson.js"], function() {
-		  renderjson.set_show_to_level(1)
-		  document.getElementById('%s').appendChild(renderjson(%s))
-		});
-		""" % (self.uuid, self.json_str), raw=True)
+#
+# def compare_config(base, other=None, bi=False, ignore_keys=None):
+# 	# vs_default = False
+#
+# 	protected_keys = {'name', 'info', 'job', 'save_dir'}
+# 	if other is None:
+#
+# 		protected_keys.update({
+# 		'_logged_date', 'din', 'dout', 'info', 'dataroot', 'saveroot', 'run_mode', 'dins', 'douts',
+# 		})
+#
+# 		if 'history' not in base.info:
+# 			raise Exception('Unable to load default - no history found')
+#
+# 		other = base
+# 		base = get_base_config(base)
+#
+# 	if ignore_keys is not None:
+# 		protected_keys.update(ignore_keys)
+#
+# 	diffs = ConfigDict()#util.NS()
+# 	_compare_configs(base, other, diffs=diffs, protected_keys=protected_keys)
+#
+# 	if bi:
+# 		adiffs = ConfigDict()#util.NS()
+# 		_compare_configs(other, base, diffs=adiffs, protected_keys=protected_keys)
+# 		return diffs, adiffs
+#
+# 	return diffs
+#
+# def get_base_config(base):
+# 	if 'info' in base and 'history' in base.info:
+# 		return parse_config(base.info.history)
+#
+# def _compare_configs(base, other, diffs, protected_keys=None):
+#
+# 	for k,v in base.items():
+#
+# 		if k in protected_keys:
+# 			pass
+# 		elif k not in other:
+# 			diffs[k] = '__removed__'
+# 		elif isinstance(v, ConfigDict):
+# 			_compare_configs(v, other[k], diffs=diffs[k], protected_keys=protected_keys)
+# 			if len(diffs[k]) == 0:
+# 				del diffs[k]
+# 		elif v != other[k]:
+# 			diffs[k] = other[k]
+#
+# 	for k,v in other.items():
+# 		if k not in protected_keys and k not in base:
+# 			diffs[k] = v
+#
+#
+#
+# def render_format(raw, unfolded=False):
+# 	unfolded = True
+# 	if isinstance(raw, set):
+# 		itr = dict()
+# 		for i, el in enumerate(raw):
+# 			itr['s{}'.format(i)] = render_format(el, unfolded)
+# 		return itr
+# 	elif isinstance(raw, dict):
+# 		return dict((str(k), render_format(v, unfolded)) for k, v in raw.items())
+# 	elif isinstance(raw, list):
+# 		return list(render_format(el) for el in raw)
+# 		itr = dict()
+# 		for i, el in enumerate(raw):
+# 			itr['l{}'.format(i)] = render_format(el, unfolded)
+# 		return itr
+# 	elif isinstance(raw, tuple):
+# 		return list(render_format(el) for el in raw)
+# 		itr = dict()
+# 		for i, el in enumerate(raw):
+# 			itr['t{}'.format(i)] = render_format(el, unfolded)
+# 		return itr
+# 	return str(raw)
+#
+#
+# import uuid
+# from IPython.display import display_javascript, display_html
+#
+#
+# class render_dict(object):
+# 	def __init__(self, json_data):
+# 		self.json_str = render_format(json_data)
+#
+# 		# if isinstance(json_data, dict):
+# 		#     self.json_str = json_data
+# 		#     #self.json_str = json.dumps(json_data)
+# 		# else:
+# 		#     self.json_str = json
+# 		self.uuid = str(uuid.uuid4())
+#
+# 	def _ipython_display_(self):
+# 		display_html('<div id="{}" style="height: 600px; width:100%;"></div>'.format(self.uuid),
+# 		             raw=True
+# 		             )
+# 		display_javascript("""
+# 		require(["https://rawgit.com/caldwell/renderjson/master/renderjson.js"], function() {
+# 		  renderjson.set_show_to_level(1)
+# 		  document.getElementById('%s').appendChild(renderjson(%s))
+# 		});
+# 		""" % (self.uuid, self.json_str), raw=True)
 
 
 

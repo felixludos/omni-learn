@@ -7,6 +7,8 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset
 import h5py as hf
 
+from omnibelt import unspecified_argument
+
 from .. import util
 
 
@@ -77,15 +79,39 @@ class MissingFIDStatsError(Exception):
 
 class Image_Dataset(DatasetBase):
 
-	def __init__(self, A, root=None, **other):
+	def __init__(self, A, root=None, fid_ident=unspecified_argument, **other):
 		dataroot = A.pull('dataroot', '<>root', root)
+		if fid_ident is unspecified_argument:
+			fid_ident = A.pull('fid_ident', None)
 		super().__init__(A, **other)
+		self.fid_ident = fid_ident
 		self.root = Path(dataroot) if dataroot is not None else None
 
-	def get_fid_stats(self, dim, *modes):
+	def get_available_fid(self, name=None):
+		if name is None:
+			name = 'fid_stats.h5' if self.fid_ident is None else f'{self.fid_ident}_fid_stats.h5'
+		if self.root is not None:
+			path = self.root / name
+			if path.is_file():
+				with hf.File(path, 'r') as f:
+					available = list(f.keys())
+				
+				available = [a.split('_')[:-1] for a in available if 'mu' in a]
+				out = []
+				for a in available:
+					try:
+						m, d = a
+						out.append((int(d), m))
+					except:
+						pass
+				return out
+
+	def get_fid_stats(self, dim, *modes, name=None):
+		if name is None:
+			name = 'fid_stats.h5' if self.fid_ident is None else f'{self.fid_ident}_fid_stats.h5'
 		available = None
 		if self.root is not None:
-			path = self.root / 'fid_stats.h5'
+			path = self.root / name
 			if path.is_file():
 				with hf.File(path, 'r') as f:
 					available = f.keys()

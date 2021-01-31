@@ -261,7 +261,7 @@ class StatsManager(Switchable, StatsMeter):
 			self._collections[self.get_mode()] = dict(self)
 		
 	def export(self):
-		self._sync_collections()
+		self.archive()
 		return self._archive
 		
 	def load(self, stats):

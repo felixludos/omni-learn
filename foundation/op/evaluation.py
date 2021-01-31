@@ -1,4 +1,7 @@
+import sys, os
+from pathlib import Path
 import omnifig as fig
+from omnibelt import unspecified_argument
 
 from foundation.op.runs import NoOverwriteError
 from .. import util
@@ -15,17 +18,35 @@ def evaluate(A=None, run=None):
 	
 	if A is not None:
 		respect_config(A)
+		
 	
 	ret_run = False
 	if run is None:
 		ret_run = True
+		
 		assert A is not None, 'either run or A must not be None'
-		A.push('run._type', 'run', overwrite=False)
-		run = A.pull('run')
+		
+		override = A.pull('override', None, raw=True, silent=True)
+		
+		name = A.pull('name', '<>path', '<>load', '<>resume')
+		path = Path(name)
+		
+		if not path.is_dir():
+			saveroot = A.pull('saveroot', os.environ.get('FOUNDATION_SAVE_DIR', '.'))
+			path = saveroot / path
+		
+		assert path.is_dir(), f'run: {name} not found'
+		
+		config = fig.get_config(str(path))
+		config.push('path', name)
+		config.push('saveroot', saveroot)
+		if override is not None:
+			config.update({'override': override})
+		run = config.pull('run')
 	
-	A = run.get_config()
-
-	results = run.evaluate()
+	# A = run.get_config()
+	
+	results = run.evaluate(config=A)
 	
 	ret_run = A.pull('ret_run', ret_run, silent=True)
 	if ret_run:

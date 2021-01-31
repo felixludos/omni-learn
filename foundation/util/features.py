@@ -154,8 +154,9 @@ class Priority(Configurable):
 
 
 class Switchable(Configurable):
-	def __init__(self, A, mode='train', **kwargs):
-		mode = A.pull('mode', mode)
+	def __init__(self, A, mode=None, **kwargs):
+		if mode is None:
+			mode = A.pull('mode', 'train')
 		super().__init__(A, **kwargs)
 		self.mode = mode
 	
@@ -195,11 +196,12 @@ class Dimensions(Configurable, DimensionBase):
 
 
 class Seed(Configurable):
-	def __init__(self, A, **kwargs):
-		seed = A.pull('seed', random.getrandbits(32))
+	def __init__(self, A, seed=None, **kwargs):
+		if seed is None:
+			seed = A.pull('seed', random.getrandbits(32))
 		set_seed(seed)
 		super().__init__(A, **kwargs)
-
+		self.seed = seed
 
 
 # endregion

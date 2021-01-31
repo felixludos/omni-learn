@@ -118,6 +118,10 @@ class Records(Freq, Switchable, Seed, Configurable, dict):
 		if self.logger is not None:
 			self.logger.add(data_type, tag, *args, global_step=global_step, **kwargs)
 		
+	def create_stats(self, *names):
+		if self.stats is not None:
+			self.stats.new(*names)
+		
 	def switch_to(self, mode='train'):
 		super().switch_to(mode)
 		if self.stats is not None:

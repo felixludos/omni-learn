@@ -138,13 +138,15 @@ class Visualizable(Recordable):
 
 class Evaluatable(Recordable): # TODO: maybe not needed
 
-	def evaluate(self, info, config=None):
+	def evaluate(self, info, config=None, out=None):
 		if config is None:
 			config = info.get_config()
-		return self._evaluate(info, config)
+		return self._evaluate(info, config, out=out)
 
-	def _evaluate(self, info, config):
-		return util.TensorDict() # by default eval does nothing
+	def _evaluate(self, info, config, out=None):
+		if out is None:
+			out = util.TensorDict()
+		return out # by default eval does nothing
 
 
 @fig.AutoModifier('optim')

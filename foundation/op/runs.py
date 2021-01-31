@@ -119,7 +119,7 @@ class Run(Configurable):
 		path = A.pull('path', '<>resume', '<>load', None)
 		novel = A.push('novel', path is None, overwrite=False)
 
-		override = A.pull('override', {})
+		override = A.pull('override', {}, raw=True)
 		
 		if path is not None:
 			path = Path(path)
@@ -194,7 +194,9 @@ class Run(Configurable):
 	
 	def _load_storage(self, A):
 		self.name = self.path.stem
-
+		
+		A.push('path', str(self.path))
+		
 		num = A.pull('ckpt-num', None, silent=self.silent)
 		best = A.pull('best', False, silent=self.silent)
 		if best:
@@ -326,14 +328,36 @@ class Run(Configurable):
 
 		return self.results[fixed]
 
-	def update_results(self, ident, data, path=None, remove_ext=True):
+
+	def update_results(self, ident, data, path=None, overwrite=False, remove_ext=True):
 
 		fixed = ident.split('.')[0] if remove_ext else ident
+
+		if self.has_results(fixed, path=path) and not overwrite:
+			old = self.get_results(fixed, path=path)
+			old.update(data)
+			data = old
 
 		self._save_results(data, name=fixed, path=path)
 		
 		if fixed in self.results:
 			self.results[fixed] = data
+			
+		return data
+
+
+	def has_results(self, ident, path=None, ext=None):
+		fixed = ident.split('.')[0] if ext is not None else ident
+		
+		if fixed in self.results:
+			return True
+		
+		if ext is not None:
+			fixed = f'{fixed}.{ext}'
+		
+		if path is None:
+			path = self.get_path()
+		return (path/fixed).is_file()
 
 	# endregion
 	
@@ -496,14 +520,15 @@ class Run(Configurable):
 	def evaluate(self, ident='eval', config=None,
 	             evaluation=None, store_batch=True, overwrite=False, path=None):
 		
-		if config is None:
-			config = self.get_config().sub('eval')
-		
 		if config is not None:
-			ident = config.push('ident', ident, overwrite=False)
-			mode = config.pull('mode', 'val')
-			# mode = config.push('mode', 'val', overwrite=False)
+			self.get_config().sub('eval').update(config)
+		config = self.get_config().sub('eval')
+		
+		ident = config.push('ident', ident, overwrite=False)
+		mode = config.pull('mode', 'val')
 		assert ident is not None, 'No ident specified'
+		
+		config.push('mode', mode, force_root=True, silent=True)
 		
 		if path is None:
 			path = self.get_path()
@@ -580,15 +605,16 @@ class Run(Configurable):
 				output.update(eval_out)
 		
 		records.step(fmt=fmt)
-		fmt, N = _records_info
-		records.set_fmt(fmt)
-		records.set_step(N)
 		
 		if store_batch and output is not None:
 			output['batch'] = batch
 		if path is not None:
 			self.update_results(ident, output, path=path)
 			records.checkpoint(path)
+		
+		fmt, N = _records_info
+		records.set_fmt(fmt)
+		records.set_step(N)
 		
 		return output
 		
