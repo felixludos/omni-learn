@@ -368,7 +368,11 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 			images = np.load(os.path.join(dataroot, 'mpi3d', fname))['images']
 			indices = np.arange(len(images))
 		else:
-			with hf.File(os.path.join(dataroot, 'mpi3d', fname), 'r') as f:
+			path = os.path.join(dataroot, 'mpi3d', fname)
+			if not os.path.isfile(path):
+				path = os.path.join(dataroot, 'mpi3d', f'mpi3d_{cat}_train.h5')
+				print(f'{fname} not found, loading training set instead')
+			with hf.File(path, 'r') as f:
 				images = f['images'][()]
 				indices = f['indices'][()]
 

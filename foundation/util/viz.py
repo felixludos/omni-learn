@@ -99,11 +99,17 @@ def plot_vec_fn(f, din=None, dim=None, lim=(-5, 5), N=1000, figax=None):
 def plot_distribs(pts, figax=None, figsize=(6, 6), lim_y=None,
 				  scale='count', inner='box', gridsize=100, cut=None, split=False,
 				  color=None, palette=None, hue=None, **kwargs):
-	Xs = np.arange(pts.shape[-1]) + 1
-	inds = np.stack([Xs] * pts.shape[0])
 	
-	vals = pts.cpu().numpy()
-	df = pd.DataFrame({'x': inds.reshape(-1), 'y': vals.reshape(-1)})
+	if not isinstance(pts, list):
+		pts = pts.tolist()
+	
+	inds = []
+	vals = []
+	for i, samples in enumerate(pts):
+		inds.extend([i+1]*len(samples))
+		vals.extend(samples)
+	
+	df = pd.DataFrame({'x': inds, 'y': vals})
 	
 	if figax is None:
 		figax = plt.subplots(figsize=figsize)
@@ -362,7 +368,7 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 	return fg, axes
 
 
-def plot_mat(M, val_fmt=None, figax=None, **kwargs):
+def plot_mat(M, val_fmt=None, figax=None, text_kwargs=dict(), **kwargs):
 	if figax is None:
 		figax = plt.subplots()
 	fg, ax = figax
@@ -377,9 +383,18 @@ def plot_mat(M, val_fmt=None, figax=None, **kwargs):
 	if val_fmt is not None:
 		if isinstance(val_fmt, int):
 			val_fmt = f'.{val_fmt}f'
-		fmt = '{:' + val_fmt + '}'
+		if isinstance(val_fmt, str):
+			val_fmt = '{:' + val_fmt + '}'
+			fmt = lambda x: val_fmt.format(x)
+		else:
+			fmt = val_fmt
+			
+		if 'va' not in text_kwargs:
+			text_kwargs['va'] = 'center'
+		if 'ha' not in text_kwargs:
+			text_kwargs['ha'] = 'center'
 		for (i, j), z in np.ndenumerate(M):
-			ax.text(j, i, fmt.format(z), ha='center', va='center')
+			ax.text(j, i, fmt(z), **text_kwargs)
 
 
 def play_back(imgs, figax=None, batch_first=True): # imgs is numpy: either (seq, H, W, C) or (batch, seq, H, W, C)
