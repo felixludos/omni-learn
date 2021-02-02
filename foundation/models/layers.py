@@ -329,8 +329,12 @@ class DenseLayer(fm.Function, DenseLayerBase):
 		
 		if din is None:
 			din = A.pull('din')
+			if din is None:
+				din = A.pull('width', '<>channels')
 		if dout is None:
 			dout = A.pull('dout')
+			if dout is None:
+				dout = A.pull('width', '<>channels')
 		if bias is None:
 			bias = A.pull('bias', True)
 		if nonlin is None:

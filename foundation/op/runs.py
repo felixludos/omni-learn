@@ -314,7 +314,7 @@ class Run(Configurable):
 	def get_loader(self, mode=None, **kwargs):
 		return self.get_dataset().get_loader(mode, **kwargs)
 	
-	def get_results(self, ident, path=None, remove_ext=True): # you must specify which results (ident used when results were created)
+	def get_results(self, ident, path=None, remove_ext=True, **kwargs): # you must specify which results (ident used when results were created)
 		
 		if ident in self.results:
 			return self.results[ident]
@@ -324,7 +324,7 @@ class Run(Configurable):
 		if fixed in self.results:
 			return self.results[fixed]
 
-		self.results[fixed] = self._load_results(name=ident, path=path)
+		self.results[fixed] = self._load_results(name=ident, path=path, **kwargs)
 
 		return self.results[fixed]
 
@@ -609,7 +609,7 @@ class Run(Configurable):
 		if store_batch and output is not None:
 			output['batch'] = batch
 		if path is not None:
-			self.update_results(ident, output, path=path)
+			self.update_results(ident, {k:v for k,v in output.items()}, path=path)
 			records.checkpoint(path)
 		
 		fmt, N = _records_info

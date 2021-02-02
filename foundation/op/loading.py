@@ -27,7 +27,7 @@ class Torch_Run(Run):
 		
 		return torch.save(data, str(path))
 	
-	def _load_results(self, path=None, name=None, ext='pth.tar'):
+	def _load_results(self, path=None, name=None, ext='pth.tar', device=None, **kwargs):
 		if path is None:
 			path = self.get_path()
 		
@@ -36,7 +36,9 @@ class Torch_Run(Run):
 			assert name is not None, 'name is missing'
 			path = path / f'{name}.{ext}'
 			
-		return torch.load(str(path))
+		
+		special = {'map_location':device} if device is not None else {}
+		return torch.load(str(path), **special)
 
 
 def respect_config(A):
