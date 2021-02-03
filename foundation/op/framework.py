@@ -9,8 +9,8 @@ from omnibelt import primitives, InitWall
 
 import omnifig as fig
 
-from foundation import util
-from foundation.util import Configurable, Seed, Checkpointable, Switchable, TrackedAttrs, \
+from .. import util
+from ..util import Configurable, Seed, Checkpointable, Switchable, TrackedAttrs, \
 	Dimensions, Deviced, DeviceBase, DimensionBase
 import torch.multiprocessing as mp
 from itertools import chain

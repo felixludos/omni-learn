@@ -3,7 +3,7 @@ from pathlib import Path
 import omnifig as fig
 from omnibelt import unspecified_argument
 
-from foundation.op.runs import NoOverwriteError
+from .runs import NoOverwriteError
 from .. import util
 
 from .loading import respect_config

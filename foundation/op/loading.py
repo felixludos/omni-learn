@@ -4,7 +4,7 @@ import torch
 import omnifig as fig
 
 from .. import util
-from foundation.op.runs import Run
+from .runs import Run
 # from .data impor
 
 _config_root = Path(__file__) / '..' / '..' / '..' / 'config'

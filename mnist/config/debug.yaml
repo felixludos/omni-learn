@@ -5,19 +5,20 @@ _meta.script_name: train
 #override.budget: 10000
 
 #parents: [scheduler, conv, basics]
-parents: [ conv, basics ]
+#parents: [ conv, basics ]
+parents: [demo]
 
-model.net.layer_type: coord-conv-layer
-
-#epochs: 5
-budget: 2000
-#budget: 100
-#records.freq: 1
-#model.optim.lr.freq: 1
-
-name: test-pycharm
-
-inline: True
+#model.net.layer_type: coord-conv-layer
+#
+##epochs: 5
+#budget: 2000
+##budget: 100
+##records.freq: 1
+##model.optim.lr.freq: 1
+#
+#name: test-pycharm
+#
+#inline: True
 
 #model.optim.lr.end: 0.01
 #model.optim.lr.kurtosis: 0.5
