@@ -7,6 +7,11 @@ from .. import util
 from foundation.op.runs import Run
 # from .data impor
 
+_config_root = Path(__file__) / '..' / '..' / '..' / 'config'
+
+# fig.register_config_dir(str(_config_root)) # WARNING: overrides debug
+fig.register_config('origin', str(_config_root/'origin.yaml'))
+
 # @fig.AutoModifier('torch')
 @fig.Component('run')
 class Torch_Run(Run):
