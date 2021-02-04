@@ -7,10 +7,8 @@ from .. import util
 from .runs import Run
 # from .data impor
 
-_config_root = Path(__file__) / '..' / '..' / '..' / 'config'
+_config_root = Path(__file__).parents[2] / 'config'
 
-# fig.register_config_dir(str(_config_root)) # WARNING: overrides debug
-fig.register_config('origin', str(_config_root/'origin.yaml'))
 
 # @fig.AutoModifier('torch')
 @fig.Component('run')
@@ -113,3 +111,7 @@ def respect_config(A):
 # 		records = yaml.safe_load(f)
 # 	return records
 #
+
+# fig.register_config_dir(str(_config_root)) # WARNING: overrides debug
+fig.register_config('origin', str(_config_root/'origin.yaml'))
+

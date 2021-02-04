@@ -2,7 +2,7 @@ import random
 import torch
 
 from wrapt import ObjectProxy
-from omnibelt import Value as ValueWrapper, primitives
+from omnibelt import Value as ValueWrapper, primitives, InitWall
 
 
 from omnifig import Configurable
