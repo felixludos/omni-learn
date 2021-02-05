@@ -7,7 +7,7 @@ import torch
 from omnibelt import unspecified_argument
 from torch.nn import functional as F
 
-from foundation import util
+from .. import util
 from ...data import Dataset, Deviced, Batchable, Image_Dataset, DatasetBase
 
 from .transforms import Cropped

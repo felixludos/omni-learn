@@ -1,11 +1,9 @@
 
-py_info: 'foundation/_info.py'
-
+py_info: omnilearn/_info.py
 
 
 src:
-#  - startup.py
-  - foundation/op/runs.py
-  - foundation/op/report.py
-  - foundation/op/status.py
+  - omnilearn/op/runs.py
+  - omnilearn/op/report.py
+  - omnilearn/op/status.py
 

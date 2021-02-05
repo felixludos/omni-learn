@@ -1,7 +1,7 @@
 import os
 from setuptools import setup
 
-info = {'__file__': os.path.join(os.path.abspath(os.path.dirname(__file__)), 'foundation', '_info.py')}
+info = {'__file__': os.path.join(os.path.abspath(os.path.dirname(__file__)), 'omnilearn', '_info.py')}
 with open(info['__file__'], 'r') as f:
 	exec(f.read(), info)
 del info['__file__']

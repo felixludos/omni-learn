@@ -10,9 +10,7 @@ import omnifig as fig
 
 from bisect import bisect_left
 
-from foundation import util
-# from foundation.old.train.config import get_config, ConfigDict, parse_config
-# from foundation.old.train.loading import find_checkpoint
+from .. import util
 
 # import tensorflow as tf
 # from tensorboard import main as tb

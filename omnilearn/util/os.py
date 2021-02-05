@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-FOUNDATION_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+OMNILEARN_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 def save_figure(name, fg=None, root=None, force=False, exts=None, **kwargs):
 	

@@ -4,8 +4,7 @@ import torch
 import omnifig as fig
 
 from ..op import framework as fm
-
-from foundation.op.clock import Freq, Reg, Savable
+from ..op.clock import Freq, Reg, Savable
 
 from .. import util
 

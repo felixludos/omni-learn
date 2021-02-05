@@ -125,7 +125,7 @@ class Run(Configurable):
 			path = Path(path)
 			
 			if not path.is_dir():
-				root = A.pull('saveroot', '<>root', os.environ.get('FOUNDATION_SAVE_DIR', None))
+				root = A.pull('saveroot', '<>root', os.environ.get('OMNILEARN_SAVE_DIR', None))
 				if root is None:
 					raise RunNotFoundError(path)
 				path = root / path
@@ -172,7 +172,7 @@ class Run(Configurable):
 		path = None
 		
 		if not self.invisible:
-			saveroot = A.pull('saveroot', os.environ.get('FOUNDATION_SAVE_DIR', DEFAULT_SAVE_PATH))
+			saveroot = A.pull('saveroot', os.environ.get('OMNILEARN_SAVE_DIR', DEFAULT_SAVE_PATH))
 			saveroot = Path(saveroot)
 
 			path = saveroot / self.name

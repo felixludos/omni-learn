@@ -387,7 +387,7 @@ def load_data(A):
 @fig.Component('dataset')
 class DataManager(InfoManager, Splitable, SimpleDataManager):
 	def __init__(self, A, **kwargs):
-		A.push('dataroot', os.environ.get('FOUNDATION_DATA_DIR', 'local_data'), overwrite=False)
+		A.push('dataroot', os.environ.get('OMNILEARN_DATA_DIR', 'local_data'), overwrite=False)
 		super().__init__(A, **kwargs)
 		
 		skip_load = A.pull('skip_load', False)

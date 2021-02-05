@@ -4,9 +4,9 @@ import sys, os,  #traceback, ipdb
 
 #%matplotlib tk
 
-import foundation as fd
-from foundation import util
-from foundation.old import train as trn
+import omnilearn as fd
+from omnilearn import util
+from omnilearn.old import train as trn
 
 MY_PATH = os.path.dirname(os.path.abspath(__file__))
 

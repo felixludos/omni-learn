@@ -43,7 +43,7 @@ def get_report(A):
 	
 	root = A.pull('saveroot', '<>root', None)
 	if root is None:
-		root = os.environ['FOUNDATION_SAVE_DIR'] if 'FOUNDATION_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
+		root = os.environ['OMNILEARN_SAVE_DIR'] if 'OMNILEARN_SAVE_DIR' in os.environ else DEFAULT_SAVE_PATH
 
 	# print(root)
 

@@ -11,12 +11,12 @@ import numpy as np
 # %matplotlib tk
 from matplotlib import cm
 
-import foundation as fd
-from foundation import util
+import omnilearn as learn
+from omnilearn import util
 
 
 @fig.Component('point-enc')
-class PointEncoder(fd.Encodable, fd.Visualizable, fd.FunctionBase):
+class PointEncoder(learn.Encodable, learn.Visualizable, learn.FunctionBase):
 
 	def __init__(self, A):
 		in_shape = A.pull('in_shape', '<>din')
@@ -46,7 +46,7 @@ class PointEncoder(fd.Encodable, fd.Visualizable, fd.FunctionBase):
 
 	def _visualize(self, out, logger):  # TODO
 		for m in self.pointnet.tfms:
-			if isinstance(m, fd.Visualizable):
+			if isinstance(m, learn.Visualizable):
 				m._visualize(out, logger)
 
 	def forward(self, x):  # images
@@ -58,7 +58,7 @@ class PointEncoder(fd.Encodable, fd.Visualizable, fd.FunctionBase):
 
 
 @fig.AutoComponent('patch-points')
-class Patch_Points(fd.FunctionBase):
+class Patch_Points(learn.FunctionBase):
 	'''
 	Converts an image into a set of unordered points where each point is a concat of the pixels of
 	a unique patch of the image.
@@ -139,7 +139,7 @@ def make_pointnet(pin, pout, hidden=None,
 
 
 @fig.Component('point-net')
-class PointNet(fd.Model):
+class PointNet(learn.Model):
 	def __init__(self, A):
 
 		pin = A.pull('pin')  # should be the number of channels of the points
@@ -225,7 +225,7 @@ class PointNet(fd.Model):
 
 # Abstract modules
 
-class PointNetModule(fd.FunctionBase):
+class PointNetModule(learn.FunctionBase):
 	def __init__(self, pin=None, pout=None,
 	             pin1=None, pout1=None, pin2=None, pout2=None):
 		super().__init__(pin, pout)
@@ -370,7 +370,7 @@ class PointJoiner(PointJoin):
 
 
 @fig.AutoComponent('point-wsum')
-class PointWeightedSum(fd.Cacheable, fd.Visualizable, PointJoin):
+class PointWeightedSum(learn.Cacheable, learn.Visualizable, PointJoin):
 
 	def __init__(self, pin1, pin2, heads=1, keys=1, norm_heads=False, sum_heads=True,
 	             gumbel=None, gumbel_min=0.1, gumbel_delta=2e-4):

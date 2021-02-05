@@ -8,7 +8,6 @@ import torch
 from torch.nn import functional as F
 import torchvision
 
-# from foundation.old.train.registry import create_component, Component
 from ... import util
 
 from ...data import Dataset, Batchable, Deviced, Image_Dataset

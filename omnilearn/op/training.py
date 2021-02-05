@@ -7,8 +7,6 @@ from omnibelt import unspecified_argument
 
 import omnifig as fig
 
-from foundation.op.framework import Recordable, Evaluatable
-
 from .. import util
 
 # from .loading import load_config, load_records, setup_logging, setup_records, \

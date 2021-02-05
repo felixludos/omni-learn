@@ -5,8 +5,8 @@ import time
 import torch
 import omnifig as fig
 
-import foundation as fd
-from foundation import util
+import omnilearn as fd
+from omnilearn import util
 
 @fig.Component('simple')
 class Simple_Model(fd.Model):

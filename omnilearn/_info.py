@@ -1,10 +1,10 @@
 
 
-name = 'foundation'
-long_name = 'foundation'
+name = 'omnilearn'
+long_name = 'omni-learn'
 
-version = '0.4.1'
-url = 'https://github.com/felixludos/foundation'
+version = '0.5'
+url = 'https://github.com/felixludos/omni-learn'
 
 description = 'Powerful machine learning utilities for python'
 
@@ -15,7 +15,7 @@ license = 'MIT'
 
 readme = 'README.md'
 
-installable_packages = ['foundation']
+installable_packages = ['omnilearn']
 
 import os
 try:

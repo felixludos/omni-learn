@@ -40,10 +40,10 @@ def get_images(root, size=None, is_mask=False):
 @fig.Script('download-mvtec', description='Download and Format MVTec Anomaly Detection dataset')
 def download_mvtec(A):
 	
-	root = A.pull('root', os.environ.get('FOUNDATION_DATA_DIR', None))
+	root = A.pull('root', os.environ.get('OMNILEARN_DATA_DIR', None))
 	
 	if root is None:
-		raise Exception('Must specify a FOUNDATION_DATA_DIR as env variable (or pass in a `root`)')
+		raise Exception('Must specify a OMNILEARN_DATA_DIR as env variable (or pass in a `root`)')
 	
 	root = os.path.join(root, 'mvtec')
 	

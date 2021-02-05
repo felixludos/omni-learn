@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 @fig.Script('format-iam', description='Format IAM handwriting dataset')
 def format_iam(A):
 	
-	root = A.pull('root', '<>path', os.environ.get('FOUNDATION_DATA_DIR', '.'))
+	root = A.pull('root', '<>path', os.environ.get('OMNILEARN_DATA_DIR', '.'))
 	root = Path(root) / 'iam'
 	
 	lroot = root / 'lines'

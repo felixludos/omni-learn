@@ -32,7 +32,7 @@ def evaluate(A=None, run=None):
 		path = Path(name)
 		
 		if not path.is_dir():
-			saveroot = A.pull('saveroot', os.environ.get('FOUNDATION_SAVE_DIR', '.'))
+			saveroot = A.pull('saveroot', os.environ.get('OMNILEARN_SAVE_DIR', '.'))
 			path = saveroot / path
 		
 		assert path.is_dir(), f'run: {name} not found'

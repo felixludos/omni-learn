@@ -1,4 +1,4 @@
-# Foundation
+# omni-learn
 
 This repo contains a framework for various machine learning and simulation projects.
 
@@ -10,11 +10,9 @@ Run `pip install .` while in this dir to install package.
 
 It is strongly encouraged to set a few environment variables when using this library:
 
-`FOUNDATION_RUN_MODE="cmd"` - this will keep executing scripts simple, and allow for some debugging using `ipdb`. Other possible values include {`cluster`, `pycharm`, `jupyter`}.
+`OMNILEARN_SAVE_DIR="$HOME/trained_nets"` - set this to an absolute path to a directory you have write access to, this is where scripts will save output (by default).
 
-`FOUNDATION_SAVE_DIR="$HOME/trained_nets"` - set this to an absolute path to a directory you have write access to, this is where scripts will save output (by default).
-
-`FOUNDATION_DATA_DIR="$HOME/local_data"` - set this to an absolute path to a directory with some datasets (best to also have write access to allow automatic downloading of some datasets).
+`OMNILEARN_DATA_DIR="$HOME/local_data"` - set this to an absolute path to a directory with some datasets (best to also have write access to allow automatic downloading of some datasets).
 
 
 
