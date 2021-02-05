@@ -1,0 +1,87 @@
+
+
+offset-mag: 0.05
+scale-mag: 0.05
+
+noise: None
+brightness: 0.2
+contrast: 0.2
+
+
+
+transforms:
+  bottle:
+    rot: True
+    offset: <>offset-mag
+    flip: 0.5
+
+  cable:
+    offset: <>offset-mag
+    scale: <>scale-mag
+
+  capsule:
+    offset: <>offset-mag
+
+  carpet:
+    rot_90: True
+    flip_h: True
+    flip_w: True
+
+  grid: # greyscale
+    rot_90: True
+    flip_h: True
+    flip_w: True
+
+  hazelnut:
+    rot: True
+    offset: <>offset-mag
+    scale: <>scale-mag
+    flip: 0.5
+
+  leather:
+#    rot: True
+    rot_90: True
+    flip_w: True
+    flip_h: True
+    offset: <>offset-mag
+    scale: <>scale-mag
+    flip: 0.5
+
+  metal_nut:
+    rot: True
+    offset: <>offset-mag
+    scale: <>scale-mag
+    flip: 0.5
+
+  pill: {}
+
+  screw: # greyscale
+    rot: True
+    offset: <>offset-mag
+    flip: 0.5
+
+  tile:
+    rot: True
+    offset: <>offset-mag
+    scale: <>scale-mag
+    flip: 0.5
+
+  toothbrush:
+    flip_h: True
+
+  transistor:
+    flip_h: True
+
+  wood:
+#    rot: True
+    rot_90: True
+    flip_w: True
+    flip_h: True
+    offset: <>offset-mag
+    scale: <>scale-mag
+#    flip: 0.5
+
+  zipper: # greyscale
+    flip_h: True
+    flip_w: True
+

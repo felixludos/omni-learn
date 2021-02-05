@@ -4,16 +4,16 @@ import sys, os,  #traceback, ipdb
 
 #%matplotlib tk
 
-import foundation as fd
-from foundation import util
-from foundation.old import train as trn
+import omnilearn as fd
+from omnilearn import util
+from omnilearn.old import train as trn
 
 MY_PATH = os.path.dirname(os.path.abspath(__file__))
 
 trn.register_config_dir(os.path.join(MY_PATH, 'config'), recursive=True)
 
 @fd.Component('model')
-class Model(fd.Visualizable, fd.Trainable_Model):
+class Model(fd.Visualizable, fd.Model):
 	def __init__(self, info):
 
 		net = info.pull('net')

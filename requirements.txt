@@ -11,3 +11,6 @@ pyyaml
 tqdm
 pandas
 humpack
+scikit-learn
+seaborn
+moviepy

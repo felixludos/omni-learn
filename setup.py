@@ -1,7 +1,7 @@
 import os
 from setuptools import setup
 
-info = {'__file__': os.path.join(os.path.abspath(os.path.dirname(__file__)), 'foundation', '_info.py')}
+info = {'__file__': os.path.join(os.path.abspath(os.path.dirname(__file__)), 'omnilearn', '_info.py')}
 with open(info['__file__'], 'r') as f:
 	exec(f.read(), info)
 del info['__file__']
@@ -33,7 +33,7 @@ setup(name=info.get('name', None),
       author=info.get('author', None),
       author_email=info.get('author_email', None),
       license=info.get('license', None),
-      packages=info.get('packages', [info['name']]),
+      packages=info.get('installable_packages', [info['name']]),
       entry_points=info.get('entry_points', {}),
       install_requires=info.get('install_requires', []),
       zip_safe=info.get('zip_safe', False),

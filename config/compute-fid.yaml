@@ -1,0 +1,10 @@
+_meta.script_name: compute-fid
+
+dataset:
+  _type: dataset
+  name: 3dshapes
+
+pbar._type: progress-bar
+
+n_samples: 100
+dim: 64

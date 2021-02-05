@@ -1,45 +1,28 @@
 
+_meta.script_name: train
+#_meta.script_name: eval
 
-_meta.script_name: compute-fid
+#override.budget: 10000
 
+#parents: [scheduler, conv, basics]
+#parents: [ conv, basics ]
+parents: [demo]
 
-dataset:
-  name: mnist
-
-  drop_last: False
-
-batch_size: 250
-
-pbar: True
-
-#fid-dim: 64
-#n-samples: 10
-
-#_meta.script_name: train
-
-#  script_name: eval
-
-#resume: test-pycharm_200707-021212
+#model.net.layer_type: coord-conv-layer
 #
-#override:
-#  eval:
-#    identifier: test
-#    overwrite: True
-#    use_testset: True
-
-#extend: 5000
-
-#parents: ['demo']
-
-
-
-#name: 'test-pycharm'
-
+##epochs: 5
+#budget: 2000
+##budget: 100
+##records.freq: 1
+##model.optim.lr.freq: 1
+#
+#name: test-pycharm
+#
 #inline: True
 
-#dataset.name: mnist
-
-#output.save_freq: 800
+#model.optim.lr.end: 0.01
+#model.optim.lr.kurtosis: 0.5
+#model.optim.lr.skew: 0.7
 
 
 
