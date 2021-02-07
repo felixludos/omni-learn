@@ -8,16 +8,37 @@ from collections import OrderedDict
 
 import humpack as hp
 
+from omnibelt import load_yaml, save_yaml, get_now, create_dir, get_printer, unspecified_argument
+
 import omnifig as fig
 from omnifig import Configurable
-from omnifig.errors import MissingParameterError
-
-from omnibelt import load_yaml, save_yaml, get_now, create_dir
+from omnifig.errors import MissingParameterError, MissingComponentError
 
 
+prt = get_printer(__name__)
 
-FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH), 'trained_nets')
+
+_warn_savedir = True
+def get_save_dir(A=None, silent=False):
+	if A is not None:
+		root = A.pull('saveroot', None, silent=silent)
+		if root is not None:
+			return Path(root)
+	
+	if 'OMNILEARN_SAVE_DIR' in os.environ:
+		return Path(os.environ['OMNILEARN_SAVE_DIR'])
+	
+	root = Path(os.getcwd())
+	root = root / 'trained_nets'
+	root.mkdir(exist_ok=True)
+	
+	global _warn_savedir
+	if _warn_savedir:
+		prt.warning(f'No savedir found (specify with "OMNILEARN_SAVE_DIR" env variable), '
+		            f'now using {str(root)}')
+		_warn_savedir = False
+	
+	return root
 
 
 
@@ -27,43 +48,87 @@ class RunNotFoundError(Exception):
 
 
 
-class Validation_Flag(Exception):
-	pass
-
-class Checkpoint_Flag(Exception):
-	pass
-
-class NoOverwriteError(Exception):
-	pass
+# class Validation_Flag(Exception):
+# 	pass
+#
+# class Checkpoint_Flag(Exception):
+# 	pass
+#
+# class NoOverwriteError(Exception):
+# 	pass
 
 
 @fig.Script('load-run', description='Load a new or existing run') # the script just loads a run
 def load_run(A):
 	
+	silent = A.pull('silent', False, silent=True)
+	
+	override = A.pull('override', None, raw=True, silent=True)
+	
+	name = A.pull('path', '<>load', '<>resume', None, silent=silent)
+	if name is not None:
+		path = Path(name)
+		
+		if not path.is_dir():
+			saveroot = get_save_dir(A)
+			path = saveroot / path
+		
+		if not path.is_dir():
+			raise RunNotFoundError(name)
+		
+		A = fig.get_config(str(path))
+		if override is not None:
+			A.update(override)
+	
 	if 'run' in A:
 		A = A.sub('run')
 	
-	A.push('_type', 'run', overwrite=False)
-
+	run_type = A.push('_type', 'run', overwrite=False, silent=True)
+	if not fig.has_component(run_type):
+		prt.error(f'Run type "{run_type}" not found, using default instead')
+		A.push('_type', 'run')
+		
 	return A.pull_self()
-
-
 	
-
+	
 @fig.Component('run')
 class Run(Configurable):
 	'''
 	Holds all the data and functions to load, save, train, and evaluate runs.
 	Runs include the model, datasets, dataloaders, the logger, and stats
 	'''
-	def __init__(self, A, silent=False, **kwargs):
+	def __init__(self, A, name=unspecified_argument, path=unspecified_argument,
+	             silent=None, invisible=None, use_root=None, **kwargs):
+		
+		if silent is None:
+			silent = A.pull('silent', silent)
+
+		if invisible is None:
+			invisible = A.pull('invisible', False, silent=silent)
+
+		if use_root is None:
+			use_root = A.pull('use_config_root', True, silent=silent)
+			
+		if path is unspecified_argument:
+			path = A.pull('path', '<>load', '<>resume', None, silent=silent)
+		
+		if name is unspecified_argument:
+			name = A.pull('name', None, silent=silent) if path is None else None
+		
 		super().__init__(A, **kwargs)
-		self.silent = A.pull('silent', silent)
-
-		self.invisible = A.pull('invisible', False)
-
-		A = A.get_root()
-		A = self._find_origin(A)
+		self.silent = silent
+		self.invisible = invisible
+		if use_root:
+			A = A.get_root()
+		self.A = A
+		
+		self.name = name
+		
+		if path is not None:
+			A.push('path', path, silent=silent)
+			path = Path(path)
+		self.path = path
+		self.novel = path is None
 		
 		if not self.invisible:
 			self._setup_storage(A)
@@ -78,7 +143,7 @@ class Run(Configurable):
 		pass
   
 	def __repr__(self):
-		return f'RUN:{self.get_name()}'
+		return f'{self.__class__.__name__.upper()}:{self.get_name()}'
 	
 	def __str__(self):
 		return self.get_name()
@@ -91,7 +156,6 @@ class Run(Configurable):
 		A.push('records._type', 'records', overwrite=False, silent=True)
 		self.records = A.pull('records', ref=True)
 
-		self.A = A
 	
 	def purge(self): # remove any potentially large objects to free memory
 		self.dataset = None
@@ -113,41 +177,6 @@ class Run(Configurable):
 		self.results = {}
 	
 		self._started = False
-	
-	def _find_origin(self, A):
-		
-		path = A.pull('path', '<>resume', '<>load', None)
-		novel = A.push('novel', path is None, overwrite=False)
-
-		override = A.pull('override', {}, raw=True)
-		
-		if path is not None:
-			path = Path(path)
-			
-			if not path.is_dir():
-				root = A.pull('saveroot', '<>root', os.environ.get('OMNILEARN_SAVE_DIR', None))
-				if root is None:
-					raise RunNotFoundError(path)
-				path = root / path
-				if not path.is_dir():
-					raise RunNotFoundError(path)
-			
-			config_path = path / 'config.yaml'
-			
-			if not self.silent:
-				print(f'Loading Config (for run): {config_path}')
-			
-			load_A = fig.get_config(str(config_path))
-			if novel:
-				load_A.update(A)
-			A.clear()
-			A.update(load_A)
-			A.update(override)
-		
-		self.path = path
-		self.novel = novel
-		
-		return A
 		
 	def _setup_storage(self, A):
 		if self.path is None:
@@ -157,10 +186,10 @@ class Run(Configurable):
 		
 	def _create_storage(self, A):
 		
-		name = A.pull('run.name', '<>name', None)
+		name = self.get_name()
+		
 		if name is None:
 			name = self._gen_name(A)
-			A.push('name', name)
 		
 		logdate = A.pull('name-include-date', True)
 		if logdate:
@@ -169,11 +198,10 @@ class Run(Configurable):
 		
 		self.name = name
 		
-		path = None
+		path = self.get_path()
 		
-		if not self.invisible:
-			saveroot = A.pull('saveroot', os.environ.get('OMNILEARN_SAVE_DIR', DEFAULT_SAVE_PATH))
-			saveroot = Path(saveroot)
+		if path is None and not self.invisible:
+			saveroot = get_save_dir(A, silent=self.silent)
 
 			path = saveroot / self.name
 			
@@ -194,8 +222,6 @@ class Run(Configurable):
 	
 	def _load_storage(self, A):
 		self.name = self.path.stem
-		
-		A.push('path', str(self.path))
 		
 		num = A.pull('ckpt-num', None, silent=self.silent)
 		best = A.pull('best', False, silent=self.silent)

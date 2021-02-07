@@ -12,19 +12,28 @@ from omnibelt import unspecified_argument
 from .. import util
 
 
-class ExistingModes:
+class ExistingModes(util.Switchable):
 	def __init_subclass__(cls, **kwargs):
 		cls.available_modes = {'train'}
 	
-	def add_existing_modes(self, *modes):
-		self.available_modes.update(modes)
+	@classmethod
+	def add_existing_modes(cls, *modes):
+		cls.available_modes.update(modes)
 	
-	def get_available_modes(self):
-		return self.available_modes
+	@classmethod
+	def get_available_modes(cls):
+		return cls.available_modes
 
 class DatasetBase(ExistingModes, util.Dimensions, util.Configurable, PytorchDataset):
 	pass
+
+class Sourced(DatasetBase):
+	def __init__(self, A, dataroot=None, **kwargs):
+		super().__init__(A, **kwargs)
+		self.root = util.get_data_dir(A) if dataroot is None else dataroot
 	
+	def get_root(self):
+		return self.root
 	
 class Batchable(DatasetBase): # you can select using a full batch
 	def allow_batched(self):
@@ -63,7 +72,14 @@ class Deviced(util.Deviced, DatasetBase): # Full dataset is in memory, so it can
 				except AttributeError:
 					pass
 
+class Downloadable(Sourced):
+	@classmethod
+	def download(cls, A, **kwargs):
+		raise NotImplementedError
 
+class MissingDatasetError(Exception):
+	def __init__(self, name):
+		super().__init__(f'Missing dataset {name} (it can be downloaded using the "download-dataset" script)')
 
 class MissingFIDStatsError(Exception):
 	def __init__(self, root, dim, modes, available=None):
@@ -80,12 +96,10 @@ class MissingFIDStatsError(Exception):
 class Image_Dataset(DatasetBase):
 
 	def __init__(self, A, root=None, fid_ident=unspecified_argument, **other):
-		dataroot = A.pull('dataroot', '<>root', root)
 		if fid_ident is unspecified_argument:
 			fid_ident = A.pull('fid_ident', None)
 		super().__init__(A, **other)
 		self.fid_ident = fid_ident
-		self.root = Path(dataroot) if dataroot is not None else None
 
 	def get_available_fid(self, name=None):
 		if name is None:

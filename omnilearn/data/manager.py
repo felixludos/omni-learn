@@ -23,7 +23,7 @@ from ..op.clock import AlertBase
 class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Deviced):
 	def __init__(self, A, mode='train', **kwargs):
 		
-		name = A.pull('_dataset_type', '<>name')
+		name = A.pull('_dataset_type', '<>dataset-name', '<>name')
 		mods = A.pull('_dataset_mod', [])
 		
 		default_mode = A.pull('default_mode', '<>mode', mode)
@@ -387,7 +387,6 @@ def load_data(A):
 @fig.Component('dataset')
 class DataManager(InfoManager, Splitable, SimpleDataManager):
 	def __init__(self, A, **kwargs):
-		A.push('dataroot', os.environ.get('OMNILEARN_DATA_DIR', 'local_data'), overwrite=False)
 		super().__init__(A, **kwargs)
 		
 		skip_load = A.pull('skip_load', False)

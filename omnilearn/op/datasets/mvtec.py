@@ -39,7 +39,7 @@ def get_images(root, size=None, is_mask=False):
 	
 @fig.Script('download-mvtec', description='Download and Format MVTec Anomaly Detection dataset')
 def download_mvtec(A):
-	
+	raise NotImplementedError
 	root = A.pull('root', os.environ.get('OMNILEARN_DATA_DIR', None))
 	
 	if root is None:

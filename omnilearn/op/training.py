@@ -372,8 +372,7 @@ def iterative_training(A=None, run=None):
 
 	if run is None:
 		assert A is not None, 'either run or A must not be None'
-		A.push('run._type', 'run', overwrite=False)
-		run = A.pull('run')
+		run = fig.run('load-run', A)
 	
 	A = run.get_config()
 	

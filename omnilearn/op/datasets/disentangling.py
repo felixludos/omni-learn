@@ -1,14 +1,29 @@
-import os
+import sys, os
 from pathlib import Path
+import subprocess
 import pickle
+import zipfile
 import h5py as hf
 import numpy as np
 import torch
-from omnibelt import unspecified_argument
+from omnibelt import unspecified_argument, get_printer
 from torch.nn import functional as F
 
-from .. import util
-from ...data import Dataset, Deviced, Batchable, Image_Dataset, DatasetBase
+prt = get_printer(__name__)
+
+try:
+	from google.cloud import storage
+except ImportError:
+	prt.info('Failed to import gsutil (install with "pip install gsutil")')
+
+try:
+	import wget
+except ImportError:
+	prt.info('Failed to import wget (install with "pip install wget")')
+	
+
+from ... import util
+from ...data import Dataset, Deviced, Batchable, Image_Dataset, Downloadable, DatasetBase, MissingDatasetError
 
 from .transforms import Cropped
 
@@ -90,76 +105,114 @@ class dSprites(Deviced, Batchable, Image_Dataset):
 			return imgs, self.labels[item]
 		return imgs,
 
+
 @Dataset('3dshapes')
-class Shapes3D(Deviced, Batchable, Image_Dataset):
+class Shapes3D(Deviced, Batchable, Downloadable, Image_Dataset):
 
 	din = (3, 64, 64)
 	dout = 6
 
 	def __init__(self, A, mode=None, labeled=None, **kwargs):
 
-		root = None
-
-		load_memory = A.pull('load_memory', True)
 		if mode is None:
 			mode = A.pull('mode', 'full')
 		if labeled is None:
 			labeled = A.pull('labeled', False)
-		label_type = A.pull('label_type', 'class')
-		noise = A.pull('noise', None)
+		label_type = A.pull('label_type', 'class') if labeled else None
 
 		din = A.pull('din', self.din)
 		dout = A.pull('dout', self.dout if labeled else din)
 
-		if not load_memory:
-			raise NotImplementedError
-
 		super().__init__(A, din=din, dout=dout, **kwargs)
+		self.add_existing_modes('test')
 		
-		dataroot = self.root
-		
-		if dataroot is None:
-			raise NotImplementedError
-
-		if dataroot is not None: # TODO: automate the downloading and formatting of the dataset (including split)
-			if mode == 'full':
-				file_name = '3dshapes.h5'
-				print('WARNING: using full dataset (train+test)')
-			elif mode == 'test':
-				file_name = '3dshapes_test.h5'
-			else:
-				file_name = '3dshapes_train.h5'
-
-			root = dataroot / '3dshapes'
-			with hf.File(str(root / file_name), 'r') as data:
-
-				images = data['images']
-				images = torch.from_numpy(images[()]).permute(0,3,1,2)#.float().div(255)
-
-				self.register_buffer('images', images)
-
-				labels = data['labels']
-				labels = torch.from_numpy(labels[()]).float()
-
-				self.register_buffer('labels', labels)
-
-		self.root = root
-
-		# if noise is not None:
-		# 	print('Adding {} noise'.format(noise))
-		self.noise = noise
-
-		self.labeled = labeled
-
 		self.factor_order = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
 		self.factor_sizes = [10, 10, 10, 8, 4, 15]
 		self.factor_num_values = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10,
-                          'scale': 8, 'shape': 4, 'orientation': 15}
+		                          'scale': 8, 'shape': 4, 'orientation': 15}
 		
-		if label_type == 'class':
-			labels -= labels.min(0, keepdim=True)[0]
-			labels *= ((torch.tensor(self.factor_sizes).float() - 1) / labels.max(0, keepdim=True)[0])
-			self.labels = labels.long()
+		raw_mins = torch.tensor([  0.  ,   0.  ,   0.  ,   0.75,   0.  , -30.  ]).float()
+		raw_maxs = torch.tensor([  0.9 ,  0.9 ,  0.9 ,  1.25,  3.  , 30.  ]).float()
+		
+		dataroot = self.root / '3dshapes'
+		dataroot.mkdir(exist_ok=True)
+		self.root = dataroot
+		
+		path = dataroot / '3dshapes.h5'
+		if not path.is_file():
+			download = A.pull('download', False)
+			if download:
+				self.download(A)
+			else:
+				raise MissingDatasetError('3dshapes')
+		
+		self.images, self.labels, self.indices = None, None, None
+		with hf.File(path, 'r') as data:
+			
+			images = torch.from_numpy(data['images'][()])
+			labels = torch.from_numpy(data['labels'][()]).float() if labeled else None
+			
+			indices = None if mode == 'full' else \
+				(data['test_idx'][()] if mode == 'test' else data['train_idx'][()])
+			if indices is not None:
+				indices = torch.from_numpy(indices).long()
+				images = images[indices]
+				if labels is not None:
+					labels = labels[indices]
+				self.register_buffer('indices', indices)
+			else:
+				prt.warning('using the full dataset (train+test)')
+			
+			images = images.permute(0, 3, 1, 2)#.float().div(255)
+			self.register_buffer('images', images)
+			
+			if labels is not None:
+				if label_type == 'class':
+					labels -= raw_mins
+					labels *= ((torch.tensor(self.factor_sizes).float() - 1) / raw_maxs)
+					labels = labels.long()
+				self.register_buffer('labels', labels)
+				
+		self.labeled = labeled
+		self.label_type = label_type
+
+		
+	_source_url = 'gs://3d-shapes/3dshapes.h5'
+	@classmethod
+	def download(cls, A, dataroot=None, **kwargs):
+		
+		if dataroot is None:
+			dataroot = util.get_data_dir(A) / '3dshapes'
+		
+		dest = dataroot / '3dshapes.h5'
+		
+		force_download = A.pull('force-download', False, silent=True)
+		
+		if not dest.is_file() or force_download:
+			print(f'Downloading 3dshapes dataset to {str(dest)} ...', end='')
+			subprocess.run(['gsutil', 'cp', cls._source_url, str(dest)])
+			print(' done!')
+		
+		ratio = A.pull('separate-testset', 0.2)
+		
+		rng = np.random.RandomState(0)
+		
+		with hf.File(dest, 'r+') as f:
+			if ratio is not None and ratio > 0 and 'train_idx' not in f:
+				
+				N, H, W, C = f['images'].shape
+				
+				test_N = int(N * ratio)
+				
+				order = rng.permutation(N)
+				
+				train_idx = order[:-test_N]
+				train_idx.sort()
+				test_idx = order[-test_N:]
+				test_idx.sort()
+				
+				f.create_dataset('train_idx', data=train_idx)
+				f.create_dataset('test_idx', data=test_idx)
 
 	def get_factor_sizes(self):
 		return self.factor_sizes
@@ -180,10 +233,9 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 	def __getitem__(self, item):
 		# if isinstance(item, (np.ndarray, torch.Tensor)):
 		# 	item = item.tolist()
-		# images = torch.from_numpy(self.images[item]).permute(2,0,1).float().div(255)
 		images = self.images[item].float().div(255)
-		if self.noise is not None:
-			images = images.add(torch.randn_like(images).mul(self.noise)).clamp(0,1)
+		# if self.noise is not None:
+		# 	images = images.add(torch.randn_like(images).mul(self.noise)).clamp(0,1)
 		if self.labeled:
 			labels = self.labels[item]
 			# labels = torch.from_numpy(self.labels[item]).float()
@@ -191,11 +243,11 @@ class Shapes3D(Deviced, Batchable, Image_Dataset):
 		return images,
 
 
-@Dataset('full-celeba') # probably shouldnt be used
-class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
-
+@Dataset('full-celeba')  # probably shouldnt be used
+class FullCelebA(Downloadable, Image_Dataset):  # TODO: automate downloading and formatting
+	
 	din = (3, 218, 178)
-
+	
 	ATTRIBUTES = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
 	              'Bald', 'Bangs', 'Big_Lips', 'Big_Nose', 'Black_Hair', 'Blond_Hair',
 	              'Blurry', 'Brown_Hair', 'Bushy_Eyebrows', 'Chubby', 'Double_Chin',
@@ -203,22 +255,20 @@ class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
 	              'Male', 'Mouth_Slightly_Open', 'Mustache', 'Narrow_Eyes', 'No_Beard',
 	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
 	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
-	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young',]
-
+	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
+	
 	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None, **kwargs):
-
-		dataroot = A.pull('dataroot') # force to load data here.
-
+		
 		if label_type is unspecified_argument:
 			label_type = A.pull('label_type', None)
-
+		
 		if mode is None:
 			mode = A.pull('mode', 'train')
 		if resize is unspecified_argument:
 			resize = A.pull('resize', (256, 256))
-
+		
 		din = A.pull('din', self.din)
-
+		
 		if label_type is None:
 			dout = din
 		elif label_type == 'attr':
@@ -229,33 +279,93 @@ class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
 			dout = 1
 		else:
 			raise Exception('unknown {}'.format(label_type))
-
+		
 		dout = A.pull('dout', dout)
-
+		
 		_labels = {
 			'attr': 'attrs',
 			'identity': 'identities',
 			'landmark': 'landmarks',
 		}
-
-		if resize is not None: # TODO: use Interpolated as modifier
+		
+		if resize is not None:  # TODO: use Interpolated as modifier
 			din = 3, *resize
-
+		
 		super().__init__(A, din=din, dout=dout, **kwargs)
-		self.root = Path(dataroot) / 'celeba'
+		# self.add_existing_modes('val', 'test')
+		self.root = Path(self.root) / 'celeba'
+		dataroot = self.root
 		name = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
-
-		with hf.File(os.path.join(dataroot, 'celeba', name), 'r') as f:
-			self.images = f['images'][()] # encoded as str
+		
+		with hf.File(dataroot/name, 'r') as f:
+			self.images = f['images'][()]  # encoded as str
 			self.labels = f[_labels[label_type]][()] if label_type is not None else None
-
+			
 			self.attr_names = f.attrs['attr_names']
 			self.landmark_names = f.attrs['landmark_names']
-
+		
 		self.resize = resize
-
+	
+	# google drive ids
+	_google_drive_ids = {
+		'list_eval_partition.txt': '0B7EVK8r0v71pY0NSMzRuSXJEVkk',
+		'identity_CelebA.txt': '1_ee_0u7vcNLOfNLegJRHmolfH5ICW-XS',
+		'list_attr_celeba.txt': '0B7EVK8r0v71pblRyaVFSWGxPY0U',
+		'list_bbox_celeba.txt': '0B7EVK8r0v71pbThiMVRxWXZ4dU0',
+		'list_landmarks_align_celeba.txt': '0B7EVK8r0v71pd0FJY3Blby1HUTQ',
+	}
+	_google_drive_image_id = '0B7EVK8r0v71pZjFTYXZWM3FlRnM'
+	
+	@classmethod
+	def download(cls, A, dataroot=None, **kwargs):
+		
+		raise NotImplementedError('Unfortunately, automatically downloading CelebA is current not supported.')
+		
+		dataroot = util.get_data_dir(A)
+		dataroot = dataroot / 'celeba'
+		dataroot.mkdir(exist_ok=True)
+		
+		prt.warning(
+			'Downloading CelebA doesn\'t seem to work currently (issues with google drive), instead it must be downloaded manually:'
+			'\n1. create a directory "celeba" in the local_data directory'
+			'\n2. download "img_align_celeba.zip" into that directory'
+			'\n3. download label files: {}'
+			'\n4. extract "img_align_celeba.zip" to a directory "img_align_celeba"'.format(
+				', '.join(f'"{c}"' for c in cls._google_drive_ids.keys())))
+		
+		raise NotImplementedError
+		
+		imgdir = dataroot / 'img_align_celeba'
+		
+		pbar = A.pull('pbar', None)
+		
+		util.download_file_from_google_drive('0B7EVK8r0v71pOXBhSUdJWU1MYUk', dataroot, pbar=pbar)
+		
+		for name, ID in cls._google_drive_ids.items():
+			path = dataroot / name
+			if not path.exists():
+				util.download_file_from_google_drive(ID, dataroot, name, pbar=pbar)
+		
+		if not imgdir.is_dir():
+			
+			imgpath = dataroot / 'img_align_celeba.zip'
+			
+			# download zip
+			if not imgpath.exists():
+				imgpath = util.download_file_from_google_drive(cls._google_drive_image_id, dataroot, pbar=pbar)
+			
+			# extract zip
+			imgdir.mkdir(exist_ok=True)
+			with zipfile.ZipFile(str(imgpath), 'r') as zip_ref:
+				zip_ref.extractall(str(imgdir))
+			
+			# os.remove(str(imgpath))
+			
+		raise NotImplementedError
+	
 	def get_factor_sizes(self):
-		return [2]*len(self.ATTRIBUTES)
+		return [2] * len(self.ATTRIBUTES)
+	
 	def get_factor_order(self):
 		return self.ATTRIBUTES
 	
@@ -264,22 +374,22 @@ class FullCelebA(Image_Dataset): # TODO: automate downloading and formatting
 			return self.ATTRIBUTES[idx]
 		except IndexError:
 			pass
-
+	
 	def __len__(self):
 		return len(self.images)
-
+	
 	def __getitem__(self, item):
-
-		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2,0,1).float().div(255)
-
+		
+		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255)
+		
 		if self.resize is not None:
 			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
-
+		
 		if self.labels is None:
 			return img,
-
+		
 		lbl = torch.from_numpy(self.labels[item])
-
+		
 		return img, lbl
 
 
@@ -293,14 +403,12 @@ class CelebA(Cropped, FullCelebA):
 
 
 @Dataset('mpi3d')
-class MPI3D(Deviced, Batchable, Image_Dataset):
+class MPI3D(Deviced, Batchable, Downloadable, Image_Dataset):
 
 	din = (3, 64, 64)
 	dout = 7
 
 	def __init__(self, A, mode=None, fid_ident=None, **kwargs):
-
-		dataroot = A.pull('dataroot', None)
 
 		if mode is None:
 			mode = A.pull('mode', 'train')
@@ -316,20 +424,10 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 			cat = 'realistic'
 
 		super().__init__(A, din=din, dout=dout, fid_ident=cat, **kwargs)
+		self.add_existing_modes('test')
+		dataroot = self.root / 'mpi3d'
+		self.root = dataroot
 		
-		myroot = os.path.join(dataroot, 'mpi3d')
-		self.root = Path(myroot)
-		# fid_name = f'mpi3d_{cat}_stats_fid.pkl'
-		# if fid_name in os.listdir(myroot):
-		#
-		# 	p = pickle.load(open(os.path.join(myroot, fid_name), 'rb'))
-		#
-		# 	self.fid_stats = p['m'], p['sigma']
-		#
-		# 	print('Found FID Stats')
-		# else:
-		# 	print('WARNING: Unable to load FID stats for this dataset')
-
 		self.factor_order = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
 		                     'horizonal_axis', 'vertical_axis']
 		self.factor_sizes = [6,6,2,3,3,40,40]
@@ -361,23 +459,89 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 
 		self.labeled = labeled
 
-		fname = f'mpi3d_{cat}_{mode}.h5'
-		if mode is None:
-			fname = 'mpi3d_{}.npz'.format(cat)
-			print('WARNING: using full dataset (train+test)')
-			images = np.load(os.path.join(dataroot, 'mpi3d', fname))['images']
-			indices = np.arange(len(images))
+		path = dataroot / f'mpi3d_{cat}.h5'
+		
+		if not path.is_file():
+			download = A.pull('download', False)
+			if download:
+				self.download(A)
+			else:
+				raise MissingDatasetError(f'mpi3d-{cat}')
+		
+		with hf.File(path, 'r') as f:
+			if mode == 'full':
+				images = np.concatenate([f['train_images'][()], f['test_images'][()]])
+				indices = np.concatenate([f['train_idx'], f['test_idx'][()]])
+			elif mode == 'test':
+				images = f['test_images'][()]
+				indices = f['test_idx'][()]
+			else:
+				images = f['train_images'][()]
+				indices = f['train_idx'][()]
+		
+		ordered = A.pull('ordered', mode == 'full')
+		if ordered:
+			self.register_buffer('sel_index', torch.from_numpy(indices.argsort()))
 		else:
-			path = os.path.join(dataroot, 'mpi3d', fname)
-			if not os.path.isfile(path):
-				path = os.path.join(dataroot, 'mpi3d', f'mpi3d_{cat}_train.h5')
-				print(f'{fname} not found, loading training set instead')
-			with hf.File(path, 'r') as f:
-				images = f['images'][()]
-				indices = f['indices'][()]
-
+			self.sel_index = None
+		
 		self.register_buffer('images', torch.from_numpy(images).permute(0,3,1,2))
 		self.register_buffer('indices', torch.from_numpy(indices))
+
+	
+	_source_url = {
+		'toy': 'https://storage.googleapis.com/disentanglement_dataset/Final_Dataset/mpi3d_toy.npz',
+		'realistic': 'https://storage.googleapis.com/disentanglement_dataset/Final_Dataset/mpi3d_realistic.npz',
+		'real': 'https://storage.googleapis.com/disentanglement_dataset/Final_Dataset/mpi3d_real.npz',
+	}
+	@classmethod
+	def download(cls, A, dataroot=None, cat=None, **kwargs):
+		
+		if dataroot is None:
+			dataroot = util.get_data_dir(A)
+			dataroot = dataroot / 'mpi3d'
+		dataroot.mkdir(exist_ok=True)
+		
+		if cat is None:
+			cat = A.pull('category', 'toy')
+		
+		assert cat in {'toy', 'sim', 'realistic', 'real'}, f'invalid category: {cat}'
+		if cat == 'sim':
+			cat = 'realistic'
+		
+		ratio = A.pull('separate-testset', 0.2)
+		
+		path = dataroot / f'mpi3d_{cat}.h5'
+		
+		if not path.exists():
+			rawpath = dataroot / f'mpi3d_{cat}.npz'
+			if not rawpath.exists():
+				print(f'Downloading mpi3d-{cat}')
+				wget.download(cls._source_url[cat], str(rawpath))
+			
+			print('Loading full dataset into memory to split train/test')
+			full = np.load(rawpath)['images']
+			
+			N = len(full)
+		
+			test_N = int(N * ratio)
+
+			rng = np.random.RandomState(0)
+			order = rng.permutation(N)
+			
+			train_idx = order[:-test_N]
+			train_idx.sort()
+			test_idx = order[-test_N:]
+			test_idx.sort()
+			
+			with hf.File(path, 'w') as f:
+				f.create_dataset('train_idx', data=train_idx)
+				f.create_dataset('train_images', data=full[train_idx])
+				
+				f.create_dataset('test_idx', data=test_idx)
+				f.create_dataset('test_images', data=full[test_idx])
+				
+			os.remove(str(rawpath))
 
 	def get_factor_sizes(self):
 		return self.factor_sizes
@@ -403,9 +567,123 @@ class MPI3D(Deviced, Batchable, Image_Dataset):
 		return len(self.images)
 
 	def __getitem__(self, idx):
+		if self.sel_index is not None:
+			idx = self.sel_index[idx]
 		imgs = self.images[idx].float().div(255)
 		if self.labeled:
 			labels = self.get_label(self.indices[idx])
 			return imgs, labels
 		return imgs,
+
+
+class OldFullCelebA(Downloadable, Image_Dataset):  # TODO: automate downloading and formatting
+	
+	din = (3, 218, 178)
+	
+	ATTRIBUTES = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
+	              'Bald', 'Bangs', 'Big_Lips', 'Big_Nose', 'Black_Hair', 'Blond_Hair',
+	              'Blurry', 'Brown_Hair', 'Bushy_Eyebrows', 'Chubby', 'Double_Chin',
+	              'Eyeglasses', 'Goatee', 'Gray_Hair', 'Heavy_Makeup', 'High_Cheekbones',
+	              'Male', 'Mouth_Slightly_Open', 'Mustache', 'Narrow_Eyes', 'No_Beard',
+	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
+	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
+	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
+	
+	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None, **kwargs):
+		self.add_existing_modes('val', 'test')
+		
+		if label_type is unspecified_argument:
+			label_type = A.pull('label_type', None)
+		
+		if mode is None:
+			mode = A.pull('mode', 'train')
+		if resize is unspecified_argument:
+			resize = A.pull('resize', (256, 256))
+		
+		din = A.pull('din', self.din)
+		
+		if label_type is None:
+			dout = din
+		elif label_type == 'attr':
+			dout = 40
+		elif label_type == 'landmark':
+			dout = 10
+		elif label_type == 'identity':
+			dout = 1
+		else:
+			raise Exception('unknown {}'.format(label_type))
+		
+		dout = A.pull('dout', dout)
+		
+		_labels = {
+			'attr': 'attrs',
+			'identity': 'identities',
+			'landmark': 'landmarks',
+		}
+		
+		if resize is not None:  # TODO: use Interpolated as modifier
+			din = 3, *resize
+		
+		super().__init__(A, din=din, dout=dout, **kwargs)
+		self.root = Path(self.root) / 'celeba'
+		dataroot = self.root
+		name = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
+		
+		with hf.File(os.path.join(dataroot, 'celeba', name), 'r') as f:
+			self.images = f['images'][()]  # encoded as str
+			self.labels = f[_labels[label_type]][()] if label_type is not None else None
+			
+			self.attr_names = f.attrs['attr_names']
+			self.landmark_names = f.attrs['landmark_names']
+		
+		self.resize = resize
+	
+	# google drive ids
+	_google_drive_ids = {
+		'img_align_celeba.zip': '0B7EVK8r0v71pZjFTYXZWM3FlRnM',
+		'list_eval_partition.txt': '0B7EVK8r0v71pY0NSMzRuSXJEVkk',
+		'identity_CelebA.txt': '1_ee_0u7vcNLOfNLegJRHmolfH5ICW-XS',
+		'list_attr_celeba.txt': '0B7EVK8r0v71pblRyaVFSWGxPY0U',
+		'list_bbox_celeba.txt': '0B7EVK8r0v71pbThiMVRxWXZ4dU0',
+		'list_landmarks_align_celeba.txt': '0B7EVK8r0v71pd0FJY3Blby1HUTQ',
+	}
+	
+	def download(cls, A, dataroot=None, **kwargs):
+		
+		dataroot = util.get_data_dir(A)
+		dataroot = dataroot / 'celeba'
+		
+		raise NotImplementedError
+	
+	def get_factor_sizes(self):
+		return [2] * len(self.ATTRIBUTES)
+	
+	def get_factor_order(self):
+		return self.ATTRIBUTES
+	
+	def get_attribute_key(self, idx):
+		try:
+			return self.ATTRIBUTES[idx]
+		except IndexError:
+			pass
+	
+	def __len__(self):
+		return len(self.images)
+	
+	def __getitem__(self, item):
+		
+		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255)
+		
+		if self.resize is not None:
+			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
+		
+		if self.labels is None:
+			return img,
+		
+		lbl = torch.from_numpy(self.labels[item])
+		
+		return img, lbl
+
+
+
 

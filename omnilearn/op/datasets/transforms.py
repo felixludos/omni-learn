@@ -4,13 +4,15 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from omnibelt import unspecified_argument
+
 from bisect import bisect_right
 
 from ... import util
 
 from omnifig import AutoModifier, Modification
 
-from ...data import Dataset, Deviced, DatasetBase, Batchable
+from ...data import Dataset, Deviced, DatasetBase, Batchable, Subset_Dataset
 
 @Dataset('concat')
 class Concat(DatasetBase):
@@ -36,10 +38,10 @@ class Cropped(DatasetBase):
 
 	'''
 
-	def __init__(self, A, crop_size=None, **kwargs):
+	def __init__(self, A, crop_size=unspecified_argument, **kwargs):
 
-		if crop_size is None:
-			crop_size = A.pull('crop_size')
+		if crop_size is unspecified_argument:
+			crop_size = A.pull('crop_size', None)
 
 		crop_loc = A.pull('crop_loc', 'center')
 		# crop_key = A.pull('crop_key', None) # TODO
@@ -47,39 +49,47 @@ class Cropped(DatasetBase):
 		if crop_loc is not 'center':
 			raise NotImplementedError
 
-		try:
-			len(crop_size)
-		except TypeError:
-			crop_size = crop_size, crop_size
-		assert len(crop_size) == 2, 'invalid cropping size: {}'.format(crop_size)
-
-		if crop_size[0] != crop_size[1]:
-			raise NotImplementedError('only square crops are implemented')
-
-		assert hasattr(self, 'din'), 'This modifier requires a din (see Info_Dataset, eg. 3dshapes) ' \
-		                                'in the dataset to be modified'
-
-		assert len(self.din) == 3 or len(self.din) == 1, 'must be an image dataset'
-
-		din = self.din
-		
-		self.din = (self.din[0], *crop_size)
+		if crop_size is not None:
+			try:
+				len(crop_size)
+			except TypeError:
+				crop_size = crop_size, crop_size
+			assert len(crop_size) == 2, 'invalid cropping size: {}'.format(crop_size)
+	
+			if crop_size[0] != crop_size[1]:
+				raise NotImplementedError('only square crops are implemented')
+	
+			assert hasattr(self, 'din'), 'This modifier requires a din (see Info_Dataset, eg. 3dshapes) ' \
+			                                'in the dataset to be modified'
+	
+			assert len(self.din) == 3 or len(self.din) == 1, 'must be an image dataset'
+	
+			din = self.din
+			
+			self.din = (self.din[0], *crop_size)
 
 		super().__init__(A, **kwargs)
+		
+		self.r = None
+		if crop_size is not None:
+		
+			_, self.cy, self.cx = din
+			self.cy, self.cx = self.cy // 2, self.cx // 2
+			self.r = crop_size[0] // 2
 
-		_, self.cy, self.cx = din
-		self.cy, self.cx = self.cy // 2, self.cx // 2
-		self.r = crop_size[0] // 2
 
 	def __getitem__(self, item):
 		sample = super().__getitem__(item)
+		if self.r is None:
+			return sample
+		
 		img, *other = sample
 
 		img = img[..., self.cy-self.r:self.cy+self.r, self.cx-self.r:self.cx+self.r]
 
 		return (img, *other)
 
-@AutoModifier('interpolated')
+# @AutoModifier('interpolated')
 class Interpolated(DatasetBase):
 	def __init__(self, A, interpolate_size=None, interpolate_mode=None, **kwargs):
 
@@ -150,7 +160,61 @@ class Resamplable(DatasetBase):
 			item = self.inds[item]
 		return super().__getitem__(item)
 
-@AutoModifier('blurred')
+
+
+@Modification('blurred')
+def blurred(dataset, config):
+
+	if not isinstance(dataset, Deviced):
+		raise NotImplementedError
+
+	level = config.pull('blur-level', 5)
+	assert level % 2 == 1, f'bad blur level: {level}'
+	blur_type = config.pull('blur-type', 'uniform')
+
+	assert blur_type == 'uniform', f'not implemented: {blur_type}'
+
+	pad_type = config.pull('pad-type', 'reflect')
+	padding = (level-1)//2
+
+	C = dataset.din[0]
+
+	blur = nn.Conv2d(C, 1, groups=C, bias=False, kernel_size=level,
+	                      padding=padding, padding_mode=pad_type)
+	blur.weight.requires_grad = False
+	blur.weight.copy_(torch.ones_like(blur.weight)).div_(level**2)
+
+	blur.to(dataset.device)
+
+	key = config.pull('data_key', 'images')
+	full = getattr(dataset, key)
+
+	with torch.no_grad():
+		full = blur(full).detach()
+
+	setattr(dataset, key, full)
+
+	return dataset
+
+
+@Modification('subset')
+def make_subset(dataset, info):
+	num = info.pull('num', None)
+	
+	shuffle = info.pull('shuffle', True)
+	
+	if num is None or num == len(dataset):
+		print('WARNING: no subset provided, using original dataset')
+		return dataset
+	
+	assert num <= len(dataset), '{} vs {}'.format(num, len(dataset))
+	
+	inds = torch.randperm(len(dataset))[:num].numpy() if shuffle else np.arange(num)
+	return Subset_Dataset(dataset, inds)
+
+
+
+# @AutoModifier('blurred')
 class Blurred(DatasetBase):
 
 	def __init__(self, config):
@@ -213,40 +277,4 @@ class Blurred(DatasetBase):
 
 
 		pass
-
-
-@Modification('blurred')
-def blurred(dataset, config):
-
-	if not isinstance(dataset, Deviced):
-		raise NotImplementedError
-
-	level = config.pull('blur-level', 5)
-	assert level % 2 == 1, f'bad blur level: {level}'
-	blur_type = config.pull('blur-type', 'uniform')
-
-	assert blur_type == 'uniform', f'not implemented: {blur_type}'
-
-	pad_type = config.pull('pad-type', 'reflect')
-	padding = (level-1)//2
-
-	C = dataset.din[0]
-
-	blur = nn.Conv2d(C, 1, groups=C, bias=False, kernel_size=level,
-	                      padding=padding, padding_mode=pad_type)
-	blur.weight.requires_grad = False
-	blur.weight.copy_(torch.ones_like(blur.weight)).div_(level**2)
-
-	blur.to(dataset.device)
-
-	key = config.pull('data_key', 'images')
-	full = getattr(dataset, key)
-
-	with torch.no_grad():
-		full = blur(full).detach()
-
-	setattr(dataset, key, full)
-
-	return dataset
-
 

@@ -1,5 +1,5 @@
 from .collectors import *
-from .register import Dataset
+from .register import Dataset, dataset_registry
 from . import manager
 from .loaders import get_loaders, DataLoader, BatchedDataLoader
 from . import preprocess

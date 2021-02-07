@@ -17,6 +17,7 @@ def Dataset(name):
 	def _reg_fn(fn):
 		nonlocal name
 		register_dataset(name, fn)
+		fn._dataset_ident = name
 		return fn
 	
 	return _reg_fn

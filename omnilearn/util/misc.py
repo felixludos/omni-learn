@@ -1,7 +1,8 @@
 
 import sys, os, time
 import traceback
-from tqdm import tqdm, tqdm_notebook
+from tqdm import tqdm
+from tqdm.notebook import tqdm as tqdm_notebook
 import math
 import torch
 import numpy as np
@@ -48,7 +49,7 @@ def create_param(*sizes, requires_grad=True):
 @fig.Component('progress-bar')
 class Progress_Bar(Singleton):
 	def __init__(self, A):
-		ptype = A.pull('pbar-type', 'cmd')
+		ptype = A.pull('display-on', 'cmd')
 		
 		self._pbar_cls = tqdm_notebook if ptype in {'notebook', 'jupyter'} else tqdm
 		self.pbar = None

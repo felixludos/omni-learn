@@ -5,7 +5,9 @@ from torch import optim as O
 from torch import nn
 from torch.optim import Optimizer as PytorchOptimizer
 
-from omnibelt import LoadedValue
+from omnibelt import LoadedValue, get_printer
+
+prt = get_printer(__name__)
 
 from .stats import StatsMeter
 
@@ -98,8 +100,7 @@ try:
 			                 eps=eps, weight_decay=weight_decay)
 
 except ImportError:
-	print('WARNING: failed to import Ranger optimizer')
-
+	prt.info('failed to import Ranger optimizer')
 
 
 

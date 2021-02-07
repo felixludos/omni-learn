@@ -56,6 +56,12 @@ class TensorDict(Movable, OrderedDict):
 			self._find_size_key()
 		return self[self._size_key].size(*args, **kwargs)
 
+	def __getstate__(self):
+		return {k:v for k,v in self.items()}
+
+	def __setstate__(self, state):
+		self.update(state)
+
 	def __getattr__(self, item):
 		if item in self.__dict__ or item in {'__setattr__', '__setstate__'}:
 			return super().__getattribute__(item)
@@ -100,6 +106,12 @@ class TensorList(Movable, list):
 			self._find_size_key()
 		return self[self._size_key].size(*args, **kwargs)
 
+	def __getstate__(self):
+		return [x for x in self]
+
+	def __setstate__(self, state):
+		for i,x in enumerate(state):
+			self[i] = x
 
 class Cached(Deviced):
 	def __init__(self, A, **kwargs):

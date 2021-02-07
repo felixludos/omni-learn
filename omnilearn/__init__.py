@@ -9,10 +9,14 @@ from . import models
 from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
 	Evaluatable, Visualizable, Function, Optimizable
 
+from omnibelt import get_printer
+
+prt = get_printer(__name__)
+
 try:
 	from . import legacy
 except:
-	print('WARNING: failed to import legacy models')
+	prt.info('Failed to important legacy models')
 
 import os
 __info__ = {'__file__':os.path.join(os.path.abspath(os.path.dirname(__file__)), '_info.py')}
