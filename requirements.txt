@@ -1,3 +1,6 @@
+humpack
+omnibelt
+omnifig
 numpy
 matplotlib
 torch
@@ -10,7 +13,6 @@ h5py
 pyyaml
 tqdm
 pandas
-humpack
 scikit-learn
 seaborn
 moviepy

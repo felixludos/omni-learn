@@ -22,6 +22,7 @@ try:
 	with open(os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'requirements.txt'), 'r') as f:
 		install_requires = f.readlines()
 except:
-	install_requires = ['pyyaml', 'c3linearize', 'numpy', 'matplotlib', 'torch', 'tensorflow',
-	                    'gym', 'tabulate', 'ipdb', 'h5py', 'pyyaml', 'tqdm', 'pandas', 'humpack']
+	install_requires = ['humpack', 'omnibelt', 'omnifig', 'pyyaml', 'c3linearize', 'numpy', 'matplotlib',
+	                    'torch', 'tensorflow',
+	                    'gym', 'tabulate', 'ipdb', 'h5py', 'pyyaml', 'tqdm', 'pandas']
 del os
