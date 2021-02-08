@@ -6,6 +6,7 @@ import torch
 import yaml
 from torch import multiprocessing as mp
 
+from omnibelt import get_printer
 import omnifig as fig
 
 from bisect import bisect_left
@@ -17,18 +18,25 @@ from .. import util
 from tensorboard import program
 import pandas as pd
 
+prt = get_printer(__name__)
+
 try:
 	import matplotlib.pyplot as plt
 	from matplotlib.figure import Figure
 	from matplotlib.animation import Animation
+	
+except ImportError:
+	prt.warning('matplotlib not found')
+	
+try:
 	import seaborn as sns
 except ImportError:
-	print('WARNING: matplotlib not found')
+	prt.warning('seaborn not found')
 
 try:
 	from IPython.display import HTML
 except ImportError:
-	print('WARNING: ipython not found')
+	prt.warning('ipython not found')
 
 class Visualization(object): # wriapper
 	def __init__(self, obj):

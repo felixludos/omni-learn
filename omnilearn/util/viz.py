@@ -2,6 +2,10 @@
 import sys, os
 import numpy as np
 import torch
+from omnibelt import get_printer
+
+prt = get_printer(__name__)
+
 try:
 	import matplotlib.pyplot as plt
 	from matplotlib import animation
@@ -9,11 +13,11 @@ try:
 	import matplotlib.patches as patches
 	from matplotlib.figure import figaspect
 except ImportError:
-	print('WARNING: matplotlib not found')
+	prt.warning('matplotlib not found')
 try:
 	import imageio
 except ImportError:
-	print('WARNING: imageio not found')
+	prt.warning('imageio not found')
 # try:
 # 	import ffmpeg
 # except ImportError:
@@ -21,16 +25,16 @@ except ImportError:
 try:
 	from IPython.display import HTML
 except ImportError:
-	print('WARNING: ipython not found')
+	prt.warning('ipython not found')
 
 try:
 	import pandas as pd
 except ImportError:
-	print('WARNING: pandas not found')
+	prt.warning('pandas not found')
 try:
 	import seaborn as sns
 except ImportError:
-	print('WARNING: seaborn not found')
+	prt.warning('seaborn not found')
 
 from torch.nn import functional as F
 

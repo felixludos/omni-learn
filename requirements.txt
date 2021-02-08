@@ -4,9 +4,11 @@ omnifig
 numpy
 matplotlib
 torch
+torchvision
 tensorflow
 gym
-OpenCV-Python
+wget
+opencv-python
 tabulate
 ipdb
 h5py

@@ -5,10 +5,15 @@ from pathlib import Path
 import random
 
 from tqdm import tqdm
+
+from omnibelt import create_dir, get_printer
+
+prt = get_printer(__name__)
+
 try:
 	import wget
 except ImportError:
-	print('WARNING: unable to import wget')
+	prt.warning('wget not found')
 import shutil
 import h5py as hf
 
@@ -16,7 +21,6 @@ import cv2
 import numpy as np
 import torch
 
-from omnibelt import create_dir
 import omnifig as fig
 
 from ... import util

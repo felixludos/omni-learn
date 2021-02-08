@@ -7,19 +7,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from omnibelt import get_printer
 import omnifig as fig
 
 from ... import util
 from . import utils
 
+prt = get_printer(__name__)
 
 def load_inception_model(dim=2048, device='cuda'): # 64, 192, 768, 2048
 
 	if not torch.cuda.is_available(): # cuda not found
-		print('WARNING: cuda not found')
+		prt.warning('cuda not found')
 		device = 'cpu'
 	if device == 'cpu':
-		print('WARNING: running on cpu - this will take a long time!')
+		prt.warning('using cpu for inception model - this will take a long time!')
 
 	block_idx = utils.InceptionV3.BLOCK_INDEX_BY_DIM[dim]
 
