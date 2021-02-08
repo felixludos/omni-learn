@@ -79,6 +79,7 @@ def load_run(A):
 		A = fig.get_config(str(path))
 		if override is not None:
 			A.update(override)
+		A.push('path', str(path))
 	
 	if 'run' in A:
 		A = A.sub('run')
@@ -130,7 +131,7 @@ class Run(Configurable):
 		self.path = path
 		self.novel = path is None
 		
-		if not self.invisible:
+		if not invisible:
 			self._setup_storage(A)
 
 		self._prep(A)

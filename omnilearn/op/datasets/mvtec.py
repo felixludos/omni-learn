@@ -133,7 +133,7 @@ class MVTec_Anomaly_Detection(Batchable):
 
 	def __init__(self, A, **kwargs):
 	
-		dataroot = Path(A.pull('dataroot')) / 'mvtec'
+		dataroot = util.get_data_dir(A) / 'mvtec'
 
 		mode = A.pull('mode', 'train')
 
