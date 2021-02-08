@@ -2,6 +2,7 @@ humpack
 omnibelt
 omnifig
 numpy
+networkx
 matplotlib
 torch
 torchvision

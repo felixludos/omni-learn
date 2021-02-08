@@ -1,5 +1,6 @@
 import os
 from setuptools import setup, find_packages
+from glob import glob
 
 info = {'__file__': os.path.join(os.path.abspath(os.path.dirname(__file__)), 'omnilearn', '_info.py')}
 with open(info['__file__'], 'r') as f:
@@ -36,6 +37,7 @@ kwargs = dict(name=info.get('name', None),
       packages=find_packages(),#info.get('installable_packages', [info['name']]),
       entry_points=info.get('entry_points', {}),
       install_requires=info.get('install_requires', []),
+      data_files=[('config', glob('config/**/*', recursive=True))],
       zip_safe=info.get('zip_safe', False),)
 
 # print(kwargs)

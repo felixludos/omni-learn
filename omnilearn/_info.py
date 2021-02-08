@@ -3,7 +3,7 @@
 name = 'omnilearn'
 long_name = 'omni-learn'
 
-version = '0.5.6'
+version = '0.5.7'
 url = 'https://github.com/felixludos/omni-learn'
 
 description = 'Powerful machine learning utilities for python'
@@ -36,7 +36,7 @@ except:
 'wget',
 'opencv-python',
 'tabulate',
-	                    'ipython',
+	                    'ipython', 'networkx',
 'ipdb',
 'h5py',
 'pyyaml',
