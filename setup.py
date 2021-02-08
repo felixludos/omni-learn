@@ -25,7 +25,7 @@ if 'readme' in info:
 else:
 	README = ''
 
-setup(name=info.get('name', None),
+kwargs = dict(name=info.get('name', None),
       version=info.get('version', None),
       description=info.get('description', None),
       long_description=README,
@@ -36,5 +36,8 @@ setup(name=info.get('name', None),
       packages=info.get('installable_packages', [info['name']]),
       entry_points=info.get('entry_points', {}),
       install_requires=info.get('install_requires', []),
-      zip_safe=info.get('zip_safe', False),
-      )
+      zip_safe=info.get('zip_safe', False),)
+
+print(kwargs)
+
+setup(**kwargs)
