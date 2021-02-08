@@ -3,7 +3,7 @@
 name = 'omnilearn'
 long_name = 'omni-learn'
 
-version = '0.5.7'
+version = '0.5.10'
 url = 'https://github.com/felixludos/omni-learn'
 
 description = 'Powerful machine learning utilities for python'

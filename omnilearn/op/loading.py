@@ -7,7 +7,7 @@ from .. import util
 from .runs import Run
 # from .data impor
 
-_config_root = Path(__file__).parents[2] / 'config'
+_config_root = Path(__file__).parents[0] / 'configs'
 
 
 # @fig.AutoModifier('torch')

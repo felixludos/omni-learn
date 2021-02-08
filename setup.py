@@ -34,12 +34,21 @@ kwargs = dict(name=info.get('name', None),
       author=info.get('author', None),
       author_email=info.get('author_email', None),
       license=info.get('license', None),
-      packages=find_packages(),#info.get('installable_packages', [info['name']]),
+      packages=find_packages(exclude=['mnist', 'empty']),#info.get('installable_packages', [info['name']]),
       entry_points=info.get('entry_points', {}),
       install_requires=info.get('install_requires', []),
-      data_files=[('config', glob('config/**/*', recursive=True))],
-      zip_safe=info.get('zip_safe', False),)
+              package_data={
+	              # If any package contains *.txt files, include them:
+	              '': ['*.txt'],
+	              # And include any files found in the 'data' subdirectory
+	              # of the 'rawdata' package, also:
+	              'omnilearn': ['op/configs/*.*'],
+              },
+              # data_files=[('omnilearn', glob('**/*.yaml', recursive=True))],
+      zip_safe=info.get('zip_safe', False),
+              install_package_data=True,)
 
 # print(kwargs)
 
-setup(**kwargs)
+setup(
+	**kwargs)
