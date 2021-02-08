@@ -38,6 +38,6 @@ kwargs = dict(name=info.get('name', None),
       install_requires=info.get('install_requires', []),
       zip_safe=info.get('zip_safe', False),)
 
-print(kwargs)
+# print(kwargs)
 
 setup(**kwargs)
