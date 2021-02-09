@@ -78,12 +78,13 @@ class Intervention_Sampler(SamplerBase):
 			return imgs, lbls
 		return imgs
 	
-	def full_intervention(self, idx=None):
+	def full_intervention(self, idx=None, B=None):
 		if idx is None:
 			idx = random.randint(0, self.num_factors-1)
-		vals = self.factors_num_values[idx]
-		sample = self.sample_labels(1).expand(vals, self.num_factors).clone()
-		sample[:, idx] = torch.arange(vals)
+		if B is None:
+			B = self.factors_num_values[idx]
+		sample = self.sample_labels(1).expand(B, self.num_factors).clone()
+		sample[:, idx] = torch.arange(B)
 		inds = self.labels_to_inds(sample)
 		return self.inds_to_samples(inds)
 	
