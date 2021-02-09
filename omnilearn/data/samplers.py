@@ -78,20 +78,40 @@ class Intervention_Sampler(SamplerBase):
 			return imgs, lbls
 		return imgs
 	
-	def full_intervention(self, idx=None, B=None):
+	def full_intervention(self, idx=None, B=None, vals=None):
+		'''
+		Intervenes on all but label-dim `idx`
+		
+		:param idx: index of the label-dim that should be resampled
+		:param B: `B` samples (default is size of latent-dim `idx`)
+		:param vals: label vec to use (vals[idx] is ignored)
+		:return: `B` samples of `vals` except where label-dim `idx` is resampled
+		'''
 		if idx is None:
 			idx = random.randint(0, self.num_factors-1)
 		if B is None:
 			B = self.factors_num_values[idx]
-		sample = self.sample_labels(1).expand(B, self.num_factors).clone()
+		if vals is None:
+			vals = self.sample_labels(1)
+		sample = vals.view(1, self.num_factors).expand(B, self.num_factors).clone()
 		sample[:, idx] = torch.arange(B)
 		inds = self.labels_to_inds(sample)
 		return self.inds_to_samples(inds)
 	
-	def intervention(self, idx=None, B=128):
+	def intervention(self, idx=None, B=128, val=None):
+		'''
+		Intervene on label-dim `idx`
+		
+		:param idx: index of the label-dim that should be fixed to `val`
+		:param B: number of samples to return
+		:param val: value of label-dim `idx` that should be set
+		:return: `B` random samples except where label-dim `idx` is set to `val`
+		'''
 		sizes = self.factors_num_values
 		sample = self.sample_labels(B)
-		sample[:, idx] = torch.randint(sizes[idx], size=())
+		if val is None:
+			val = torch.randint(sizes[idx], size=())
+		sample[:, idx] = val
 		inds = self.labels_to_inds(sample)
 		return self.inds_to_samples(inds)
 
