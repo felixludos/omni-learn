@@ -131,8 +131,11 @@ class Run(Configurable):
 		self.path = path
 		self.novel = path is None
 		
-		if not invisible:
-			self._setup_storage(A)
+		if invisible:
+			raise NotImplementedError
+		# if not invisible:
+		# 	self._setup_storage(A)
+		self._setup_storage(A)
 
 		self._prep(A)
 		

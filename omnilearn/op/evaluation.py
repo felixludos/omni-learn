@@ -15,7 +15,10 @@ def evaluate(A=None, run=None):
 	Use argument "use_testset" to evaluate on test set
 	'''
 	
-	if A is not None:
+	if A is None:
+		assert run is not None, 'either run or A must not be None'
+		A = run.get_config()
+	else:
 		respect_config(A)
 		
 	ret_run = False
@@ -23,8 +26,6 @@ def evaluate(A=None, run=None):
 		ret_run = True
 		assert A is not None, 'either run or A must not be None'
 		run = fig.run('load-run', A)
-	
-	# A = run.get_config()
 	
 	results = run.evaluate(config=A)
 	

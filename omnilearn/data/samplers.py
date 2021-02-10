@@ -55,7 +55,7 @@ class SamplerBase:
 		return self[inds]
 
 
-class Intervention_Sampler(SamplerBase):
+class InterventionSamplerBase(SamplerBase):
 	def __init__(self, dataset, include_labels=False):
 		super().__init__()
 		self.dataset = dataset
@@ -109,6 +109,8 @@ class Intervention_Sampler(SamplerBase):
 		'''
 		sizes = self.factors_num_values
 		sample = self.sample_labels(B)
+		if idx is None:
+			idx = random.randint(0, self.num_factors-1)
 		if val is None:
 			val = torch.randint(sizes[idx], size=())
 		sample[:, idx] = val
@@ -117,7 +119,7 @@ class Intervention_Sampler(SamplerBase):
 
 
 @fig.Component('intervention-sampler')
-class _InterventionSampler(util.Configurable, Intervention_Sampler):
+class InterventionSampler(util.Configurable, InterventionSamplerBase):
 	def __init__(self, A, dataset=None, sizes=unspecified_argument, include_labels=None, **kwargs):
 		
 		if dataset is None:
@@ -129,7 +131,8 @@ class _InterventionSampler(util.Configurable, Intervention_Sampler):
 		if include_labels is None:
 			include_labels = A.pull('include-labels', False)
 			
-		super().__init__(A, dataset=dataset, sizes=sizes, include_labels=include_labels, **kwargs)
+		super().__init__(A, dataset=dataset, sizes=sizes, include_labels=include_labels,
+		                 _req_kwargs={'dataset':dataset, 'include_labels':include_labels}, **kwargs)
 
 
 @fig.AutoModifier('joint-sampler')
