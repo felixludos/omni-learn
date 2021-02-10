@@ -14,7 +14,7 @@ import omnifig as fig
 from .. import util
 from ..util.features import Checkpointable
 
-from .register import dataset_registry
+from .register import dataset_registry, DatasetNotFoundError
 from .collectors import Shuffle_Dataset, Subset_Dataset
 from .loaders import Featured_DataLoader, BatchedDataLoader
 
@@ -39,7 +39,7 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 
 		cmpn_name = dataset_registry.get(name, None)
 		if cmpn_name is None:
-			raise NotImplementedError
+			raise DatasetNotFoundError(name)
 		self.A.push('_type', cmpn_name, silent=True)
 		self.A.push('_mod', mods, silent=True)
 

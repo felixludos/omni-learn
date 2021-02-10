@@ -3,6 +3,8 @@ import omnifig as fig
 
 from .. import util
 
+class DatasetNotFoundError(Exception):
+	pass
 
 dataset_registry = util.Registry()
 
