@@ -82,8 +82,10 @@ def load_run(A):
 		A.push('path', str(path))
 	
 	if 'run' in A:
-		A = A.sub('run')
-	
+		config = A.pull('run', None, raw=True)
+		if config is not None:
+			A = config
+
 	run_type = A.push('_type', 'run', overwrite=False, silent=True)
 	if not fig.has_component(run_type):
 		prt.error(f'Run type "{run_type}" not found, using default instead')
@@ -158,9 +160,11 @@ class Run(Configurable):
 		self.clock = A.pull('clock', ref=True)
 
 		A.push('records._type', 'records', overwrite=False, silent=True)
-		self.records = A.pull('records', ref=True)
+		# self.records = A.pull('records', ref=True)
+		self.records = None
+		self.get_records()
 
-	
+
 	def purge(self): # remove any potentially large objects to free memory
 		self.dataset = None
 		self.model = None
@@ -284,15 +288,15 @@ class Run(Configurable):
 	
 	def create_dataset(self, A=None, **meta):
 		if A is None:
-			A = self.get_config().sub('dataset')
+			A = self.get_config().pull('dataset', raw=True, silent=True)
 		return self.wrap_pull(A, **meta)
 	def create_model(self, A=None, **meta):
 		if A is None:
-			A = self.get_config().sub('model')
+			A = self.get_config().pull('model', raw=True, silent=True)
 		return self.wrap_pull(A, **meta)
 	def create_records(self, A=None, **meta):
 		if A is None:
-			A = self.get_config().sub('records')
+			A = self.get_config().pull('records', raw=True, silent=True)
 		return A.pull_self()
 	
 	def create_loader(self, mode='train', **kwargs):
@@ -665,9 +669,60 @@ class Run(Configurable):
 	
 	# endregion
 
+
+@fig.AutoModifier('testable')
+class Testable(Run):
+
+	def purge(self):
+		super().purge()
+		self.trainset = None
+		self.testset = None
+
+	def create_dataset(self, mode, A=None, switch=False, **meta):
+		if A is None:
+			A = self.get_config().pull(f'{mode}-dataset', None, raw=True, silent=True)
+			if A is None:
+				A = self.get_config().pull('dataset', raw=True, silent=True)
+				A.begin()
+				A.push('mode', mode, silent=True)
+				switch = True
+		dataset = self.wrap_pull(A, **meta)
+		if switch:
+			dataset.switch_to(mode)
+		return dataset
+	def create_trainset(self, A=None, **meta):
+		return self.create_dataset(mode='train', A=A, **meta)
+	def create_testset(self, A=None, **meta):
+		return self.create_dataset(mode='test', A=A, **meta)
+
+	def get_dataset(self, mode='train', **meta):
+		if mode == 'test':
+			return self.get_testset(**meta)
+		return self.get_trainset(**meta)
+	def get_trainset(self, **meta):
+		if self.trainset is None:
+			self.trainset = self.create_trainset(**meta)
+		return self.trainset
+	def get_testset(self, **meta):
+		if self.testset is None:
+			self.testset = self.create_testset(**meta)
+		return self.testset
+
+	def get_loader(self, mode='train', **kwargs):
+		if mode == 'test':
+			return self.get_testloader(**kwargs)
+		return self.get_trainloader(**kwargs)
+	def get_trainloader(self, mode='train', **kwargs):
+		return self.get_trainset().get_loader(mode, **kwargs)
+	def get_testloader(self, mode='test', **kwargs):
+		return self.get_trainset().get_loader(mode, **kwargs)
+
+
 @fig.AutoModifier('inline')
 class Inline(Run):
 	def _prep(self, A):
+
+		super()._prep(A)
 		
 		inline = A.pull('inline', False)
 		if inline:
@@ -676,7 +731,6 @@ class Inline(Run):
 		if self.pbar is not None:
 			A.push('print', None)
 
-		super()._prep(A)
 
 	def _take_steps(self, n=1):
 		
@@ -707,20 +761,6 @@ class Inline(Run):
 		epochs = self.records['total_epochs'][mode]
 		
 		return f'{mode}:{epochs} {ticks}/{limit} {progress}'
-		
-		
-# @fig.AutoModifier('extendable')
-# class Extendable(Run):
-#
-# 	def startup(self, A):
-# 		super().startup()
-#
-# 		A = self.get_config()
-#
-# 		extend = A.pull('extend', None)
-# 		if extend is not None:
-# 			self.clock.set_time(extend)
-
 
 		
 @fig.AutoModifier('timed-run')
