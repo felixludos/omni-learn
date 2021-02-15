@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 import torch
 
@@ -9,6 +10,12 @@ from .runs import Run
 
 _config_root = Path(__file__).parents[0] / 'configs'
 
+class CompatibilityUnpickler(pickle.Unpickler):
+	def find_class(self, module, name):
+		renamed_module = module.replace('foundation', 'omnilearn')
+		return super().find_class(renamed_module, name)
+
+CompatibilityUnpickler.Unpickler = CompatibilityUnpickler
 
 # @fig.AutoModifier('torch')
 @fig.Component('run')
@@ -41,12 +48,15 @@ class Torch_Run(Run):
 			
 		
 		special = {'map_location':device} if device is not None else {}
-		return torch.load(str(path), **special)
-
+		try:
+			return torch.load(str(path), **special)
+		except ModuleNotFoundError:
+			special['pickle_module'] = CompatibilityUnpickler
+			return torch.load(str(path), **special)
 
 def respect_config(A):
 	device = A.push('device', 'cuda' if torch.cuda.is_available() else 'cpu',
-	                overwrite=not torch.cuda.is_available())
+					overwrite=not torch.cuda.is_available())
 	
 	cudnn_det = A.pull('cudnn_det', False)
 	if 'cuda' in device:

@@ -111,7 +111,10 @@ class TensorList(Movable, list):
 
 	def __setstate__(self, state):
 		for i,x in enumerate(state):
-			self[i] = x
+			if i == len(self):
+				self.append(x)
+			else:
+				self[i] = x
 
 class Cached(Deviced):
 	def __init__(self, A, **kwargs):

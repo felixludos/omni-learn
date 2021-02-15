@@ -14,7 +14,6 @@ import omnifig as fig
 from omnifig import Configurable
 from omnifig.errors import MissingParameterError, MissingComponentError
 
-
 prt = get_printer(__name__)
 
 
