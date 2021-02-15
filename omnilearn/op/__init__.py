@@ -7,7 +7,7 @@ from .model import load_model
 from .evaluation import evaluate
 from .training import iterative_training
 from .report import get_report
-from .runs import Run, get_save_dir
+from .runs import Run, get_save_dir, Testable, Inline
 from .loading import Torch_Run
 from . import extensions
 from .report import get_report

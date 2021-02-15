@@ -229,7 +229,7 @@ class MVTec_Anomaly_Detection(Batchable):
 			# print(key, imgs.shape)
 			images.extend(imgs)
 			if labels is not None:
-				labels.extend([1 if 'test_' in key else 0]*len(imgs))
+				labels.extend([1 if 'test_' in key and key != 'test_good' else 0]*len(imgs))
 			ident = '_'.join(key.split('_')[1:])
 			idents.append(ident)
 			if masks is not None:

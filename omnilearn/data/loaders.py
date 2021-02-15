@@ -89,6 +89,9 @@ class Featured_DataLoader(DataLoader):
 	def get_dataset(self):
 		return self.dataset
 
+	def get_dataset_size(self):
+		return len(self.dataset)
+
 	def get_batch_size(self):
 		return self.batch_size
 
