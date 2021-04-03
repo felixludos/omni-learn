@@ -2,6 +2,7 @@
 try:
 	import timm
 except ImportError:
+	print('WARNING: timm not found')
 	pass
 else:
 	import omnifig as fig
