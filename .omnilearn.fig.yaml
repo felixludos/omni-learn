@@ -1,0 +1,8 @@
+
+name: omnilearn
+
+py_info: omnilearn/_info.py
+
+
+package: omnilearn
+

@@ -66,11 +66,17 @@ def load_run(A):
 	
 	name = A.pull('path', '<>load', '<>resume', None, silent=silent)
 	if name is not None:
-		path = Path(name)
+		base = Path(name)
+		path = base
 		
 		if not path.is_dir():
 			saveroot = get_save_dir(A)
-			path = saveroot / path
+			path = saveroot / base
+		
+		if not path.is_dir():
+			root = A.pull('root', None, silent=silent)
+			if root is not None:
+				path = root / base
 		
 		if not path.is_dir():
 			raise RunNotFoundError(name)

@@ -118,8 +118,8 @@ class TensorList(Movable, list):
 
 class Cached(Deviced):
 	def __init__(self, A, **kwargs):
-		self.volatile = TensorDict()
 		super().__init__(A, **kwargs)
+		self.volatile = TensorDict()
 	
 	def to(self, device):
 		super().to(device)

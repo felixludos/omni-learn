@@ -39,7 +39,11 @@ def load_model(A):
 	
 	optim = model.set_optim(A) if isinstance(model, fm.Optimizable) else None
 	
-	model.to(model.get_device())
+	try:
+		device = model.get_device()
+	except AttributeError:
+		device = A.pull('device')
+	model.to(device)
 	
 	print_model = A.pull('_print_model', False)
 	if print_model:

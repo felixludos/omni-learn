@@ -5,7 +5,7 @@ import torch
 import copy
 import torch.nn as nn
 
-from omnibelt import primitives, InitWall
+from omnibelt import primitives, InitWall, Simple_Child, unspecified_argument
 
 import omnifig as fig
 
@@ -50,6 +50,25 @@ class Function(Switchable, TrackedAttrs, Dimensions, Deviced, Configurable, Func
 	
 	def get_hparams(self):
 		return {}
+
+
+class FunctionWrapperBase(Simple_Child, FunctionBase):
+	def __init__(self, function, **kwargs):
+		super().__init__(_parent=function, **kwargs)
+		self.__dict__['_parent'] = self._parent
+		del self._modules['_parent']
+		self.function = function
+	
+	def forward(self, *args, **kwargs):
+		return self.function(*args, **kwargs)
+	
+	
+class FunctionWrapper(Configurable, FunctionWrapperBase):
+	def __init__(self, A, function=unspecified_argument, **kwargs):
+		if function is None:
+			function = A.pull('function', None)
+		super().__init__(A, function=function, **kwargs)
+
 
 class HyperParam(Function):
 	def __init__(self, *args, **kwargs):
