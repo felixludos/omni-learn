@@ -11,7 +11,7 @@ from torch.nn import functional as F
 import torchvision
 
 from ... import util
-from ...data import Dataset, Batchable, Deviced, Downloadable, Image_Dataset
+from ...data import Dataset, Batchable, Deviced, Downloadable, ImageDataset
 
 
 from .transforms import Interpolated
@@ -20,7 +20,7 @@ from .transforms import Interpolated
 
 
 
-class Torchvision_Toy_Dataset(Batchable, Deviced, Downloadable, Image_Dataset): # TODO: enable (pytorch) transforms
+class Torchvision_Toy_Dataset(Batchable, Deviced, Downloadable, ImageDataset): # TODO: enable (pytorch) transforms
 	available_modes = {'train', 'test'}
 
 	_default_label_attr = 'targets'

@@ -198,6 +198,8 @@ def get_nonlinearity(ident, dim=1, inplace=True, **kwargs):
 		return nn.Sigmoid()
 	elif ident == 'elu':
 		return nn.ELU(inplace=inplace, **kwargs)
+	elif ident == 'selu':
+		return nn.SELU(inplace=inplace, **kwargs)
 
 	elif ident == 'mish':
 		return Mish()

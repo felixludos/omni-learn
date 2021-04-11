@@ -93,7 +93,7 @@ class MissingFIDStatsError(Exception):
 		self.available = available
 
 
-class Image_Dataset(DatasetBase):
+class ImageDataset(DatasetBase):
 
 	def __init__(self, A, root=None, fid_ident=unspecified_argument, **other):
 		if fid_ident is unspecified_argument:

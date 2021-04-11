@@ -7,6 +7,7 @@ import h5py as hf
 import numpy as np
 import torch
 from omnibelt import unspecified_argument, get_printer
+import omnifig as fig
 from torch.nn import functional as F
 
 prt = get_printer(__name__)
@@ -23,7 +24,7 @@ except ImportError:
 	
 
 from ... import util
-from ...data import Dataset, Deviced, Batchable, Image_Dataset, Downloadable, DatasetBase, MissingDatasetError
+from ...data import Dataset, Deviced, Batchable, ImageDataset, Downloadable, DatasetBase, MissingDatasetError
 
 from .transforms import Cropped
 
@@ -43,16 +44,84 @@ def _rec_decode(obj):
 		return obj.decode()
 	return obj
 
+
+class DisentanglementDataset(ImageDataset):
+	
+	def get_factor_sizes(self):
+		raise NotImplementedError
+	def get_factor_order(self):
+		raise NotImplementedError
+	
+	def get_observations(self):
+		raise NotImplementedError
+	def get_labels(self):
+		raise NotImplementedError
+	def update_data(self, indices):
+		raise NotImplementedError
+
+@fig.AutoModifier('selected')
+class Selected(DisentanglementDataset):
+	def __init__(self, A, ordered=unspecified_argument, unordered=unspecified_argument,
+	             invert=None, **kwargs):
+		
+		if ordered is unspecified_argument:
+			ordered = A.pull('ordered', None)
+		if unordered is unspecified_argument:
+			unordered = A.pull('unordered', None)
+		
+		if invert is None:
+			invert = A.pull('invert', False)
+		
+		super().__init__(A, **kwargs)
+		
+		sizes = self.get_factor_sizes()
+		flts = {}
+		
+		self.ordered = ordered
+		if ordered is not None:
+			for idx, ratio in ordered.items():
+				if idx not in flts and ratio != 0:
+					N = sizes[idx]
+					vals = np.arange(N)
+					num = min(np.ceil(abs(ratio)*N), N-1) if isinstance(ratio, float) \
+						else max(1,min(abs(ratio), N-1))
+					vals = vals[:num] if ratio > 0 else vals[-num:]
+					vals = vals.tolist()
+					
+					flts[idx] = vals
+		
+		self.unordered = unordered
+		if unordered is not None:
+			raise NotImplementedError
+		
+		self.invert = invert
+		
+	def _select(self, flts):
+		lbls = self.get_labels()
+		ok = None
+		for idx, valid in flts.items():
+			valid = torch.tensor(valid, device=lbls.device).unsqueeze(0)
+			vals = lbls[:, idx:idx+1]
+			for v in valid:
+				s = vals.sub(v).eq(0).sum(-1)
+				if ok is None:
+					ok = s
+				else:
+					ok *= s
+		if self.invert:
+			ok = torch.logical_not(ok)
+			
+		self.update_data(torch.arange(len(lbls), device=lbls.device)[ok])
+	
+	
+
 @Dataset('dsprites')
-class dSprites(Deviced, Batchable, Image_Dataset):
+class dSprites(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (1, 64, 64)
 	dout = 5
 
-	def __init__(self, A):
-
-		dataroot = A.pull('dataroot', None)
-		root = None
+	def __init__(self, A, **kwargs):
 
 		label_type = A.pull('label_type', None)
 
@@ -67,7 +136,9 @@ class dSprites(Deviced, Batchable, Image_Dataset):
 		if dout is None and label_type is not None:
 			dout = 5 if label_type == 'value' else 113
 
-		super().__init__(din=din, dout=din if dout is None else dout)
+		super().__init__(A, din=din, dout=din if dout is None else dout, **kwargs)
+
+		dataroot = self.root
 
 		if dataroot is not None:
 			root = os.path.join(dataroot, 'dsprites')
@@ -107,7 +178,7 @@ class dSprites(Deviced, Batchable, Image_Dataset):
 
 
 @Dataset('3dshapes')
-class Shapes3D(Deviced, Batchable, Downloadable, Image_Dataset):
+class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (3, 64, 64)
 	dout = 6
@@ -227,6 +298,11 @@ class Shapes3D(Deviced, Batchable, Downloadable, Image_Dataset):
 			return self.images, self.labels
 		return self.images
 
+	def update_data(self, indices):
+		self.images = self.images[indices]
+		if self.labeled:
+			self.labels = self.labels[indices]
+
 	def __len__(self):
 		return len(self.images)
 
@@ -244,7 +320,7 @@ class Shapes3D(Deviced, Batchable, Downloadable, Image_Dataset):
 
 
 @Dataset('full-celeba')  # probably shouldnt be used
-class FullCelebA(Downloadable, Image_Dataset):  # TODO: automate downloading and formatting
+class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
 	
@@ -403,7 +479,7 @@ class CelebA(Cropped, FullCelebA):
 
 
 @Dataset('mpi3d')
-class MPI3D(Deviced, Batchable, Downloadable, Image_Dataset):
+class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (3, 64, 64)
 	dout = 7
@@ -551,6 +627,11 @@ class MPI3D(Deviced, Batchable, Downloadable, Image_Dataset):
 	def get_labels(self):
 		return self.get_label(self.indices)
 
+	def update_data(self, indices):
+		self.images = self.images[indices]
+		if self.labeled:
+			self.indices = indices
+
 	def get_label(self, inds):
 		try:
 			len(inds)
@@ -576,7 +657,7 @@ class MPI3D(Deviced, Batchable, Downloadable, Image_Dataset):
 		return imgs,
 
 
-class OldFullCelebA(Downloadable, Image_Dataset):  # TODO: automate downloading and formatting
+class OldFullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
 	

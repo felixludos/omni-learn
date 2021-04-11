@@ -25,7 +25,7 @@ import omnifig as fig
 
 from ... import util
 
-from ...data import Dataset, Deviced, Batchable, Image_Dataset
+from ...data import Dataset, Deviced, Batchable, ImageDataset
 
 DATASET_URL = 'ftp://guest:GU.205dldo@ftp.softronics.ch/mvtec_anomaly_detection/mvtec_anomaly_detection.tar.xz'
 

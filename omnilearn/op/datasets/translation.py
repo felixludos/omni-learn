@@ -1,10 +1,10 @@
 
 import numpy as np
-from ...data import Dataset, Deviced, Batchable, Image_Dataset
+from ...data import Dataset, Deviced, Batchable, ImageDataset
 
 
 @Dataset('unpaired-translation')
-class UnpairedTranslationDataset(Image_Dataset):
+class UnpairedTranslationDataset(ImageDataset):
 	def __init__(self, A, dataset1=None, dataset2=None, sel_one=None, swap=None, **kwargs):
 
 		if dataset1 is None:

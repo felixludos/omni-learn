@@ -89,6 +89,8 @@ class Cropped(DatasetBase):
 
 		return (img, *other)
 
+
+
 # @AutoModifier('interpolated')
 class Interpolated(DatasetBase):
 	def __init__(self, A, interpolate_size=None, interpolate_mode=None, **kwargs):
