@@ -8,17 +8,17 @@ class DatasetNotFoundError(Exception):
 
 dataset_registry = util.Registry()
 
-def register_dataset(name, dataset):
+def dataset_registration(name, dataset):
 	cmpn_name = f'dataset/{name}'
 	fig.Component(cmpn_name)(dataset)
 	
 	dataset_registry.new(name, cmpn_name)
 
 
-def Dataset(name):
+def register_dataset(name):
 	def _reg_fn(fn):
 		nonlocal name
-		register_dataset(name, fn)
+		dataset_registration(name, fn)
 		fn._dataset_ident = name
 		return fn
 	

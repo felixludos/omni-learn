@@ -24,10 +24,13 @@ class ExistingModes(util.Switchable):
 	def get_available_modes(cls):
 		return cls.available_modes
 
-class DatasetBase(ExistingModes, util.Dimensions, util.Configurable, PytorchDataset):
+class DatasetBase(util.DimensionBase, PytorchDataset):
 	pass
 
-class Sourced(DatasetBase):
+class Dataset(ExistingModes, util.Dimensions, util.Configurable, DatasetBase):
+	pass
+
+class Sourced(Dataset):
 	def __init__(self, A, dataroot=None, **kwargs):
 		super().__init__(A, **kwargs)
 		self.root = util.get_data_dir(A) if dataroot is None else dataroot
@@ -35,12 +38,12 @@ class Sourced(DatasetBase):
 	def get_root(self):
 		return self.root
 	
-class Batchable(DatasetBase): # you can select using a full batch
+class Batchable(Dataset): # you can select using a full batch
 	def allow_batched(self):
 		return True
 
 
-class Deviced(util.Deviced, DatasetBase): # Full dataset is in memory, so it can be moved to GPU
+class DevicedBase(util.DeviceBase, DatasetBase):
 	def __init__(self, *args, **kwargs):
 
 		super().__init__(*args, **kwargs)
@@ -72,14 +75,20 @@ class Deviced(util.Deviced, DatasetBase): # Full dataset is in memory, so it can
 				except AttributeError:
 					pass
 
+class Deviced(util.Deviced, DevicedBase): # Full dataset is in memory, so it can be moved to GPU
+	pass
+
+
 class Downloadable(Sourced):
 	@classmethod
 	def download(cls, A, **kwargs):
 		raise NotImplementedError
 
+
 class MissingDatasetError(Exception):
 	def __init__(self, name):
 		super().__init__(f'Missing dataset {name} (it can be downloaded using the "download-dataset" script)')
+
 
 class MissingFIDStatsError(Exception):
 	def __init__(self, root, dim, modes, available=None):
@@ -93,7 +102,7 @@ class MissingFIDStatsError(Exception):
 		self.available = available
 
 
-class ImageDataset(DatasetBase):
+class ImageDataset(Dataset):
 
 	def __init__(self, A, root=None, fid_ident=unspecified_argument, **other):
 		if fid_ident is unspecified_argument:
@@ -137,7 +146,7 @@ class ImageDataset(DatasetBase):
 		raise MissingFIDStatsError(self.root, dim, modes, available)
 
 
-class List_Dataset(DatasetBase):
+class List_Dataset(Dataset):
 
 	def __init__(self, ls):
 		self.data = ls

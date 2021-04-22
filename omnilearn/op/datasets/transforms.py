@@ -12,10 +12,10 @@ from ... import util
 
 from omnifig import AutoModifier, Modification
 
-from ...data import Dataset, Deviced, DatasetBase, Batchable, Subset_Dataset
+from ...data import register_dataset, Deviced, Dataset, Batchable, Subset_Dataset
 
-@Dataset('concat')
-class Concat(DatasetBase):
+@register_dataset('concat')
+class Concat(Dataset):
 	def __init__(self, A, din=None, dout=None, **kwargs):
 		datasets = A.pull('datasets')
 		assert len(datasets), 'no datasets'
@@ -32,7 +32,7 @@ class Concat(DatasetBase):
 		return self.datasets[idx][item - int(self.cumlens[int(idx-1)]) if idx > 0 else item]
 
 @AutoModifier('cropped')
-class Cropped(DatasetBase):
+class Cropped(Dataset):
 	'''
 	Parent dataset must have a din that is an image
 
@@ -92,7 +92,7 @@ class Cropped(DatasetBase):
 
 
 # @AutoModifier('interpolated')
-class Interpolated(DatasetBase):
+class Interpolated(Dataset):
 	def __init__(self, A, interpolate_size=None, interpolate_mode=None, **kwargs):
 
 		if interpolate_size is None:
@@ -131,7 +131,7 @@ class Interpolated(DatasetBase):
 
 
 @AutoModifier('resamplable')
-class Resamplable(DatasetBase):
+class Resamplable(Dataset):
 	def __init__(self, A, budget=None):
 		if budget is None:
 			budget = A.pull('budget', None)
@@ -217,7 +217,7 @@ def make_subset(dataset, info):
 
 
 # @AutoModifier('blurred')
-class Blurred(DatasetBase):
+class Blurred(Dataset):
 
 	def __init__(self, config):
 

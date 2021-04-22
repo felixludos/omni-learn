@@ -8,6 +8,7 @@ from torch.nn import functional as F
 import torch.distributions as distrib
 from torch.distributions.utils import lazy_property
 
+from omnibelt import InitWall
 import omnifig as fig
 
 #####################
@@ -312,6 +313,8 @@ def deconv_size_change(H, W, kernel_size=(4,4), padding=(1,1), stride=(1,1), dil
 	H = (H - 1) * stride[0] - 2 * padding[0] + dilation[0] * (kernel_size[0] - 1) + output_padding[0] + 1
 	W = (W - 1) * stride[1] - 2 * padding[1] + dilation[1] * (kernel_size[1] - 1) + output_padding[1] + 1
 	return H, W
+
+
 
 # endregion
 #####################

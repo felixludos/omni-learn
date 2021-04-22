@@ -7,7 +7,7 @@ import torch.multiprocessing as mp
 from omnibelt import unspecified_argument
 import omnifig as fig
 
-from .collectors import DatasetBase
+from .collectors import Dataset
 
 from .. import util
 
@@ -136,7 +136,7 @@ class InterventionSampler(util.Configurable, InterventionSamplerBase):
 
 
 @fig.AutoModifier('joint-sampler')
-class JointFactorSampler(DatasetBase, util.Configurable, SamplerBase):
+class JointFactorSampler(Dataset, util.Configurable, SamplerBase):
 	'''
 	for datasets of the type: (observation, factors)
 	where the observation is usually an image, and the factors are the latent factors of variation that (ideally)

@@ -2,7 +2,7 @@ import random
 import torch
 
 from wrapt import ObjectProxy
-from omnibelt import Value as ValueWrapper, primitives, InitWall
+from omnibelt import Value as ValueWrapper, primitives, InitWall, unspecified_argument
 
 
 from omnifig import Configurable
@@ -173,7 +173,7 @@ class Deviced(Configurable, DeviceBase):
 			device = 'cuda' if torch.cuda.is_available() else 'cpu'
 		device = A.pull('device', device)
 		super().__init__(A, device=device, **kwargs)
-		self.device = device
+		# self.device = device
 
 
 class Checkpointable(Configurable):
@@ -192,17 +192,40 @@ class Dimensions(Configurable, DimensionBase):
 		if dout is None:
 			dout = A.pull('dout', self.dout)
 		super().__init__(A, din=din, dout=dout, **kwargs)
-		self.din, self.dout = din, dout
+		# self.din, self.dout = din, dout
 
 
 class Seed(Configurable):
-	def __init__(self, A, seed=None, **kwargs):
-		if seed is None:
+	def __init__(self, A, seed=unspecified_argument, **kwargs):
+		if seed is unspecified_argument:
 			seed = A.pull('seed', random.getrandbits(32))
-		set_seed(seed)
+		if seed is not None:
+			set_seed(seed)
 		super().__init__(A, **kwargs)
 		self.seed = seed
 
+
+class Seeded(Deviced):
+	def __init__(self, A, seed=unspecified_argument, **kwargs):
+		if seed is unspecified_argument:
+			seed = A.pull('gen-seed', '<>seed', random.getrandbits(64))
+		if seed is None:
+			seed = random.getrandbits(64)
+			
+		super().__init__(A, **kwargs)
+		
+		# self.gen = torch.Generator(self.device)
+		self.gen = torch.Generator()
+		if seed is not None:
+			self.seed = seed
+			self.gen.manual_seed(seed)
+
+	# def to(self, device):
+	# 	gen = torch.Generator(device)
+	# 	gen.set_state(self.gen.get_state())
+	# 	self.gen = gen
+	#
+	# 	return super().to(device)
 
 # endregion
 

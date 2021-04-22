@@ -20,7 +20,7 @@ from .loaders import Featured_DataLoader, BatchedDataLoader
 
 from ..op.clock import AlertBase
 
-class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Deviced):
+class SimpleDataManager(util.Seed, util.Switchable, util.Deviced):
 	def __init__(self, A, mode='train', **kwargs):
 		
 		name = A.pull('_dataset_type', '<>dataset-name', '<>name')
@@ -54,6 +54,9 @@ class SimpleDataManager(util.Seed, util.Dimensions, util.Switchable, util.Device
 	def purge(self):
 		self._active = None
 		self._modes = {}
+	
+	def available_modes(self):
+		return list(self._modes.keys())
 	
 	def _create_mode(self, mode):
 
@@ -192,6 +195,9 @@ class Splitable(SimpleDataManager):
 		self.split_src = split_src
 		self._split_done = False
 		
+	def register_mode(self, mode, subset):
+		self._modes[mode] = subset
+		
 	def _split_load(self, dataset):
 		
 		if self.split_src == self.get_mode():
@@ -207,8 +213,8 @@ class Splitable(SimpleDataManager):
 				splits = self.split(dataset, *ratios, shuffle=self.shuffle_split)
 				
 				for mode, split in zip(modes, splits):
-					self._modes[mode] = split
-				self._modes[self.split_src] = splits[-1]
+					self.register_mode(mode, split)
+				self.register_mode(self.split_src, splits[-1])
 				dataset = splits[-1]
 				self.switch_to(self.split_src)
 		
@@ -288,6 +294,11 @@ class Active(Loadable, AlertBase):
 				self._loader = None
 				return self.get_batch(**loader_args)
 			raise
+	
+	def switch_to(self, mode):
+		if self._loader is not None and self.get_mode() != mode:
+			self._loader = None
+		return super().switch_to(mode)
 	
 	def activate(self, tick, info=None):
 		info.receive_batch(self.get_batch())
@@ -392,8 +403,12 @@ class DataManager(InfoManager, Splitable, SimpleDataManager):
 		skip_load = A.pull('skip_load', False)
 		if not skip_load:
 			dataset = self.startup()
-			if isinstance(dataset, util.Dimensions):
-				self.din, self.dout = dataset.get_dims()
+			try:
+				dataset.get_dims()
+				# self.din, self.dout = dataset.get_dims()
+			except AttributeError:
+				pass
+			else:
 				if A is None:
 					A = self.A
 				A.push('din', self.din, silent=True)

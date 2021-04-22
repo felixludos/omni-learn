@@ -100,6 +100,29 @@ def plot_vec_fn(f, din=None, dim=None, lim=(-5, 5), N=1000, figax=None):
 	plt.ylabel('Output')
 	return fig, ax
 
+
+def plot_hists(pts, figax=None, figsize=(6, 6), series_kwargs=None, sharex=False, **kwargs):
+	
+	if figax is None:
+		figax = plt.subplots(len(pts), figsize=figsize, sharex=sharex)
+	fig, axes = figax
+	
+	if series_kwargs is None:
+		series_kwargs = [kwargs.copy() for _ in range(len(pts))]
+	elif len(kwargs):
+		series = []
+		for s in series_kwargs:
+			series.append(kwargs.copy())
+			series[-1].update(s)
+		series_kwargs = series
+	
+	for i, (ax, vals, kwargs) in enumerate(zip(axes, pts, series_kwargs)):
+		plt.sca(ax)
+		plt.hist(vals, **kwargs)
+		
+	return fig, axes
+
+
 def plot_distribs(pts, figax=None, figsize=(6, 6), lim_y=None,
 				  scale='count', inner='box', gridsize=100, cut=None, split=False,
 				  color=None, palette=None, hue=None, **kwargs):
@@ -271,13 +294,13 @@ def plot_parallel_coords(samples, categories=None, dim_names=None,
 	return fig, host
 	
 
-def show_imgs(imgs, titles=None, H=None, W=None,
-			  figsize=None, scale=1,
-			  reverse_rows=False, grdlines=False,
-			  channel_first=None,
-			  imgroot=None, params={},
-			  savepath=None, dpi=96, autoclose=True, savescale=1,
-			  adjust={}, border=0., between=0.01):
+def plot_imgs(imgs, titles=None, H=None, W=None,
+              figsize=None, scale=1,
+              reverse_rows=False, grdlines=False,
+              channel_first=None,
+              imgroot=None, params={},
+              savepath=None, dpi=96, autoclose=True, savescale=1,
+              adjust={}, border=0., between=0.01):
 
 	if isinstance(imgs, str):
 		imgs = [imgs]
@@ -372,10 +395,12 @@ def show_imgs(imgs, titles=None, H=None, W=None,
 	return fg, axes
 
 
-def plot_mat(M, val_fmt=None, figax=None, text_kwargs=dict(), **kwargs):
+def plot_mat(M, val_fmt=None, figax=None, figsize=None, text_kwargs=dict(), **kwargs):
+	H, W = M.shape
 	if figax is None:
-		figax = plt.subplots()
+		figax = plt.subplots(figsize=figsize)
 	fg, ax = figax
+	
 	plt.sca(ax)
 	if isinstance(M, torch.Tensor):
 		M = M.cpu().detach().numpy()
@@ -399,6 +424,7 @@ def plot_mat(M, val_fmt=None, figax=None, text_kwargs=dict(), **kwargs):
 			text_kwargs['ha'] = 'center'
 		for (i, j), z in np.ndenumerate(M):
 			ax.text(j, i, fmt(z), **text_kwargs)
+	return fg, ax
 
 
 def play_back(imgs, figax=None, batch_first=True): # imgs is numpy: either (seq, H, W, C) or (batch, seq, H, W, C)
@@ -473,12 +499,12 @@ class Video(object):
 		self.frames = frames
 		# self.path = path
 
-	def play(self, mode='mpl', scale=1):
+	def play(self, mode='mpl', **kwargs):
 
 		if mode == 'mpl':
 			play_back(self.frames)
 		elif mode == 'jupyter':
-			return HTML(self.as_animation(scale=scale).to_html5_video())
+			return HTML(self.as_animation(**kwargs).to_html5_video())
 		else:
 			raise Exception('Unknonwn mode: {}'.format(mode))
 

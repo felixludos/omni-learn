@@ -25,7 +25,7 @@ import omnifig as fig
 
 from ... import util
 
-from ...data import Dataset, Deviced, Batchable, ImageDataset
+from ...data import register_dataset, Deviced, Batchable, ImageDataset
 
 DATASET_URL = 'ftp://guest:GU.205dldo@ftp.softronics.ch/mvtec_anomaly_detection/mvtec_anomaly_detection.tar.xz'
 
@@ -128,7 +128,7 @@ def download_mvtec(A):
 	
 	return path
 
-@Dataset('mvtec')
+@register_dataset('mvtec')
 class MVTec_Anomaly_Detection(Batchable):
 
 	CATEGORIES = {'bottle', 'carpet', 'leather', 'screw', 'transistor', 'cable', 'grid',

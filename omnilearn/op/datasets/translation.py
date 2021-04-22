@@ -1,9 +1,9 @@
 
 import numpy as np
-from ...data import Dataset, Deviced, Batchable, ImageDataset
+from ...data import register_dataset, Deviced, Batchable, ImageDataset
 
 
-@Dataset('unpaired-translation')
+@register_dataset('unpaired-translation')
 class UnpairedTranslationDataset(ImageDataset):
 	def __init__(self, A, dataset1=None, dataset2=None, sel_one=None, swap=None, **kwargs):
 
@@ -51,7 +51,7 @@ class UnpairedTranslationDataset(ImageDataset):
 		return (b1, b2)
 
 
-@Dataset('batched-unpaired-translation')
+@register_dataset('batched-unpaired-translation')
 class BatchedUnpairedTranslationDataset(Batchable, UnpairedTranslationDataset):
 
 	def __getitem__(self, item):

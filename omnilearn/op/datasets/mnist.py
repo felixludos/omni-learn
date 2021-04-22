@@ -11,7 +11,7 @@ from torch.nn import functional as F
 import torchvision
 
 from ... import util
-from ...data import Dataset, Batchable, Deviced, Downloadable, ImageDataset
+from ...data import register_dataset, Batchable, Deviced, Downloadable, ImageDataset
 
 
 from .transforms import Interpolated
@@ -142,22 +142,22 @@ class Torchvision_Toy_Dataset(Batchable, Deviced, Downloadable, ImageDataset): #
 
 
 
-@Dataset('mnist')
+@register_dataset('mnist')
 class MNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.MNIST):
 	din = (1, 28, 28)
 	dout = 10
 
-@Dataset('kmnist')
+@register_dataset('kmnist')
 class KMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.KMNIST):
 	din = (1, 28, 28)
 	dout = 10
 
-@Dataset('fmnist')
+@register_dataset('fmnist')
 class FashionMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.FashionMNIST):
 	din = (1, 28, 28)
 	dout = 10
 
-@Dataset('emnist')
+@register_dataset('emnist')
 class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST):
 	din = (1, 28, 28)
 	dout = 26
@@ -229,7 +229,7 @@ class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST
 		return kwargs
 
 
-@Dataset('svhn')
+@register_dataset('svhn')
 class SVHN(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.SVHN):
 	din = (3, 32, 32)
 	dout = 10
@@ -244,7 +244,7 @@ class SVHN(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.SVHN):
 		return kwargs
 
 
-@Dataset('cifar10')
+@register_dataset('cifar10')
 class CIFAR10(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR10):
 	din = (3, 32, 32)
 	dout = 10
@@ -253,7 +253,7 @@ class CIFAR10(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR
 		return super()._get_dataroot(*args, ident='cifar', **kwargs)
 
 
-@Dataset('cifar100')
+@register_dataset('cifar100')
 class CIFAR100(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR100):
 	din = (3, 32, 32)
 	dout = 100

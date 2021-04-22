@@ -32,7 +32,7 @@ class Simple_Model(fd.Model):
 		
 		guess = pred[:N].max(-1)[1]
 		
-		fg, ax = util.show_imgs(x[:N], titles=guess[:N].tolist())
+		fg, ax = util.plot_imgs(x[:N], titles=guess[:N].tolist())
 		
 		records.log('figure', 'samples', fg)
 

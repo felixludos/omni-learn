@@ -24,7 +24,8 @@ except ImportError:
 	
 
 from ... import util
-from ...data import Dataset, Deviced, Batchable, ImageDataset, Downloadable, DatasetBase, MissingDatasetError
+from ...data import register_dataset, Deviced, Batchable, Splitable, ImageDataset, \
+	Downloadable, Dataset, MissingDatasetError, Subset_Dataset
 
 from .transforms import Cropped
 
@@ -60,10 +61,12 @@ class DisentanglementDataset(ImageDataset):
 		raise NotImplementedError
 
 @fig.AutoModifier('selected')
-class Selected(DisentanglementDataset):
+class Selected(Splitable):
 	def __init__(self, A, ordered=unspecified_argument, unordered=unspecified_argument,
-	             invert=None, **kwargs):
+	             accepted=unspecified_argument, invert=None, eval_name=None, **kwargs):
 		
+		if accepted is unspecified_argument:
+			accepted = A.pull('accepted', {})
 		if ordered is unspecified_argument:
 			ordered = A.pull('ordered', None)
 		if unordered is unspecified_argument:
@@ -72,31 +75,55 @@ class Selected(DisentanglementDataset):
 		if invert is None:
 			invert = A.pull('invert', False)
 		
+		if eval_name is None:
+			eval_name = A.pull('eval-name', 'extra')
+		
+		if accepted is not None or ordered is not None or unordered is not None:
+			A.push('load-labels', True)
+		
+		self.accepted = accepted
+		self.ordered = ordered
+		self.unordered = unordered
+		
+		self.invert = invert
+		
+		self.eval_name = eval_name
+		
 		super().__init__(A, **kwargs)
+		
+		
+	def _split_load(self, dataset):
 		
 		sizes = self.get_factor_sizes()
 		flts = {}
 		
-		self.ordered = ordered
-		if ordered is not None:
-			for idx, ratio in ordered.items():
+		if self.accepted is not None:
+			flts.update({int(k): v for k, v in self.accepted.items()})
+		
+		if self.ordered is not None:
+			for idx, ratio in self.ordered.items():
+				idx = int(idx)
 				if idx not in flts and ratio != 0:
 					N = sizes[idx]
 					vals = np.arange(N)
-					num = min(np.ceil(abs(ratio)*N), N-1) if isinstance(ratio, float) \
-						else max(1,min(abs(ratio), N-1))
+					num = min(np.ceil(abs(ratio) * N), N - 1) if isinstance(ratio, float) \
+						else max(1, min(abs(ratio), N - 1))
 					vals = vals[:num] if ratio > 0 else vals[-num:]
 					vals = vals.tolist()
 					
 					flts[idx] = vals
 		
-		self.unordered = unordered
-		if unordered is not None:
+		if self.unordered is not None:
 			raise NotImplementedError
 		
-		self.invert = invert
+		self.accepted = flts
 		
-	def _select(self, flts):
+		if len(flts):
+			dataset = self._select(dataset, flts)
+			
+		return super()._split_load(dataset)
+		
+	def _select(self, dataset, flts):
 		lbls = self.get_labels()
 		ok = None
 		for idx, valid in flts.items():
@@ -108,14 +135,22 @@ class Selected(DisentanglementDataset):
 					ok = s
 				else:
 					ok *= s
+		ok = ok.bool()
 		if self.invert:
 			ok = torch.logical_not(ok)
 			
-		self.update_data(torch.arange(len(lbls), device=lbls.device)[ok])
-	
-	
+		inds = torch.arange(len(lbls), device=lbls.device)
+		
+		extra = Subset_Dataset(dataset, inds[torch.logical_not(ok)])
+		self.register_mode(self.eval_name, extra)
+		
+		dataset = Subset_Dataset(dataset, inds[ok])
+		self.register_mode(self.split_src, dataset)
 
-@Dataset('dsprites')
+		return dataset
+
+
+@register_dataset('dsprites')
 class dSprites(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (1, 64, 64)
@@ -177,19 +212,22 @@ class dSprites(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		return imgs,
 
 
-@Dataset('3dshapes')
+@register_dataset('3dshapes')
 class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (3, 64, 64)
 	dout = 6
 
-	def __init__(self, A, mode=None, labeled=None, **kwargs):
+	def __init__(self, A, mode=None, labeled=None, load_labels=None, **kwargs):
 
 		if mode is None:
 			mode = A.pull('mode', 'full')
 		if labeled is None:
 			labeled = A.pull('labeled', False)
-		label_type = A.pull('label_type', 'class') if labeled else None
+		if load_labels is None and not labeled:
+			load_labels = A.pull('load-labels', False)
+		load_labels = load_labels or labeled
+		label_type = A.pull('label_type', 'class') if load_labels else None
 
 		din = A.pull('din', self.din)
 		dout = A.pull('dout', self.dout if labeled else din)
@@ -221,7 +259,7 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		with hf.File(path, 'r') as data:
 			
 			images = torch.from_numpy(data['images'][()])
-			labels = torch.from_numpy(data['labels'][()]).float() if labeled else None
+			labels = torch.from_numpy(data['labels'][()]).float() if load_labels else None
 			
 			indices = None if mode == 'full' else \
 				(data['test_idx'][()] if mode == 'test' else data['train_idx'][()])
@@ -239,9 +277,11 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 			
 			if labels is not None:
 				if label_type == 'class':
+					nums = torch.tensor(self.factor_sizes).float() - 1
 					labels -= raw_mins
-					labels *= ((torch.tensor(self.factor_sizes).float() - 1) / raw_maxs)
-					labels = labels.long()
+					labels /= raw_maxs - raw_mins
+					labels *= nums
+					labels = labels.round().long()
 				self.register_buffer('labels', labels)
 				
 		self.labeled = labeled
@@ -319,7 +359,7 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		return images,
 
 
-@Dataset('full-celeba')  # probably shouldnt be used
+@register_dataset('full-celeba')  # probably shouldnt be used
 class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
@@ -469,7 +509,7 @@ class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and 
 		return img, lbl
 
 
-@Dataset('celeba')
+@register_dataset('celeba')
 class CelebA(Cropped, FullCelebA):
 	def __init__(self, A, resize=None, crop_size=128, **kwargs):
 		# raise NotImplementedError('doesnt work since FullCelebA automatically resizes to (256,256)')
@@ -478,7 +518,7 @@ class CelebA(Cropped, FullCelebA):
 		super().__init__(A, resize=resize, crop_size=crop_size, **kwargs)
 
 
-@Dataset('mpi3d')
+@register_dataset('mpi3d')
 class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (3, 64, 64)
