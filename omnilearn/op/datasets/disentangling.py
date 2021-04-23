@@ -63,10 +63,10 @@ class DisentanglementDataset(ImageDataset):
 @fig.AutoModifier('selected')
 class Selected(Splitable):
 	def __init__(self, A, ordered=unspecified_argument, unordered=unspecified_argument,
-	             accepted=unspecified_argument, invert=None, eval_name=None, **kwargs):
+	             reject=unspecified_argument, invert=None, eval_name=None, **kwargs):
 		
-		if accepted is unspecified_argument:
-			accepted = A.pull('accepted', {})
+		if reject is unspecified_argument:
+			reject = A.pull('reject', {})
 		if ordered is unspecified_argument:
 			ordered = A.pull('ordered', None)
 		if unordered is unspecified_argument:
@@ -78,10 +78,10 @@ class Selected(Splitable):
 		if eval_name is None:
 			eval_name = A.pull('eval-name', 'extra')
 		
-		if accepted is not None or ordered is not None or unordered is not None:
+		if reject is not None or ordered is not None or unordered is not None:
 			A.push('load-labels', True)
 		
-		self.accepted = accepted
+		self.reject = reject
 		self.ordered = ordered
 		self.unordered = unordered
 		
@@ -97,8 +97,8 @@ class Selected(Splitable):
 		sizes = self.get_factor_sizes()
 		flts = {}
 		
-		if self.accepted is not None:
-			flts.update({int(k): v for k, v in self.accepted.items()})
+		if self.reject is not None:
+			flts.update({int(k): v for k, v in self.reject.items()})
 		
 		if self.ordered is not None:
 			for idx, ratio in self.ordered.items():
@@ -108,6 +108,7 @@ class Selected(Splitable):
 					vals = np.arange(N)
 					num = min(np.ceil(abs(ratio) * N), N - 1) if isinstance(ratio, float) \
 						else max(1, min(abs(ratio), N - 1))
+					num = int(num)
 					vals = vals[:num] if ratio > 0 else vals[-num:]
 					vals = vals.tolist()
 					
@@ -116,7 +117,7 @@ class Selected(Splitable):
 		if self.unordered is not None:
 			raise NotImplementedError
 		
-		self.accepted = flts
+		self.reject = flts
 		
 		if len(flts):
 			dataset = self._select(dataset, flts)
@@ -136,7 +137,7 @@ class Selected(Splitable):
 				else:
 					ok *= s
 		ok = ok.bool()
-		if self.invert:
+		if not self.invert:
 			ok = torch.logical_not(ok)
 			
 		inds = torch.arange(len(lbls), device=lbls.device)

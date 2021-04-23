@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset
 import h5py as hf
 
-from omnibelt import unspecified_argument
+from omnibelt import unspecified_argument, InitWall
 
 from .. import util
 
@@ -24,7 +24,7 @@ class ExistingModes(util.Switchable):
 	def get_available_modes(cls):
 		return cls.available_modes
 
-class DatasetBase(util.DimensionBase, PytorchDataset):
+class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 	pass
 
 class Dataset(ExistingModes, util.Dimensions, util.Configurable, DatasetBase):

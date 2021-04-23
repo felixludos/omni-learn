@@ -32,6 +32,13 @@ class FunctionDataset(DevicedBase, InitWall):
 		if remove_grads:
 			for param in function.parameters():
 				param.requires_grad = False
+			
+			if sampler is not None:
+				try:
+					for param in sampler.parameters():
+						param.requires_grad = False
+				except AttributeError:
+					pass
 		
 		self.labeled = labeled
 		self.batch_size = batch_size
