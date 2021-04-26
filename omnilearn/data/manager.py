@@ -404,15 +404,15 @@ class DataManager(InfoManager, Splitable, SimpleDataManager):
 		if not skip_load:
 			dataset = self.startup()
 			try:
-				dataset.get_dims()
+				din, dout = dataset.get_dims()
 				# self.din, self.dout = dataset.get_dims()
 			except AttributeError:
 				pass
 			else:
 				if A is None:
 					A = self.A
-				A.push('din', self.din, silent=True)
-				A.push('dout', self.dout, silent=True)
+				A.push('din', din, silent=True)
+				A.push('dout', dout, silent=True)
 
 
 

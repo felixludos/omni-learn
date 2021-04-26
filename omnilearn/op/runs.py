@@ -40,6 +40,55 @@ def get_save_dir(A=None, silent=False):
 	return root
 
 
+def find_path(base, A, silent=False, allow_file=True):
+	base = Path(base)
+	path = base
+	
+	if path.is_file() and allow_file:
+		if path.suffix == 'yaml':
+			return path.parents[1]
+		if path.suffix == 'pth.tar':
+			return path.parents[2]
+		raise RunNotFoundError(base)
+	
+	if not path.is_dir():
+		saveroot = get_save_dir(A)
+		path = saveroot / base
+	
+	if not path.is_dir():
+		root = A.pull('root', None, silent=silent)
+		if root is not None:
+			path = root / base
+	
+	if not path.is_dir():
+		raise RunNotFoundError(base)
+	
+	return path
+
+def find_ckpt_path(path, A, silent=False):
+	path = Path(path)
+	
+	if path.is_file():
+		return path
+	
+	if not path.is_dir():
+		path = find_path(path, A, silent=silent)
+	
+	num = A.pull('ckpt-num', None, silent=silent)
+	best = A.pull('best', False, silent=silent)
+	if best:
+		raise NotImplementedError
+	last = A.pull('last', not best and num is None, silent=silent)
+	
+	ckpts = {int(path.stem[4:]): path for path in path.glob('ckpt*') if path.is_dir()}
+	nums = sorted(ckpts.keys())
+	
+	if not len(nums):
+		return
+	
+	ckpt = ckpts[nums[-1]] if last or num is None or num not in ckpts else ckpts[num]
+	return ckpt
+
 
 class RunNotFoundError(Exception):
 	def __init__(self, name):
@@ -66,22 +115,9 @@ def load_run(A):
 	
 	name = A.pull('path', '<>load', '<>resume', None, silent=silent)
 	if name is not None:
-		base = Path(name)
-		path = base
-		
-		if not path.is_dir():
-			saveroot = get_save_dir(A)
-			path = saveroot / base
-		
-		if not path.is_dir():
-			root = A.pull('root', None, silent=silent)
-			if root is not None:
-				path = root / base
-		
-		if not path.is_dir():
-			raise RunNotFoundError(name)
-		
+		path = find_path(name, A)
 		A = fig.get_config(str(path))
+		
 		if override is not None:
 			A.update(override)
 		A.push('path', str(path))
@@ -236,21 +272,9 @@ class Run(Configurable):
 	def _load_storage(self, A):
 		self.name = self.path.stem
 		
-		num = A.pull('ckpt-num', None, silent=self.silent)
-		best = A.pull('best', False, silent=self.silent)
-		if best:
-			raise NotImplementedError
-		last = A.pull('last', not best and num is None, silent=self.silent)
-		
-		ckpts = {int(path.stem[4:]):path for path in self.path.glob('ckpt*') if path.is_dir()}
-		nums = sorted(ckpts.keys())
-		
-		if not len(nums):
-			return
-		
-		ckpt = ckpts[nums[-1]] if last or num is None or num not in ckpts else ckpts[num]
-		
+		ckpt = find_ckpt_path(self.path, A, silent=self.silent)
 		ckpt = str(ckpt)
+		
 		A.push('dataset._load-ckpt', ckpt, overwrite=True, silent=self.silent)
 		A.push('model._load-ckpt', ckpt, overwrite=True, silent=self.silent)
 		A.push('records._load-ckpt', ckpt, overwrite=True, silent=self.silent)
@@ -797,4 +821,43 @@ class Timed(Run):
 				self.exit_run('timelimit reached', code=self.timer_exit_code)
 			
 
+# @fig.AutoModifier('loadable') # TODO: works, but problem is model is created not through the config,
+##                                    so ref pulls don't work
+# class Loadable(Run):
+# 	def __init__(self, A, load_path=unspecified_argument,
+# 	             load_model=None, load_dataset=None, **kwargs):
+#
+# 		if load_path is unspecified_argument:
+# 			load_path = A.pull('load-path', None)
+#
+# 		if load_model is None:
+# 			load_model = A.pull('load-model', False)
+#
+# 		if load_dataset is None:
+# 			load_dataset = A.pull('load-dataset', False)
+#
+# 		super().__init__(A, **kwargs)
+#
+# 		self.load_run = None
+# 		if load_path is not None:
+# 			self.load_run = fig.quick_run('load-run', load=load_path)
+# 			load_path = Path(load_path)
+#
+# 		self.load_path = load_path
+# 		self.load_model = load_model
+# 		self.load_dataset = load_dataset
+#
+#
+# 	def create_model(self, A=None, **meta):
+# 		if A is None and self.load_run is not None and self.load_model:
+# 			return self.load_run.get_model(**meta)
+# 		return super().create_model(A=A, **meta)
+#
+#
+# 	def create_dataset(self, A=None, **meta):
+# 		if A is None and self.load_run is not None and self.load_dataset:
+# 			return self.load_run.get_dataset(**meta)
+# 		return super().create_dataset(A=A, **meta)
+		
+		
 		

@@ -1,10 +1,11 @@
-
+from pathlib import Path
 import omnifig as fig
 
 import torch
 from torch import nn
 
 from .. import util
+from . import runs
 from . import framework as fm
 
 
@@ -17,27 +18,46 @@ def load_checkpoint(path):  # model parameters - TODO: maybe add more options
 
 @fig.Script('load-model', description='Creates/loads a model')
 @fig.Component('model')
-def load_model(A):
+def load_model(A, silent=None):
 	'''
 	Creates the model and possibly loads existing model parameters
 	'''
 	
-	raw_type = A.pull('_type', silent=True)
-	if raw_type == 'model':
-		model_type = A.pull('_model_type', None, silent=True)
-		if model_type is None:
-			assert A.contains_nodefault('model')
-			A = A.sub('model')
-		else:
-			A.push('_type', model_type, silent=True)
-			A.push('_mod', A.pull('_model_mod', []), silent=True)
+	if silent is None:
+		silent = A.pull('silent', False, silent=True)
 	
-	util.Seed(A)
+	model_config = A
+	
+	ckpt = A.pull('_load-ckpt', '<>load-model', '<>load', None)
+	if ckpt is not None:
+		try:
+			path = runs.find_path(ckpt, A, silent=silent, allow_file=False)
+		except runs.RunNotFoundError:
+			pass
+		else:
+			model_config = fig.get_config(str(path))
+			model_config.update(A.pull('model-override', {}, raw=True, silent=True))
+	
+	raw_type = model_config.pull('_type', None, silent=True)
+	if raw_type is None:
+		assert model_config.contains_nodefault('model'), 'No model found'
+		model_config = model_config.sub('model')
+		raw_type = model_config.pull('_type', None, silent=True)
+	if raw_type == 'model':
+		model_type = model_config.pull('_model_type', None, silent=True)
+		if model_type is None:
+			assert model_config.contains_nodefault('model')
+			model_config = model_config.sub('model')
+		else:
+			model_config.push('_type', model_type, silent=True)
+			model_config.push('_mod', model_config.pull('_model_mod', []), silent=True)
+	
+	util.Seed(model_config)
 	
 	# model = fig.create_component(A)
-	model = A.pull_self()
+	model = model_config.pull_self()
 	
-	optim = model.set_optim(A) if isinstance(model, fm.Optimizable) else None
+	optim = model.set_optim(model_config) if isinstance(model, fm.Optimizable) else None
 	
 	try:
 		device = model.get_device()
@@ -52,11 +72,11 @@ def load_model(A):
 			print(optim)
 		print(f'Number of model parameters: {util.count_parameters(model)}')
 	
-	path = A.pull('_load-ckpt', None)
-	if path is not None:
-		model.load_checkpoint(path)
+	if ckpt is not None:
+		ckpt = runs.find_ckpt_path(ckpt, A, silent=silent)
+		model.load_checkpoint(ckpt)
 		if print_model:
-			print(f'Loaded parameters from {path}')
+			print(f'Loaded parameters from {ckpt}')
 	
 	# origin_name = A.pull('__origin_key', None, silent=True)
 	
