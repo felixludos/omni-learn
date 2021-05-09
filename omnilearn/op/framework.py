@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import copy
 import torch.nn as nn
+import tensorflow as tf
 
 from omnibelt import primitives, InitWall, Simple_Child, unspecified_argument
 
@@ -134,7 +135,36 @@ class Savable(Checkpointable, Function):
 		return path
 	
 
-		
+class Fitable(Function): # TODO: split into different groups
+	# Estimator
+	def fit(self, data, targets=None):
+		raise NotImplementedError
+	
+	# Predictor
+	def predict(self, data):
+		raise NotImplementedError
+	
+	def predict_proba(self, data):
+		raise NotImplementedError
+	
+	# Transformer
+	def transform(self, data):
+		raise NotImplementedError
+	
+	def fit_transform(self, data):
+		raise NotImplementedError
+	
+	# Model
+	def score(self, data):
+		raise NotImplementedError
+
+class Initializable(Function): # TODO: include in load-model
+	def init_params(self, dataset):
+		return self._init_params(dataset.get_batch())
+	
+	def _init_params(self, batch):
+		pass
+
 class Recordable(util.StatsClient, Function):
 	pass
 	
@@ -319,5 +349,140 @@ class Invertible(object):
 	def inverse(self, *args, **kwargs):
 		raise NotImplementedError
 
+@fig.AutoModifier('tensorflow')
+class TensorflowPort(Function):
+	def __init__(self, A, skip_tf_load=None,
+	             allow_torch_load=None, save_torch_ckpt=unspecified_argument,
+	             tf_path=unspecified_argument, tf_var_names=None, **kwargs):
+	
+		if skip_tf_load is None:
+			skip_tf_load = A.pull('skip-tf-load', False)
+		
+		if allow_torch_load is None:
+			allow_torch_load = A.pull('allow-torch-load', True)
+		
+		if save_torch_ckpt is unspecified_argument:
+			save_torch_ckpt = A.pull('save-torch-ckpt', self._torch_save_name)
+		
+		if tf_path is unspecified_argument:
+			tf_path = self._process_tf_path(A, tf_path=tf_path)
+	
+		if tf_var_names is None:
+			tf_var_names = A.pull('tf-var-names', {})
+			codes = {}
+			if self._tf_var_names is not None:
+				codes.update(self._tf_var_names)
+			codes.update(tf_var_names)
+			tf_var_names = codes
+	
+		super().__init__(A, **kwargs)
+		
+		self.tf_torch_path = None
+		if tf_path is not None and save_torch_ckpt is not None:
+			root = tf_path.parents[1] / 'torch_checkpoint'
+			root.mkdir(exist_ok=True)
+			self.tf_torch_path = root / f'{save_torch_ckpt}.pt'
+		self.allow_torch_load = allow_torch_load
+		
+		self._tf_var_names = tf_var_names
+		if not skip_tf_load and tf_path is not None:
+			self._load_tf_model(A, path=tf_path)
+		
+		self.tf_path = tf_path
+		
+	
+	_tf_var_names = None
+	_torch_save_name = None
+	
+	class MissingParamError(Exception):
+		def __init__(self, param_name):
+			super().__init__(f'Failed to find {param_name}')
+	
+	@staticmethod
+	def _process_tf_path(A, tf_path=unspecified_argument):
+		
+		if tf_path is unspecified_argument:
+			tf_path = A.pull('tf-ckpt-path', None)
+		
+		if tf_path is None:
+			return
+		
+		tf_path = Path(tf_path)
+		base = tf_path
+		if not tf_path.is_file():
+			if not tf_path.exists():
+				root = util.get_data_dir(A) / 'checkpoints'
+				tf_path = root / tf_path
+			
+			if tf_path.is_dir():
+				opts = list(tf_path.glob('model.ckpt*.index*'))
+				if not len(opts):
+					tf_path = tf_path / 'model' / 'tf_checkpoint'
+					opts = list(tf_path.glob('model.ckpt*.index*'))
+				if len(opts):
+					return opts[0].parents[0] / opts[0].stem
+			
+			if tf_path.is_file() and 'model.ckpt' in str(tf_path):
+				return tf_path
+		
+		raise FileNotFoundError(str(base))
+	
+	def _load_tf_val(self, my_name, param, tf_path):
+		
+		if my_name not in self._tf_var_names:
+			raise TensorflowPort.MissingParamError(my_name)
+		
+		tf_val = tf.train.load_variable(str(tf_path), self._tf_var_names[my_name])
+		param.data.copy_(self._convert_tf_val(my_name, param, tf_val))
+	
+	def _convert_tf_val(self, my_name, param, tf_val):
+		tf_val = tf_val.T
+		tf_val = torch.from_numpy(tf_val).float()
+		if len(tf_val.shape) == 4:
+			tf_val = tf_val.permute(0,1,3,2).contiguous()
+		return tf_val
+	
+	def _save_tf_torch_model(self, path=None):
+		if path is None:
+			path = self.tf_torch_path
+		torch.save(self.state_dict(), str(path))
+	
+	def _load_tf_torch_model(self, path=None, strict=True):
+		if path is None:
+			path = self.tf_torch_path
+		return self.load_state_dict(torch.load(str(path)), strict=strict)
+	
+	
+	def _load_tf_model(self, A, path=None, strict=None):
+		
+		if path is None:
+			path = self._process_tf_path(A)
+			if path is None:
+				return
 
+		if strict is None:
+			strict = A.pull('strict', True)
+			
+		if self.allow_torch_load and self.tf_torch_path is not None and self.tf_torch_path.is_file():
+			print(f'Loaded pytorch (ported from tensorflow) parameters {str(self.tf_torch_path)}')
+			return self._load_tf_torch_model(self.tf_torch_path)
+			
+		missing = []
+		for name, param in self.named_parameters():
+			try:
+				self._load_tf_val(name, param, path)
+			except TensorflowPort.MissingParamError:
+				if strict:
+					raise
+				else:
+					missing.append(name)
+
+		print(f'Loaded tensorflow parameters {str(path)} ({len(missing)} missing)')
+		
+		if self.tf_torch_path is not None and not self.tf_torch_path.exists():
+			print(f'Saved tensorflow (ported to pytorch) parameters {str(self.tf_torch_path)}')
+			self._save_tf_torch_model(self.tf_torch_path)
+		
+		if not strict:
+			return missing
 

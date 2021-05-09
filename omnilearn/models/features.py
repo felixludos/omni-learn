@@ -162,7 +162,7 @@ class Normal(Function):
 		# A.push('out-layer._type', 'conv-layer', silent=True)
 
 		self.normal_layer = out
-		self.width = chn
+		# self.width = chn
 		self.dout = dout
 
 	def forward(self, *args, **kwargs):
@@ -172,8 +172,8 @@ class Normal(Function):
 		if self.normal_layer is not None:
 			x = self.normal_layer(x)
 
-		mu, sigma = x.narrow(1, 0, self.width), x.narrow(1, self.width, self.width).exp()
-
+		mu, logsigma = torch.chunk(x, 2, 1)
+		sigma = logsigma.exp()
 		return NormalDistribution(mu, sigma)
 
 # endregion

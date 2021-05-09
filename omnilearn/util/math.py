@@ -540,6 +540,7 @@ def orthogonalize(M): # gram schmidt process
 # 	R = A.t() @ A
 
 
+
 # endregion
 #####################
 # region Affine transformations/conversions
@@ -716,6 +717,11 @@ def sphr2cart(sphr):
 # Rotations
 #####################
 
+def angle_diff(angle1, angle2):
+	a = angle1 - angle2
+	return (a + np.pi) % (2*np.pi) - np.pi
+	
+	
 def geodesic(R, eps=1e-8):
 	diag = torch.diagonal(R, 0, -1, -2).sum(-1)
 	angles = torch.acos((diag - 1).div(2).clamp(-1 + eps, 1 - eps))

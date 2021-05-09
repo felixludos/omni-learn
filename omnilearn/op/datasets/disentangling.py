@@ -374,7 +374,8 @@ class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and 
 	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
 	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
 	
-	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None, **kwargs):
+	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None,
+	             din=None, dout=None, **kwargs):
 		
 		if label_type is unspecified_argument:
 			label_type = A.pull('label_type', None)
@@ -384,20 +385,22 @@ class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and 
 		if resize is unspecified_argument:
 			resize = A.pull('resize', (256, 256))
 		
-		din = A.pull('din', self.din)
+		if din is None:
+			din = A.pull('din', self.din)
 		
-		if label_type is None:
-			dout = din
-		elif label_type == 'attr':
-			dout = 40
-		elif label_type == 'landmark':
-			dout = 10
-		elif label_type == 'identity':
-			dout = 1
-		else:
-			raise Exception('unknown {}'.format(label_type))
-		
-		dout = A.pull('dout', dout)
+		if dout is None:
+			if label_type is None:
+				dout = din
+			elif label_type == 'attr':
+				dout = 40
+			elif label_type == 'landmark':
+				dout = 10
+			elif label_type == 'identity':
+				dout = 1
+			else:
+				raise Exception('unknown {}'.format(label_type))
+			
+			dout = A.pull('dout', dout)
 		
 		_labels = {
 			'attr': 'attrs',

@@ -63,12 +63,18 @@ def find_path(base, A, silent=False, allow_file=True):
 	if not path.is_dir():
 		raise RunNotFoundError(base)
 	
+	if 'ckpt' in path.stem:
+		return path.parents[0]
+	
 	return path
 
 def find_ckpt_path(path, A, silent=False):
 	path = Path(path)
 	
 	if path.is_file():
+		path = path.parents[0]
+	
+	if path.is_dir() and 'ckpt' in path.stem:
 		return path
 	
 	if not path.is_dir():

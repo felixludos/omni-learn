@@ -7,7 +7,7 @@ from . import eval
 from . import models
 # from .framework import * # TODO: cleanup
 from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
-	Evaluatable, Visualizable, Function, Optimizable
+	Evaluatable, Visualizable, Function, Optimizable, TensorflowPort
 
 from omnibelt import get_printer
 

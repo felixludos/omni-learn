@@ -7,4 +7,5 @@ from .criterion import MultiGroupClassification, Feature_Match
 from .features import Prior, Gaussian, Uniform, Normal
 from .style import StyleFusionLayer, StyleFusion, PriorStyleFusionLayer, StyleExtractorLayer, StyleExtractor
 from . import curriculum
+from .regression import NSegReg_Base
 from .unsup import Autoencoder, Variational_Autoencoder, Wasserstein_Autoencoder

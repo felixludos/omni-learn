@@ -1,4 +1,5 @@
 from pathlib import Path
+from omnibelt import get_printer
 import omnifig as fig
 
 import torch
@@ -8,6 +9,7 @@ from .. import util
 from . import runs
 from . import framework as fm
 
+prt = get_printer(__file__)
 
 def load_checkpoint(path):  # model parameters - TODO: maybe add more options
 	try:
@@ -28,15 +30,25 @@ def load_model(A, silent=None):
 	
 	model_config = A
 	
+	legacy = A.pull('legacy', False) # TODO: remove
+	
 	ckpt = A.pull('_load-ckpt', '<>load-model', '<>load', None)
 	if ckpt is not None:
 		try:
 			path = runs.find_path(ckpt, A, silent=silent, allow_file=False)
 		except runs.RunNotFoundError:
-			pass
+			prt.warning(f'Failed to find config from: {str(ckpt)}')
 		else:
 			model_config = fig.get_config(str(path))
+			if legacy: # TODO: remove
+				addr = A.pull('load-model', None)
+				if addr is not None:
+					model_config = fig.get_config(str(Path(ckpt).parents[1]/addr))
+			src_config = model_config.pull('_loaded_model', None, silent=True, raw=True)
+			if src_config is not None:
+				model_config = src_config
 			model_config.update(A.pull('model-override', {}, raw=True, silent=True))
+			A.push('_loaded_model', model_config, silent=True, process=False)
 	
 	raw_type = model_config.pull('_type', None, silent=True)
 	if raw_type is None:
@@ -56,6 +68,8 @@ def load_model(A, silent=None):
 	
 	# model = fig.create_component(A)
 	model = model_config.pull_self()
+	
+	# TODO: check if model needs the dataset (eg. a batch) to initialize params before creating the optim
 	
 	optim = model.set_optim(model_config) if isinstance(model, fm.Optimizable) else None
 	

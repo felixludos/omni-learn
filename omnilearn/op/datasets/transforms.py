@@ -91,41 +91,45 @@ class Cropped(Dataset):
 
 
 
-# @AutoModifier('interpolated')
+@AutoModifier('interpolated')
 class Interpolated(Dataset):
-	def __init__(self, A, interpolate_size=None, interpolate_mode=None, **kwargs):
+	def __init__(self, A, interpolate_size=unspecified_argument, interpolate_mode=None, din=None, **kwargs):
 
-		if interpolate_size is None:
-			interpolate_size = A.pull('interpolate_size', None)
+		if interpolate_size is unspecified_argument:
+			interpolate_size = A.pull('interpolate-size', '<>size', None)
 
-		if interpolate_mode:
-			interpolate_mode = A.pull('interpolate_mode', 'bilinear')
+		if interpolate_mode is None:
+			interpolate_mode = A.pull('interpolate-mode', 'bilinear')
+		
+		if interpolate_size is not None:
+			try:
+				len(interpolate_size)
+			except TypeError:
+				interpolate_size = interpolate_size, interpolate_size
+			assert len(interpolate_size) == 2, 'invalid cropping size: {}'.format(interpolate_size)
+			if din is None:
+				din = self.din
+			din = din[0], *interpolate_size
 
-		assert hasattr(self, 'din'), 'This modifier requires a din (see Info_Dataset, eg. 3dshapes) ' \
-		                             'in the dataset to be modified'
-
-		try:
-			len(interpolate_size)
-		except TypeError:
-			interpolate_size = interpolate_size, interpolate_size
-		assert len(interpolate_size) == 2, 'invalid cropping size: {}'.format(interpolate_size)
-
-		assert len(self.din) == 3 or len(self.din) == 1, 'must be an image dataset'
-
-		raise NotImplementedError
-		A.din = (self.din[0], *interpolate_size)
-
-		super().__init__(A, **kwargs)
-
+		
+		super().__init__(A, din=din, **kwargs)
+		
 		self.interpolate_size = interpolate_size
 		self.interpolate_mode = interpolate_mode
 
 	def __getitem__(self, item):
 
-		sample = self.__getitem__(item)
+		sample = super().__getitem__(item)
 		img, *other = sample
-
-		img = F.interpolate(img, self.interpolate_size, mode=self.interpolate_mode).squeeze(0)
+		
+		if self.interpolate_size is not None:
+			sqz = False
+			if len(img.size()) == 3:
+				sqz = True
+				img = img.unsqueeze(0)
+			img = F.interpolate(img, self.interpolate_size, mode=self.interpolate_mode)
+			if sqz:
+				img = img.squeeze(0)
 
 		return (img, *other)
 
