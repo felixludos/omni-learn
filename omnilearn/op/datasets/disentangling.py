@@ -2,6 +2,7 @@ import sys, os
 from pathlib import Path
 import subprocess
 import pickle
+from typing import Any
 import zipfile
 import h5py as hf
 import numpy as np
@@ -219,7 +220,7 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 	din = (3, 64, 64)
 	dout = 6
 
-	def __init__(self, A, mode=None, labeled=None, load_labels=None, **kwargs):
+	def __init__(self, A, mode=None, labeled=None, load_labels=None, din=None, dout=None, **kwargs):
 
 		if mode is None:
 			mode = A.pull('mode', 'full')
@@ -230,8 +231,8 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		load_labels = load_labels or labeled
 		label_type = A.pull('label_type', 'class') if load_labels else None
 
-		din = A.pull('din', self.din)
-		dout = A.pull('dout', self.dout if labeled else din)
+		if din is None: din = A.pull('din', self.din)
+		if dout is None: dout = A.pull('dout', self.dout if labeled else din)
 
 		super().__init__(A, din=din, dout=dout, **kwargs)
 		self.add_existing_modes('test')
@@ -358,6 +359,183 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 			# labels = torch.from_numpy(self.labels[item]).float()
 			return images, labels
 		return images,
+
+
+@register_dataset('rfd')
+class RFD(Downloadable, DisentanglementDataset):
+
+	""" Implementing RA dataset for RFD based on .h5 storage"""
+	shape = (3, 128,128)
+	din = shape
+	dout = 9
+	raw_subfolders = {'train':"finger", 'test':'finger', 'heldout_test':"finger_heldout_colors",
+	                  'real_test':"finger_real"}
+	raw_files = {'train':8, 'test':2, 'heldout_test':1} #train, test, heldout_test files
+
+	# expected folder structure
+	# root (whatever this is it must be passed in the kwargs)
+	# |-RFD
+	# 	|-raw
+	#		|- finger
+	#			finger_info.npz
+	#		|- finger_heldout
+	#			finger_heldout_info.npz
+	#		|- finger_real
+	#			finger_real_info.npz
+	#			finger_real_labels.npz
+	#			finger_real_images.npz
+	# 	|-processed
+	# 		|-processed
+	# 		Here go all the .h5 files
+
+
+	def __init__(self,
+				 A,
+	             mode=None,
+				 labeled=None,
+	             din=None, dout=None,
+	             **kwargs) -> None:
+
+		if mode is None: mode = A.pull('mode', 'train')
+		if labeled is None: labeled = A.pull('labeled', False)
+
+		if din is None: din = A.pull('din', self.din)
+		if dout is None: dout = A.pull('dout', self.dout if labeled else din)
+
+		super().__init__(A, din=din, dout=din if dout is None else dout, **kwargs)
+		self.root = self.root / 'RFD'
+		self.add_existing_modes(*self.raw_subfolders.keys())
+		
+		self.partitions_dict = None
+		self.real_set = None
+		self.info = None
+		
+		self.labeled = labeled
+		
+		self.switch_to(mode)
+
+	def switch_to(self, mode):
+		if mode == 'real_test' and self.real_set is None:
+			self.real_set = self.read_real_images_and_labels()
+		elif mode != self.get_mode() or self.partitions_dict is None:
+			self.partitions_dict = self.init_partitions()
+		self.info = self.read_info()
+		return super().switch_to(mode)
+
+	def read_real_images_and_labels(self):
+		""" Loading function only for real test dataset images"""
+		print("====== Opening real RFD Dataset ======")
+		images = np.load(self.raw_folder+"_images.npz", allow_pickle=True)["images"]
+		labels = np.load(self.raw_folder+"_labels.npz", allow_pickle=True)["labels"]
+		return (images, labels)
+
+	def init_partitions(self):
+		"""Initialising the .h5 files and their order.
+		Note: when reading .h5 file it won't be loaded into memory until its
+		entries are called."""
+		print("====== Opening RFD Dataset ======")
+		partitions_dict = {idx: self.open_partition(idx) for idx in range(self.num_files)}
+		return partitions_dict
+
+	def get_relative_index(self, index):
+		""" Given absolute index it returns the partition index and the
+		relative index inside the partition
+		#TODO: make it work for multiple indices"""
+		len_per_file = self.partitions_dict[0][1]
+		partition_idx = index//len_per_file
+		relative_index = index%len_per_file
+		if index >= len_per_file*self.num_files:
+			# contained in last partition
+			relative_index = index - len_per_file*self.num_files
+		return partition_idx, relative_index
+
+	def open_partition(self, number):
+		filename = f"RFD_{self.set_name}_{number}.h5"
+		f = hf.File(str(self.root / 'processed' / filename), 'r')
+		images = f['images']
+		labels = f['labels']
+		length = images.shape[0]
+		return (images, labels), length
+
+	def __getitem__(self, index: int) -> Any:
+		if self.get_mode() == 'real_test':
+			imgs, lbls = self.real_set
+			rel_idx = index
+		else:
+			par_idx, rel_idx = self.get_relative_index(index)
+			imgs, lbls = self.partitions_dict[par_idx][0]
+		img = torch.from_numpy(imgs[rel_idx]).float().div(255).permute(2,0,1)#rescaling the uint8 # from (H,W,C) to (C, H, W)
+		
+		# both the above are numpy arrays
+		# so they need to be cast to torch tensors
+		#Note: no rescaling needed as the imgs have already been
+		# processed by the ToTensor transformation.
+		# if self.transform is not None:
+		# 	img = self.transform(img)
+		if self.labeled:
+			lbl = torch.from_numpy(lbls[rel_idx])
+			# if self.target_transform is not None:
+			# 	lbl = self.target_transform(lbl)
+			return img, lbl
+		return img
+
+	def __len__(self) -> int:
+		#TODO: see here too for the "batched" case
+		if self.get_mode() in {'heldout_test', 'real_test'}: return self.size
+		if self.get_mode() != 'test': return int(self.size*0.8)
+		# only test is remaining
+		return self.size -  int(self.size*0.8)
+
+	def read_info(self):
+		""" Opens the labels and info .npz files and stores them in the class"""
+		# loading labels
+		info = dict(np.load(self.raw_folder+"_info.npz", allow_pickle=True))
+		self.size = info["dataset_size"].item()
+		self.factor_order = list(info['factor_values'].item().keys())
+		self.factor_sizes = info['num_factor_values']
+		self.factor_num_values = {k:v for k,v in zip(self.factor_order, self.factor_sizes)}
+		return info
+
+	def get_factor_sizes(self):
+		return self.factor_sizes
+
+	def get_factor_order(self):
+		return self.factor_order
+
+	def get_observations(self):
+		raise NotImplementedError
+
+	def get_labels(self):
+		raise NotImplementedError
+
+	def update_data(self, indices):
+		raise NotImplementedError
+
+	def close_all(self):
+		#TODO: use this when finished to close all the hdf5 files opened
+		pass
+
+	@property
+	def raw_folder(self) -> str:
+		prefix = self.raw_subfolders.get(self.get_mode(), 'finger')
+		return str(self.root / 'raw' / prefix / prefix)
+
+	@property
+	def num_files(self) -> int:
+		return self.raw_files.get(self.get_mode(), 1)
+
+	@property
+	def set_name(self) -> str:
+		if self.get_mode() == 'test': return "test"
+		if self.get_mode() == 'heldout_test': return "HC"
+		return "train"
+
+	# @property
+	# def processed_folder(self) -> str:
+	# 	return self.root + 'RFD/processed/'
+
+
+
 
 
 @register_dataset('full-celeba')  # probably shouldnt be used

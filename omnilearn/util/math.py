@@ -567,13 +567,26 @@ def se2_tfm(R, t=None):
 
 
 def aff_transform(points, transforms):
-
-	D = transforms.shape[-1] - 1
-
+	no_batch = points.size(0) == 1 and transforms.size(0) == 2
+	
+	D = points.size(-1)
+	points = points.reshape(-1,D, 1)
+	transforms = transforms.reshape(-1,D,D+1)
+	
+	if points.size(0) != transforms.size(0):
+		if points.size(0) == 1:
+			points = points.expand(transforms.size(0), D, 1)
+		elif transforms.size(0) == 1:
+			transforms = transforms.expand(points.size(0),D,D+1)
+		else:
+			raise NotImplementedError(f'{transforms.size()} {points.size()}')
+	
 	R, t = transforms.narrow(-1, 0, D), transforms.narrow(-1, D, 1)
-	# R = R.transpose(-1,-2)
-
-	return R @ points + t
+	
+	out = torch.baddbmm(t, R, points).squeeze(-1)
+	if no_batch:
+		out = out.squeeze(0)
+	return out
 
 
 def aff_compose(*poses):

@@ -238,6 +238,6 @@ class Shuffle_Dataset(DatasetWrapper):
 			pass
 
 	def __getitem__(self, idx):
-		return self.__wrapped__[self._self_indices[idx]]
+		return self.__wrapped__[self._self_indices[idx].item()]
 
 # endregion
