@@ -458,6 +458,8 @@ class RFD(Downloadable, DisentanglementDataset):
 		return (images, labels), length
 
 	def __getitem__(self, index: int) -> Any:
+		if not isinstance(index, int):
+			index = index.item()
 		if self.get_mode() == 'real_test':
 			imgs, lbls = self.real_set
 			rel_idx = index
