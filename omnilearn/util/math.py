@@ -669,6 +669,12 @@ def se3_quat2Rt(se3quats): # qw, qx, qy, qz, x, y, z
 # region Angles/Spheres
 #####################
 
+
+def angle_diff(angle1, angle2, period=2*np.pi):
+	a = angle1 - angle2
+	return (a + period/2) % period - period/2
+
+
 def cart2angl(pts):
 	N, D = pts.size()
 
@@ -730,10 +736,6 @@ def sphr2cart(sphr):
 # Rotations
 #####################
 
-def angle_diff(angle1, angle2):
-	a = angle1 - angle2
-	return (a + np.pi) % (2*np.pi) - np.pi
-	
 	
 def geodesic(R, eps=1e-8):
 	diag = torch.diagonal(R, 0, -1, -2).sum(-1)
