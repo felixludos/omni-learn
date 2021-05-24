@@ -27,6 +27,7 @@ def compute_fid(A):
 	mode = A.push('mode', 'train', overwrite=False)
 
 	dataset = fig.run('load-data', A.sub('dataset'))
+	
 
 	out_path = A.pull('save-path', '<>out-path', '<>out', None)
 
@@ -34,11 +35,14 @@ def compute_fid(A):
 		ident = A.pull('ident', None)
 		ident = 'fid_stats.h5' if ident is None else f'{ident}_fid_stats.h5'
 		
-		dataroot = A.pull('root', '<>dataset.dataroot', None)
+		try:
+			dataroot = dataset.root
+		except:
+			dataroot = util.get_data_dir(A)
 		name = A.pull('name', '<>dataset.name', dataset.__class__.__name__)
 		if '.h5' not in name:
-			name = os.path.join(name, ident)
-		out_path = os.path.join(dataroot, name)
+			name = dataroot / ident
+		out_path = dataroot / name
 
 	print(f'Will save to {out_path}')
 	

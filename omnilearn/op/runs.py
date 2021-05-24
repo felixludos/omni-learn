@@ -117,12 +117,16 @@ def load_run(A):
 	
 	silent = A.pull('silent', False, silent=True)
 	
+	replace_config = A.pull('replace-config', '<>novel', False, silent=True)
 	override = A.pull('override', None, raw=True, silent=True)
 	
 	name = A.pull('path', '<>load', '<>resume', None, silent=silent)
 	if name is not None:
 		path = find_path(name, A)
+		old_A = A
 		A = fig.get_config(str(path))
+		if replace_config:
+			A.update(old_A)
 		
 		if override is not None:
 			A.update(override)

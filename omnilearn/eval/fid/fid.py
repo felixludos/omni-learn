@@ -50,6 +50,21 @@ def apply_inception(samples, inception, include_grad=False):
 	return pred
 
 
+def calculate_inception_score(p_yx, p_y=None, reduction='mean', eps=1e-16):
+	if p_y is None:
+		p_y = p_yx.mean(0,keepdim=True)
+	p_y = p_y.view(1,-1)
+	
+	# kl divergence for each image
+	kl = p_yx * ((p_yx + eps).log() - (p_y + eps).log())
+	kl = kl.sum(-1)
+	if reduction == 'mean':
+		return kl.mean().exp()
+	elif reduction == 'sum':
+		return kl.sum().exp()
+	else:
+		return kl.exp()
+
 
 def compute_inception_stat(generate, inception=None, batch_size=50, n_samples=50000,
                      dim=2048, device='cuda', pbar=None, name=None):

@@ -63,7 +63,8 @@ class make_infinite(DataLoader):
 			if self.cached is None:
 				x = next(self)
 				# by default, assume batch is a tuple and pull first element
-				x = x[0] if extract is None else extract(x)
+				if extract is not None:
+					x = extract(x)
 			else:
 				x = self.cached
 				self.cached = None

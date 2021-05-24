@@ -52,7 +52,7 @@ class ASGD(OptimizerBase, O.ASGD):
 
 
 @fig.AutoComponent('adadelta', auto_name=False)
-class Adagrad(OptimizerBase, O.Adadelta):
+class Adadelta(OptimizerBase, O.Adadelta):
 	def __init__(self, lr=1.0, rho=0.9, eps=1e-06, weight_decay=0):
 		super().__init__(lr=lr, rho=rho, weight_decay=weight_decay, eps=eps)
 		

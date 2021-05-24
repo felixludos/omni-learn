@@ -553,8 +553,8 @@ def rots_2d(thetas):
 	cos = torch.cos(thetas)
 
 	return torch.stack([
-		torch.stack([cos, -sin], -1),
-		torch.stack([sin, cos], -1)
+		torch.stack([cos, sin], -1),
+		torch.stack([-sin, cos], -1)
 	], -2)
 
 
@@ -848,7 +848,7 @@ def quat2mat(quat): # w, x, y, z
 
 	quat = F.normalize(quat,p=2,dim=-1)
 
-	w, x, y, z = quat.narrow(-1,0,1), quat.narrow(-1,1,1), quat.narrow(-1,2,1), quat.narrow(-1,3,1)
+	w, x, y, z = quat.arrow(-1,0,1), quat.narrow(-1,1,1), quat.narrow(-1,2,1), quat.narrow(-1,3,1)
 
 	x2, y2, z2 = x.pow(2), y.pow(2), z.pow(2)
 

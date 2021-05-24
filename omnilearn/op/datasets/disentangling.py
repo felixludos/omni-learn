@@ -524,7 +524,7 @@ class RFD(Downloadable, DisentanglementDataset):
 
 	@property
 	def num_files(self) -> int:
-		return self.raw_files.get(self.get_mode(), 1)
+		return self.raw_files.get(self.get_mode(), self.raw_files['train'])
 
 	@property
 	def set_name(self) -> str:
