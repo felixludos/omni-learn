@@ -49,6 +49,8 @@ def pairwise_distance(ps, qs=None, p=2): # last dim is summed
 	if qs is None:
 		return F.pdist(ps, p=p)
 
+	return torch.cdist(ps, qs, p=p)
+
 	ps, qs = ps.unsqueeze(-2), qs.unsqueeze(-3)
 	return (ps - qs).pow(p).sum(-1).pow(1/p)
 
@@ -61,7 +63,7 @@ def lorentzian(ps, qs=None, C=None):
 
 	return C / (C + dists)
 
-def MMD(p, q, C=None):
+def MMD(p, q, reduction='mean', C=None):
 
 	if C is None:
 		C = q.size(-1)
@@ -70,7 +72,12 @@ def MMD(p, q, C=None):
 	qs = lorentzian(q, C=C)
 	pq = lorentzian(p, q, C=C)
 
-	return ps.mean() + qs.mean() - 2*pq.mean()
+	if reduction == 'mean':
+		return ps.mean() + qs.mean() - 2*pq.mean()
+	elif reduction == 'sum':
+		return ps.sum() + qs.sum() - 2*pq.sum()
+	else:
+		return ps + qs - 2*pq
 
 # endregion
 #####################

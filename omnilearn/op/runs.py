@@ -631,7 +631,7 @@ class Run(Configurable):
 		if ident not in records['evaluations']:
 			records['evaluations'][ident] = []
 		if N in records['evaluations'][ident]:
-			overwrite = overwrite if config is None else config.pull('overwrite', False)
+			overwrite = overwrite if config is None else config.pull('overwrite', overwrite)
 			if not overwrite:
 				print(f'Already evaluated "{ident}" after {N} steps, and overwrite is False')
 				results = None

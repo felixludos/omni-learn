@@ -4,7 +4,7 @@ import cv2
 from io import BytesIO
 from PIL import Image
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, TensorDataset
 # from torch.utils.data.dataloader import re, numpy_type_map, _use_shared_memory, string_classes, int_classes#,
 import re
 try:
@@ -24,6 +24,16 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+def process_in_batches(fn, *inputs, batch_size=64, **loader_kwargs):
+	x = inputs[0]
+	if len(x) <= batch_size:
+		return fn(x)
+	outs = []
+	for batch in DataLoader(TensorDataset(*inputs), batch_size=batch_size, **loader_kwargs):
+		outs.append(fn(*batch))
+	if isinstance(outs[0], torch.Tensor):
+		return torch.cat(outs)
+	return outs
 
 class make_infinite(DataLoader):
 	def __init__(self, loader, extractor=None):
