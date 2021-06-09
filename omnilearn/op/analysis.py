@@ -104,7 +104,7 @@ class Run_Manager(object):
 			kwargs['saveroot'] = str(self._root)
 		if self._override is not None:
 			kwargs['override'] = self._override.copy()
-		todo = [None]*len(self._names), self._names
+		todo = zip([None]*len(self._names), self._names)
 		if isinstance(self._names, dict):
 			todo = self._names.items()
 		todo = todo if self._pbar is None else self._pbar(todo)

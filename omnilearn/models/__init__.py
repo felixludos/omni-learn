@@ -9,3 +9,4 @@ from .style import StyleFusionLayer, StyleFusion, PriorStyleFusionLayer, StyleEx
 from . import curriculum
 from .regression import NSegReg_Base
 from .unsup import Autoencoder, Variational_Autoencoder, Wasserstein_Autoencoder
+from .losses import get_loss_type

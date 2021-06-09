@@ -313,6 +313,22 @@ class Model(Seed, Savable, Trainable, Evaluatable, Visualizable, Function): # to
 	pass
 
 
+@fig.AutoModifier('presentable')
+class Presentable(Function):
+	def __init__(self, A, batch_size=None, loader_args=None, **kwargs):
+		if batch_size is None:
+			batch_size = A.pull('batch-size')
+		if loader_args is None:
+			loader_args = A.pull('loader-args', {})
+		super().__init__(A, **kwargs)
+		self._batch_size = batch_size
+		self._loader_args = loader_args
+		
+	def __call__(self, *args, **kwargs):
+		if not self.training:
+			return util.process_in_batches(super().__call__, *args, input_kwargs=kwargs,
+			                               batch_size=self._batch_size, **self._loader_args)
+		return super().__call__(*args, **kwargs)
 
 
 class Regularizable(object):
@@ -320,16 +336,20 @@ class Regularizable(object):
 		return torch.tensor(0).type_as(q)
 
 
-
-@fig.AutoModifier('generative')
-class Generative(object):
-	def sample_prior(self, N=1):
+class Stochastic(Function):
+	def sample(self, *shape, seed=None):
+		N = int(np.product(shape))
+		samples = self._sample(max(N, 1), seed=seed)
+		return samples.reshape(*shape, *samples.shape[1:])
+	
+	def _sample(self, N, seed=None):
 		raise NotImplementedError
 
-	def generate(self, N=1, prior=None):
-		if prior is None:
-			prior = self.sample_prior(N)
-		return self(prior)
+
+@fig.AutoModifier('generative')
+class Generative(Stochastic):
+	def generate(self, N=1):
+		return self._sample(N)
 
 
 @fig.AutoModifier('encodable')

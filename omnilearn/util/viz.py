@@ -395,8 +395,8 @@ def plot_imgs(imgs, titles=None, H=None, W=None,
 	return fg, axes
 
 
-def plot_mat(M, val_fmt=None, figax=None, figsize=None, text_kwargs=dict(), **kwargs):
-	H, W = M.shape
+def plot_mat(M, val_fmt=None, figax=None, figsize=None, figside=0.7,
+             edgeeps=0.03, text_kwargs=dict(), **kwargs):
 	if figax is None:
 		figax = plt.subplots(figsize=figsize)
 	fg, ax = figax
@@ -406,12 +406,16 @@ def plot_mat(M, val_fmt=None, figax=None, figsize=None, text_kwargs=dict(), **kw
 		M = M.cpu().detach().numpy()
 	if len(M.shape) == 1:
 		M = M.reshape(1,-1)
+	H, W = M.shape
+	if figsize is None:
+		fg.set_size_inches(figside * W + 0.5, figside * H + 0.5)
 	plt.matshow(M, False, **kwargs)
-	eps = 0.03
-	plt.subplots_adjust(eps,eps,1-eps,1-eps)
+	plt.yticks(np.arange(H), np.arange(H))
+	plt.xticks(np.arange(W), np.arange(W))
+	plt.subplots_adjust(edgeeps, edgeeps, 1 - edgeeps, 1 - edgeeps)
 	if val_fmt is not None:
 		if isinstance(val_fmt, int):
-			val_fmt = f'.{val_fmt}f'
+			val_fmt = f'.{val_fmt}g'
 		if isinstance(val_fmt, str):
 			val_fmt = '{:' + val_fmt + '}'
 			fmt = lambda x: val_fmt.format(x)

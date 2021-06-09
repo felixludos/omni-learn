@@ -9,6 +9,7 @@ import omnifig as fig
 # from ... import framework as fm
 from ...op import framework as fm
 from ... import util
+from .. import losses
 
 from ..features import Prior, Gaussian
 
@@ -37,7 +38,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 		self.encoder = encoder
 		self.decoder = decoder
 
-		self.criterion = util.get_loss_type(criterion)
+		self.criterion = losses.get_loss_type(criterion)
 
 		self.reg_wt = reg_wt
 		self.reg_fn = util.get_regularization(reg, reduction='sum')
@@ -71,8 +72,8 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 		if 'latent' in info:
 			q = info.latent
 			if 'latent' in settings and q is not None:
-				if isinstance(info.latent, distrib.Distribution):
-					q = q.loc
+				if isinstance(info.latent, util.DistributionBase):
+					q = q.bsample()
 
 				shape = q.size()
 				if len(shape) > 1 and np.product(shape) > 0:
@@ -92,6 +93,9 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 				N = min(B, 8)
 
 				R = info.reconstruction
+				if isinstance(R, util.DistributionBase):
+					R = R.bsample()
+				
 				viz_x, viz_rec = X[:N], R[:N]
 
 				recs = torch.cat([viz_x, viz_rec], 0)
@@ -136,7 +140,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		rec = out.reconstruction
 
-		loss = self.criterion(rec, x) / B
+		loss = self.criterion(rec, x)
 		out.rec_loss = loss
 		self.mete('rec-loss', loss)
 
@@ -194,20 +198,20 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		return out
 
-class Generative_AE(fm.Generative, Prior, Autoencoder):
+class Generative_AE(Prior, Autoencoder):
 
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
 		self.prior_dim = self.latent_dim
 
-	def generate(self, N=1, prior=None):
+	def _sample(self, N, seed=None, prior=None):
 		if prior is None:
-			prior = self.sample_prior(N)
+			prior = self.sample_prior(N, seed=seed)
 		return self.decode(prior)
 
 
 @fig.Component('vae')
-class Variational_Autoencoder(Gaussian, Generative_AE):
+class Variational_Autoencoder(Generative_AE, Gaussian):
 
 	def __init__(self, A, **kwargs):
 
@@ -230,8 +234,8 @@ class Variational_Autoencoder(Gaussian, Generative_AE):
 		super().__init__(A, **kwargs)
 
 	def decode(self, q):
-		if isinstance(q, distrib.Distribution):
-			q = q.rsample() if self.training else q.mean
+		if isinstance(q, util.DistributionBase):
+			q = q.rsample() if self.training else q.bsample()
 		return super().decode(q)
 
 	def regularize(self, q):

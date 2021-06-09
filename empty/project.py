@@ -5,6 +5,7 @@ import sys, os,  #traceback, ipdb
 #%matplotlib tk
 
 import omnilearn as fd
+from omnilearn import models
 from omnilearn import util
 from omnilearn.old import train as trn
 
@@ -23,7 +24,7 @@ class Model(fd.Visualizable, fd.Model):
 		super().__init__(net.din, net.dout)
 
 		self.net = net
-		self.criterion = util.get_loss_type(criterion)
+		self.criterion = models.get_loss_type(criterion)
 
 		self.stats.new('accuracy', 'confidence')
 

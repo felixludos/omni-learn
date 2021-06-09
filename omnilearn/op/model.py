@@ -98,37 +98,16 @@ def load_model(A, silent=None):
 
 
 
-fig.AutoComponent('criterion')(util.get_loss_type)
-fig.AutoComponent('nonlin')(util.get_nonlinearity)
-fig.AutoComponent('normalization')(util.get_normalization)
-fig.AutoComponent('pooling')(util.get_pooling)
-fig.AutoComponent('upsampling')(util.get_upsample)
-
-@fig.AutoComponent('viz-criterion')
-class Viz_Criterion(nn.Module):
-	def __init__(self, criterion, arg_names=[], kwarg_names=[],
-	             allow_grads=False):
-		super().__init__()
-		
-		self.criterion = util.get_loss_type(criterion)
-		self.arg_names = arg_names
-		self.kwarg_names = kwarg_names
-		self.allow_grads = allow_grads
-
-	def forward(self, out):
-		
-		args = [out[key] for key in self.arg_names]
-		kwargs = {key:out[key] for key in self.kwarg_names}
-		
-		if self.allow_grads:
-			return self.criterion(*args, **kwargs)
-		
-		with torch.no_grad():
-			return self.criterion(*args, **kwargs)
+# fig.AutoComponent('criterion')(util.get_loss_type)
+# fig.AutoComponent('nonlin')(util.get_nonlinearity)
+# fig.AutoComponent('normalization')(util.get_normalization)
+# fig.AutoComponent('pooling')(util.get_pooling)
+# fig.AutoComponent('upsampling')(util.get_upsample)
 
 # @Component('stage') # TODO
 class Stage_Model(fm.Model):
 	def __init__(self, A):
+		raise NotImplementedError
 		stages = A.pull('stages')
 
 		din = A.pull('din')

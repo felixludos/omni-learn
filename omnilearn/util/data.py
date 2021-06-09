@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 # from torch.utils.data.dataloader import re, numpy_type_map, _use_shared_memory, string_classes, int_classes#,
 import re
 try:
-	from torch.utils.data.dataloader import container_abcs
+	from torch.utils.data.dataloader import container_abcs, default_collate
 except:
 	pass
 
@@ -24,16 +24,50 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-def process_in_batches(fn, *inputs, batch_size=64, **loader_kwargs):
-	x = inputs[0]
-	if len(x) <= batch_size:
-		return fn(x)
+class AmbiguousArgError(Exception):
+	def __init__(self, key, val):
+		super().__init__(f'{key}: {val.shape}')
+
+def process_in_batches(fn, *inputs, input_kwargs={},
+                       batch_size=64, collate_fn='default',
+                       safe=False, batchable_keys=None,
+                       **loader_kwargs):
+	B = None
+	if len(inputs):
+		B = inputs[0].shape[0]
+	
+	if batchable_keys is None:
+		batchable_keys = []
+		for key, val in input_kwargs.items():
+			try:
+				b, *other = val.shape
+			except:
+				pass
+			else:
+				if not safe and len(other) and B is None:
+					B = b
+				if b != B:
+					raise AmbiguousArgError(key, val)
+				batchable_keys.append(key)
+	
+	settings = {key:val for key, val in input_kwargs.items() if key not in batchable_keys}
+	
+	assert len(inputs) or len(batchable_keys), 'no batchable tensors found'
+	dataset = TensorDataset(*inputs, *[input_kwargs[key] for key in batchable_keys])
+	
 	outs = []
-	for batch in DataLoader(TensorDataset(*inputs), batch_size=batch_size, **loader_kwargs):
-		outs.append(fn(*batch))
-	if isinstance(outs[0], torch.Tensor):
-		return torch.cat(outs)
+	for batch in DataLoader(dataset, batch_size=batch_size, **loader_kwargs):
+		kwargs = settings.copy()
+		args = batch[:len(inputs)]
+		kwargs.update({key:val for key, val in zip(batchable_keys, batch[len(inputs):])})
+		outs.append(fn(*args, **kwargs))
+	
+	if collate_fn is not None:
+		if collate_fn == 'default':
+			collate_fn = default_collate
+		return collate_fn(outs)
 	return outs
+
 
 class make_infinite(DataLoader):
 	def __init__(self, loader, extractor=None):

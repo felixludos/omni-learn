@@ -114,42 +114,6 @@ class Unlogifier(nn.Module):
 	def forward(self, x):
 		return unlogify(x)
 
-
-class RMSELoss(nn.MSELoss):
-	def forward(self, *args, **kwargs):
-		loss = super().forward(*args, **kwargs)
-		return loss.sqrt()
-
-@fig.AutoComponent('loss')
-def get_loss_type(ident, **kwargs):
-
-	if not isinstance(ident, str):
-		return ident
-
-	if ident == 'mse':
-		return nn.MSELoss(**kwargs)
-	elif ident == 'rmse':
-		return RMSELoss(**kwargs)
-	elif ident == 'l1':
-		return nn.L1Loss(**kwargs)
-	elif ident == 'huber':
-		return nn.SmoothL1Loss(**kwargs)
-	elif ident == 'nll':
-		print('WARNING: should probably use cross-entropy')
-		return nn.NLLLoss(**kwargs)
-	elif ident == 'cross-entropy':
-		return nn.CrossEntropyLoss(**kwargs)
-	elif ident == 'kl-div':
-		return nn.KLDivLoss(**kwargs)
-	elif ident == 'bce':
-		#print('WARNING: should probably use bce-log')
-		return nn.BCELoss(**kwargs)
-	elif ident == 'bce-log':
-		return nn.BCEWithLogitsLoss(**kwargs)
-	else:
-		assert False, "Unknown loss type: " + ident
-
-
 @fig.AutoComponent('regularization')
 def get_regularization(ident, p=2, dim=1, reduction='mean'):
 
@@ -1012,9 +976,9 @@ class Joint_Distribution(distrib.Distribution):
 	@lazy_property
 	def mle(self, separate=False):
 		if separate:
-			return [MLE(p) for p, s in zip(self.base, self.douts)]
-		mle = torch.cat([MLE(p).type(self._dtype) if s > 1 else MLE(p).unsqueeze(-1).type(self._dtype) for p, s in
-						 zip(self.base, self.douts)], -1)
+			return [get_best_samples(p) for p, s in zip(self.base, self.douts)]
+		mle = torch.cat([get_best_samples(p).type(self._dtype) if s > 1 else get_best_samples(p).unsqueeze(-1).type(self._dtype) for p, s in
+		                 zip(self.base, self.douts)], -1)
 		return mle.view(self._extended_shape())
 
 	def __repr__(self):
@@ -1057,6 +1021,8 @@ class Normal_Mixture(distrib.Distribution):
 
 	def rsample(self, sample_shape=None):
 
+		raise NotImplementedError # TODO
+
 		if self.wts is None:
 
 
@@ -1080,13 +1046,17 @@ def standard_kl(p, q=None):
 distrib.kl.register_kl(distrib.Normal, type(None))(standard_kl)
 
 
-def MLE(q):
-	if isinstance(q, distrib.MultivariateNormal):
+def get_best_samples(q):
+	if isinstance(q, (distrib.MultivariateNormal, distrib.Beta)):
 		return q.mean
 	elif isinstance(q, distrib.Normal):
 		return q.loc
 	elif isinstance(q, distrib.Categorical):
 		return q.logits.max(dim=-1)[1]
+	# elif isinstance(q, distrib.Beta): # temperature approximation
+	# 	alpha = q.concentration0 ** (1/temp)
+	# 	beta = q.concentration1 ** (1/temp)
+	# 	return distrib.Beta(alpha, beta).rsample()
 	return q.mle
 
 # endregion

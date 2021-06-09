@@ -5,6 +5,7 @@ import omnifig as fig
 
 # from .. import framework as fm
 from ..op import framework as fm
+from . import losses
 from .. import util
 
 
@@ -76,12 +77,12 @@ class Feature_Match(nn.Module):
 			# self.register_buffer('weights', weights)
 		else:
 			self.weights = None
-		self.criterion = util.get_loss_type(criterion)
+		self.criterion = losses.get_loss_type(criterion)
 		assert reduction in {'mean', 'sum', 'none'}
 		self.reduction = reduction
 
 		self.out_wt = out_wt
-		self.out_criterion = util.get_loss_type(out_criterion)
+		self.out_criterion = losses.get_loss_type(out_criterion)
 		if self.out_wt is not None and self.out_wt > 0:
 			self.num += 1
 

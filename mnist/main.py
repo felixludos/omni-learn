@@ -7,6 +7,7 @@ import omnifig as fig
 
 import omnilearn as fd
 from omnilearn import util
+from omnilearn import models
 
 @fig.Component('simple')
 class Simple_Model(fd.Model):
@@ -18,7 +19,7 @@ class Simple_Model(fd.Model):
 		super().__init__(info, din=net.din, dout=net.dout)
 
 		self.net = net
-		self.criterion = util.get_loss_type(criterion)
+		self.criterion = models.get_loss_type(criterion)
 
 		self.register_stats('accuracy', 'confidence')
 
