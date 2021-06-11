@@ -8,9 +8,11 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 # from torch.utils.data.dataloader import re, numpy_type_map, _use_shared_memory, string_classes, int_classes#,
 import re
 try:
-	from torch.utils.data.dataloader import container_abcs, default_collate
+	from torch.utils.data.dataloader import container_abcs
 except:
 	pass
+
+from torch.utils.data.dataloader import default_collate
 
 from .misc import TreeSpace
 import random

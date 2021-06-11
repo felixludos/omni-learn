@@ -6,8 +6,7 @@ import random
 
 from collections import OrderedDict
 
-import humpack as hp
-
+import omnibelt as belt
 from omnibelt import load_yaml, save_yaml, get_now, create_dir, get_printer, unspecified_argument
 
 import omnifig as fig

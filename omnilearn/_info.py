@@ -25,7 +25,7 @@ except:
 	# install_requires = ['humpack', 'omnibelt', 'omnifig', 'pyyaml', 'c3linearize', 'numpy', 'matplotlib',
 	#                     'torch', 'tensorflow',
 	#                     'gym', 'tabulate', 'ipdb', 'h5py', 'pyyaml', 'tqdm', 'pandas']
-	install_requires = ['humpack', 'omnibelt',
+	install_requires = ['omnibelt',
 'omnifig',
 'numpy',
 'matplotlib',

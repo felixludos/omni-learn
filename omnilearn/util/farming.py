@@ -1,5 +1,5 @@
 
-from humpack.farming import Farmer, make_ghost, Replicator, Parallelizer, replicate, Cloner
+# from omnibelt.farming import Farmer, make_ghost, Replicator, Parallelizer, replicate, Cloner
 
 # import sys, os
 # import torch

@@ -8,8 +8,7 @@ except ImportError:
 
 from tabulate import tabulate
 
-import humpack as hp
-
+import omnibelt as belt
 import omnifig as fig
 
 FD_PATH = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -61,7 +60,7 @@ def get_report(A):
 	A.push('silent', True, overwrite=False)
 	A.push('_type', A.pull('run_type', 'run'), overwrite=False)
 	
-	runs = hp.Table()
+	runs = belt.Table()
 	
 	print(f'Found {len(names)} runs')
 	

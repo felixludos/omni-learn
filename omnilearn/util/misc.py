@@ -13,7 +13,7 @@ from omnibelt import Simple_Child, Proper_Child, get_now, create_dir, save_yaml,
 
 import omnifig as fig
 
-from humpack import adict, tlist, tset, Table, TreeSpace
+from omnibelt import adict, tlist, tset, Table, TreeSpace
 
 import torch.nn as nn
 import torch.multiprocessing as mp
