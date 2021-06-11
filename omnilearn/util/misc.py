@@ -20,7 +20,7 @@ import torch.multiprocessing as mp
 # from torch.utils.data.dataloader import ExceptionWrapper
 import random
 
-from .farming import make_ghost
+# from .farming import make_ghost
 
 FD_PATH = os.path.dirname(os.path.dirname(__file__))
 
