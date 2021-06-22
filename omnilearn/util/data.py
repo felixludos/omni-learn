@@ -13,6 +13,8 @@ except:
 	pass
 
 from torch.utils.data.dataloader import default_collate
+from torch.utils.data._utils.collate import np_str_obj_array_pattern, string_classes, \
+	int_classes, default_collate_err_msg_format
 
 from .misc import TreeSpace
 import random
@@ -26,14 +28,64 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from .containers import TensorDict, TensorList
+
 class AmbiguousArgError(Exception):
 	def __init__(self, key, val):
 		super().__init__(f'{key}: {val.shape}')
 
+def cat_default_collate(batch): # copy of pytorch's default collate except assumes batch elements are subbatches
+	r"""Puts each data field into a tensor with outer dimension batch size"""
+
+	elem = batch[0]
+	elem_type = type(elem)
+	if isinstance(elem, torch.Tensor):
+		out = None
+		if torch.utils.data.get_worker_info() is not None:
+			# If we're in a background process, concatenate directly into a
+			# shared memory tensor to avoid an extra copy
+			numel = sum([x.numel() for x in batch])
+			storage = elem.storage()._new_shared(numel)
+			out = elem.new(storage)
+		return torch.cat(batch, 0, out=out)
+	elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
+			and elem_type.__name__ != 'string_':
+		if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
+			# array of string classes and object
+			if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
+				raise TypeError(default_collate_err_msg_format.format(elem.dtype))
+
+			return default_collate([torch.as_tensor(b) for b in batch])
+		elif elem.shape == ():  # scalars
+			return torch.as_tensor(batch)
+	elif isinstance(elem, float):
+		return torch.tensor(batch, dtype=torch.float64)
+	elif isinstance(elem, int_classes):
+		return torch.tensor(batch)
+	elif isinstance(elem, string_classes):
+		return batch
+	elif isinstance(elem, (TensorDict, TensorList)):
+		return type(elem).merge(batch)
+	elif isinstance(elem, container_abcs.Mapping):
+		return {key: default_collate([d[key] for d in batch]) for key in elem}
+	elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+		return elem_type(*(default_collate(samples) for samples in zip(*batch)))
+	elif isinstance(elem, container_abcs.Sequence):
+		# check to make sure that the elements in batch have consistent size
+		it = iter(batch)
+		elem_size = len(next(it))
+		if not all(len(elem) == elem_size for elem in it):
+			raise RuntimeError('each element in list of batch should be of equal size')
+		transposed = zip(*batch)
+		return [default_collate(samples) for samples in transposed]
+
+	raise TypeError(default_collate_err_msg_format.format(elem_type))
+
+
 def process_in_batches(fn, *inputs, input_kwargs={},
-                       batch_size=64, collate_fn='default',
-                       safe=False, batchable_keys=None,
-                       **loader_kwargs):
+					   batch_size=64, collate_fn='default',
+					   safe=False, batchable_keys=None,
+					   **loader_kwargs):
 	B = None
 	if len(inputs):
 		B = inputs[0].shape[0]
@@ -66,17 +118,18 @@ def process_in_batches(fn, *inputs, input_kwargs={},
 	
 	if collate_fn is not None:
 		if collate_fn == 'default':
-			collate_fn = default_collate
+			collate_fn = cat_default_collate
 		return collate_fn(outs)
 	return outs
 
 
 class make_infinite(DataLoader):
-	def __init__(self, loader, extractor=None):
+	def __init__(self, loader, extractor=None, collate=cat_default_collate):
 		assert len(loader) >= 1, 'has no len'
 		self.loader = loader
 		self.itr = None
 		self.extractor = extractor
+		self.collate = collate
 		
 		self.cached = None
 	
@@ -90,17 +143,30 @@ class make_infinite(DataLoader):
 	def empty(self):
 		self.cached = None
 	
-	def demand(self, N, extract=None, merge=None):
+	def _find_size(self, batch):
+		if isinstance(batch, (TensorDict, TensorList)):
+			return batch.size(0)
+		return len(batch)
+	
+	def _split_size(self, batch, num):
+		if isinstance(batch, (TensorDict, TensorList)):
+			return batch.split(num)
+		return batch[:num], batch[num:]
+	
+	def demand(self, N, extract=None, collate=None):
 		'''
 		
 		:param N:
 		:param extract: callable input: raw batch; output: mergable data with len()
-		:param merge: callable input: list of extracted batches; output: whatever is expected
+		:param collate: callable input: list of extracted batches; output: whatever is expected
 		:return:
 		'''
 		
 		if extract is None:
 			extract = self.extractor
+		
+		if collate is None:
+			collate = self.collate
 		
 		missing = N
 		batches = []
@@ -115,13 +181,14 @@ class make_infinite(DataLoader):
 				x = self.cached
 				self.cached = None
 			
-			if len(x) > missing:
-				self.cached = x[missing:]
-				x = x[:missing]
-			missing -= len(x)
+			num = self._find_size(x)
+			
+			if num > missing:
+				x, self.cached = self._split_size(x, missing)
+			missing -= num
 			batches.append(x)
 		
-		return (torch.cat(batches),) if merge is None else merge(batches)
+		return collate(batches)
 	
 	def __next__(self):
 		if self.itr is not None:

@@ -10,7 +10,8 @@ from .containers import *
 from .logging import *
 from .features import *
 from . import distributions
-from .distributions import get_distrib_param_size, get_distribution_base, constrain_real, DistributionBase
+from .distributions import get_distrib_param_size, get_distribution_base, constrain_real, Distribution
+from . import distributions as distrib
 
 #from .setup import *
 try:

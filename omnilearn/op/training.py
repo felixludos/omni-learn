@@ -1,5 +1,5 @@
 
-import sys
+import sys, os
 from pathlib import Path
 from tqdm import tqdm
 
@@ -160,6 +160,7 @@ class Epoch(RunEvent):
 			N = self.step_limit
 		loader = enumerate(loader)
 		if self.pbar is not None:
+			self.pbar.reset()
 			loader = self.pbar(loader, limit=N)
 		
 		if records is not None:
@@ -176,7 +177,7 @@ class Epoch(RunEvent):
 				progress = model.get_description()
 				self.pbar.set_description(f'{title} {progress}')
 			
-			if self.step_limit is not None and i >= self.step_limit:
+			if self.step_limit is not None and i+1 >= self.step_limit:
 				break
 		
 		if self.pbar is not None:
@@ -275,12 +276,13 @@ class Checkpointer(RunEvent):
 		if clock is not None:
 			clock.checkpoint(path)
 	
+	
 	def create_path(self, num, root=None):
 		if root is None:
 			root = self.root
 	
 		if root is None:
-			pass
+			raise NotImplementedError
 			
 		path = Path(root) / f'ckpt{num}'
 		return path
@@ -304,7 +306,15 @@ class Checkpointer(RunEvent):
 		if records is not None:
 			records.prep_checkpoint(num)
 		
-		return self.save_checkpoint(path, dataset, model, records, clock)
+		self.save_checkpoint(path, dataset, model, records, clock)
+		
+		if root is None:
+			root = self.root
+		if (root/'last').exists():
+			os.remove(str(root/'last'))
+		os.symlink(str(path), str(root/'last'), target_is_directory=True)
+		
+		return path
 		
 	def activate(self, tick, info=None):
 		assert info is not None
@@ -319,9 +329,11 @@ class Checkpointer(RunEvent):
 		records = info.get_records() if self.records is None else self.records
 		clock = info.get_clock() if self.clock is None else self.clock
 		
-		self.checkpoint(dataset=dataset, model=model, records=records, clock=clock, root=root, num=tick)
+		path = self.checkpoint(dataset=dataset, model=model, records=records, clock=clock, root=root, num=tick)
 		
 		self._limit_checkpoints(root)
+		
+		info.update_ckpt_path(path)
 		
 		
 @fig.Component('run/viz')
@@ -380,7 +392,8 @@ def iterative_training(A=None, run=None):
 	
 	include_eval = A.pull('include-eval', True)
 	if include_eval:
-		evaluate(A=None, run=run)
+		output = run.evaluate()
+		run.evaluation_output = output
 	
 	print(f'Completed {run.get_name()}')
 	

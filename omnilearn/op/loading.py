@@ -1,7 +1,9 @@
 import pickle
 from pathlib import Path
+import numpy as np
 import torch
 
+from omnibelt import load_txt, save_txt
 import omnifig as fig
 
 from .. import util
@@ -21,31 +23,19 @@ CompatibilityUnpickler.Unpickler = CompatibilityUnpickler
 @fig.Component('run')
 class Torch_Run(Run):
 	
-	def has_results(self, ident, path=None, ext=None):
+	def has_results(self, ident, path=None, ext=None, persistent=False):
 		if ext is None:
 			ext = 'pth.tar'
-		return super().has_results(ident, path=path, ext=ext)
+		return super().has_results(ident, path=path, ext=ext, persistent=persistent)
 	
-	def _save_results(self, data, path=None, name=None, ext='pth.tar'):
-		if path is None:
-			path = self.get_path()
-		
-		path = Path(path)
-		if path.is_dir():
-			assert name is not None, 'name is missing'
-			path = path / f'{name}.{ext}'
-		
-		return torch.save(data, str(path))
+	def _save_results(self, data, path=None, name=None, ext='pth.tar', overwrite=False):
+		path = self._get_results_path(path, name=name, ext=ext)
+		if not path.exists() or overwrite:
+			torch.save(data, str(path))
+			return path
 	
 	def _load_results(self, path=None, name=None, ext='pth.tar', device=None, **kwargs):
-		if path is None:
-			path = self.get_path()
-		
-		path = Path(path)
-		if path.is_dir():
-			assert name is not None, 'name is missing'
-			path = path / f'{name}.{ext}'
-			
+		path = self._get_results_path(path, name=name, ext=ext)
 		
 		special = {'map_location':device} if device is not None else {}
 		try:
@@ -53,6 +43,67 @@ class Torch_Run(Run):
 		except ModuleNotFoundError:
 			special['pickle_module'] = CompatibilityUnpickler
 			return torch.load(str(path), **special)
+
+
+@fig.AutoModifier('smart-results')
+class SmartResults(Torch_Run):
+	
+	def _save_results(self, data, path=None, name=None, ext=None, overwrite=False,
+	                  separate_dict=True, recursive=False):
+		
+		if separate_dict and isinstance(data, dict):
+			ext = None
+		elif isinstance(data, str):
+			ext = 'txt'
+		elif isinstance(data, (np.ndarray, int, float)):
+			ext = 'npy'
+		else:
+			ext = 'pth.tar'
+		
+		path = self._get_results_path(path, name=name, ext=ext)
+		
+		if ext is None:
+			if not path.exists():
+				path.mkdir()
+			for key, value in data.items():
+				self._save_results(value, path=path, name=key, overwrite=overwrite,
+				                   separate_dict=separate_dict and recursive, recursive=recursive)
+		elif ext == 'txt':
+			save_txt(data, path)
+		elif ext == 'npy':
+			np.save(str(path), data)
+		else:
+			torch.save(data, str(path))
+		
+		return path
+	
+	
+	def _load_results(self, path=None, name=None, ext=None, device=None, delimiter='/', **kwargs):
+		
+		assert path is not None or name is not None, 'no info'
+		
+		if isinstance(name, str):
+			name = name.split(delimiter)
+		if name is not None:
+			name = Path(*name)
+		
+		path = self._get_results_path(path=path, name=name, ext=ext)
+		if path.is_dir():
+			return {p.stem: self._load_results(path=p, device=device, delimiter=delimiter, **kwargs)
+			        for p in path.glob('*')}
+		elif not path.is_file():
+			fix = list(path.parents[0].glob(f'{path.name}*'))
+			if len(fix) == 0:
+				raise FileNotFoundError(str(path))
+			path = fix[0]
+		
+		if path.suffix == '.txt':
+			return load_txt(path)
+		elif path.suffix == '.npy':
+			return np.load(str(path))
+		return torch.load(str(path))
+	
+
 
 def respect_config(A):
 	device = A.push('device', 'cuda' if torch.cuda.is_available() else 'cpu',

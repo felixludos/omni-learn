@@ -14,13 +14,18 @@ import omnifig as fig
 
 from .features import Deviced, DeviceBase
 
-class DistributionBase(DeviceBase, distrib.Distribution):
+class Distribution(DeviceBase, distrib.Distribution):
 	def __init__(self, *args, device=None, **kwargs):
 		if device is not None:
 			args = tuple((a.to(device) if isinstance(a, torch.Tensor) else a) for a in args)
 			kwargs = {k:(v.to(device) if isinstance(v, torch.Tensor) else v) for k,v in kwargs.items()}
 		super().__init__(*args, device=device, **kwargs)
 		# self.to(self.device)
+	
+	def sample(self, sample_shape=torch.Size()):
+		if isinstance(sample_shape, int):
+			sample_shape = sample_shape,
+		return super().sample(sample_shape)
 	
 	def bsample(self):
 		'''
@@ -37,14 +42,10 @@ class DistributionBase(DeviceBase, distrib.Distribution):
 				setattr(self, p, data.to(device))
 
 
-class Distribution(Deviced, fig.Configurable, DistributionBase):
-	def sample(self, sample_shape=torch.Size()):
-		if isinstance(sample_shape, int):
-			sample_shape = sample_shape,
-		return super().sample(sample_shape)
+class DistributionFunction(Deviced, fig.Configurable, Distribution):
+	pass
 
-
-_available_base_distributions = {x.lower(): type(f'{x}Base', (DistributionBase, t), {})
+_available_base_distributions = {x.lower(): type(x, (Distribution, t), {})
                                  for x in distrib.__dict__['__all__']
                                  if type((t := getattr(distrib, x))) == type and t.__name__ !='Distribution' and issubclass(t, distrib.Distribution)}
 locals().update({t.__name__:t for t in _available_base_distributions.values()})
@@ -89,7 +90,7 @@ def get_distribution_base(ident):
 	return _available_base_distributions.get(ident.lower())
 
 
-class TorchDistribution(Distribution):
+class TorchDistribution(DistributionFunction):
 	def __init__(self, A, **kwargs):
 		params = self._config_params(A, **kwargs)
 		super().__init__(A, **params, **kwargs)
@@ -124,7 +125,7 @@ class TorchDistribution(Distribution):
 		return params
 
 
-_available_distributions = {k: type(t.__name__[:-4], (TorchDistribution, t), {})
+_available_distributions = {k: type(f'{t.__name__}Function', (TorchDistribution, t), {})
                                  for k,t in _available_base_distributions.items()}
 locals().update({t.__name__:t for t in _available_distributions.values()})
 

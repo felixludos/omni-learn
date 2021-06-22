@@ -65,6 +65,9 @@ def find_path(base, A, silent=False, allow_file=True):
 	if 'ckpt' in path.stem:
 		return path.parents[0]
 	
+	if 'last' in path.stem:
+		return path.parents[0]
+	
 	return path
 
 def find_ckpt_path(path, A, silent=False):
@@ -181,6 +184,7 @@ class Run(Configurable):
 			A.push('path', path, silent=silent)
 			path = Path(path)
 		self.path = path
+		self._ckpt_path = None
 		self.novel = path is None
 		
 		if invisible:
@@ -281,7 +285,11 @@ class Run(Configurable):
 	def _load_storage(self, A):
 		self.name = self.path.stem
 		
-		ckpt = find_ckpt_path(self.path, A, silent=self.silent)
+		ckpt = self.path / 'last'
+		if not ckpt.exists():
+			ckpt = find_ckpt_path(self.path, A, silent=self.silent)
+
+		self._ckpt_path = ckpt
 		ckpt = str(ckpt)
 		
 		A.push('dataset._load-ckpt', ckpt, overwrite=True, silent=self.silent)
@@ -386,6 +394,7 @@ class Run(Configurable):
 	def get_loader(self, mode=None, **kwargs):
 		return self.get_dataset().get_loader(mode, **kwargs)
 	
+	
 	def get_results(self, ident, path=None, remove_ext=True, **kwargs): # you must specify which results (ident used when results were created)
 		
 		if ident in self.results:
@@ -401,42 +410,71 @@ class Run(Configurable):
 		return self.results[fixed]
 
 
-	def update_results(self, ident, data, path=None, overwrite=False, remove_ext=True):
+	def update_results(self, ident, data, path=None, overwrite=False, remove_ext=True, **kwargs):
 
 		fixed = ident.split('.')[0] if remove_ext else ident
 
-		if self.has_results(fixed, path=path) and not overwrite:
-			old = self.get_results(fixed, path=path)
-			old.update(data)
-			data = old
-
-		self._save_results(data, name=fixed, path=path)
+		self.results[fixed] = data
+		return self._save_results(data, name=fixed, path=path, overwrite=overwrite, **kwargs)
 		
-		if fixed in self.results:
-			self.results[fixed] = data
-			
-		return data
-
-
-	def has_results(self, ident, path=None, ext=None):
-		fixed = ident.split('.')[0] if ext is not None else ident
 		
-		if fixed in self.results:
-			return True
+	def store_results(self, data=None, path=None, overwrite=False, remove_ext=True, **kwargs):
+		if data is None:
+			data = self.results
+		return {name:self.update_results(name, value, path=path, overwrite=overwrite, remove_ext=remove_ext, **kwargs)
+		        for name, value in data.items()}
+	
+	
+	def _get_results_path(self, path=None, name=None, ext=None):
+		results_path = self.get_path() if path is None else Path(path)
+		if name is None:
+			if path is None:
+				if (results_path/'last').exists():
+					results_path = results_path/'last'
+				results_path = results_path / 'results'
+				if not results_path.exists():
+					results_path.mkdir()
+			return results_path
 		
-		if ext is not None:
-			fixed = f'{fixed}.{ext}'
+		file_name = name if ext is None else f'{str(name)}.{ext}'
+		
+		file_path = results_path / file_name
+		if file_path.exists():
+			return file_path
 		
 		if path is None:
-			path = self.get_path()
-		return (path/fixed).is_file()
-
+			if (results_path / 'last').exists():
+				results_path = results_path / 'last'
+			results_path = results_path / 'results'
+			if not results_path.exists():
+				results_path.mkdir()
+		return results_path / file_name
+	
+	
+	def has_results(self, ident, path=None, ext=None, persistent=False):
+		fixed = ident.split('.')[0] if ext is not None else ident
+		
+		if fixed in self.results and not persistent:
+			return True
+		
+		return self._get_results_path(path=path, name=ident, ext=ext).exists()
+		
 	# endregion
 	
 	# region Signals
 
 	def get_path(self):
 		return self.path
+
+	def update_ckpt_path(self, path):
+		self._ckpt_path = path
+
+	def get_ckpt_path(self):
+		if self._ckpt_path is None:
+			last = self.get_path() / 'last'
+			if last.exists():
+				return last
+		return self._ckpt_path
 
 	def get_batch(self):
 		if self.batch is None:
@@ -603,10 +641,14 @@ class Run(Configurable):
 		config.push('mode', mode, force_root=True, silent=True)
 		
 		if path is None:
-			path = self.get_path()
+			save_results = config.pull('save-results', True)
+			if save_results:
+				path = self._get_results_path()
 		if path is not None:
 			path = Path(path)
 			print(f'Will save results to {str(path)}')
+		else:
+			print('WARNING: results of evaluation will not be saved')
 			
 		dataset = self.get_dataset()
 		model = self.get_model()
@@ -681,8 +723,10 @@ class Run(Configurable):
 		if store_batch and output is not None:
 			output['batch'] = batch
 		if path is not None:
-			self.update_results(ident, {k:v for k,v in output.items()}, path=path)
-			records.checkpoint(path)
+			self.update_results(ident, dict(output), path=path)
+			cpath = self.get_ckpt_path()
+			if cpath is not None:
+				records.checkpoint(cpath)
 		
 		fmt, N = _records_info
 		records.set_fmt(fmt)

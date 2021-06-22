@@ -83,6 +83,7 @@ class BCEWithLogitsLoss(Loss, nn.BCEWithLogitsLoss):
 	pass
 
 
+@fig.AutoComponent('criterion') # TODO: legacy
 @fig.AutoComponent('loss')
 def get_loss_type(ident, **kwargs):
 

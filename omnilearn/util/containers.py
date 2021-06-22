@@ -51,6 +51,21 @@ class TensorDict(Movable, OrderedDict):
 
 		raise Exception('No torch.Tensor found')
 
+	def split(self, num):
+		# assert 0 < num < self.size(0)
+		start, end = TensorDict(), TensorDict()
+		for key, val in self.items():
+			start[key] = val[:num]
+			end[key] = val[num:]
+		return start, end
+
+	@staticmethod
+	def merge(ds):
+		merged = TensorDict()
+		for key in ds[0].keys():
+			merged[key] = torch.cat([d[key] for d in ds])
+		return merged
+
 	def size(self, *args, **kwargs):
 		if self._size_key is None:
 			self._find_size_key()
@@ -93,6 +108,14 @@ class TensorList(Movable, list):
 
 		return self
 
+	@staticmethod
+	def merge(ls):
+		return TensorList([torch.cat(el) for el in zip(*ls)])
+
+	def split(self, num):
+		# assert 0 < num < self.size(0)
+		return TensorList(x[:num] for x in self), TensorList(x[num:] for x in self)
+		
 	def _find_size_key(self):
 		for i, x in enumerate(self):
 			if isinstance(x, torch.Tensor):

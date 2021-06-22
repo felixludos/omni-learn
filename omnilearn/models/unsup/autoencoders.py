@@ -72,7 +72,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 		if 'latent' in info:
 			q = info.latent
 			if 'latent' in settings and q is not None:
-				if isinstance(info.latent, util.DistributionBase):
+				if isinstance(info.latent, util.Distribution):
 					q = q.bsample()
 
 				shape = q.size()
@@ -93,7 +93,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 				N = min(B, 8)
 
 				R = info.reconstruction
-				if isinstance(R, util.DistributionBase):
+				if isinstance(R, util.Distribution):
 					R = R.bsample()
 				
 				viz_x, viz_rec = X[:N], R[:N]
@@ -234,7 +234,7 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 		super().__init__(A, **kwargs)
 
 	def decode(self, q):
-		if isinstance(q, util.DistributionBase):
+		if isinstance(q, util.Distribution):
 			q = q.rsample() if self.training else q.bsample()
 		return super().decode(q)
 

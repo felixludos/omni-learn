@@ -68,8 +68,9 @@ class Progress_Bar(Singleton):
 	
 	def unpause(self):
 		if self.pause_state is not None:
-			self.reset()
-			self.init_pbar(**self.pause_state)
+			if self.pause_state['limit'] > self.pause_state['initial']:
+				self.reset()
+				self.init_pbar(**self.pause_state)
 			self.pause_state = None
 	
 	def init_pbar(self, itr=None, limit=None, initial=0, desc=None, total=None, **kwargs):
