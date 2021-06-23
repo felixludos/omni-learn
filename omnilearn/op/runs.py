@@ -76,7 +76,7 @@ def find_ckpt_path(path, A, silent=False):
 	if path.is_file():
 		path = path.parents[0]
 	
-	if path.is_dir() and 'ckpt' in path.stem:
+	if path.is_dir() and ('ckpt' in path.stem or 'last' in path.name):
 		return path
 	
 	if not path.is_dir():
