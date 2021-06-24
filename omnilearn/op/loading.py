@@ -89,7 +89,7 @@ class SmartResults(Torch_Run):
 		
 		path = self._get_results_path(path=path, name=name, ext=ext)
 		if path.is_dir():
-			return {p.stem: self._load_results(path=p, device=device, delimiter=delimiter, **kwargs)
+			return {p.stem.split('.')[0]: self._load_results(path=p, device=device, delimiter=delimiter, **kwargs)
 			        for p in path.glob('*')}
 		elif not path.is_file():
 			fix = list(path.parents[0].glob(f'{path.name}*'))
