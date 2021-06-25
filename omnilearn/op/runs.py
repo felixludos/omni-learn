@@ -405,6 +405,7 @@ class Run(Configurable):
 		if fixed in self.results:
 			return self.results[fixed]
 
+		# print(f'loading {fixed}')
 		self.results[fixed] = self._load_results(name=ident, path=path, **kwargs)
 
 		return self.results[fixed]
