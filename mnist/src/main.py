@@ -5,12 +5,12 @@ import time
 import torch
 import omnifig as fig
 
-import omnilearn as fd
+import omnilearn as learn
 from omnilearn import util
 from omnilearn import models
 
 @fig.Component('simple')
-class Simple_Model(fd.Model):
+class Simple_Model(learn.Model):
 	def __init__(self, info):
 
 		net = info.pull('net')

@@ -1,6 +1,6 @@
 omnibelt
 omnifig
-numpy
+numpy>=1.19.5
 networkx
 matplotlib
 torch

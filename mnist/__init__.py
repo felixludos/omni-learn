@@ -1,3 +1,3 @@
 
 
-from .main import Simple_Model
+from .src.main import Simple_Model

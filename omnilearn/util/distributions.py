@@ -45,9 +45,12 @@ class Distribution(DeviceBase, distrib.Distribution):
 class DistributionFunction(Deviced, fig.Configurable, Distribution):
 	pass
 
-_available_base_distributions = {x.lower(): type(x, (Distribution, t), {})
-                                 for x in distrib.__dict__['__all__']
-                                 if type((t := getattr(distrib, x))) == type and t.__name__ !='Distribution' and issubclass(t, distrib.Distribution)}
+
+_available_base_distributions = {}
+for x in distrib.__dict__['__all__']:
+	t = getattr(distrib, x)
+	if type(t) == type and t.__name__ !='Distribution' and issubclass(t, distrib.Distribution):
+		_available_base_distributions[x.lower()] = type(x, (Distribution, t), {})
 locals().update({t.__name__:t for t in _available_base_distributions.values()})
 
 # class NormalBase(DistributionBase, distrib.Normal):

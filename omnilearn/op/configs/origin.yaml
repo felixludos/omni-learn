@@ -11,6 +11,7 @@ run:
   _type: run
   _mod:
     inline: 5
+#    smart-results: 7
   allow-missing-mods: True
 
 
