@@ -14,7 +14,7 @@ except:
 
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data._utils.collate import np_str_obj_array_pattern, string_classes, \
-	int_classes, default_collate_err_msg_format
+	default_collate_err_msg_format
 
 from .misc import TreeSpace
 import random
@@ -60,7 +60,7 @@ def cat_default_collate(batch): # copy of pytorch's default collate except assum
 			return torch.as_tensor(batch)
 	elif isinstance(elem, float):
 		return torch.tensor(batch, dtype=torch.float64)
-	elif isinstance(elem, int_classes):
+	elif isinstance(elem, int):
 		return torch.tensor(batch)
 	elif isinstance(elem, string_classes):
 		return batch
