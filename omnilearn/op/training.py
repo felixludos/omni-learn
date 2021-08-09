@@ -312,7 +312,7 @@ class Checkpointer(RunEvent):
 			root = self.root
 		if (root/'last').exists():
 			os.remove(str(root/'last'))
-		os.symlink(str(path), str(root/'last'), target_is_directory=True)
+		os.symlink(str(path.name), str(root/'last'), target_is_directory=True)
 		
 		return path
 		
