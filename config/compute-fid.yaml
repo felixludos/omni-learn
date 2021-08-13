@@ -6,5 +6,6 @@ dataset:
 
 pbar._type: progress-bar
 
-n_samples: 100
+n_samples: 50000
 dim: 64
+

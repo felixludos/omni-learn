@@ -33,7 +33,8 @@ def compute_fid(A):
 	run = None
 	gen_fn = None
 	stats_save_name = None
-	
+
+	model = None
 	if use_model:
 		raise NotImplementedError # TODO
 		

@@ -112,13 +112,17 @@ class Distribution(Stochastic):
 	'''Automodifier that turns a function output into a distribution'''
 	def __init__(self, A, autosample=None, distrib_cls=None, joint_params=None, modify_out_layer=None,
 	             force_distrib_layer=None, distrib_layer_info=None, constraint_eps=None,
+	             soft_constraint_transform=None,
 	             **kwargs):
 		if autosample is None:
 			autosample = A.pull('autosample', None)
 		
 		if constraint_eps is None:
 			constraint_eps = A.pull('constraint-eps', '<>epsilon', 1e-12)
-		
+
+		if soft_constraint_transform is None:
+			soft_constraint_transform = A.pull('soft-constraint-transform', False)
+
 		if distrib_cls is None:
 			distrib_cls = A.pull('src-distrib')
 		distrib_cls = util.get_distribution_base(distrib_cls)
@@ -167,6 +171,7 @@ class Distribution(Stochastic):
 		
 		self._use_autosample = autosample
 		self._constraint_eps = constraint_eps
+		self._soft_constraint_transform = soft_constraint_transform
 	
 	
 	def _create_distrib_layer(self, A, distrib_layer_info=None, joint_params=None, force_distrib_layer=None):
@@ -240,7 +245,8 @@ class Distribution(Stochastic):
 		else:
 			params = {key:self.distrib_layer[key](params) for key in self._param_constraints}
 		
-		params = {key: util.constrain_real(cons, params[key]) for key, cons in self._param_constraints.items()}
+		params = {key: util.constrain_real(cons, params[key], soft_constraints=self._soft_constraint_transform)
+		          for key, cons in self._param_constraints.items()}
 		return self._distrib_cls(**params)
 
 

@@ -57,13 +57,13 @@ locals().update({t.__name__:t for t in _available_base_distributions.values()})
 # 	pass
 # _available_base_distributions['normal'] = NormalBase
 
-def constrain_real(cons, real, eps=1e-12):
+def constrain_real(cons, real, eps=1e-12, soft_constraints=False):
 	
 	if cons == constraints.simplex:
 		return F.normalize(real, p=1, dim=1).abs()
 	
 	if isinstance(cons, (constraints.greater_than, constraints.greater_than_eq)) and cons.lower_bound == 0:
-		return real.exp()
+		return F.softplus(real) if soft_constraints else real.exp()
 	
 	if isinstance(cons, constraints.interval):
 		mn, mx = cons.lower_bound, cons.upper_bound
