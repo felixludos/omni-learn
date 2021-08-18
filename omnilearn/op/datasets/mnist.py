@@ -82,7 +82,7 @@ class Torchvision_Toy_Dataset(Batchable, Deviced, Downloadable, ImageDataset): #
 		images = self.data
 		if isinstance(images, np.ndarray):
 			images = torch.from_numpy(images)
-		images = images.float().div(255)
+		images = images.float().div(255).clamp(1e-7, 1-1e-7)
 		if images.ndimension() == 3:
 			images = images.unsqueeze(1)
 		

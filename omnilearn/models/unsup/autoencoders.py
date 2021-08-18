@@ -248,10 +248,9 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 		out = super()._step(batch, out=out)
 
 		if self.has_stat('bpd'):
-			self.mete('bpd', eval.bits_per_dim(out.original, out.reconstruction.detach()))
+			self.mete('bpd', eval.bits_per_dim(out.original, out.reconstruction))
 		if self.has_stat('elbo'):
-			self.mete('elbo', eval.elbo(out.original, out.reconstruction.detach(),
-			                            out.reg_loss.detach()))
+			self.mete('elbo', eval.elbo(out.original, out.reconstruction, out.reg_loss))
 
 		return out
 

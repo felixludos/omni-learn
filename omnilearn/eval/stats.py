@@ -5,9 +5,9 @@ from torch.nn import functional as F
 from ..util import Distribution
 
 
-def negative_log_likelihood(original, reconstruction, batch_mean=True):
+def log_likelihood(original, reconstruction, batch_mean=True):
 	if isinstance(reconstruction, Distribution):
-		return -reconstruction.log_prob(original).view(original.size(0),-1).sum(-1).mean()
+		return reconstruction.log_prob(original).view(original.size(0),-1).sum(-1).mean()
 	if len(reconstruction.shape) > 2:
 		return F.binary_cross_entropy(reconstruction, original, reduction='none')\
 			.view(original.size(0),-1).sum(-1).mean()
@@ -15,13 +15,13 @@ def negative_log_likelihood(original, reconstruction, batch_mean=True):
 
 
 def elbo(original, reconstruction, kl, batch_mean=True):
-	nll = negative_log_likelihood(original, reconstruction, batch_mean=batch_mean)
-	return nll - kl
+	ll = log_likelihood(original, reconstruction, batch_mean=batch_mean)
+	return ll - kl
 
 
 def bits_per_dim(original, reconstruction, batch_mean=True):
-	return negative_log_likelihood(original, reconstruction, batch_mean=batch_mean) \
-	       / np.log(2) / int(np.prod(original.shape))
+	ll = log_likelihood(original, reconstruction, batch_mean=batch_mean)
+	return ll / np.log(2) / int(np.prod(original.shape))
 
 
 

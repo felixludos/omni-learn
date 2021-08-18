@@ -1,3 +1,4 @@
+import os
 import pickle
 from pathlib import Path
 import numpy as np
@@ -112,6 +113,9 @@ def respect_config(A):
 	cudnn_det = A.pull('cudnn_det', False)
 	if 'cuda' in device:
 		torch.backends.cudnn.deterministic = cudnn_det
+
+	if A.pull('cuda-blocking', True):
+		os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 	
 	A.push('seed', util.gen_random_seed(), overwrite=False, silent=False)
 	
