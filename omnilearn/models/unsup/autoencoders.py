@@ -12,7 +12,7 @@ from ... import util
 from .. import losses
 
 from ..features import Prior, Gaussian
-
+from ... import eval
 
 @fig.Component('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
@@ -212,8 +212,7 @@ class Generative_AE(Prior, Autoencoder):
 
 @fig.Component('vae')
 class Variational_Autoencoder(Generative_AE, Gaussian):
-
-	def __init__(self, A, **kwargs):
+	def __init__(self, A, include_bpd=None, include_elbo=None, **kwargs):
 
 		# mod_check = A.pull('mod_check', True)  # make sure encoder outputs a normal distribution
 		# if mod_check:
@@ -225,6 +224,12 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 		# 	else:
 		# 		A.push('encoder._mod.normal', 1)
 
+		if include_elbo is None:
+			include_elbo = A.pull('include-elbo', True)
+
+		if include_bpd is None:
+			include_bpd = A.pull('include-bpd', True)
+
 		A.push('reg', None)  # already taken care of
 		wt = A.pull('reg-wt', None, silent=True)
 		if wt is None or wt <= 0:
@@ -233,10 +238,28 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 
 		super().__init__(A, **kwargs)
 
+		if include_bpd:
+			self.register_stats('bpd')
+		if include_elbo:
+			self.register_stats('elbo')
+
+
+	def _step(self, batch, out=None):
+		out = super()._step(batch, out=out)
+
+		if self.has_stat('bpd'):
+			self.mete('bpd', eval.bits_per_dim(out.original, out.reconstruction))
+		if self.has_stat('elbo'):
+			self.mete('elbo', eval.elbo(out.original, out.reconstruction, out.reg_loss))
+
+		return out
+
+
 	def decode(self, q):
 		if isinstance(q, util.Distribution):
 			q = q.rsample() if self.training else q.bsample()
 		return super().decode(q)
+
 
 	def regularize(self, q):
 		return util.standard_kl(q).sum() / q.loc.size(0)

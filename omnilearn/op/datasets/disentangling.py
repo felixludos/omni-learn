@@ -350,7 +350,7 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 	def __getitem__(self, item):
 		# if isinstance(item, (np.ndarray, torch.Tensor)):
 		# 	item = item.tolist()
-		images = self.images[item].float().div(255)
+		images = self.images[item].float().div(255).clamp(1e-7, 1-1e-7)
 		# if self.noise is not None:
 		# 	images = images.add(torch.randn_like(images).mul(self.noise)).clamp(0,1)
 		if self.labeled:
@@ -679,7 +679,7 @@ class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and 
 	
 	def __getitem__(self, item):
 		
-		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255)
+		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
 		
 		if self.resize is not None:
 			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
@@ -880,7 +880,7 @@ class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 	def __getitem__(self, idx):
 		if self.sel_index is not None:
 			idx = self.sel_index[idx]
-		imgs = self.images[idx].float().div(255)
+		imgs = self.images[idx].float().div(255).clamp(1e-7, 1-1e-7)
 		if self.labeled:
 			labels = self.get_label(self.indices[idx])
 			return imgs, labels
@@ -983,7 +983,7 @@ class OldFullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading a
 	
 	def __getitem__(self, item):
 		
-		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255)
+		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
 		
 		if self.resize is not None:
 			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)

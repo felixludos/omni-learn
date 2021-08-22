@@ -307,7 +307,10 @@ class StatsClient(Configurable):
 			if self._stats_fmt is not None:
 				name = self._stats_fmt.format(name)
 			self._stats.mete(name, val, n=n)
-	
+
+	def has_stat(self, name):
+		return name in self._stats
+
 	def get_stat(self, name):
 		if self._stats is not None:
 			if self._stats_fmt is not None:
