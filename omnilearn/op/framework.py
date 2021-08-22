@@ -135,7 +135,7 @@ class Savable(Checkpointable, Function):
 		return path
 	
 
-class Fitable(Function): # TODO: split into different groups
+class Fitable(FunctionBase): # TODO: split into different groups
 	# Estimator
 	def fit(self, data, targets=None):
 		raise NotImplementedError
@@ -157,6 +157,14 @@ class Fitable(Function): # TODO: split into different groups
 	# Model
 	def score(self, data):
 		raise NotImplementedError
+	
+	# Loading/Saving
+	def get_params(self):
+		return self.state_dict()
+	
+	def set_params(self, **params):
+		return self.load_state_dict(params)
+	
 
 class Initializable(Function): # TODO: include in load-model
 	def init_params(self, dataset):

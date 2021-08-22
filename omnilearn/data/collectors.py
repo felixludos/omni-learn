@@ -146,6 +146,20 @@ class ImageDataset(Dataset):
 		raise MissingFIDStatsError(self.root, dim, modes, available)
 
 
+class Memory_Dataset(Dataset):
+	
+	def get_observations(self):
+		raise NotImplementedError
+	def get_labels(self):
+		raise NotImplementedError
+	def update_data(self, indices):
+		raise NotImplementedError
+	def _replace_observations(self, observations):
+		raise NotImplementedError
+	def _replace_labels(self, labels):
+		raise NotImplementedError
+
+
 class List_Dataset(Dataset):
 
 	def __init__(self, ls):

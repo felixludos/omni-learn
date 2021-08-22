@@ -9,6 +9,7 @@ from .optim import *
 from .containers import *
 from .logging import *
 from .features import *
+from .spaces import *
 from . import distributions
 from .distributions import get_distrib_param_size, get_distribution_base, constrain_real, Distribution
 from . import distributions as distrib

@@ -146,21 +146,35 @@ class Torchvision_Toy_Dataset(Batchable, Deviced, Downloadable, ImageDataset): #
 class MNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.MNIST):
 	din = (1, 28, 28)
 	dout = 10
+	true_label_space = util.CategoricalDim(10)
+	theory_label_space = true_label_space
+
+
 
 @register_dataset('kmnist')
 class KMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.KMNIST):
 	din = (1, 28, 28)
 	dout = 10
+	true_label_space = util.CategoricalDim(10)
+	theory_label_space = true_label_space
+
+
 
 @register_dataset('fmnist')
 class FashionMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.FashionMNIST):
 	din = (1, 28, 28)
 	dout = 10
+	true_label_space = util.CategoricalDim(10)
+	theory_label_space = true_label_space
+
+
 
 @register_dataset('emnist')
 class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST):
 	din = (1, 28, 28)
 	dout = 26
+	true_label_space = util.CategoricalDim(26) # TODO: adjust depending on split_keys
+	theory_label_space = true_label_space
 	
 	_split_keys = {
 		'byclass': '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy',
@@ -219,7 +233,8 @@ class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST
 			self.labels -= 1  # targets use 1-based indexing :(
 		
 		self.labels_key = self._split_keys[self.split]
-	
+		
+		
 	@classmethod
 	def _get_dataset_kwargs(cls, A, split=None, **other):
 		kwargs = super()._get_dataset_kwargs(A, **other)
@@ -229,12 +244,16 @@ class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST
 		return kwargs
 
 
+
 @register_dataset('svhn')
 class SVHN(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.SVHN):
 	din = (3, 32, 32)
 	dout = 10
+	true_label_space = util.CategoricalDim(10)
+	theory_label_space = true_label_space
 	
 	_default_label_attr = 'labels'
+
 
 	@classmethod
 	def _get_dataset_kwargs(cls, A, **unused):
@@ -244,19 +263,27 @@ class SVHN(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.SVHN):
 		return kwargs
 
 
+
 @register_dataset('cifar10')
 class CIFAR10(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR10):
 	din = (3, 32, 32)
 	dout = 10
+	true_label_space = util.CategoricalDim(10)
+	theory_label_space = true_label_space
+
 
 	def _get_dataroot(cls, *args, ident=None, **kwargs):
 		return super()._get_dataroot(*args, ident='cifar', **kwargs)
+
 
 
 @register_dataset('cifar100')
 class CIFAR100(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR100):
 	din = (3, 32, 32)
 	dout = 100
+	true_label_space = util.CategoricalDim(100)
+	theory_label_space = true_label_space
+
 
 	def _get_dataroot(cls, *args, ident=None, **kwargs):
 		return super()._get_dataroot(*args, ident='cifar', **kwargs)
