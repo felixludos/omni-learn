@@ -48,10 +48,16 @@ def _rec_decode(obj):
 
 
 class DisentanglementDataset(Memory_Dataset, ImageDataset):
-	
+
 	def get_factor_sizes(self):
 		raise NotImplementedError
 	def get_factor_order(self):
+		raise NotImplementedError
+
+	def get_theoretical_label_space(self):
+		raise NotImplementedError
+
+	def get_true_label_space(self):
 		raise NotImplementedError
 	
 
@@ -214,11 +220,17 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (3, 64, 64)
 	dout = 6
-	true_label_space = util.JointSpace(util.CategoricalDim(10), util.CategoricalDim(10), util.CategoricalDim(10),
-	                              util.CategoricalDim(8), util.CategoricalDim(4), util.CategoricalDim(15))
-	theory_label_space = util.JointSpace(util.PeriodicDim(), util.PeriodicDim(), util.PeriodicDim(),
-	                                     util.BoundDim(0.75, 1.25), util.CategoricalDim(4), util.BoundDim(-30., 30.))
-	
+
+	def get_theoretical_label_space(self):
+		return util.JointSpace(util.PeriodicDim(), util.PeriodicDim(), util.PeriodicDim(),
+		                       util.BoundDim(0.75, 1.25), util.CategoricalDim(4), util.BoundDim(-30., 30.))
+
+	def get_true_label_space(self):
+		return util.JointSpace(util.CategoricalDim(10), util.CategoricalDim(10), util.CategoricalDim(10),
+		                       util.CategoricalDim(8), util.CategoricalDim(4), util.CategoricalDim(15))
+
+
+
 	def __init__(self, A, mode=None, labeled=None, load_labels=None, din=None, dout=None, **kwargs):
 
 		if mode is None:
@@ -706,13 +718,16 @@ class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
 	din = (3, 64, 64)
 	dout = 7
-	true_label_space = util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.CategoricalDim(2),
-	                                   util.CategoricalDim(3), util.CategoricalDim(3),
-	                                   util.CategoricalDim(40), util.CategoricalDim(40))
-	theory_label_space = util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.BoundDim(),
-	                                     util.BoundDim(), util.CategoricalDim(3),
-	                                     util.BoundDim(), util.BoundDim())
-	
+
+	def get_true_label_space(self):
+		return util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.CategoricalDim(2),
+		                       util.CategoricalDim(3), util.CategoricalDim(3),
+		                       util.CategoricalDim(40), util.CategoricalDim(40))
+
+	def get_theoretical_label_space(self):
+		return util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.BoundDim(),
+		                       util.BoundDim(), util.CategoricalDim(3),
+		                       util.BoundDim(), util.BoundDim())
 
 	def __init__(self, A, mode=None, fid_ident=None, **kwargs):
 
