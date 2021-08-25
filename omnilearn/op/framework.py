@@ -135,36 +135,13 @@ class Savable(Checkpointable, Function):
 		return path
 	
 
-class Fitable(FunctionBase): # TODO: split into different groups
-	# Estimator
-	def fit(self, data, targets=None):
-		raise NotImplementedError
-	
-	# Predictor
-	def predict(self, data):
-		raise NotImplementedError
-	
-	def predict_proba(self, data):
-		raise NotImplementedError
-	
-	# Transformer
-	def transform(self, data):
-		raise NotImplementedError
-	
-	def fit_transform(self, data):
-		raise NotImplementedError
-	
-	# Model
-	def score(self, data):
-		raise NotImplementedError
-	
-	# Loading/Saving
+class Learner(FunctionBase):
 	def get_params(self):
 		return self.state_dict()
 	
 	def set_params(self, **params):
 		return self.load_state_dict(params)
-	
+
 
 class Initializable(Function): # TODO: include in load-model
 	def init_params(self, dataset):

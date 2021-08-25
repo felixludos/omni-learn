@@ -390,7 +390,6 @@ class _PeriodicDim(_DimSpec, PeriodicDim):
 
 
 
-
 @fig.Component('space/categorical')
 class _CategoricalDim(_DimSpec, CategoricalDim):
 	def __init__(self, A, n=unspecified_argument, **kwargs):

@@ -139,9 +139,9 @@ class TensorList(Movable, list):
 			else:
 				self[i] = x
 
-class Cached(Deviced):
-	def __init__(self, A, **kwargs):
-		super().__init__(A, **kwargs)
+class Cached(DeviceBase):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
 		self.volatile = TensorDict()
 	
 	def to(self, device):
