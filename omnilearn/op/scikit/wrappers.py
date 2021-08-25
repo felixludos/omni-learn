@@ -63,7 +63,7 @@ class Estimator(util.Cached, Learner, ScikitWrapper, base.BaseEstimator):
 			self.results = None
 		
 		def predict(self):
-		
+			pass
 		
 		def __enter__(self):
 			self.results = {}
