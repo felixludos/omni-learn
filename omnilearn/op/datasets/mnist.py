@@ -20,7 +20,8 @@ from .transforms import Interpolated
 
 
 
-class Torchvision_Toy_Dataset(Batchable, Deviced, Downloadable, ImageDataset): # TODO: enable (pytorch) transforms
+class Torchvision_Toy_Dataset(Memory_Dataset, Batchable, Deviced, Downloadable, ImageDataset):
+	# TODO: enable (pytorch) transforms
 	available_modes = {'train', 'test'}
 
 	_default_label_attr = 'targets'
@@ -146,8 +147,9 @@ class Torchvision_Toy_Dataset(Batchable, Deviced, Downloadable, ImageDataset): #
 class MNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.MNIST):
 	din = (1, 28, 28)
 	dout = 10
-	true_label_space = util.CategoricalDim(10)
-	theory_label_space = true_label_space
+
+	_full_label_space = util.CategoricalDim(10)
+	_all_label_names = list(map(str, range(10)))
 
 
 
@@ -155,8 +157,9 @@ class MNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.MNIST):
 class KMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.KMNIST):
 	din = (1, 28, 28)
 	dout = 10
-	true_label_space = util.CategoricalDim(10)
-	theory_label_space = true_label_space
+
+	_full_label_space = util.CategoricalDim(10)
+	_all_label_names = ['お', 'き', 'す', 'つ', 'な', 'は', 'ま', 'や', 'れ', 'を']
 
 
 
@@ -164,8 +167,9 @@ class KMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.KMNIST
 class FashionMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.FashionMNIST):
 	din = (1, 28, 28)
 	dout = 10
-	true_label_space = util.CategoricalDim(10)
-	theory_label_space = true_label_space
+
+	_full_label_space = util.CategoricalDim(10)
+	_all_label_names = ['top', 'trouser', 'pullover', 'dress', 'coat', 'sandal', 'shirt', 'sneaker', 'bag', 'boot']
 
 
 
@@ -173,9 +177,9 @@ class FashionMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.
 class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST):
 	din = (1, 28, 28)
 	dout = 26
-	true_label_space = util.CategoricalDim(26) # TODO: adjust depending on split_keys
-	theory_label_space = true_label_space
-	
+
+	_full_label_space = util.CategoricalDim(26)
+
 	_split_keys = {
 		'byclass': '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy',
 		'bymerge': '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabdefghnqrt',
@@ -184,6 +188,7 @@ class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST
 		'mnist': '0123456789',
 		'balanced': '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabdefghnqrt',
 	}
+	_all_label_names = list(_split_keys['letters'])
 	
 	def __init__(self, A, **kwargs):
 		
@@ -233,6 +238,9 @@ class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST
 			self.labels -= 1  # targets use 1-based indexing :(
 		
 		self.labels_key = self._split_keys[self.split]
+		self.dout = len(self.labels_key)
+		self._all_label_names = list(self.labels_key)
+		self._full_label_space = util.CategoricalDim(self.dout)
 		
 		
 	@classmethod
@@ -249,8 +257,8 @@ class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST
 class SVHN(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.SVHN):
 	din = (3, 32, 32)
 	dout = 10
-	true_label_space = util.CategoricalDim(10)
-	theory_label_space = true_label_space
+	_full_label_space = util.CategoricalDim(10)
+	_all_label_names = list(map(str, range(10)))
 	
 	_default_label_attr = 'labels'
 
@@ -268,8 +276,8 @@ class SVHN(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.SVHN):
 class CIFAR10(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR10):
 	din = (3, 32, 32)
 	dout = 10
-	true_label_space = util.CategoricalDim(10)
-	theory_label_space = true_label_space
+	_full_label_space = util.CategoricalDim(10)
+	_all_label_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
 
 	def _get_dataroot(cls, *args, ident=None, **kwargs):
@@ -281,8 +289,19 @@ class CIFAR10(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR
 class CIFAR100(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.CIFAR100):
 	din = (3, 32, 32)
 	dout = 100
-	true_label_space = util.CategoricalDim(100)
-	theory_label_space = true_label_space
+	_full_label_space = util.CategoricalDim(100)
+	_all_label_names = ['apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle',
+	                    'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle',
+	                    'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch',
+	                    'cra', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest',
+	                    'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower',
+	                    'leopard', 'lion', 'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain',
+	                    'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear',
+	                    'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit',
+	                    'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk',
+	                    'skyscraper', 'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower',
+	                    'sweet_pepper', 'table', 'tank', 'telephone', 'television', 'tiger', 'tractor', 'train',
+	                    'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman', 'worm']
 
 
 	def _get_dataroot(cls, *args, ident=None, **kwargs):

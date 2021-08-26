@@ -48,17 +48,37 @@ def _rec_decode(obj):
 
 
 class DisentanglementDataset(Memory_Dataset, ImageDataset):
+	_all_mechanism_names = None
+	_all_mechanism_class_names = None
+	_full_mechanism_space = None
+	_full_label_space = None
 
-	def get_factor_sizes(self):
-		raise NotImplementedError
-	def get_factor_order(self):
-		raise NotImplementedError
+	# def get_factor_sizes(self):
+	# 	raise NotImplementedError
+	# def get_factor_order(self):
+	# 	raise NotImplementedError
 
-	def get_theoretical_label_space(self):
-		raise NotImplementedError
+	def get_mechanism_class_names(self, mechanism):
+		if isinstance(mechanism, str):
+			return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))
+		if self._all_mechanism_class_names is not None:
+			return self._all_mechanism_class_names[mechanism]
+	def get_mechanism_class_space(self, mechanism):
+		if isinstance(mechanism, str):
+			return self.get_mechanism_class_space(self.get_mechanism_names().index(mechanism))
+		return self.get_mechanism_space()[mechanism]
 
-	def get_true_label_space(self):
-		raise NotImplementedError
+	def get_mechanism_names(self):
+		return self._all_mechanism_names
+	def get_mechanism_space(self):
+		if self._full_mechanism_space is None:
+			return self.get_label_space()
+		return self._full_mechanism_space
+
+	def get_label_names(self):
+		return self._all_mechanism_names
+	def get_label_sizes(self):
+		return list(map(len, self.get_mechanism_names()))
 	
 
 @fig.AutoModifier('selected')
@@ -221,15 +241,20 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 	din = (3, 64, 64)
 	dout = 6
 
-	def get_theoretical_label_space(self):
-		return util.JointSpace(util.PeriodicDim(), util.PeriodicDim(), util.PeriodicDim(),
+	_all_mechanism_names = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
+	_full_mechanism_space = util.JointSpace(util.PeriodicDim(), util.PeriodicDim(), util.PeriodicDim(),
 		                       util.BoundDim(0.75, 1.25), util.CategoricalDim(4), util.BoundDim(-30., 30.))
-
-	def get_true_label_space(self):
-		return util.JointSpace(util.CategoricalDim(10), util.CategoricalDim(10), util.CategoricalDim(10),
+	_full_label_space = util.JointSpace(util.CategoricalDim(10), util.CategoricalDim(10), util.CategoricalDim(10),
 		                       util.CategoricalDim(8), util.CategoricalDim(4), util.CategoricalDim(15))
 
-
+	_hue_names = ['red', 'orange', 'yellow', 'green', 'seagreen', 'cyan', 'blue', 'dark-blue', 'purple', 'pink']
+	_all_mechanism_class_names = [
+		_hue_names, _hue_names, _hue_names,
+		list(map(str,range(8))),
+		['cube', 'cylinder', 'ball', 'capsule'],
+		list(map(str,range(15))),
+	]
+	del _hue_names
 
 	def __init__(self, A, mode=None, labeled=None, load_labels=None, din=None, dout=None, **kwargs):
 
@@ -248,13 +273,13 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		super().__init__(A, din=din, dout=dout, **kwargs)
 		self.add_existing_modes('test')
 		
-		self.factor_order = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
-		self.factor_sizes = [10, 10, 10, 8, 4, 15]
-		self.factor_num_values = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10,
-		                          'scale': 8, 'shape': 4, 'orientation': 15}
+		# self.factor_order = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
+		# self.factor_sizes = [10, 10, 10, 8, 4, 15]
+		# self.factor_num_values = {'floor_hue': 10, 'wall_hue': 10, 'object_hue': 10,
+		#                           'scale': 8, 'shape': 4, 'orientation': 15}
 		
-		raw_mins = torch.tensor([  0.  ,   0.  ,   0.  ,   0.75,   0.  , -30.  ]).float()
-		raw_maxs = torch.tensor([  0.9 ,  0.9 ,  0.9 ,  1.25,  3.  , 30.  ]).float()
+		# raw_mins = torch.tensor([  0.  ,   0.  ,   0.  ,   0.75,   0.  , -30.  ]).float()
+		# raw_maxs = torch.tensor([  0.9 ,  0.9 ,  0.9 ,  1.25,  3.  , 30.  ]).float()
 		
 		dataroot = self.root / '3dshapes'
 		dataroot.mkdir(exist_ok=True)
@@ -290,11 +315,12 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 			
 			if labels is not None:
 				if label_type == 'class':
-					nums = torch.tensor(self.factor_sizes).float() - 1
-					labels -= raw_mins
-					labels /= raw_maxs - raw_mins
-					labels *= nums
-					labels = labels.round().long()
+					labels = self.get_label_space().transform(labels, self.get_mechanism_space())
+					# nums = torch.tensor(self.factor_sizes).float() - 1
+					# labels -= raw_mins
+					# labels /= raw_maxs - raw_mins
+					# labels *= nums
+					# labels = labels.round().long()
 				self.register_buffer('labels', labels)
 				
 		self.labeled = labeled
@@ -338,10 +364,11 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 				f.create_dataset('train_idx', data=train_idx)
 				f.create_dataset('test_idx', data=test_idx)
 
-	def get_factor_sizes(self):
-		return self.factor_sizes
-	def get_factor_order(self):
-		return self.factor_order
+	# def get_factor_sizes(self):
+	# 	return self.factor_sizes
+	# def get_factor_order(self):
+	# 	return self.factor_order
+
 
 	def get_labels(self):
 		return self.labels
@@ -719,15 +746,22 @@ class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 	din = (3, 64, 64)
 	dout = 7
 
-	def get_true_label_space(self):
-		return util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.CategoricalDim(2),
-		                       util.CategoricalDim(3), util.CategoricalDim(3),
-		                       util.CategoricalDim(40), util.CategoricalDim(40))
-
-	def get_theoretical_label_space(self):
-		return util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.BoundDim(),
+	_all_mechanism_names = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
+		                     'horizonal_axis', 'vertical_axis']
+	_all_mechanism_class_names = [
+		['white', 'green', 'red', 'blue', 'brown', 'olive'],
+		['cone', 'cube', 'cylinder', 'hexagonal', 'pyramid', 'sphere'],
+		['small', 'large'],
+		['top', 'center', 'bottom'],
+		['purple', 'sea_green', 'salmon'],
+		list(map(str,range(40))), list(map(str,range(40))),
+	]
+	_full_mechanism_space = util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.BoundDim(),
 		                       util.BoundDim(), util.CategoricalDim(3),
 		                       util.BoundDim(), util.BoundDim())
+	_full_label_space = util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.CategoricalDim(2),
+		                       util.CategoricalDim(3), util.CategoricalDim(3),
+		                       util.CategoricalDim(40), util.CategoricalDim(40))
 
 	def __init__(self, A, mode=None, fid_ident=None, **kwargs):
 
@@ -749,27 +783,38 @@ class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		dataroot = self.root / 'mpi3d'
 		self.root = dataroot
 		
-		self.factor_order = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
-		                     'horizonal_axis', 'vertical_axis']
-		self.factor_sizes = [6,6,2,3,3,40,40]
-
-		self.factor_values = {
-			'object_color': ['white', 'green', 'red', 'blue', 'brown', 'olive'],
-			'object_shape': ['cone', 'cube', 'cylinder', 'hexagonal', 'pyramid', 'sphere'],
-			'object_size': ['small', 'large'],
-			'camera_height': ['top', 'center', 'bottom'],
-			'background_color': ['purple', 'sea_green', 'salmon'],
-			'horizonal_axis': list(range(40)),
-			'vertical_axis': list(range(40)),
-		}
+		# self.factor_order = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
+		#                      'horizonal_axis', 'vertical_axis']
+		# self.factor_sizes = [6,6,2,3,3,40,40]
+		#
+		# self.factor_values = {
+		# 	'object_color': ['white', 'green', 'red', 'blue', 'brown', 'olive'],
+		# 	'object_shape': ['cone', 'cube', 'cylinder', 'hexagonal', 'pyramid', 'sphere'],
+		# 	'object_size': ['small', 'large'],
+		# 	'camera_height': ['top', 'center', 'bottom'],
+		# 	'background_color': ['purple', 'sea_green', 'salmon'],
+		# 	'horizonal_axis': list(map(str, range(40))),
+		# 	'vertical_axis': list(map(str, range(40))),
+		# }
 		
 		if cat == 'complex':
-		
-			self.factor_sizes[0], self.factor_sizes[1] = 4, 4
-			self.factor_values['object_shape'] = ['mug', 'ball', 'banana', 'cup']
-			self.factor_values['object_color'] = ['yellow', 'green', 'olive', 'red']
+			self._all_mechanism_class_names[0] = ['mug', 'ball', 'banana', 'cup']
+			self._all_mechanism_class_names[1] = ['yellow', 'green', 'olive', 'red']
 
-		sizes = np.array(self.factor_sizes)
+			self._full_mechanism_space = util.JointSpace(util.CategoricalDim(4), util.CategoricalDim(4),
+			                                             util.BoundDim(), util.BoundDim(), util.CategoricalDim(3),
+			                                        util.BoundDim(), util.BoundDim())
+			self._full_label_space = util.JointSpace(util.CategoricalDim(4), util.CategoricalDim(4),
+			                                         util.CategoricalDim(2), util.CategoricalDim(3),
+			                                         util.CategoricalDim(3), util.CategoricalDim(40),
+			                                         util.CategoricalDim(40))
+
+		
+			# self.factor_sizes[0], self.factor_sizes[1] = 4, 4
+			# self.factor_values['object_shape'] = ['mug', 'ball', 'banana', 'cup']
+			# self.factor_values['object_color'] = ['yellow', 'green', 'olive', 'red']
+
+		sizes = np.array(self.get_label_sizes())
 
 		flr = np.cumprod(sizes[::-1])[::-1]
 		flr[:-1] = flr[1:]
@@ -864,10 +909,10 @@ class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 				
 			os.remove(str(rawpath))
 
-	def get_factor_sizes(self):
-		return self.factor_sizes
-	def get_factor_order(self):
-		return self.factor_order
+	# def get_factor_sizes(self):
+	# 	return self.factor_sizes
+	# def get_factor_order(self):
+	# 	return self.factor_order
 
 	def get_labels(self):
 		return self.get_label(self.indices)

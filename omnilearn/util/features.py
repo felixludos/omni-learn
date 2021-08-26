@@ -153,18 +153,23 @@ class Priority(Configurable):
 		return self.priority
 
 
-class Switchable(Configurable):
+class SwitchableBase:
+	def __init__(self, mode='train', **kwargs):
+		super().__init__(**kwargs)
+		self.mode = mode
+
+	def switch_to(self, mode):
+		self.mode = mode
+
+	def get_mode(self):
+		return self.mode
+
+
+class Switchable(Configurable, SwitchableBase):
 	def __init__(self, A, mode=None, **kwargs):
 		if mode is None:
 			mode = A.pull('mode', 'train')
-		super().__init__(A, **kwargs)
-		self.mode = mode
-	
-	def switch_to(self, mode):
-		self.mode = mode
-	
-	def get_mode(self):
-		return self.mode
+		super().__init__(A, mode=mode, **kwargs)
 
 
 class Deviced(Configurable, DeviceBase):

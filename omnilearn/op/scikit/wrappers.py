@@ -1,6 +1,6 @@
 import torch
-from sklearn import base
-from ..framework import Learner, FunctionBase
+from sklearn import base, metrics
+from ..framework import Learner, FunctionBase, Evaluatable
 from ...eval import EvaluatorBase
 
 from ... import util
@@ -13,19 +13,51 @@ class ScikitWrapper:
 		return data
 
 
+class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
+	def __init__(self, estimator, dataset):
+		self.__dict__['_estimator'] = estimator
+		self.__dict__['dataset'] = dataset
+		self._process_dataset()
 
-class Estimator(util.Cached, Learner, ScikitWrapper, base.BaseEstimator):
-	
-	def fit(self, data, targets=None):
-		return self._fit(data, targets=targets)
-	
-	
-	def _fit(self, data, targets=None):
-		data = self._format_scikit_arg(data)
-		targets = self._format_scikit_arg(targets)
-		return super(Estimator, self).fit(data, targets=targets)
-	
-	
+	def _process_dataset(self):
+		self.observations = self.dataset.get_observations()
+		self.labels = self.dataset.get_labels()
+		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.observations)
+		self.__dict__['_estimator_labels'] = self._format_scikit_arg(self.labels)
+
+	def get_observations(self):
+		return self._estimator_observations
+
+	def get_labels(self):
+		return self._estimator_labels
+
+	def get_result(self, key):
+		if key not in self:
+			self[key] = self._estimator.make_prediction(key, self._estimator_observations)
+		return self[key]
+
+
+class ScikitEstimator(Learner, EvaluatorBase, ScikitWrapper):
+
+	def get_params(self):
+		try:
+			return super(Learner, self).get_params()
+		except AttributeError:
+			return self.state_dict()
+
+	def set_params(self, **params):
+		try:
+			return super(Learner, self).set_params(**params)
+		except AttributeError:
+			return self.load_state_dict(params)
+
+	def _fit(self, dataset, out=None):
+		if out is None:
+			out = util.ScikitEstimatorInfo(self, dataset)
+		super(Learner, self).fit(out._estimator_observations, targets=out._estimator_labels)
+		return out
+
+
 	def predict(self, data):
 		return self._predict(data)
 	
@@ -50,44 +82,117 @@ class Estimator(util.Cached, Learner, ScikitWrapper, base.BaseEstimator):
 	
 	def _predict_score(self, data):
 		return super(Estimator, self).predict_scores(data)
-	
-	
-	def cache_results(self, data):
-		return self.ResultContext(self, data)
-	
-	
-	class ResultContext:
-		def __init__(self, estimator, data):
-			self.estimator = estimator
-			self.data = data
-			self.results = None
-		
-		def predict(self):
-			pass
-		
-		def __enter__(self):
-			self.results = {}
-			
-		def __exit__(self, exc_type, exc_val, exc_tb):
-			pass
+
+
+	def make_prediction(self, name, data):
+		methods = {'pred': self.predict,
+		           'scores': self.predict_score,
+		           'probs': self.predict_probs}
+		method = methods.get(name, None)
+		if method is not None:
+			return method(data)
+
+
+	def _compute(self, run):
+		if not self.is_fit():
+			dataset = run.get_dataset()
+			out = self.fit(dataset)
+		return self.evaluate(run, out=out)
+
+
+	def evaluate(self, info, out=None, **kwargs):
+		dataset = info.get_dataset()
+		if out is None:
+			out = util.ScikitEstimatorInfo(self, dataset)
+		return self._evaluate(out, **kwargs)
+
+
+	def _evaluate(self, info, **kwargs):
+		return info
+
+
+	# def cache_results(self, data):
+	# 	return self.ResultContext(self, data)
+	#
+	# class ResultContext:
+	# 	def __init__(self, estimator, data):
+	# 		self.estimator = estimator
+	# 		self.data = data
+	# 		self.results = None
+	#
+	# 	def predict(self):
+	# 		pass
+	#
+	# 	def __enter__(self):
+	# 		self.results = {}
+	#
+	# 	def __exit__(self, exc_type, exc_val, exc_tb):
+	# 		pass
 	
 
-class Supervised(Estimator):
+class Supervised(ScikitEstimator):
 	pass
 	
 
 
 class Classifier(Supervised, base.ClassifierMixin):
+
+	def _evaluate(self, info, **kwargs):
+		info = super()._evaluate(info, **kwargs)
+
+		labels, pred = info.get_labels(), info.get_result('pred')
+
+		report = metrics.classification_report(labels, pred, target_names=info.dataset.get_label_names(),
+		                                       output_dict=True)
+		confusion = metrics.confusion_matrix(labels, pred)
+
+
+
+		info.update({
+			'f1'
+			
+			'report': report,
+			'confusion': confusion,
+		})
+		return info
+
+	def get_scores(self):
+		return ['mse', 'mxe', 'mae', 'medae', *super().get_scores()]
+
+	def get_results(self):
+		return ['report', 'confusion', *super().get_results()]
+
 	pass
 
 
 
 class Regressor(Supervised, base.RegressorMixin):
-	pass
+
+	def _evaluate(self, info, **kwargs):
+		info = super()._evaluate(info, **kwargs)
+
+		mse = metrics.mean_squared_error(info.get_labels(), info.get_result('pred'))
+		mxe = metrics.max_error(info.get_labels(), info.get_result('pred'))
+		mae = metrics.mean_absolute_error(info.get_labels(), info.get_result('pred'))
+		medae = metrics.median_absolute_error(info.get_labels(), info.get_result('pred'))
+
+		info.update({
+			'mse': mse,
+			'mxe': mxe,
+			'mae': mae,
+			'medae': medae,
+		})
+
+		return info
+
+	def get_scores(self):
+		return ['mse', 'mxe', 'mae', 'medae', *super().get_scores()]
 
 
 
 class Clustering(Estimator, base.ClusterMixin):
+
+
 	pass
 
 

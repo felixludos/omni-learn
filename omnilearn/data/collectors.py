@@ -147,17 +147,26 @@ class ImageDataset(Dataset):
 
 
 class Memory_Dataset(Dataset):
-	
+
+	_full_label_space = None
+	_all_label_names = None
+
 	def get_observations(self):
 		raise NotImplementedError
 	def get_labels(self):
 		raise NotImplementedError
 	def update_data(self, indices):
 		raise NotImplementedError
+
 	def _replace_observations(self, observations):
 		raise NotImplementedError
 	def _replace_labels(self, labels):
 		raise NotImplementedError
+
+	def get_label_names(self):
+		return self._all_label_names
+	def get_label_space(self):
+		return self._full_label_space
 
 
 class List_Dataset(Dataset):
@@ -239,7 +248,6 @@ class Format_Dataset(DatasetWrapper):
 		return formatted
 
 class Shuffle_Dataset(DatasetWrapper):
-
 	def __init__(self, dataset):
 		super().__init__(dataset)
 
@@ -253,5 +261,12 @@ class Shuffle_Dataset(DatasetWrapper):
 
 	def __getitem__(self, idx):
 		return self.__wrapped__[self._self_indices[idx]]
+
+
+
+def split_label_dataset():
+
+	pass
+
 
 # endregion

@@ -133,14 +133,37 @@ class Savable(Checkpointable, Function):
 			data = _data
 		self.load_state_dict(data['model_state'], strict=self._strict_load_state)
 		return path
-	
 
-class Learner(FunctionBase):
-	def get_params(self):
-		return self.state_dict()
-	
-	def set_params(self, **params):
-		return self.load_state_dict(params)
+
+class Evaluatable(FunctionBase): # TODO: maybe not needed
+
+	def evaluate(self, info, **kwargs):
+		return self._evaluate(info, **kwargs)
+
+	def _evaluate(self, info, out=None, **kwargs):
+		if out is None:
+			out = util.TensorDict()
+		return out # by default eval does nothing
+
+
+class Learner(Evaluatable): # non-iterative method
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self._is_fit = False
+
+	def is_fit(self):
+		return self._is_fit
+
+	def fit(self, dataset, **kwargs):
+		out = self._fit(dataset, **kwargs)
+		self._is_fit = True
+		return out
+
+	def _fit(self, dataset, out=None):
+		if out is None:
+			out = util.TensorDict()
+		return out
+
 
 
 class Initializable(Function): # TODO: include in load-model
@@ -150,9 +173,13 @@ class Initializable(Function): # TODO: include in load-model
 	def _init_params(self, batch):
 		pass
 
+
+
 class Recordable(util.StatsClient, Function):
 	pass
-	
+
+
+
 class Maintained(Function, AlertBase):
 	
 	def maintain(self, tick, info=None):
@@ -160,6 +187,8 @@ class Maintained(Function, AlertBase):
 	
 	def activate(self, tick, info=None):
 		return self.maintain(tick, info=info)
+
+
 
 class Visualizable(Recordable):
 	def visualize(self, info, logger): # records output directly to logger
@@ -169,18 +198,6 @@ class Visualizable(Recordable):
 	def _visualize(self, info, logger):
 		pass # by default nothing is visualized
 
-
-class Evaluatable(Recordable): # TODO: maybe not needed
-
-	def evaluate(self, info, config=None, out=None):
-		if config is None:
-			config = info.get_config()
-		return self._evaluate(info, config, out=out)
-
-	def _evaluate(self, info, config, out=None):
-		if out is None:
-			out = util.TensorDict()
-		return out # by default eval does nothing
 
 
 @fig.AutoModifier('optim')
@@ -248,7 +265,6 @@ class Optimizable(Function):
 
 
 class Trainable(Maintained, HyperParam, Recordable, Optimizable, Function, AlertBase):
-	
 	def __init__(self, A, **kwargs):
 		
 		optim_metric = A.pull('optim-metric', 'loss')
@@ -295,7 +311,12 @@ class Trainable(Maintained, HyperParam, Recordable, Optimizable, Function, Alert
 	
 
 class Model(Seed, Savable, Trainable, Evaluatable, Visualizable, Function): # top level - must be implemented to train
-	pass
+
+	def evaluate(self, info, config=None, out=None, **kwargs):
+		if config is None:
+			config = info.get_config()
+		return self._evaluate(info, config=config, out=out, **kwargs)
+
 
 
 @fig.AutoModifier('presentable')

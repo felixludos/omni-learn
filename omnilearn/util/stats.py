@@ -4,9 +4,10 @@ import numpy as np
 import torch
 from collections import deque, OrderedDict
 
+from omnibelt import unspecified_argument
 import omnifig as fig
 
-from .features import Configurable, Switchable
+from .features import Configurable, Switchable, SwitchableBase
 
 # class StatsCollector(object):
 # 	def __init__(self, require_all_keys=True):
@@ -56,20 +57,16 @@ from .features import Configurable, Switchable
 # 					stats_fmt = A.pull('_stats_fmt', None)
 # 					records.register_stats_client(self, fmt=stats_fmt)
 
-@fig.Component('stats')
-class StatsMeter(Configurable, OrderedDict):
-	def __init__(self , A=None, meter_info=None, **kwargs):
-		
+
+
+class StatsMeterBase(OrderedDict):
+	def __init__(self, meter_info=None, **kwargs):
 		if meter_info is None:
-			assert A is not None, 'need config to know how to create new meters'
-			if 'meter-info' not in A:
-				A.push('meter-info._type', 'meter', overwrite=False)
-			meter_info = A.pull('meter-info', raw=True)
-		
-		super().__init__(A, **kwargs)
-		
+			meter_info = fig.get_config(_type='meter')
+		super().__init__(**kwargs)
+
 		self.meter_info = meter_info
-		
+
 	def set_tau(self, tau):
 		for meter in self.values():
 			meter.tau = tau
@@ -77,7 +74,7 @@ class StatsMeter(Configurable, OrderedDict):
 	def reset(self):
 		for meter in self.values():
 			meter.reset()
-	
+
 	# def __deepcopy__(self):
 	# 	'''returns deepcopy of self'''
 	# 	new = self.__class__(meter_info=self.meter_info)
@@ -100,6 +97,7 @@ class StatsMeter(Configurable, OrderedDict):
 		for name in names:
 			if name in self:
 				del self[name]
+
 	def remove(self, *names):
 		for name in names:
 			del self[name]
@@ -107,12 +105,12 @@ class StatsMeter(Configurable, OrderedDict):
 	def mete(self, name, value, n=1):
 		# assert isinstance(value, (int,float)) or value.size == 1, 'unknown: {} {}'.format(value.shape, value)
 		self[name].mete(value, n=n)
-	
+
 	def __add__(self, other):
 		new = self.copy()
 		new.join(other)
 		return new
-	
+
 	def join(self, other, intersection=False, fmt=None):
 		'''other is another stats meter'''
 		for name, meter in other.items():
@@ -128,33 +126,35 @@ class StatsMeter(Configurable, OrderedDict):
 			if fmt is not None:
 				name = fmt.format(name)
 			self[name] = meter
-	
+
 	def vals(self, fmt='{}'):
-		return {fmt.format(k):v.val.item() for k,v in self.items()}
+		return {fmt.format(k): v.val.item() for k, v in self.items()}
 
 	def avgs(self, fmt='{}'):
-		return {fmt.format(k):v.avg.item() for k,v in self.items() if v.count > 0}
-	
+		return {fmt.format(k): v.avg.item() for k, v in self.items() if v.count > 0}
+
 	def smooths(self, fmt='{}'):
-		return {fmt.format(k): (v.smooth.item()) for k,v in self.items() if v.smooth is not None}
+		return {fmt.format(k): (v.smooth.item()) for k, v in self.items() if v.smooth is not None}
 
 	def split(self):
-		all_vals = {k:v.export() for k,v in self.__dict__.items()}
+		all_vals = {k: v.export() for k, v in self.__dict__.items()}
 		key = next(iter(self.__dict__.keys()))
 		try:
 			shape = all_vals[key]['val'].shape
 		except Exception as e:
 			raise e
 
-		stats = [{stat:{k:v[idx] for k,v in vals.items()} for stat,vals in all_vals.items()} for idx in np.ndindex(*shape)]
+		stats = [{stat: {k: v[idx] for k, v in vals.items()} for stat, vals in all_vals.items()} for idx in
+		         np.ndindex(*shape)]
 
 		return [StatsMeter(**info) for info in stats]
 
 	def load(self, stats):
-		self.update({stat:self._create_meter(stat).load(vals) for stat,vals in stats.items()})
+		self.update({stat: self._create_meter(stat).load(vals) for stat, vals in stats.items()})
 
 	def export(self):
-		return {name : meter.export() for name, meter in self.items()}
+		return {name: meter.export() for name, meter in self.items()}
+
 	#
 	# def save(self, filename):
 	# 	torch.save(self.export() ,filename)
@@ -165,53 +165,62 @@ class StatsMeter(Configurable, OrderedDict):
 	#
 	# def load(self, filename):
 	# 	self.load_dict(torch.load(filename))
-	
+
 	def __repr__(self):
 		return self.__str__()
-		
+
 	def __str__(self):
-		return 'StatsMeter({})'.format(', '.join(['{}:{:.4f}'.format(k,v.val.item()) for k,v in self.items()]))
+		return 'StatsMeter({})'.format(', '.join(['{}:{:.4f}'.format(k, v.val.item()) for k, v in self.items()]))
 
 
-@fig.Component('stats-manager')
-class StatsManager(Switchable, StatsMeter):
 
-	def __init__(self, A=None, collections=None, collection_fmts=None, **kwargs):
-		
-		if collection_fmts is None and A is not None:
-			collection_fmts = A.pull('stat-collection-fmts', {})
+@fig.Component('stats')
+class StatsMeter(Configurable, StatsMeterBase):
+	def __init__(self, A, meter_info=None, **kwargs):
+		if meter_info is None:
+			if 'meter-info' not in A:
+				A.push('meter-info._type', 'meter', overwrite=False)
+			meter_info = A.pull('meter-info', raw=True)
+		super().__init__(A, meter_info=meter_info, **kwargs)
+
+
+
+class StatsManagerBase(SwitchableBase, StatsMeterBase):
+	def __init__(self, collections=None, collection_fmts=None, reset_collections=None, **kwargs):
 		if collections is None:
 			collections = {}
-		
-		reset_collections = set(A.pull('reset-modes', []))
-		
-		super().__init__(A=A, **kwargs)
+		if collection_fmts is None:
+			collection_fmts = {}
+		if reset_collections is None:
+			reset_collections = []
+		super().__init__(**kwargs)
+
 		self._collections = collections
 		self._reset_collections = reset_collections
 		self._master_names = set()
 		self._timestep = None
 		self._archive = {}
 		self._collection_fmts = collection_fmts
-	
+
 	def vals(self, fmt=None):
 		if fmt is None:
 			fmt = self._collection_fmts.get(self.get_mode(), '{}')
 		return super().vals(fmt=fmt)
-	
+
 	def avgs(self, fmt=None):
 		if fmt is None:
 			fmt = self._collection_fmts.get(self.get_mode(), '{}')
 		return super().avgs(fmt=fmt)
-	
+
 	def smooths(self, fmt=None):
 		if fmt is None:
 			fmt = self._collection_fmts.get(self.get_mode(), '{}')
 		return super().smooths(fmt=fmt)
-	
+
 	def new(self, *names, tau=None):
 		self._master_names.update(names)
 		super().new(*names, tau=tau)
-	
+
 	def remove(self, *names):
 		self._master_names.difference_update(names)
 		super().remove(*names)
@@ -219,13 +228,13 @@ class StatsManager(Switchable, StatsMeter):
 	def discard(self, *names):
 		self._master_names.difference_update(names)
 		super().discard(*names)
-		
+
 	def _create_collection(self):
-		return {name:self._create_meter(name) for name in self._master_names}
-	
+		return {name: self._create_meter(name) for name in self._master_names}
+
 	def set_step(self, ticks):
 		self._timestep = ticks
-	
+
 	def archive(self, ticks=None, mode=None):
 		if mode is None:
 			mode = self.get_mode()
@@ -233,67 +242,78 @@ class StatsManager(Switchable, StatsMeter):
 			ticks = self._timestep
 		if mode is None or ticks is None:
 			return
-		
+
 		self._sync_collections()
-		
+
 		if mode not in self._archive:
 			self._archive[mode] = {}
 		self._archive[mode][str(ticks)] = {name: meter.export() for name, meter in self._collections[mode].items()}
-	
+
 	def switch_to(self, mode):
-		
+
 		old = self.get_mode()
 		if mode == old:
 			return
-		
+
 		self.archive()
-		
+
 		super().switch_to(mode)
 		self.clear()
-		
+
 		if mode not in self._collections or mode in self._reset_collections:
 			self._collections[mode] = self._create_collection()
 		self.update(self._collections[mode])
-		
+
 	def _sync_collections(self):
 		mode = self.get_mode()
 		if mode is not None:
 			self._collections[self.get_mode()] = dict(self)
-		
+
 	def export(self):
 		self.archive()
 		return self._archive
-		
+
 	def load(self, stats):
 		mode = None
 		self._archive = stats
 		self._collections = {}
 		for mode, arc in stats.items():
-			last = arc[str(max(map(int,arc.keys())))]
+			last = arc[str(max(map(int, arc.keys())))]
 			if mode not in self._reset_collections:
-				self._collections[mode] = {name:self._create_meter(name).load(vals)
-				                                for name, vals in last.items()}
-		
+				self._collections[mode] = {name: self._create_meter(name).load(vals)
+				                           for name, vals in last.items()}
+
 		if mode is not None:
 			self._master_names = set(last.keys())
-		
+
 		self.clear()
 		self.mode = None
 
 
-class StatsClient(Configurable):
-	def __init__(self, A, **kwargs):
-		stats = A.pull('stats', None, ref=True)
-		if stats is None:
-			print('WARNING: no stats manager found')
-		fmt = A.pull('stats-fmt', None)
+
+@fig.Component('stats-manager')
+class StatsManager(Switchable, StatsManagerBase):
+
+	def __init__(self, A, collections=None, collection_fmts=None, **kwargs):
 		
-		default_tau = A.pull('smooth-tau', '<>tau', None)
+		if collection_fmts is None:
+			collection_fmts = A.pull('stat-collection-fmts', {})
+		if collections is None:
+			collections = {}
 		
-		super().__init__(A, **kwargs)
+		reset_collections = set(A.pull('reset-modes', []))
+		
+		super().__init__(A, collections=collections, collection_fmts=collection_fmts,
+		                 reset_collections=reset_collections, **kwargs)
+
+
+
+class StatsClientBase:
+	def __init__(self, stats, stats_fmt=None, default_tau=None, **kwargs):
+		super().__init__(**kwargs)
 		
 		self._stats = stats
-		self._stats_fmt = fmt
+		self._stats_fmt = stats_fmt
 		self._stats_tau = default_tau
 	
 	def register_stats(self, *names):
@@ -316,6 +336,24 @@ class StatsClient(Configurable):
 			if self._stats_fmt is not None:
 				name = self._stats_fmt.format(name)
 			return self._stats.get(name, None)
+
+
+
+class StatsClient(Configurable, StatsClientBase):
+	def __init__(self, A, stats=unspecified_argument, default_tau=unspecified_argument,
+	             stats_fmt=unspecified_argument, **kwargs):
+		stats = A.pull('stats', None, ref=True)
+		if stats is None:
+			print('WARNING: no stats manager found')
+
+		if stats_fmt is None:
+			stats_fmt = A.pull('stats-fmt', None)
+
+		if default_tau is None:
+			default_tau = A.pull('smooth-tau', '<>tau', None)
+
+		super().__init__(A, stats=stats, stats_fmt=stats_fmt, default_tau=default_tau, **kwargs)
+
 
 
 _tau = 0.005

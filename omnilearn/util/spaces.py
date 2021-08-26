@@ -8,6 +8,9 @@ from torch.nn import functional as F
 
 from .features import DeviceBase, Configurable
 
+# TODO: include dtypes
+
+
 class DimSpec:
 	def __init__(self, min=None, max=None, shape=(1,), **kwargs):
 		
@@ -222,7 +225,37 @@ class PeriodicDim(BoundDim):
 	def compress(self, vals):
 		vals = vals.view(-1, *self.expanded_shape)
 		return torch.atan2(vals[...,1], vals[...,0]).div(2*np.pi/self.period).remainder(self.period).add(self.min)
-	
+
+
+class SpatialSpace(DimSpec):
+	def __init__(self, channels, size, channel_first=False, **kwargs):
+		shape = (channels, *size) if channel_first else (*size, channels)
+		super().__init__(shape=shape, **kwargs)
+		self.channel_first = channel_first
+		self.img_size = size
+		self.channels = channels
+
+
+class SequenceSpace(SpatialSpace):
+	def __init__(self, channels=1, length=None, **kwargs):
+		super().__init__(channels=channels, size=(length,), **kwargs)
+		self.length = length
+
+
+class ImageSpace(SpatialSpace):
+	def __init__(self, channels=1, height=None, width=None, **kwargs):
+		super().__init__(channels=channels, size=(height, width), **kwargs)
+		self.height = height
+		self.width = width
+
+
+class VolumeSpace(SpatialSpace):
+	def __init__(self, channels=1, height=None, width=None, depth=None, **kwargs):
+		super().__init__(channels=channels, size=(height, width, depth), **kwargs)
+		self.height = height
+		self.width = width
+		self.depth = depth
+
 
 
 class CategoricalDim(DimSpec):
@@ -333,6 +366,9 @@ class JointSpace(DimSpec):
 	def sample(self, N=None, gen=None, seed=None):
 		return self._dispatch('sample', N=N, gen=gen, seed=seed)
 
+
+	def __getitem__(self, item):
+		return self.dims[item]
 
 
 
