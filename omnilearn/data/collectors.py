@@ -263,10 +263,35 @@ class Shuffle_Dataset(DatasetWrapper):
 		return self.__wrapped__[self._self_indices[idx]]
 
 
+class SingleLabelDataset(DatasetWrapper):
 
-def split_label_dataset():
+	def __init__(self, dataset, idx):
+		if not isinstance(dataset, Memory_Dataset):
+			raise NotImplementedError
+		super().__init__(dataset)
+		self._self_idx = idx
 
-	pass
+		self.dout = 1
+		self._subselect_info('_all_label_names', idx)
+		self._subselect_info('_all_mechanism_names', idx)
+		self._subselect_info('_all_mechanism_class_names', idx)
+		self._subselect_info('_full_mechanism_space', idx)
+		self._subselect_info('_full_label_space', idx)
+
+	def _subselect_info(self, attrname, idx):
+		try:
+			if hasattr(self, attrname):
+				setattr(self, attrname, getattr(self, attrname)[idx])
+		except IndexError:
+			pass
+
+	def get_labels(self):
+		return self.__wrapped__.get_labels().narrow(-1, self._self_idx, 1)
+
+
+def split_label_dataset(dataset):
+	num_labels = dataset.get_labels().size(-1)
+	return [SingleLabelDataset(dataset, idx) for idx in range(num_labels)]
 
 
 # endregion

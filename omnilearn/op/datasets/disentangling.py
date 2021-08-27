@@ -53,11 +53,6 @@ class DisentanglementDataset(Memory_Dataset, ImageDataset):
 	_full_mechanism_space = None
 	_full_label_space = None
 
-	# def get_factor_sizes(self):
-	# 	raise NotImplementedError
-	# def get_factor_order(self):
-	# 	raise NotImplementedError
-
 	def get_mechanism_class_names(self, mechanism):
 		if isinstance(mechanism, str):
 			return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))

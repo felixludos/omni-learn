@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
+from .math import angle_diff
 from .features import DeviceBase, Configurable
 
 # TODO: include dtypes
@@ -77,7 +78,13 @@ class DimSpec:
 	
 	def transform(self, vals, spec):
 		return self.unstandardize(spec.standardize(vals))
-	
+
+
+	def difference(self, x, y): # x-y
+		x = self.standardize(x)
+		y = self.standardize(y)
+		return x-y
+
 	
 	def standardize(self, vals):
 		raise NotImplementedError
@@ -91,21 +98,28 @@ class DimSpec:
 class DenseDim(DimSpec):
 	
 	def sample(self, N=None, gen=None, seed=None):
+
 		if seed is not None:
 			gen = torch.Generator()
 			gen.manual_seed(seed)
-		
+
+		# kwargs = {} if gen is None else {'gen': gen}
+
 		sqz = N is None
 		if N is None:
 			N = 1
-		
-		samples = torch.randn(N, *self.shape, generator=gen)
+
+		samples = self.unstandardize(self._sample((N, *self.shape), gen))
 		return samples.squeeze(0) if sqz else samples
-		
+
+
+	def _sample(self, shape, generator):
+		return torch.randn(*shape, generator=generator)
+
 
 
 class HalfBoundDim(DenseDim):
-	def __init__(self, bound=0, side='lower', sample_type='exp',
+	def __init__(self, bound=0, side='lower', bound_type='exp', epsilon=1e-10,
 	             min=None, max=None, **kwargs):
 		
 		if min is None and max is None:
@@ -118,84 +132,90 @@ class HalfBoundDim(DenseDim):
 				max = bound
 				
 		assert max is None or min is None, f'Too many bounds specified: min={min}, max={max}'
-		assert sample_type in {'exp', 'soft', 'chi', 'abs'}
+		assert bound_type in {'exp', 'soft', 'chi', 'abs'}
+		if bound_type in {'chi', 'abs'}:
+			print(f'WARNING: half-bound dim using transformation {bound_type} cannot be standardized')
 		super().__init__(max=max, min=min, **kwargs)
 		
-		self._sample_type = sample_type
-		
-	
-	def sample(self, N=None, gen=None, seed=None):
-		
-		samples = super().sample(N=N, gen=gen, seed=seed)
-		
-		if self._sample_type == 'soft':
-			samples = F.softplus(samples)
-		elif self._sample_type == 'chi':
-			samples = samples.pow(2)
-		elif self._sample_type == 'abs':
-			samples = samples.abs()
-		else:
-			samples = samples.exp()
-		
-		if self.min is not None:
-			samples = samples + self.min.unsqueeze(0)
-		elif self.max is not None:
-			samples = -samples + self.max.unsqueeze(0)
-		
-		return samples
-	
+		self._bound_type = bound_type
+		self._epsilon = epsilon
+
 	
 	def standardize(self, vals):
-		raise NotImplementedError
-	
-	
+		if self.min is not None:
+			vals = vals - self.min.unsqueeze(0)
+		elif self.max is not None:
+			vals = vals.sub(self.max.unsqueeze(0)).mul(-1)
+
+		vals = vals.clamp(min=self._epsilon)
+		if self._bound_type == 'soft':
+			vals = vals.exp().sub(1).log()
+		elif self._bound_type == 'chi':
+			vals = vals.sqrt()
+		elif self._bound_type == 'exp':
+			vals = vals.log()
+
+		return vals
+
+
 	def unstandardize(self, vals):
-		raise NotImplementedError
+		if self._bound_type == 'soft':
+			vals = F.softplus(vals)
+		elif self._bound_type == 'chi':
+			vals = vals.pow(2)
+		elif self._bound_type == 'exp':
+			vals = vals.exp()
+		else:
+			vals = vals.abs()
+
+		if self.min is not None:
+			vals = vals + self.min.unsqueeze(0)
+		elif self.max is not None:
+			vals = -vals + self.max.unsqueeze(0)
+
+		return vals
 
 
 
 class BoundDim(DenseDim):
-	def __init__(self, min=0., max=1., **kwargs):
+	def __init__(self, min=0., max=1., epsilon=1e-10, **kwargs):
 		super().__init__(min=min, max=max, **kwargs)
 		assert self.min is not None, f'No lower bound provided'
 		assert self.max is not None, f'No upper bound provided'
-	
-	
-	def sample(self, N=None, gen=None, seed=None):
-		if seed is not None:
-			gen = torch.Generator()
-			gen.manual_seed(seed)
-		
-		# kwargs = {} if gen is None else {'gen': gen}
-		
-		sqz = N is None
-		if N is None:
-			N = 1
-		
-		samples = self.unstandardize(torch.rand(N, *self.shape, generator=gen))
-		return samples.squeeze(0) if sqz else samples
+
+		self._epsilon = epsilon
+
+
+	def _sample(self, shape, generator):
+		return torch.rand(*shape, generator=generator)
 
 
 	def standardize(self, vals):
-		return vals.sub(self.min.unsqueeze(0)).div(self.range.unsqueeze(0))
+		return vals.sub(self.min.unsqueeze(0)).div(self.range.unsqueeze(0))\
+			.clamp(min=self._epsilon, max=1-self._epsilon)
 	
 	
 	def unstandardize(self, vals):
-		return vals.mul(self.range.unsqueeze(0)).add(self.min.unsqueeze(0))
+		return vals.clamp(min=self._epsilon, max=1-self._epsilon)\
+			.mul(self.range.unsqueeze(0)).add(self.min.unsqueeze(0))
+
+
+	def difference(self, x, y):
+		return super().difference(x, y) * self.range.unsqueeze(0)
 
 
 
 class UnboundDim(DenseDim):
 	def __init__(self, min=None, max=None, **kwargs):
 		super().__init__(min=None, max=None, **kwargs)
-	
-	
+
+
 	def standardize(self, vals):
-		raise NotImplementedError
-	
-	
+		return vals
+
+
 	def unstandardize(self, vals):
-		raise NotImplementedError
+		return vals
 
 
 
@@ -227,6 +247,11 @@ class PeriodicDim(BoundDim):
 		return torch.atan2(vals[...,1], vals[...,0]).div(2*np.pi/self.period).remainder(self.period).add(self.min)
 
 
+	def difference(self, x, y):
+		return angle_diff(self.standardize(x), self.standardize(y), period=1.) * self.period
+
+
+
 class SpatialSpace(DimSpec):
 	def __init__(self, channels, size, channel_first=False, **kwargs):
 		shape = (channels, *size) if channel_first else (*size, channels)
@@ -236,10 +261,12 @@ class SpatialSpace(DimSpec):
 		self.channels = channels
 
 
+
 class SequenceSpace(SpatialSpace):
 	def __init__(self, channels=1, length=None, **kwargs):
 		super().__init__(channels=channels, size=(length,), **kwargs)
 		self.length = length
+
 
 
 class ImageSpace(SpatialSpace):
@@ -247,6 +274,7 @@ class ImageSpace(SpatialSpace):
 		super().__init__(channels=channels, size=(height, width), **kwargs)
 		self.height = height
 		self.width = width
+
 
 
 class VolumeSpace(SpatialSpace):
@@ -303,6 +331,10 @@ class CategoricalDim(DimSpec):
 		return vals.argmax(-1)
 
 
+	def difference(self, x, y):
+		return x.sub(y).bool().long()
+
+
 
 class JointSpace(DimSpec):
 	def __init__(self, *dims, shape=None, max=None, min=None, **kwargs):
@@ -322,21 +354,19 @@ class JointSpace(DimSpec):
 		return self._expanded_shape
 	
 	
-	def _dispatch(self, method, vals=None, use_expanded=False, **kwargs):
+	def _dispatch(self, method, *vals, use_expanded=False, **base_kwargs):
 		
 		outs = []
 		idx = 0
 		B = None
 		for dim in self.dims:
 			D = dim.expanded_len() if use_expanded else len(dim)
-			args = kwargs.copy()
-			if vals is not None:
-				val = vals.narrow(-1, idx, D)
-				args['vals'] = val
+			args = tuple(v.narrow(-1, idx, D) for v in vals)
+			kwargs = base_kwargs.copy()
 			
-			out = getattr(dim, method)(**args)
+			out = getattr(dim, method)(*args, **kwargs)
 			if B is None:
-				B = out.size(0)
+				B = out.size(0) if len(out.size()) > 1 else 1
 			out = out.view(B, -1)
 			if self._is_dense:
 				out = out.float()
@@ -367,6 +397,10 @@ class JointSpace(DimSpec):
 		return self._dispatch('sample', N=N, gen=gen, seed=seed)
 
 
+	def difference(self, x, y):
+		return self._dispatch('difference', x, y)
+
+
 	def __getitem__(self, item):
 		return self.dims[item]
 
@@ -391,22 +425,28 @@ class _DimSpec(Configurable, DimSpec):
 @fig.Component('space/half-bound')
 class _HalfBoundDim(_DimSpec, HalfBoundDim):
 	def __init__(self, A, bound=unspecified_argument, side=unspecified_argument,
-	             sample_type=unspecified_argument, **kwargs):
+	             bound_type=unspecified_argument, epsilon=unspecified_argument, **kwargs):
 		
 		if bound is unspecified_argument:
 			bound = A.pull('bound', 0.)
 		if side is unspecified_argument:
 			side = A.pull('side', 'lower')
-		if sample_type is unspecified_argument:
-			sample_type = A.pull('sample-type', 'exp')
-		
-		super().__init__(A, bound=bound, side=side, sample_type=sample_type, **kwargs)
+		if bound_type is unspecified_argument:
+			bound_type = A.pull('sample-type', 'exp')
+		if epsilon is unspecified_argument:
+			epsilon = A.pull('epsilon', 1e-10)
+
+		super().__init__(A, bound=bound, side=side,
+		                 bound_type=bound_type, epsilon=epsilon, **kwargs)
 
 
 
 @fig.Component('space/bound')
 class _BoundDim(_DimSpec, BoundDim):
-	pass
+	def __init__(self, A, epsilon=unspecified_argument, **kwargs):
+		if epsilon is unspecified_argument:
+			epsilon = A.pull('epsilon', 1e-10)
+		super().__init__(A, epsilon=epsilon, **kwargs)
 
 
 

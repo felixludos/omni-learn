@@ -11,7 +11,7 @@ from torch.nn import functional as F
 import torchvision
 
 from ... import util
-from ...data import register_dataset, Batchable, Deviced, Downloadable, ImageDataset
+from ...data import register_dataset, Batchable, Deviced, Downloadable, ImageDataset, Memory_Dataset
 
 
 from .transforms import Interpolated

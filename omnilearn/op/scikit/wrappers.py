@@ -6,11 +6,11 @@ from ...eval import EvaluatorBase
 from ... import util
 
 class ScikitWrapper:
-
 	def _format_scikit_arg(self, data):
 		if data is not None and isinstance(data, torch.Tensor):
 			data = data.cpu().numpy()
 		return data
+
 
 
 class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
@@ -19,22 +19,28 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 		self.__dict__['dataset'] = dataset
 		self._process_dataset()
 
+
 	def _process_dataset(self):
 		self.observations = self.dataset.get_observations()
 		self.labels = self.dataset.get_labels()
 		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.observations)
 		self.__dict__['_estimator_labels'] = self._format_scikit_arg(self.labels)
 
+
 	def get_observations(self):
 		return self._estimator_observations
+
 
 	def get_labels(self):
 		return self._estimator_labels
 
+
 	def get_result(self, key):
 		if key not in self:
-			self[key] = self._estimator.make_prediction(key, self._estimator_observations)
+			out = self._estimator.make_prediction(key, self._estimator_observations)
+			self[key] = self._format_scikit_arg(out)
 		return self[key]
+
 
 
 class ScikitEstimator(Learner, EvaluatorBase, ScikitWrapper):
@@ -45,11 +51,13 @@ class ScikitEstimator(Learner, EvaluatorBase, ScikitWrapper):
 		except AttributeError:
 			return self.state_dict()
 
+
 	def set_params(self, **params):
 		try:
 			return super(Learner, self).set_params(**params)
 		except AttributeError:
 			return self.load_state_dict(params)
+
 
 	def _fit(self, dataset, out=None):
 		if out is None:
@@ -111,24 +119,6 @@ class ScikitEstimator(Learner, EvaluatorBase, ScikitWrapper):
 		return info
 
 
-	# def cache_results(self, data):
-	# 	return self.ResultContext(self, data)
-	#
-	# class ResultContext:
-	# 	def __init__(self, estimator, data):
-	# 		self.estimator = estimator
-	# 		self.data = data
-	# 		self.results = None
-	#
-	# 	def predict(self):
-	# 		pass
-	#
-	# 	def __enter__(self):
-	# 		self.results = {}
-	#
-	# 	def __exit__(self, exc_type, exc_val, exc_tb):
-	# 		pass
-	
 
 class Supervised(ScikitEstimator):
 	pass
@@ -146,23 +136,49 @@ class Classifier(Supervised, base.ClassifierMixin):
 		                                       output_dict=True)
 		confusion = metrics.confusion_matrix(labels, pred)
 
+		precision, recall, fscore, support = metrics.precision_recall_fscore_support(labels, pred)
 
+		scores = info.get_result('scores')
+		auc = metrics.roc_auc_score(labels, scores)
+
+		roc = None
+		if labels.max() == 1:
+			scores = scores.reshape(-1)
+			roc = metrics.roc_curve(labels, scores)
 
 		info.update({
-			'f1'
-			
+			'roc-auc': auc.mean(),
+			'f1': fscore.mean(),
+			'precision': precision.mean(),
+			'recall': recall.mean(),
+
+			'worst-roc-auc': auc.min(),
+			'worst-f1': fscore.min(),
+			'worst-precision': precision.min(),
+			'worst-recall': recall.min(),
+
+			'full-roc-auc': auc,
+			'full-f1': fscore,
+			'full-recall': recall,
+			'full-precision': precision,
+			'full-support': support,
 			'report': report,
 			'confusion': confusion,
 		})
+		if roc is not None:
+			info['roc-curve'] = roc
 		return info
 
 	def get_scores(self):
-		return ['mse', 'mxe', 'mae', 'medae', *super().get_scores()]
+		return ['roc-auc', 'f1', 'precision', 'recall',
+			'worst-roc-auc', 'worst-f1', 'worst-precision', 'worst-recall',
+			*super().get_scores()]
 
 	def get_results(self):
-		return ['report', 'confusion', *super().get_results()]
-
-	pass
+		return ['report', 'confusion',
+		        'full-roc-auc', 'roc-curve',
+		        'full-f1', 'full-recall', 'full-precision', 'full-support',
+		        *super().get_results()]
 
 
 
@@ -171,28 +187,30 @@ class Regressor(Supervised, base.RegressorMixin):
 	def _evaluate(self, info, **kwargs):
 		info = super()._evaluate(info, **kwargs)
 
-		mse = metrics.mean_squared_error(info.get_labels(), info.get_result('pred'))
-		mxe = metrics.max_error(info.get_labels(), info.get_result('pred'))
-		mae = metrics.mean_absolute_error(info.get_labels(), info.get_result('pred'))
-		medae = metrics.median_absolute_error(info.get_labels(), info.get_result('pred'))
+		labels, pred = info.get_labels(), info.get_result('pred')
+
+		mse = metrics.mean_squared_error(labels, pred)
+		mxe = metrics.max_error(labels, pred)
+		mae = metrics.mean_absolute_error(labels, pred)
+		medae = metrics.median_absolute_error(labels, pred)
+		r2 = metrics.r2_score(labels, pred)
 
 		info.update({
 			'mse': mse,
 			'mxe': mxe,
 			'mae': mae,
 			'medae': medae,
+			'r2-score': r2,
 		})
 
 		return info
 
 	def get_scores(self):
-		return ['mse', 'mxe', 'mae', 'medae', *super().get_scores()]
+		return ['mse', 'mxe', 'mae', 'medae', 'r2-score', *super().get_scores()]
 
 
 
 class Clustering(Estimator, base.ClusterMixin):
-
-
 	pass
 
 
