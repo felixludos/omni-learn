@@ -710,7 +710,7 @@ class Run(Configurable):
 			self.output = output
 		
 		try:
-			eval_out = model.evaluate(self, config=config)
+			eval_out = model.evaluate(info=self)
 		except AttributeError:
 			pass
 		else:
