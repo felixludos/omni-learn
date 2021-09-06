@@ -76,8 +76,8 @@ class GBTRegressor(SingleLabelEstimator, GradientBoostingRegressor):
 		if validation_fraction is None:
 			validation_fraction = A.pull('validation_fraction', 0.1)
 
-		if n_iter_no_change is None:
-			n_iter_no_change = A.pull('n_iter_no_change', unspecified_argument)
+		if n_iter_no_change is unspecified_argument:
+			n_iter_no_change = A.pull('n_iter_no_change', None)
 
 		if tol is None:
 			tol = A.pull('tolance', '<>tol', 0.0001)
@@ -158,8 +158,8 @@ class GBTClassifier(SingleLabelEstimator, GradientBoostingClassifier):
 		if validation_fraction is None:
 			validation_fraction = A.pull('validation_fraction', 0.1)
 
-		if n_iter_no_change is None:
-			n_iter_no_change = A.pull('n_iter_no_change', unspecified_argument)
+		if n_iter_no_change is unspecified_argument:
+			n_iter_no_change = A.pull('n_iter_no_change', None)
 
 		if tol is None:
 			tol = A.pull('tolance', '<>tol', 0.0001)

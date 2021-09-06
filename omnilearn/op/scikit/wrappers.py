@@ -2,13 +2,27 @@ import omnibelt as belt
 from omnibelt import unspecified_argument
 import omnifig as fig
 import torch
+from torch import nn
 from sklearn import base, metrics
 from ..framework import Learnable, FunctionBase, Evaluatable, Recordable, Function
 from ...eval import MetricBase
 
 from ... import util
 
-class ScikitWrapper:
+class ScikitWrapper(belt.InitWall):
+	def __init__(self, *args, _multi_inits=None, _req_args=None,
+	             _req_kwargs=None, **kwargs):
+		if isinstance(self, nn.Module):
+			_multi_inits = [None, nn.Module]
+			super().__init__(*args, _multi_inits=_multi_inits,
+			                 _req_args={}, _req_kwargs={nn.Module:kwargs},
+			                 **kwargs)
+		else:
+			super().__init__(*args, _multi_inits=_multi_inits,
+			                 _req_args=_req_args, _req_kwargs=_req_kwargs,
+			                 **kwargs)
+	
+	
 	def _format_scikit_arg(self, data):
 		if data is not None and isinstance(data, torch.Tensor):
 			data = data.cpu().numpy()
@@ -47,7 +61,7 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 
 
 class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
-
+	
 	def register_out_space(self, space):
 		self._outspace = space
 
@@ -79,7 +93,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	
 	def _predict(self, data):
 		data = self._format_scikit_arg(data)
-		return super(Estimator, self).predict(data)
+		return super(ScikitWrapper, self).predict(data)
 	
 	
 	def predict_probs(self, data):
@@ -88,7 +102,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	
 	def _predict_probs(self, data):
 		data = self._format_scikit_arg(data)
-		return super(Estimator, self).predict_proba(data)
+		return super(ScikitWrapper, self).predict_proba(data)
 	
 	
 	def predict_score(self, data):
@@ -96,7 +110,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	
 	
 	def _predict_score(self, data):
-		return super(Estimator, self).predict_scores(data)
+		return super(ScikitWrapper, self).predict_scores(data)
 
 
 	def make_prediction(self, name, data):
