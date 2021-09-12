@@ -102,6 +102,26 @@ class Torchvision_Toy_Dataset(Memory_Dataset, Batchable, Deviced, Downloadable, 
 		self.register_buffer('images', images)
 		# del self.data
 
+	def get_observations(self):
+		return self.images
+
+	def get_labels(self):
+		return self.labels
+
+	def _replace_observations(self, observations):
+		self.images = observations
+
+	def _replace_labels(self, labels):
+		self.labels = labels
+
+	@property
+	def raw_folder(self) -> str:
+		return os.path.join(self.root, self.__class__.__name__.split('_')[-1], 'raw')
+
+	@property
+	def processed_folder(self) -> str:
+		return os.path.join(self.root, self.__class__.__name__.split('_')[-1], 'processed')
+
 	def download(cls, A, **kwargs):
 		cls(A, download=True)
 

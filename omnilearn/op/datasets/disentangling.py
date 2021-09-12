@@ -574,7 +574,7 @@ class RFD(Downloadable, DisentanglementDataset):
 
 
 @register_dataset('full-celeba')  # probably shouldnt be used
-class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and formatting
+class FullCelebA(Downloadable, DisentanglementDataset):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
 	
@@ -586,7 +586,12 @@ class FullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and 
 	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
 	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
 	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
-	
+
+
+	_all_mechanism_names = ATTRIBUTES.copy()
+	_all_mechanism_class_names = [[f'no:{l}', f'yes:{l}'] for l in ATTRIBUTES]
+	_full_label_space = util.JointSpace(*[util.BinaryDim() for _ in range(len(ATTRIBUTES))])
+
 	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None,
 	             din=None, dout=None, **kwargs):
 		

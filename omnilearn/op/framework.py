@@ -24,6 +24,7 @@ class FunctionBase(DimensionBase, DeviceBase, InitWall, nn.Module):  # any diffe
 		super().__init__(din=din, dout=dout, device=device, **unused)
 	
 
+
 class Function(Switchable, TrackedAttrs, Dimensions, Deviced, Configurable, FunctionBase):
 	
 	def switch_to(self, mode):
@@ -53,6 +54,7 @@ class Function(Switchable, TrackedAttrs, Dimensions, Deviced, Configurable, Func
 		return {}
 
 
+
 class FunctionWrapperBase(Simple_Child, FunctionBase):
 	def __init__(self, function, **kwargs):
 		super().__init__(_parent=function, **kwargs)
@@ -63,12 +65,14 @@ class FunctionWrapperBase(Simple_Child, FunctionBase):
 	def forward(self, *args, **kwargs):
 		return self.function(*args, **kwargs)
 	
-	
+
+
 class FunctionWrapper(Configurable, FunctionWrapperBase):
 	def __init__(self, A, function=unspecified_argument, **kwargs):
 		if function is None:
 			function = A.pull('function', None)
 		super().__init__(A, function=function, **kwargs)
+
 
 
 class HyperParam(Function):
@@ -104,6 +108,7 @@ class HyperParam(Function):
 		return hparams
 
 
+
 class Savable(Checkpointable, Function):
 	
 	def __init__(self, A, **kwargs):
@@ -135,31 +140,42 @@ class Savable(Checkpointable, Function):
 		return path
 
 
+
 class Evaluatable(FunctionBase): # TODO: maybe not needed
+	def evaluate(self, dataset=None, info=None, **kwargs):
+		if dataset is None:
+			assert info is not None # should be a run
+			dataset = info.get_dataset()
+		return self._evaluate(dataset, **kwargs)
 
-	def evaluate(self, info, **kwargs):
-		return self._evaluate(info, **kwargs)
 
-	def _evaluate(self, info, out=None, **kwargs):
+	def _evaluate(self, dataset, out=None, **kwargs):
 		if out is None:
 			out = util.TensorDict()
 		return out # by default eval does nothing
 
 
-class Learner(Evaluatable): # non-iterative method
+
+class Learnable(Evaluatable): # non-iterative method
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
 		self._is_fit = False
 
+
 	def is_fit(self):
 		return self._is_fit
 
-	def fit(self, dataset, **kwargs):
+
+	def fit(self, dataset=None, info=None, **kwargs):
+		if dataset is None:
+			assert info is not None # should be a run
+			dataset = info.get_dataset()
 		out = self._fit(dataset, **kwargs)
 		self._is_fit = True
 		return out
 
-	def _fit(self, dataset, out=None):
+
+	def _fit(self, dataset, out=None, **kwargs):
 		if out is None:
 			out = util.TensorDict()
 		return out
@@ -167,10 +183,10 @@ class Learner(Evaluatable): # non-iterative method
 
 
 class Initializable(Function): # TODO: include in load-model
-	def init_params(self, dataset):
-		return self._init_params(dataset.get_batch())
+	def init_params(self, dataset, **kwargs):
+		return self._init_params(dataset, **kwargs)
 	
-	def _init_params(self, batch):
+	def _init_params(self, dataset, **kwargs):
 		pass
 
 
@@ -264,6 +280,7 @@ class Optimizable(Function):
 		return state_dict
 
 
+
 class Trainable(Maintained, HyperParam, Recordable, Optimizable, Function, AlertBase):
 	def __init__(self, A, **kwargs):
 		
@@ -310,6 +327,7 @@ class Trainable(Maintained, HyperParam, Recordable, Optimizable, Function, Alert
 		return self.training and self.optim is not None
 	
 
+
 class Model(Seed, Savable, Trainable, Evaluatable, Visualizable, Function): # top level - must be implemented to train
 
 	def evaluate(self, info, config=None, out=None, **kwargs):
@@ -337,9 +355,11 @@ class Presentable(Function):
 		return super().__call__(*args, **kwargs)
 
 
+
 class Regularizable(object):
 	def regularize(self, q):
 		return torch.tensor(0).type_as(q)
+
 
 
 class Stochastic(Function):
@@ -352,10 +372,12 @@ class Stochastic(Function):
 		raise NotImplementedError
 
 
+
 @fig.AutoModifier('generative')
 class Generative(Stochastic):
 	def generate(self, N=1):
 		return self._sample(N)
+
 
 
 @fig.AutoModifier('encodable')
@@ -364,16 +386,20 @@ class Encodable(object):
 		return self(x)
 
 
+
 @fig.AutoModifier('decodable')
 class Decodable(object): # by default this is just the forward pass
 	def decode(self, q):
 		return self(q)
 
 
+
 @fig.AutoModifier('invertible')
 class Invertible(object):
 	def inverse(self, *args, **kwargs):
 		raise NotImplementedError
+
+
 
 @fig.AutoModifier('tensorflow')
 class TensorflowPort(Function):

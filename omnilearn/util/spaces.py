@@ -252,19 +252,88 @@ class PeriodicDim(BoundDim):
 
 
 
-class SpatialSpace(DimSpec):
-	def __init__(self, channels, size, channel_first=False, **kwargs):
-		shape = (channels, *size) if channel_first else (*size, channels)
+class MultiDimSpace(DimSpec):
+	def __init__(self, channels, shape=None, channel_first=False, **kwargs):
+
+		if isinstance(shape, int):
+			shape = (shape,)
+
+		size = shape
+		shape = (channels,) if shape is None else (
+			(channels, *shape) if channel_first else (*shape, channels))
+
 		super().__init__(shape=shape, **kwargs)
 		self.channel_first = channel_first
-		self.img_size = size
+		self.size = size
 		self.channels = channels
+
+
+
+class SimplexSpace(MultiDimSpace, BoundDim):
+
+	def sample(self, N=None, **kwargs): # from Donald B. Rubin, The Bayesian bootstrap Ann. Statist. 9, 1981, 130-134.
+		# discussed in https://cs.stackexchange.com/questions/3227/uniform-sampling-from-a-simplex
+
+		sqz = False
+		if N is None:
+			sqz = True
+			N = 1
+
+		extra_shape = [N, *self.shape]
+		raw = super().sample(N=N, **kwargs).view(*extra_shape)
+
+		dim = (-1) ** (not self.channel_first)
+		extra_shape[dim] = 1
+
+		edges = torch.cat([torch.zeros(*extra_shape),
+		                   raw.narrow(dim, 0, self.channels - 1).sort(dim)[0],
+		                   torch.ones(*extra_shape)], dim)
+
+		samples = edges.narrow(dim, 1, self.channels) - edges.narrow(dim, 0, self.channels)
+		return samples.squeeze(0) if sqz else samples
+
+	def standardize(self, vals):
+		return F.normalize(vals, p=1, dim=(-1) ** (not self.channel_first))
+
+	def unstandardize(self, vals):
+		return self.standardize(vals)
+
+
+
+class SphericalSpace(MultiDimSpace, UnboundDim):
+
+	def standardize(self, vals):
+		return F.normalize(vals, p=2,
+		                   dim=(-1) ** (not self.channel_first),  # 1 or -1
+		                   )
+
+
+	def unstandardize(self, vals):
+		return self.standardize(vals)
+
+
+	def euclidean_difference(self, x, y):
+		return super().difference(x, y)
+
+
+	def geodesic_difference(self, x, y):
+		raise NotImplementedError
+
+
+	def difference(self, x, y): # geodesic by default
+		return self.geodesic_difference(x, y)
+
+
+
+class SpatialSpace(MultiDimSpace):
+	def __init__(self, channels, size, **kwargs):
+		super().__init__(shape=shape, **kwargs)
 
 
 
 class SequenceSpace(SpatialSpace):
 	def __init__(self, channels=1, length=None, **kwargs):
-		super().__init__(channels=channels, size=(length,), **kwargs)
+		super().__init__(channels=channels, size=(length,), channel_first=True, **kwargs)
 		self.length = length
 
 
@@ -287,8 +356,8 @@ class VolumeSpace(SpatialSpace):
 
 
 class CategoricalDim(DimSpec):
-	def __init__(self, n, shape=(1,), **kwargs):
-		super().__init__(min=0, max=n - 1, shape=shape, **kwargs)
+	def __init__(self, n, **kwargs):
+		super().__init__(min=0, max=n - 1, **kwargs)
 		self._min = self._min.long()
 		self._max = self._max.long()
 		self.n = n
@@ -335,10 +404,33 @@ class CategoricalDim(DimSpec):
 		return x.sub(y).bool().long()
 
 
+# class CategoricalProbsDim(CategoricalDim):
+#
+# 	def difference(self, x, y):
+# 		return F.binary_cross_entropy(x, y)
+#
+# class CategoricalLogitsDim(CategoricalProbsDim):
+#
+#
+#
+# 	def difference(self, x, y):
+# 		return F.binary_cross_entropy_with_logits(x, y)
+
+
+class BinaryDim(CategoricalDim):
+	def __init__(self, n=None, **kwargs):
+		super().__init__(n=2, **kwargs)
+
 
 class JointSpace(DimSpec):
 	def __init__(self, *dims, shape=None, max=None, min=None, **kwargs):
-		
+		singles = []
+		for d in dims:
+			if isinstance(d, JointSpace):
+				singles.extend(d.dims)
+			else:
+				singles.append(d)
+		dims = singles
 		shape = (sum(len(dim) for dim in dims),)
 		expanded_shape = sum(dim.expanded_len() for dim in dims)
 		
@@ -347,8 +439,12 @@ class JointSpace(DimSpec):
 		self._expanded_shape = expanded_shape
 		self.dims = dims
 		self._is_dense = any(1 for dim in dims if isinstance(dim, DenseDim))
-	
-	
+
+
+	def __iter__(self):
+		return iter(self.dims)
+
+
 	@property
 	def expanded_shape(self):
 		return self._expanded_shape

@@ -1,4 +1,4 @@
 
 from . import fid
-from .evaluator import Evaluator, EvaluatorBase
+from .metric import Metric, MetricBase
 from .stats import elbo, bits_per_dim

@@ -4,7 +4,7 @@ import torch
 from wrapt import ObjectProxy
 from omnibelt import Value as ValueWrapper, primitives, InitWall, unspecified_argument
 
-
+import omnifig as fig
 from omnifig import Configurable
 
 from .math import set_seed
@@ -231,6 +231,45 @@ class Seeded(Deviced):
 	# 	self.gen = gen
 	#
 	# 	return super().to(device)
+
+
+
+class Buildable(Configurable):
+	def resolve(self, *args, **kwargs):
+		return self
+
+
+
+@fig.Component('builder')
+class Builder(Buildable):
+	def __init__(self, A, source=unspecified_argument, **kwargs):
+		if source is unspecified_argument:
+			source = A.pull('_source', None, raw=True)
+
+		super().__init__(A, **kwargs)
+		self._build_source = source
+		self._build_args = ()
+		self._build_kwargs = {}
+		self._build_result = []
+
+
+	def resolve(self, *args, **kwargs):
+		if not len(self._build_result):
+			self._build_result[0] = self.build(*args, **kwargs)
+		return self._build_result[0]
+
+
+	def build(self, *args, **kwargs):
+		if len(args) or len(kwargs):
+			self._build_args = args
+			self._build_kwargs = kwargs
+		return self._build(self._build_source, *self._build_args, **self._build_kwargs)
+
+
+	def _build(self, config, *args, **kwargs):
+		raise NotImplementedError
+
+
 
 # endregion
 

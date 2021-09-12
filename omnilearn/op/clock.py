@@ -171,8 +171,8 @@ class Limited(SimpleClock):
 
 @fig.AutoModifier('clock/stats')
 class Stats(StatsClient, SimpleClock):
-	# def __init__(self, A, **kwargs):
-	# 	super().__init__(A, **kwargs)
+	def __init__(self, A, **kwargs):
+		super().__init__(A, **kwargs)
 	
 	
 	def register_alert(self, name, alert, add_to_stats=True, **unused):

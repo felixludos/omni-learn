@@ -14,6 +14,7 @@ from .report import get_report
 from .analysis import Run_Manager
 from . import records
 from . import download
+from . import scikit
 try:
 	from .pretrained import Pretrained
 except ImportError:

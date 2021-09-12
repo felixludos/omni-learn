@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from collections import deque, OrderedDict
 
-from omnibelt import unspecified_argument
+from omnibelt import unspecified_argument, InitWall
 import omnifig as fig
 
 from .features import Configurable, Switchable, SwitchableBase
@@ -339,17 +339,17 @@ class StatsClientBase:
 
 
 
-class StatsClient(Configurable, StatsClientBase):
+class StatsClient(Configurable, StatsClientBase, InitWall):
 	def __init__(self, A, stats=unspecified_argument, default_tau=unspecified_argument,
 	             stats_fmt=unspecified_argument, **kwargs):
 		stats = A.pull('stats', None, ref=True)
-		if stats is None:
+		if stats is unspecified_argument:
 			print('WARNING: no stats manager found')
 
-		if stats_fmt is None:
+		if stats_fmt is unspecified_argument:
 			stats_fmt = A.pull('stats-fmt', None)
 
-		if default_tau is None:
+		if default_tau is unspecified_argument:
 			default_tau = A.pull('smooth-tau', '<>tau', None)
 
 		super().__init__(A, stats=stats, stats_fmt=stats_fmt, default_tau=default_tau, **kwargs)

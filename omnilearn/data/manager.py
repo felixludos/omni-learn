@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset, DataLoader, RandomSampler
 import h5py as hf
 
-from omnibelt import save_yaml, load_yaml
+from omnibelt import save_yaml, load_yaml, unspecified_argument
 
 import omnifig as fig
 
@@ -15,60 +15,81 @@ from .. import util
 from ..util.features import Checkpointable
 
 from .register import dataset_registry, DatasetNotFoundError
-from .collectors import Shuffle_Dataset, Subset_Dataset
+from .collectors import Shuffle_Dataset, Subset_Dataset, resolve_wrappers
 from .loaders import Featured_DataLoader, BatchedDataLoader
 
 from ..op.clock import AlertBase
 
+@fig.Component('datamanager/simple-dataset')
 class SimpleDataManager(util.Seed, util.Switchable, util.Deviced):
-	def __init__(self, A, mode='train', **kwargs):
-		
-		name = A.pull('_dataset_type', '<>dataset-name', '<>name')
-		mods = A.pull('_dataset_mod', [])
-		
-		default_mode = A.pull('default_mode', '<>mode', mode)
-		A.push('mode', default_mode, overwrite=False, silent=True)
+	def __init__(self, A, mode='train', dataset_config=unspecified_argument,
+	             aliases=None, default_mode=None, **kwargs):
 
-		aliases = A.pull('mode-aliases', {})
+		if default_mode is None:
+			default_mode = A.pull('default-mode', '<>mode', mode)
+
+		if dataset_config is unspecified_argument:
+
+			name = A.pull('_dataset_type', '<>dataset-name', '<>name')
+			mods = A.pull('_dataset_mod', [])
+
+			A.push('mode', default_mode, overwrite=False, silent=True)
+
+		if aliases is None:
+			aliases = A.pull('mode-aliases', {})
 
 		super().__init__(A, mode=mode, **kwargs)
 
 		self._default_mode = default_mode
-		
-		self.A = A
 
-		cmpn_name = dataset_registry.get(name, None)
-		if cmpn_name is None:
-			raise DatasetNotFoundError(name)
-		self.A.push('_type', cmpn_name, silent=True)
-		self.A.push('_mod', mods, silent=True)
+		if dataset_config is unspecified_argument:
+			cmpn_name = dataset_registry.get(name, None)
+			if cmpn_name is None:
+				raise DatasetNotFoundError(name)
+
+			dataset_config = A
+
+			dataset_config.push('_type', cmpn_name, silent=True)
+			dataset_config.push('_mod', mods, silent=True)
+
+		self.dataset_config = dataset_config
 
 		self._mode_aliases = aliases
 
+		self._modes = {}
 		self.purge()
-			
+
+
 	def startup(self, A=None):
 		mode = self._default_mode
 		return self.get_data(mode)
 
+
 	def purge(self):
 		self._active = None
-		self._modes = {}
-	
+		self._modes.clear()
+
+
 	def available_modes(self):
 		return list(self._modes.keys())
-	
+
+
 	def _create_mode(self, mode):
 
 		# self.A.begin()
-		if self.A.contains_nodefault(mode):
-			self.A.update(self.A.sub(mode))
-		self.A.push('mode', mode, silent=True)
-		dataset = self.A.pull_self()
+		# if self.dataset_config.contains_nodefault(mode):
+		# 	self.dataset_config.update(self.dataset_config.sub(mode))
+		self.dataset_config.push('mode', mode, silent=True)
+		dataset = self.dataset_config.pull_self()
 		# self.A.abort()
-		
+
+		return self._store_mode(mode, dataset)
+
+
+	def _store_mode(self, mode, dataset):
 		self._modes[mode] = dataset
 		return dataset
+
 
 	def _find_active(self, mode):
 		if mode in self._modes:
@@ -77,23 +98,29 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced):
 			return self._find_active(self._mode_aliases[mode])
 		return self._create_mode(mode)
 
+
 	def switch_to(self, mode):
 		if mode is None:
 			mode = self._default_mode
 
 		super().switch_to(mode)
 		self._active = self._find_active(mode)
+
+
 	def get_data(self, mode=None):
 		if mode is not None:
 			self.switch_to(mode)
 		return self._active
-	
+
+
 	def __len__(self):
 		return len(self.get_data())
-	
+
+
 	def __getitem__(self, item):
 		return self.get_data()[item]
-	
+
+
 	def __getattribute__(self, item):
 		try:
 			return super().__getattribute__(item)
@@ -106,9 +133,11 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced):
 			else:
 				raise e
 
+
+
 @fig.AutoModifier('datamanager/loadable')
 class Loadable(SimpleDataManager):
-	def __init__(self, A, **kwargs):
+	def __init__(self, A, **kwargs): # TODO arg defaults
 		num_workers = A.pull('num_workers', 0)
 		batch_size = A.pull('batch_size', 64)
 		shuffle = A.pull('shuffle', True)
@@ -137,10 +166,12 @@ class Loadable(SimpleDataManager):
 	def get_loader(self, mode=None, **kwargs):
 		dataset = self.get_data(mode=mode)
 		return self.to_loader(dataset, **kwargs)
-	
+
+
 	def get_batch_size(self):
 		return self._loader_settings.get('batch_size', None)
-	
+
+
 	def to_loader(self, dataset, infinite=None, extractor=None, **updates):
 		settings = self._loader_settings.copy()
 		settings.update(updates)
@@ -180,6 +211,7 @@ class Loadable(SimpleDataManager):
 		return loader
 
 
+
 @fig.AutoModifier('datamanager/splitable')
 class Splitable(SimpleDataManager):
 	def __init__(self, A, skip_load=None, **kwargs):
@@ -194,39 +226,41 @@ class Splitable(SimpleDataManager):
 		self.split_info = split
 		self.split_src = split_src
 		self._split_done = False
-		
-	def register_mode(self, mode, subset):
-		self._modes[mode] = subset
-		
+
+
 	def _split_load(self, dataset):
 		
 		if self.split_src == self.get_mode():
 			
 			skip_modes = dataset.get_available_modes()
+			done_modes = self.available_modes()
+
+			split_ratios = {mode: ratio for mode, ratio in self.split_info.items()
+			                if mode not in skip_modes and mode not in done_modes}
 			
-			self.split_info = {mode: ratio for mode, ratio in self.split_info.items() if mode not in skip_modes}
+			if len(split_ratios):
 			
-			if len(self.split_info):
-			
-				modes, ratios = zip(*self.split_info.items())
+				modes, ratios = zip(*split_ratios.items())
 				
 				splits = self.split(dataset, *ratios, shuffle=self.shuffle_split)
 				
 				for mode, split in zip(modes, splits):
-					self.register_mode(mode, split)
-				self.register_mode(self.split_src, splits[-1])
+					self._store_mode(mode, split)
+				self._store_mode(self.split_src, splits[-1])
 				dataset = splits[-1]
 				self.switch_to(self.split_src)
 		
 		return dataset
-		
-	def startup(self, A=None):
-		dataset = super().startup(A=A)
+
+
+	def startup(self):
+		dataset = super().startup()
 		if not self._split_done:
 			dataset = self._split_load(dataset)
 			self._split_done = True
 		return dataset
-		
+
+
 	def split(self, dataset, *ratios, shuffle=True):
 		
 		for r in ratios:
@@ -251,6 +285,76 @@ class Splitable(SimpleDataManager):
 		
 		return parts
 
+
+
+@fig.AutoModifier('datamanager/sharable')
+class Sharable(SimpleDataManager):
+	def __init__(self, A, _modes=None, _current_mode=None, **kwargs):
+		super().__init__(A, **kwargs)
+
+		if _modes is not None:
+			self._modes = _modes
+
+		if _current_mode is not None:
+			self.switch_to(_current_mode)
+
+
+	def duplicate(self, base_cls=None, loaded_modes=None, **kwargs):
+		if base_cls is None:
+			base_cls = self.__class__
+		if loaded_modes is None:
+			loaded_modes = self._modes
+		return base_cls(self.dataset_config, _modes=loaded_modes, _current_mode=self.get_mode(), **kwargs)
+
+
+	def get_all_loaded(self):
+		return self._modes.copy()
+
+
+
+@fig.AutoModifier('datamanager/wrapable')
+class Wrapable(Sharable):
+	def __init__(self, A, wrappers=unspecified_argument, **kwargs):
+		if wrappers is unspecified_argument:
+			wrappers = A.pull('wrappers', [])
+
+		super().__init__(A, **kwargs)
+
+		self._data_wrappers = []
+		if wrappers is not None and len(wrappers):
+			for wrapper in wrappers:
+				cls = wrapper['ident']
+				del wrapper['ident']
+				self.register_wrapper(cls, **wrapper)
+
+
+	def register_wrapper(self, wrapper, args=(), kwargs={}, **resolve_kwargs):
+		cls = resolve_wrappers(wrapper, **resolve_kwargs)
+
+		info = (cls, args, kwargs)
+		self._data_wrappers.append(info)
+		for mode, data in self._modes.items():
+			self._modes[mode] = self._wrap_dataset(dataset, [info])
+		self.switch_to(self.get_mode())
+
+
+	def clear_wrappers(self):
+		self._data_wrappers.clear()
+
+
+	def _store_mode(self, mode, dataset):
+		return super()._store_mode(mode, self._wrap_dataset(dataset))
+
+
+	def _wrap_dataset(self, dataset, wrappers=None):
+		if wrappers is None:
+			wrappers = self._data_wrappers
+		for cls, args, kwargs in wrappers:
+			dataset = cls(dataset, *args, **kwargs)
+		return dataset
+
+
+
 class Active(Loadable, AlertBase):
 	def __init__(self, A, **kwargs):
 
@@ -259,11 +363,13 @@ class Active(Loadable, AlertBase):
 		self.epoch_seed = A.pull('epoch_seed', '<>seed', self.rng.getrandbits(32))
 		
 		self._loader = None
-	
+
+
 	def _increment_rng(self, seed):
 		self.rng.seed(seed)
 		return self.rng.getrandbits(32)
-	
+
+
 	def _start_epoch(self, seed=None, **loader_args):
 		if seed is None:
 			seed = self.epoch_seed
@@ -274,13 +380,16 @@ class Active(Loadable, AlertBase):
 		self.epoch_seed = self._increment_rng(self.epoch_seed)
 		
 		return loader
-	
+
+
 	def _end_epoch(self):
 		pass
-	
+
+
 	def __next__(self):
 		return self.get_batch()
-	
+
+
 	def get_batch(self, force=True, **loader_args):
 		
 		if self._loader is None:
@@ -294,14 +403,18 @@ class Active(Loadable, AlertBase):
 				self._loader = None
 				return self.get_batch(**loader_args)
 			raise
-	
+
+
 	def switch_to(self, mode):
 		if self._loader is not None and self.get_mode() != mode:
 			self._loader = None
 		return super().switch_to(mode)
-	
+
+
 	def activate(self, tick, info=None):
 		info.receive_batch(self.get_batch())
+
+
 
 class InfoManager(Checkpointable, Active):
 	def __init__(self, A, **kwargs):
@@ -316,7 +429,8 @@ class InfoManager(Checkpointable, Active):
 			self.load_checkpoint(ckpt)
 			
 		self.purge()
-		
+
+
 	def _init_info(self, A):
 		
 		info = {
@@ -327,21 +441,25 @@ class InfoManager(Checkpointable, Active):
 		}
 		
 		return info
-	
+
+
 	def purge(self):
 		super().purge()
 		self._records = None
-	
+
+
 	def prep(self, order, info=None):
 		super().prep(order, info=info)
 		
 		self._records = info.get_records()
 
+
 	def _increment_rng(self, seed):
 		epoch_seed = super()._increment_rng(seed)
 		self.info['epoch_seed'] = epoch_seed
 		return epoch_seed
-	
+
+
 	def _start_epoch(self, **loader_args):
 		if self.info['batch'] is None:
 			self.info['batch'] = 0
@@ -350,7 +468,8 @@ class InfoManager(Checkpointable, Active):
 		loader = super()._start_epoch(**loader_args)
 		# loader.skip(self.info['batch'])
 		return loader
-	
+
+
 	def _end_epoch(self):
 		self.info['batch'] = 0
 		self.info['epoch'] += 1
@@ -359,7 +478,8 @@ class InfoManager(Checkpointable, Active):
 			self._records['total_epochs'][self.get_mode()] += 1
 		
 		super()._end_epoch()
-	
+
+
 	def get_batch(self, force=True, **loader_args):
 		batch = super().get_batch(force=force, **loader_args)
 		self.info['batch'] += 1
@@ -367,20 +487,22 @@ class InfoManager(Checkpointable, Active):
 		# self._records['total_steps'][mode] += 1
 		# self._records['total_samples'][mode] += batch.size(0)
 		return batch
-	
+
+
 	def checkpoint(self, path, ident='dataset'):
 		path = Path(path)
 		
 		path = path / f'{ident}.yaml'
 		save_yaml(self.info, str(path))
-	
+
+
 	def load_checkpoint(self, path, ident='dataset'):
 		path = Path(path)
 		
 		path = path / f'{ident}.yaml'
 		self.info = load_yaml(str(path))
 		self.epoch_seed = self.info.get('epoch_seed', self.epoch_seed)
-		
+
 
 
 @fig.Script('load-data', description='Load datasets')
@@ -395,8 +517,9 @@ def load_data(A):
 	return A.pull_self()
 
 
+
 @fig.Component('dataset')
-class DataManager(InfoManager, Splitable, SimpleDataManager):
+class DataManager(InfoManager, Splitable, Wrapable, SimpleDataManager):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
 		
@@ -410,7 +533,7 @@ class DataManager(InfoManager, Splitable, SimpleDataManager):
 				pass
 			else:
 				if A is None:
-					A = self.A
+					A = self.dataset_config
 				A.push('din', din, silent=True)
 				A.push('dout', dout, silent=True)
 

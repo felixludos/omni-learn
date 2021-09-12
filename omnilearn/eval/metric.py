@@ -4,8 +4,7 @@ from .. import util
 
 # TODO
 
-class EvaluatorBase:
-	
+class MetricBase:
 	def compute(self, *args, **kwargs):
 		out = self._compute(*args, **kwargs)
 		if isinstance(out, dict):
@@ -13,29 +12,27 @@ class EvaluatorBase:
 			results = {result: out.get(result, None) for result in self.get_results()}
 			out = scores, results
 		return out
-	
+
+
 	def _compute(self, *args, **kwargs):
 		raise NotImplementedError
-	
+
+
 	def get_scores(self):
 		return []
-	
+
+
 	def get_results(self):
 		return []
-	
+
+
+
+class Metric(util.Configurable, MetricBase):
 	pass
 
 
 
-class Evaluator(util.Configurable, EvaluatorBase):
-	pass
-
-
-
-class EvaluationManager(util.StatsClient):
-	
-	
-	
-	pass
+# class EvaluationManager(util.StatsClient):
+# 	pass
 
 

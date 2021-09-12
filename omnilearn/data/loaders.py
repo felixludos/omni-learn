@@ -32,7 +32,6 @@ class Featured_MultiProcessIter(Featured_DataLoaderIter, _MultiProcessingDataLoa
 	pass
 
 class Featured_DataLoader(DataLoader):
-	
 	def __init__(self, dataset, *args, device=None, seed=None, generator=None, **kwargs):
 
 		if seed is not None and generator is None:

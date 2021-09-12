@@ -1,7 +1,10 @@
+import omnibelt as belt
+from omnibelt import unspecified_argument
+import omnifig as fig
 import torch
 from sklearn import base, metrics
-from ..framework import Learner, FunctionBase, Evaluatable
-from ...eval import EvaluatorBase
+from ..framework import Learnable, FunctionBase, Evaluatable, Recordable, Function
+from ...eval import MetricBase
 
 from ... import util
 
@@ -43,26 +46,30 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 
 
 
-class ScikitEstimator(Learner, EvaluatorBase, ScikitWrapper):
+class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
+
+	def register_out_space(self, space):
+		self._outspace = space
+
 
 	def get_params(self):
 		try:
-			return super(Learner, self).get_params()
+			return super(Learnable, self).get_params()
 		except AttributeError:
 			return self.state_dict()
 
 
 	def set_params(self, **params):
 		try:
-			return super(Learner, self).set_params(**params)
+			return super(Learnable, self).set_params(**params)
 		except AttributeError:
 			return self.load_state_dict(params)
 
 
 	def _fit(self, dataset, out=None):
 		if out is None:
-			out = util.ScikitEstimatorInfo(self, dataset)
-		super(Learner, self).fit(out._estimator_observations, targets=out._estimator_labels)
+			out = ScikitEstimatorInfo(self, dataset)
+		super(Learnable, self).fit(out._estimator_observations, out._estimator_labels)
 		return out
 
 
@@ -101,17 +108,19 @@ class ScikitEstimator(Learner, EvaluatorBase, ScikitWrapper):
 			return method(data)
 
 
-	def _compute(self, run):
-		if not self.is_fit():
+	def _compute(self, run, dataset=None):
+		if dataset is None:
 			dataset = run.get_dataset()
+		if not self.is_fit():
 			out = self.fit(dataset)
-		return self.evaluate(run, out=out)
+		return self.evaluate(run, out=out, dataset=dataset)
 
 
-	def evaluate(self, info, out=None, **kwargs):
-		dataset = info.get_dataset()
+	def evaluate(self, info, out=None, dataset=None, **kwargs):
+		if dataset is None:
+			dataset = info.get_dataset()
 		if out is None:
-			out = util.ScikitEstimatorInfo(self, dataset)
+			out = ScikitEstimatorInfo(self, dataset)
 		return self._evaluate(out, **kwargs)
 
 
@@ -120,7 +129,13 @@ class ScikitEstimator(Learner, EvaluatorBase, ScikitWrapper):
 
 
 
-class Supervised(ScikitEstimator):
+class ModelBuilder(util.Builder):
+	def build(self, dataset):
+		return None
+
+
+
+class Supervised(ScikitEstimatorBase):
 	pass
 	
 
@@ -210,12 +225,12 @@ class Regressor(Supervised, base.RegressorMixin):
 
 
 
-class Clustering(Estimator, base.ClusterMixin):
+class Clustering(ScikitEstimatorBase, base.ClusterMixin):
 	pass
 
 
 
-class Transformer(Estimator, base.TransformerMixin):
+class Transformer(ScikitEstimatorBase, base.TransformerMixin):
 	def transform(self, data):
 		raise NotImplementedError
 	
@@ -225,37 +240,156 @@ class Transformer(Estimator, base.TransformerMixin):
 
 
 
+class ScikitEstimator(Recordable, ScikitEstimatorBase):
 
-class Metric(ScikitWrapper):
-	_name = None
-	_result_name = None
-	_fn = None
-	_arg_reqs = {}
-	
-	
-	def _build_args(self, model, args, labels=None):
-		for argname, req in _args_reqs.items():
-			if argname not in args:
-				args[argname] = model.demand_result(req)
-		return args
-	
-	
-	@classmethod
-	def get_name(cls):
-		return cls._name
-	
-	
-	def _dispatch(self, **kwargs):
-		return self._fn(**kwargs)
-	
-	
-	def _compute(self, estimator, dataset, **kwargs):
-		
-		kwargs = self._build_args(estimator, kwargs, dataset)
-		
-		
-		
-		pass
+	pass
+
+
+
+class SingleLabelEstimator(ScikitEstimator): # dout must be 1 (dof)
+	pass
+
+
+
+# @fig.AutoModifier('discretized')
+class Discretized(ScikitEstimator): # must be a boundd space
+	pass
+
+
+
+# @fig.AutoModifier('continuized')
+class Continuized(ScikitEstimator): # must be a categorical space
+	pass
+
+
+
+@fig.Component('joint-estimator')
+class JointEstimator(ScikitEstimator): # collection of single dim estimators (can be different spaces)
+	def __init__(self, A, estimators=unspecified_argument, **kwargs):
+		if estimators is unspecified_argument:
+			estimators = A.pull('estimators', [])
+		super().__init__(A, **kwargs)
+		self.estimators = estimators
+
+
+	def include_estimators(self, *estimators):
+		self.estimators.extend(estimators)
+
+
+	def _process_datasets(self, dataset):
+		datasets = [dataset.duplicate() for _ in self.estimators]
+		for idx, ds in enumerate(datasets):
+			ds.register_wrapper('single-label', kwargs={'idx': idx})
+		return datasets
+
+
+	def _dispatch(self, key, dataset, **kwargs):
+		datasets = self._process_datasets(dataset)
+		outs = [getattr(estimator, key)(dataset) for estimator, dataset in zip(self.estimators, datasets)]
+		return self._collate_outs(outs)
+
+
+	def _collate_outs(self, outs):
+		return util.pytorch_collate(outs)
+
+
+	def _fit(self, dataset, out=None, **kwargs):
+		return self._dispatch('_fit', dataset, **kwargs)
+
+
+	def _evaluate(self, dataset, out=None, **kwargs):
+		return self._dispatch('_evaluate', dataset, **kwargs)
+
+
+
+class MultiEstimator(SingleLabelEstimator): # all estimators must be of the same kind (out space)
+	def __init__(self, estimator_info, _is_extra=None, extra_estimators=None, **kwargs):
+
+		if _is_extra is None:
+			_is_extra = A.pull('_is_extra', False, silent=True)
+
+		if not _is_extra:
+			if extra_estimators is None:
+				extra_estimators = A.pull('extra-estimators', None)
+				if extra_estimators is None:
+					extra_estimators = A.pull('dout', None)
+					if extra_estimators is not None:
+						extra_estimators -= 1
+				if extra_estimators is None:
+					extra_estimators = 0
+
+		super().__init__(**kwargs)
+
+		extras = None
+		if not _is_extra and extra_estimators > 0:
+			estimator_info.push('_is_extra', True, silent=True)
+			extras = [estimator_info.pull_self() for _ in range(extra_estimators)]
+		self.extras = extras
+
+
+	def _collate_outs(self, outs):
+		return util.pytorch_collate(outs)
+
+
+	def _process(self, key, outs, dataset, **kwargs):
+		if key == 'predict':
+			return torch.cat(outs, -1)
+		return self._collate_outs(outs)
+
+
+	def _dispatch(self, key, dataset):
+		outs = [getattr(estimator, key)(dataset) for estimator in self.estimators]
+		return self._process(key, outs, dataset)
+
+
+
+@fig.AutoModifier('periodized')
+class Periodized(MultiEstimator): # create a copy of the estimator for the sin component
+	def __init__(self, estimator_info, extra_estimators=None, **kwargs):
+		super().__init__(estimator_info, extra_estimators=1, **kwargs)
+
+
+	def _process(self, key, outs, dataset, **kwargs):
+		cos, sin = outs
+		return torch.atan2(sin, cos)
+
+
+
+
+# old
+
+
+
+# class Metric(ScikitWrapper):
+# 	_name = None
+# 	_result_name = None
+# 	_fn = None
+# 	_arg_reqs = {}
+#
+#
+# 	def _build_args(self, model, args, labels=None):
+# 		for argname, req in _args_reqs.items():
+# 			if argname not in args:
+# 				args[argname] = model.demand_result(req)
+# 		return args
+#
+#
+# 	@classmethod
+# 	def get_name(cls):
+# 		return cls._name
+#
+#
+# 	def _dispatch(self, **kwargs):
+# 		return self._fn(**kwargs)
+#
+#
+# 	def _compute(self, estimator, dataset, **kwargs):
+#
+# 		kwargs = self._build_args(estimator, kwargs, dataset)
+#
+#
+#
+# 		pass
 	
 	
 
