@@ -1,4 +1,5 @@
 from .collectors import *
+from .wrappers import *
 from .register import register_dataset, dataset_registry
 from . import manager
 from .loaders import get_loaders, DataLoader, BatchedDataLoader

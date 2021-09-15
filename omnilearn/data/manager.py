@@ -15,7 +15,7 @@ from .. import util
 from ..util.features import Checkpointable
 
 from .register import dataset_registry, DatasetNotFoundError
-from .collectors import Shuffle_Dataset, Subset_Dataset, resolve_wrappers
+from .wrappers import Shuffle_Dataset, Subset_Dataset, resolve_wrappers
 from .loaders import Featured_DataLoader, BatchedDataLoader
 
 from ..op.clock import AlertBase
@@ -293,7 +293,7 @@ class Sharable(SimpleDataManager):
 		super().__init__(A, **kwargs)
 
 		if _modes is not None:
-			self._modes = _modes
+			self._modes = _modes.copy()
 
 		if _current_mode is not None:
 			self.switch_to(_current_mode)
@@ -334,7 +334,7 @@ class Wrapable(Sharable):
 		info = (cls, args, kwargs)
 		self._data_wrappers.append(info)
 		for mode, data in self._modes.items():
-			self._modes[mode] = self._wrap_dataset(dataset, [info])
+			self._modes[mode] = self._wrap_dataset(data, [info])
 		self.switch_to(self.get_mode())
 
 
@@ -358,11 +358,11 @@ class Wrapable(Sharable):
 class Active(Loadable, AlertBase):
 	def __init__(self, A, **kwargs):
 
+		self._loader = None
 		super().__init__(A, **kwargs)
 		self.rng = random.Random()
 		self.epoch_seed = A.pull('epoch_seed', '<>seed', self.rng.getrandbits(32))
-		
-		self._loader = None
+
 
 
 	def _increment_rng(self, seed):
@@ -427,8 +427,6 @@ class InfoManager(Checkpointable, Active):
 		
 		if ckpt is not None:
 			self.load_checkpoint(ckpt)
-			
-		self.purge()
 
 
 	def _init_info(self, A):
@@ -520,10 +518,11 @@ def load_data(A):
 
 @fig.Component('dataset')
 class DataManager(InfoManager, Splitable, Wrapable, SimpleDataManager):
-	def __init__(self, A, **kwargs):
+	def __init__(self, A, skip_load=None, **kwargs):
 		super().__init__(A, **kwargs)
-		
-		skip_load = A.pull('skip_load', False)
+
+		if skip_load is None:
+			skip_load = A.pull('skip_load', False)
 		if not skip_load:
 			dataset = self.startup()
 			try:
@@ -538,7 +537,8 @@ class DataManager(InfoManager, Splitable, Wrapable, SimpleDataManager):
 				A.push('dout', dout, silent=True)
 
 
-
+	def duplicate(self, base_cls=None, loaded_modes=None, **kwargs):
+		return super().duplicate(base_cls=base_cls, loaded_modes=loaded_modes, skip_load=True, **kwargs)
 
 
 

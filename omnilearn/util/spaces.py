@@ -29,7 +29,15 @@ class DimSpec:
 		if max is not None:
 			max = torch.as_tensor(max).float().expand(shape)
 		self._max = max
-		
+
+
+	def __str__(self):
+		return f'{self.__class__.__name__}'
+
+
+	def __repr__(self):
+		return str(self)
+
 		
 	def compress(self, vals):
 		return vals
@@ -140,7 +148,12 @@ class HalfBoundDim(DenseDim):
 		self._bound_type = bound_type
 		self._epsilon = epsilon
 
-	
+
+	def __str__(self):
+		lim = f'min={self.min.mean().item():.3g}' if self.min is not None else f'max={self.max.mean().item():.3g}'
+		return f'HalfBound({lim})'
+
+
 	def standardize(self, vals):
 		if self.min is not None:
 			vals = vals - self.min.unsqueeze(0)
@@ -186,6 +199,10 @@ class BoundDim(DenseDim):
 		self._epsilon = epsilon
 
 
+	def __str__(self):
+		return f'Bound(min={self.min.mean().item():.3g}, max={self.max.mean().item():.3g})'
+
+
 	def _sample(self, shape, generator):
 		return torch.rand(*shape, generator=generator)
 
@@ -209,6 +226,8 @@ class UnboundDim(DenseDim):
 	def __init__(self, min=None, max=None, **kwargs):
 		super().__init__(min=None, max=None, **kwargs)
 
+	def __str__(self):
+		return 'Unbound()'
 
 	def standardize(self, vals):
 		return vals
@@ -225,7 +244,11 @@ class PeriodicDim(BoundDim):
 		if max is None:
 			max = min + period
 		super().__init__(min=min, max=max, **kwargs)
-	
+
+
+	def __str__(self):
+		return f'Periodic({self.period.mean().item():.3g})'
+
 	
 	@property
 	def period(self):
@@ -361,8 +384,12 @@ class CategoricalDim(DimSpec):
 		self._min = self._min.long()
 		self._max = self._max.long()
 		self.n = n
-	
-	
+
+
+	def __str__(self):
+		return f'Categorical({self.n})'
+
+
 	def standardize(self, vals):
 		return vals/self.n
 	
@@ -439,6 +466,11 @@ class JointSpace(DimSpec):
 		self._expanded_shape = expanded_shape
 		self.dims = dims
 		self._is_dense = any(1 for dim in dims if isinstance(dim, DenseDim))
+
+
+	def __str__(self):
+		contents = ', '.join(str(x) for x in self.dims)
+		return f'Joint({contents})'
 
 
 	def __iter__(self):

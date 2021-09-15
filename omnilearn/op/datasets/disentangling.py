@@ -26,7 +26,7 @@ except ImportError:
 
 from ... import util
 from ...data import register_dataset, Deviced, Batchable, Splitable, ImageDataset, \
-	Downloadable, Dataset, MissingDatasetError, Subset_Dataset, Memory_Dataset
+	Downloadable, Dataset, MissingDatasetError, Subset_Dataset, Supervised
 
 from .transforms import Cropped
 
@@ -47,11 +47,11 @@ def _rec_decode(obj):
 	return obj
 
 
-class DisentanglementDataset(Memory_Dataset, ImageDataset):
+
+class Disentanglement(Supervised):
 	_all_mechanism_names = None
 	_all_mechanism_class_names = None
 	_full_mechanism_space = None
-	_full_label_space = None
 
 	def get_mechanism_class_names(self, mechanism):
 		if isinstance(mechanism, str):
@@ -74,7 +74,8 @@ class DisentanglementDataset(Memory_Dataset, ImageDataset):
 		return self._all_mechanism_names
 	def get_label_sizes(self):
 		return list(map(len, self.get_mechanism_names()))
-	
+
+
 
 @fig.AutoModifier('selected')
 class Selected(Splitable):
@@ -167,9 +168,9 @@ class Selected(Splitable):
 		return dataset
 
 
-@register_dataset('dsprites')
-class dSprites(Deviced, Batchable, Downloadable, DisentanglementDataset):
 
+@register_dataset('dsprites')
+class dSprites(Downloadable, Batchable, ImageDataset, Disentanglement):
 	din = (1, 64, 64)
 	dout = 5
 	# label_space = util.JointSpace()
@@ -230,8 +231,9 @@ class dSprites(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		return imgs,
 
 
+
 @register_dataset('3dshapes')
-class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
+class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 
 	din = (3, 64, 64)
 	dout = 6
@@ -304,8 +306,8 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 				self.register_buffer('indices', indices)
 			else:
 				prt.warning('using the full dataset (train+test)')
-			
-			images = images.permute(0, 3, 1, 2)#.float().div(255)
+
+			images = images.permute(0, 3, 1, 2).float().div(255).clamp(1e-7, 1-1e-7)#.float().div(255)
 			self.register_buffer('images', images)
 			
 			if labels is not None:
@@ -368,6 +370,15 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 	def get_labels(self):
 		return self.labels
 
+	def get_observations(self):
+		return self.images
+
+	def _replace_labels(self, labels):
+		self.labels = labels
+
+	def _replace_observations(self, observations):
+		self.images = observations
+
 	def get_raw_data(self):
 		if self.labeled:
 			return self.images, self.labels
@@ -384,7 +395,7 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 	def __getitem__(self, item):
 		# if isinstance(item, (np.ndarray, torch.Tensor)):
 		# 	item = item.tolist()
-		images = self.images[item].float().div(255).clamp(1e-7, 1-1e-7)
+		images = self.images[item]
 		# if self.noise is not None:
 		# 	images = images.add(torch.randn_like(images).mul(self.noise)).clamp(0,1)
 		if self.labeled:
@@ -394,8 +405,9 @@ class Shapes3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		return images,
 
 
+
 @register_dataset('rfd')
-class RFD(Downloadable, DisentanglementDataset):
+class RFD(Downloadable, ImageDataset, Disentanglement):
 
 	""" Implementing RA dataset for RFD based on .h5 storage"""
 	shape = (3, 128,128)
@@ -559,22 +571,21 @@ class RFD(Downloadable, DisentanglementDataset):
 	def num_files(self) -> int:
 		return self.raw_files.get(self.get_mode(), self.raw_files['train'])
 
+	# @property
+	# def processed_folder(self) -> str:
+	# 	return self.root + 'RFD/processed/'
+
 	@property
 	def set_name(self) -> str:
 		if self.get_mode() == 'test': return "test"
 		if self.get_mode() == 'heldout_test': return "HC"
 		return "train"
 
-	# @property
-	# def processed_folder(self) -> str:
-	# 	return self.root + 'RFD/processed/'
-
-
 
 
 
 @register_dataset('full-celeba')  # probably shouldnt be used
-class FullCelebA(Downloadable, DisentanglementDataset):  # TODO: automate downloading and formatting
+class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
 	
@@ -731,6 +742,7 @@ class FullCelebA(Downloadable, DisentanglementDataset):  # TODO: automate downlo
 		return img, lbl
 
 
+
 @register_dataset('celeba')
 class CelebA(Cropped, FullCelebA):
 	def __init__(self, A, resize=None, crop_size=128, **kwargs):
@@ -740,8 +752,9 @@ class CelebA(Cropped, FullCelebA):
 		super().__init__(A, resize=resize, crop_size=crop_size, **kwargs)
 
 
+
 @register_dataset('mpi3d')
-class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
+class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 
 	din = (3, 64, 64)
 	dout = 7
@@ -947,114 +960,121 @@ class MPI3D(Deviced, Batchable, Downloadable, DisentanglementDataset):
 		return imgs,
 
 
-class OldFullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and formatting
-	
-	din = (3, 218, 178)
-	
-	ATTRIBUTES = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
-	              'Bald', 'Bangs', 'Big_Lips', 'Big_Nose', 'Black_Hair', 'Blond_Hair',
-	              'Blurry', 'Brown_Hair', 'Bushy_Eyebrows', 'Chubby', 'Double_Chin',
-	              'Eyeglasses', 'Goatee', 'Gray_Hair', 'Heavy_Makeup', 'High_Cheekbones',
-	              'Male', 'Mouth_Slightly_Open', 'Mustache', 'Narrow_Eyes', 'No_Beard',
-	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
-	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
-	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
-	
-	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None, **kwargs):
-		self.add_existing_modes('val', 'test')
-		
-		if label_type is unspecified_argument:
-			label_type = A.pull('label_type', None)
-		
-		if mode is None:
-			mode = A.pull('mode', 'train')
-		if resize is unspecified_argument:
-			resize = A.pull('resize', (256, 256))
-		
-		din = A.pull('din', self.din)
-		
-		if label_type is None:
-			dout = din
-		elif label_type == 'attr':
-			dout = 40
-		elif label_type == 'landmark':
-			dout = 10
-		elif label_type == 'identity':
-			dout = 1
-		else:
-			raise Exception('unknown {}'.format(label_type))
-		
-		dout = A.pull('dout', dout)
-		
-		_labels = {
-			'attr': 'attrs',
-			'identity': 'identities',
-			'landmark': 'landmarks',
-		}
-		
-		if resize is not None:  # TODO: use Interpolated as modifier
-			din = 3, *resize
-		
-		super().__init__(A, din=din, dout=dout, **kwargs)
-		self.root = Path(self.root) / 'celeba'
-		dataroot = self.root
-		name = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
-		
-		with hf.File(os.path.join(dataroot, 'celeba', name), 'r') as f:
-			self.images = f['images'][()]  # encoded as str
-			self.labels = f[_labels[label_type]][()] if label_type is not None else None
-			
-			self.attr_names = f.attrs['attr_names']
-			self.landmark_names = f.attrs['landmark_names']
-		
-		self.resize = resize
-	
-	# google drive ids
-	_google_drive_ids = {
-		'img_align_celeba.zip': '0B7EVK8r0v71pZjFTYXZWM3FlRnM',
-		'list_eval_partition.txt': '0B7EVK8r0v71pY0NSMzRuSXJEVkk',
-		'identity_CelebA.txt': '1_ee_0u7vcNLOfNLegJRHmolfH5ICW-XS',
-		'list_attr_celeba.txt': '0B7EVK8r0v71pblRyaVFSWGxPY0U',
-		'list_bbox_celeba.txt': '0B7EVK8r0v71pbThiMVRxWXZ4dU0',
-		'list_landmarks_align_celeba.txt': '0B7EVK8r0v71pd0FJY3Blby1HUTQ',
-	}
-	
-	def download(cls, A, dataroot=None, **kwargs):
-		
-		dataroot = util.get_data_dir(A)
-		dataroot = dataroot / 'celeba'
-		
-		raise NotImplementedError
-	
-	def get_factor_sizes(self):
-		return [2] * len(self.ATTRIBUTES)
-	
-	def get_factor_order(self):
-		return self.ATTRIBUTES
-	
-	def get_attribute_key(self, idx):
-		try:
-			return self.ATTRIBUTES[idx]
-		except IndexError:
-			pass
-	
-	def __len__(self):
-		return len(self.images)
-	
-	def __getitem__(self, item):
-		
-		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
-		
-		if self.resize is not None:
-			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
-		
-		if self.labels is None:
-			return img,
-		
-		lbl = torch.from_numpy(self.labels[item])
-		
-		return img, lbl
 
 
+
+
+
+
+#
+# class OldFullCelebA(Downloadable, ImageDataset):  # TODO: automate downloading and formatting
+#
+# 	din = (3, 218, 178)
+#
+# 	ATTRIBUTES = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
+# 	              'Bald', 'Bangs', 'Big_Lips', 'Big_Nose', 'Black_Hair', 'Blond_Hair',
+# 	              'Blurry', 'Brown_Hair', 'Bushy_Eyebrows', 'Chubby', 'Double_Chin',
+# 	              'Eyeglasses', 'Goatee', 'Gray_Hair', 'Heavy_Makeup', 'High_Cheekbones',
+# 	              'Male', 'Mouth_Slightly_Open', 'Mustache', 'Narrow_Eyes', 'No_Beard',
+# 	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
+# 	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
+# 	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
+#
+# 	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None, **kwargs):
+# 		self.add_existing_modes('val', 'test')
+#
+# 		if label_type is unspecified_argument:
+# 			label_type = A.pull('label_type', None)
+#
+# 		if mode is None:
+# 			mode = A.pull('mode', 'train')
+# 		if resize is unspecified_argument:
+# 			resize = A.pull('resize', (256, 256))
+#
+# 		din = A.pull('din', self.din)
+#
+# 		if label_type is None:
+# 			dout = din
+# 		elif label_type == 'attr':
+# 			dout = 40
+# 		elif label_type == 'landmark':
+# 			dout = 10
+# 		elif label_type == 'identity':
+# 			dout = 1
+# 		else:
+# 			raise Exception('unknown {}'.format(label_type))
+#
+# 		dout = A.pull('dout', dout)
+#
+# 		_labels = {
+# 			'attr': 'attrs',
+# 			'identity': 'identities',
+# 			'landmark': 'landmarks',
+# 		}
+#
+# 		if resize is not None:  # TODO: use Interpolated as modifier
+# 			din = 3, *resize
+#
+# 		super().__init__(A, din=din, dout=dout, **kwargs)
+# 		self.root = Path(self.root) / 'celeba'
+# 		dataroot = self.root
+# 		name = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
+#
+# 		with hf.File(os.path.join(dataroot, 'celeba', name), 'r') as f:
+# 			self.images = f['images'][()]  # encoded as str
+# 			self.labels = f[_labels[label_type]][()] if label_type is not None else None
+#
+# 			self.attr_names = f.attrs['attr_names']
+# 			self.landmark_names = f.attrs['landmark_names']
+#
+# 		self.resize = resize
+#
+# 	# google drive ids
+# 	_google_drive_ids = {
+# 		'img_align_celeba.zip': '0B7EVK8r0v71pZjFTYXZWM3FlRnM',
+# 		'list_eval_partition.txt': '0B7EVK8r0v71pY0NSMzRuSXJEVkk',
+# 		'identity_CelebA.txt': '1_ee_0u7vcNLOfNLegJRHmolfH5ICW-XS',
+# 		'list_attr_celeba.txt': '0B7EVK8r0v71pblRyaVFSWGxPY0U',
+# 		'list_bbox_celeba.txt': '0B7EVK8r0v71pbThiMVRxWXZ4dU0',
+# 		'list_landmarks_align_celeba.txt': '0B7EVK8r0v71pd0FJY3Blby1HUTQ',
+# 	}
+#
+# 	def download(cls, A, dataroot=None, **kwargs):
+#
+# 		dataroot = util.get_data_dir(A)
+# 		dataroot = dataroot / 'celeba'
+#
+# 		raise NotImplementedError
+#
+# 	def get_factor_sizes(self):
+# 		return [2] * len(self.ATTRIBUTES)
+#
+# 	def get_factor_order(self):
+# 		return self.ATTRIBUTES
+#
+# 	def get_attribute_key(self, idx):
+# 		try:
+# 			return self.ATTRIBUTES[idx]
+# 		except IndexError:
+# 			pass
+#
+# 	def __len__(self):
+# 		return len(self.images)
+#
+# 	def __getitem__(self, item):
+#
+# 		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
+#
+# 		if self.resize is not None:
+# 			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
+#
+# 		if self.labels is None:
+# 			return img,
+#
+# 		lbl = torch.from_numpy(self.labels[item])
+#
+# 		return img, lbl
+#
+#
 
 

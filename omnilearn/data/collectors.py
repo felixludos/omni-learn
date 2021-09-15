@@ -4,7 +4,7 @@ from pathlib import Path
 from wrapt import ObjectProxy
 import numpy as np
 import torch
-from torch.utils.data import Dataset as PytorchDataset
+from torch.utils.data import Dataset as PytorchDataset, TensorDataset
 import h5py as hf
 
 from omnibelt import unspecified_argument, InitWall
@@ -12,7 +12,7 @@ from omnibelt import unspecified_argument, InitWall
 from .. import util
 
 
-class ExistingModes(util.Switchable):
+class ExistingModes(util.SwitchableBase):
 	def __init_subclass__(cls, **kwargs):
 		cls.available_modes = {'train'}
 	
@@ -26,29 +26,10 @@ class ExistingModes(util.Switchable):
 
 
 
-class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
+# region DatasetBases
+
+class DatasetBase(ExistingModes, util.DimensionBase, InitWall, PytorchDataset):
 	pass
-
-
-
-class Dataset(ExistingModes, util.Dimensions, util.Configurable, DatasetBase):
-	pass
-
-
-
-class Sourced(Dataset):
-	def __init__(self, A, dataroot=None, **kwargs):
-		super().__init__(A, **kwargs)
-		self.root = util.get_data_dir(A) if dataroot is None else dataroot
-	
-	def get_root(self):
-		return self.root
-
-
-
-class Batchable(Dataset): # you can select using a full batch
-	def allow_batched(self):
-		return True
 
 
 
@@ -86,8 +67,104 @@ class DevicedBase(util.DeviceBase, DatasetBase):
 
 
 
-class Deviced(util.Deviced, DevicedBase): # Full dataset is in memory, so it can be moved to GPU
+class Observation(DatasetBase):
+	_full_observation_space = None
+
+	def get_observations(self):
+		raise NotImplementedError
+	def update_data(self, indices):
+		raise NotImplementedError
+
+	def _replace_observations(self, observations):
+		raise NotImplementedError
+
+	def get_observation_space(self):
+		return self._full_observation_space
+
+
+
+class Supervised(Observation):
+	_full_label_space = None
+	_all_label_names = None
+
+	def get_labels(self):
+		raise NotImplementedError
+
+	def _replace_labels(self, labels):
+		raise NotImplementedError
+
+	def get_label_names(self):
+		return self._all_label_names
+	def get_label_space(self):
+		return self._full_label_space
+
+
+
+class ISupervisedDataset(Supervised):
+	def __init__(self, observations=None, labels=None,
+	             label_space=None, label_names=None,
+	             din=None, dout=None, **kwargs):
+		if din is None:
+			din = tuple(observations.shape[1:])
+		if dout is None:
+			dout = tuple(labels.shape[1:])
+		super().__init__(observations, labels, din=din, dout=dout)
+
+		self.register_buffer('observations', observations)
+		self.register_buffer('labels', labels)
+
+		self._full_label_space = label_space
+		self._all_label_names = label_names
+
+	def __len__(self):
+		return self.observations.size(0)
+
+	def __getitem__(self, item):
+		return self.observations[item], self.labels[item]
+
+	def get_observations(self):
+		return self.observations
+
+	def get_labels(self):
+		return self.labels
+
+	def _replace_labels(self, labels):
+		self.labels = labels
+
+	def _replace_observations(self, observations):
+		self.observations = observations
+
+	def update_data(self, indices):
+		self._replace_observations(self.observations[indices])
+		self._replace_labels(self.labels[indices])
+
+
+
+# region Configurable Dataset
+
+class Dataset(util.Dimensions, util.Configurable, DatasetBase):
 	pass
+
+
+
+class Deviced(util.Deviced, Dataset, DevicedBase): # Full dataset is in memory, so it can be moved to GPU
+	pass
+
+
+
+class Batchable(Deviced): # you can select using a full batch
+	def allow_batched(self):
+		return True
+
+
+
+class Sourced(Dataset):
+	def __init__(self, A, dataroot=None, **kwargs):
+		super().__init__(A, **kwargs)
+		self.root = util.get_data_dir(A) if dataroot is None else dataroot
+	
+	def get_root(self):
+		return self.root
 
 
 
@@ -96,11 +173,6 @@ class Downloadable(Sourced):
 	def download(cls, A, **kwargs):
 		raise NotImplementedError
 
-
-
-class MissingDatasetError(Exception):
-	def __init__(self, name):
-		super().__init__(f'Missing dataset {name} (it can be downloaded using the "download-dataset" script)')
 
 
 
@@ -132,7 +204,7 @@ class ImageDataset(Dataset):
 			if path.is_file():
 				with hf.File(path, 'r') as f:
 					available = list(f.keys())
-				
+
 				available = [a.split('_')[:-1] for a in available if 'mu' in a]
 				out = []
 				for a in available:
@@ -156,35 +228,18 @@ class ImageDataset(Dataset):
 						key = f'{mode}_{dim}'
 						if f'{key}_mu' in f:
 							return f[f'{key}_mu'][()], f[f'{key}_sigma'][()]
-	
+
 		raise MissingFIDStatsError(self.root, dim, modes, available)
 
 
-class Memory_Dataset(Dataset):
 
-	_full_label_space = None
-	_all_label_names = None
-
-	def get_observations(self):
-		raise NotImplementedError
-	def get_labels(self):
-		raise NotImplementedError
-	def update_data(self, indices):
-		raise NotImplementedError
-
-	def _replace_observations(self, observations):
-		raise NotImplementedError
-	def _replace_labels(self, labels):
-		raise NotImplementedError
-
-	def get_label_names(self):
-		return self._all_label_names
-	def get_label_space(self):
-		return self._full_label_space
+class MissingDatasetError(Exception):
+	def __init__(self, name):
+		super().__init__(f'Missing dataset {name} (it can be downloaded using the "download-dataset" script)')
 
 
 
-class List_Dataset(Dataset):
+class ListDataset(Dataset):
 	def __init__(self, ls):
 		self.data = ls
 
@@ -199,146 +254,6 @@ class List_Dataset(Dataset):
 	
 	
 # region Wrappers
-
-class DatasetWrapper(ObjectProxy):
-	pass
-
-
-
-class Indexed_Dataset(DatasetWrapper):
-	def __getitem__(self, idx):
-		return idx, self.__wrapped__[idx]
-
-
-
-class Subset_Dataset(DatasetWrapper):
-	def __init__(self, dataset, indices=None):
-		super().__init__(dataset)
-		self._self_indices = indices
-
-		try:
-			device = self.__wrapped__.get_device()
-			if self._self_indices is not None:
-				self._self_indices = self._self_indices.to(device)
-		except AttributeError:
-			pass
-
-
-	def __getitem__(self, idx):
-		return self.__wrapped__[idx] if self._self_indices is None else self.__wrapped__[self._self_indices[idx]]
-
-
-	def __len__(self):
-		return len(self.__wrapped__) if self._self_indices is None else len(self._self_indices)
-
-
-
-class Repeat_Dataset(DatasetWrapper):
-	def __init__(self, dataset, factor):
-		super().__init__(dataset)
-		self._self_factor = factor
-		self._self_num_real = len(dataset)
-		self._self_total = self._self_factor * self._self_num_real
-		print('Repeating dataset {} times'.format(factor))
-
-
-	def __getitem__(self, idx):
-		return self.__wrapped__[idx % self._self_num_real]
-
-
-	def __len__(self):
-		return self._self_total
-
-
-
-class Format_Dataset(DatasetWrapper):
-	def __init__(self, dataset, format_fn, format_args=None, include_original=False):
-		super().__init__(dataset)
-
-		self._self_format_fn = format_fn
-		self._self_format_args = {} if format_args is None else format_args
-		self._self_include_original = include_original
-
-
-	def __getitem__(self, idx):
-
-		sample = self.__wrapped__[idx]
-
-		formatted = self._self_format_fn(sample, **self._self_format_args)
-
-		if self._self_include_original:
-			return formatted, sample
-
-		return formatted
-
-
-
-class Shuffle_Dataset(DatasetWrapper):
-	def __init__(self, dataset):
-		super().__init__(dataset)
-
-		self._self_indices = torch.randperm(len(self.__wrapped__)).clone()
-
-		try:
-			device = self.__wrapped__.get_device()
-			self._self_indices = self._self_indices.to(device).clone()
-		except AttributeError:
-			pass
-
-
-	def __getitem__(self, idx):
-		return self.__wrapped__[self._self_indices[idx]]
-
-
-
-class SingleLabelDataset(DatasetWrapper):
-	def __init__(self, dataset, idx):
-		if not isinstance(dataset, Memory_Dataset):
-			raise NotImplementedError
-		super().__init__(dataset)
-		self._self_idx = idx
-
-		self.dout = 1
-		self._subselect_info('_all_label_names', idx)
-		self._subselect_info('_all_mechanism_names', idx)
-		self._subselect_info('_all_mechanism_class_names', idx)
-		self._subselect_info('_full_mechanism_space', idx)
-		self._subselect_info('_full_label_space', idx)
-
-
-	def _subselect_info(self, attrname, idx):
-		try:
-			if hasattr(self, attrname):
-				setattr(self, attrname, getattr(self, attrname)[idx])
-		except IndexError:
-			pass
-
-
-	def get_labels(self):
-		return self.__wrapped__.get_labels().narrow(-1, self._self_idx, 1)
-
-
-
-def resolve_wrappers(ident, **kwargs):
-
-	if not isinstance(ident, str):
-		return ident
-
-	if ident == 'single-label':
-		return SingleLabelDataset
-	if ident == 'shuffle':
-		return Shuffle_Dataset
-	if ident == 'format':
-		return Format_Dataset
-	if ident == 'repeat':
-		return Repeat_Dataset
-	if ident == 'subset':
-		return Subset_Dataset
-	if ident == 'indexed':
-		return Indexed_Dataset
-
-	raise Exception(f'wrapper not found: {ident}')
-
 
 
 

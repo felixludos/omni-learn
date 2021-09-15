@@ -1,3 +1,4 @@
+import numpy as np
 import omnibelt as belt
 from omnibelt import unspecified_argument
 import omnifig as fig
@@ -28,6 +29,10 @@ class ScikitWrapper(belt.InitWall):
 			data = data.cpu().numpy()
 		return data
 
+	def _format_scikit_output(self, out):
+		if out is not None and isinstance(out, np.ndarray):
+			out = torch.from_numpy(out)
+		return out
 
 
 class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
@@ -38,10 +43,10 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 
 
 	def _process_dataset(self):
-		self.observations = self.dataset.get_observations()
-		self.labels = self.dataset.get_labels()
-		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.observations)
-		self.__dict__['_estimator_labels'] = self._format_scikit_arg(self.labels)
+		# self.observations = self.dataset.get_observations()
+		# self.labels = self.dataset.get_labels()
+		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.dataset.get_observations())
+		self.__dict__['_estimator_labels'] = self._format_scikit_arg(self.dataset.get_labels())
 
 
 	def get_observations(self):
@@ -83,7 +88,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	def _fit(self, dataset, out=None):
 		if out is None:
 			out = ScikitEstimatorInfo(self, dataset)
-		super(Learnable, self).fit(out._estimator_observations, out._estimator_labels)
+		super(Learnable, self).fit(out.get_observations(), out.get_labels())
 		return out
 
 
@@ -93,7 +98,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	
 	def _predict(self, data):
 		data = self._format_scikit_arg(data)
-		return super(ScikitWrapper, self).predict(data)
+		return self._format_scikit_output(super(ScikitWrapper, self).predict(data))
 	
 	
 	def predict_probs(self, data):
@@ -102,7 +107,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	
 	def _predict_probs(self, data):
 		data = self._format_scikit_arg(data)
-		return super(ScikitWrapper, self).predict_proba(data)
+		return self._format_scikit_output(super(ScikitWrapper, self).predict_proba(data))
 	
 	
 	def predict_score(self, data):
@@ -110,7 +115,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	
 	
 	def _predict_score(self, data):
-		return super(ScikitWrapper, self).predict_scores(data)
+		return self._format_scikit_output(super(ScikitWrapper, self).predict_scores(data))
 
 
 	def make_prediction(self, name, data):
@@ -130,7 +135,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 		return self.evaluate(run, out=out, dataset=dataset)
 
 
-	def evaluate(self, info, out=None, dataset=None, **kwargs):
+	def evaluate(self, dataset=None, info=None, out=None, **kwargs):
 		if dataset is None:
 			dataset = info.get_dataset()
 		if out is None:
@@ -143,13 +148,17 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 
 
 
-class ModelBuilder(util.Builder):
-	def build(self, dataset):
-		return None
+# class ModelBuilder(util.Builder):
+# 	def build(self, dataset):
+# 		return None
+
+
+class ScikitEstimator(Recordable, ScikitEstimatorBase):
+	pass
 
 
 
-class Supervised(ScikitEstimatorBase):
+class Supervised(ScikitEstimator):
 	pass
 	
 
@@ -167,26 +176,24 @@ class Classifier(Supervised, base.ClassifierMixin):
 
 		precision, recall, fscore, support = metrics.precision_recall_fscore_support(labels, pred)
 
-		scores = info.get_result('scores')
-		auc = metrics.roc_auc_score(labels, scores)
-
+		auc = None
 		roc = None
 		if labels.max() == 1:
+			scores = info.get_result('scores')
+			auc = metrics.roc_auc_score(labels, scores)
+
 			scores = scores.reshape(-1)
 			roc = metrics.roc_curve(labels, scores)
 
 		info.update({
-			'roc-auc': auc.mean(),
 			'f1': fscore.mean(),
 			'precision': precision.mean(),
 			'recall': recall.mean(),
 
-			'worst-roc-auc': auc.min(),
 			'worst-f1': fscore.min(),
 			'worst-precision': precision.min(),
 			'worst-recall': recall.min(),
 
-			'full-roc-auc': auc,
 			'full-f1': fscore,
 			'full-recall': recall,
 			'full-precision': precision,
@@ -196,6 +203,10 @@ class Classifier(Supervised, base.ClassifierMixin):
 		})
 		if roc is not None:
 			info['roc-curve'] = roc
+		if auc is not None:
+			info['roc-auc'] = auc.mean()
+			info['worst-roc-auc'] = auc.min()
+			info['full-roc-auc'] = auc
 		return info
 
 	def get_scores(self):
@@ -254,12 +265,6 @@ class Transformer(ScikitEstimatorBase, base.TransformerMixin):
 
 
 
-class ScikitEstimator(Recordable, ScikitEstimatorBase):
-
-	pass
-
-
-
 class SingleLabelEstimator(ScikitEstimator): # dout must be 1 (dof)
 	pass
 
@@ -277,12 +282,10 @@ class Continuized(ScikitEstimator): # must be a categorical space
 
 
 
-@fig.Component('joint-estimator')
-class JointEstimator(ScikitEstimator): # collection of single dim estimators (can be different spaces)
-	def __init__(self, A, estimators=unspecified_argument, **kwargs):
-		if estimators is unspecified_argument:
-			estimators = A.pull('estimators', [])
-		super().__init__(A, **kwargs)
+class ParallelEstimator(ScikitEstimatorBase):
+	def __init__(self, estimators, din=None, dout=None, **kwargs):
+
+		super().__init__(**kwargs)
 		self.estimators = estimators
 
 
@@ -290,82 +293,114 @@ class JointEstimator(ScikitEstimator): # collection of single dim estimators (ca
 		self.estimators.extend(estimators)
 
 
-	def _process_datasets(self, dataset):
-		datasets = [dataset.duplicate() for _ in self.estimators]
-		for idx, ds in enumerate(datasets):
-			ds.register_wrapper('single-label', kwargs={'idx': idx})
-		return datasets
+	def _process_inputs(self, key, *ins):
+		return len(self.estimators)*[ins]
 
 
-	def _dispatch(self, key, dataset, **kwargs):
-		datasets = self._process_datasets(dataset)
-		outs = [getattr(estimator, key)(dataset) for estimator, dataset in zip(self.estimators, datasets)]
-		return self._collate_outs(outs)
-
-
-	def _collate_outs(self, outs):
+	def _process_outputs(self, key, outs):
+		if 'predict' in key:
+			return torch.stack(outs, -1)
+		if 'evaluate' in key:
+			return outs
 		return util.pytorch_collate(outs)
+
+
+	def _dispatch(self, key, *ins, **kwargs):
+		ins = self._process_inputs(key, *ins)
+		outs = [getattr(estimator, key)(*inp) for estimator, inp in zip(self.estimators, ins)]
+		return self._process_outputs(key, outs)
 
 
 	def _fit(self, dataset, out=None, **kwargs):
 		return self._dispatch('_fit', dataset, **kwargs)
 
 
-	def _evaluate(self, dataset, out=None, **kwargs):
-		return self._dispatch('_evaluate', dataset, **kwargs)
+	def _predict(self, data, **kwargs):
+		return self._dispatch('_predict', data, **kwargs)
+
+
+	def evaluate(self, dataset=None, info=None, **kwargs):
+		if dataset is None:
+			dataset = info.get_dataset()
+		return self._dispatch('evaluate', dataset, **kwargs)
 
 
 
-class MultiEstimator(SingleLabelEstimator): # all estimators must be of the same kind (out space)
-	def __init__(self, estimator_info, _is_extra=None, extra_estimators=None, **kwargs):
-
-		if _is_extra is None:
-			_is_extra = A.pull('_is_extra', False, silent=True)
-
-		if not _is_extra:
-			if extra_estimators is None:
-				extra_estimators = A.pull('extra-estimators', None)
-				if extra_estimators is None:
-					extra_estimators = A.pull('dout', None)
-					if extra_estimators is not None:
-						extra_estimators -= 1
-				if extra_estimators is None:
-					extra_estimators = 0
-
-		super().__init__(**kwargs)
-
-		extras = None
-		if not _is_extra and extra_estimators > 0:
-			estimator_info.push('_is_extra', True, silent=True)
-			extras = [estimator_info.pull_self() for _ in range(extra_estimators)]
-		self.extras = extras
+@fig.Component('joint-estimator')
+class JointEstimator(ScikitEstimator, ParallelEstimator): # collection of single dim estimators (can be different spaces)
+	def __init__(self, A, estimators=unspecified_argument, **kwargs):
+		if estimators is unspecified_argument:
+			estimators = A.pull('estimators', [])
+		super().__init__(A, estimators=estimators, **kwargs)
 
 
-	def _collate_outs(self, outs):
+	def _process_inputs(self, key, dataset):
+		if 'predict' in key:
+			return [(dataset,) for _ in self.estimators]
+		datasets = [(dataset.duplicate(),) for _ in self.estimators]
+		for idx, (ds,) in enumerate(datasets):
+			ds.register_wrapper('single-label', kwargs={'idx': idx})
+		return datasets
+
+
+
+class MultiEstimator(SingleLabelEstimator, ParallelEstimator): # all estimators must be of the same kind (out space)
+	def __init__(self, A, raw_pred=None, **kwargs):
+
+		if raw_pred is None:
+			raw_pred = A.pull('raw_pred', False)
+
+		super().__init__(A, **kwargs)
+		self._raw_pred = raw_pred
+
+
+	def toggle_raw_pred(self, val=None):
+		if val is None:
+			val = not self._raw_pred
+		self._raw_pred = val
+
+
+	def __getattribute__(self, item):
+		try:
+			return super().__getattribute__(item)
+		except AttributeError:
+			return self.estimators[0].__getattribute__(item)
+
+
+	def _merge_outs(self, outs, **kwargs):
+		raise NotImplementedError
+
+
+	def _process_outputs(self, key, outs, **kwargs):
+		if 'predict' in key:
+			return outs if self._raw_pred else self._merge_outs(outs, **kwargs)
 		return util.pytorch_collate(outs)
 
 
-	def _process(self, key, outs, dataset, **kwargs):
-		if key == 'predict':
-			return torch.cat(outs, -1)
-		return self._collate_outs(outs)
 
-
-	def _dispatch(self, key, dataset):
-		outs = [getattr(estimator, key)(dataset) for estimator in self.estimators]
-		return self._process(key, outs, dataset)
-
-
-
-@fig.AutoModifier('periodized')
 class Periodized(MultiEstimator): # create a copy of the estimator for the sin component
-	def __init__(self, estimator_info, extra_estimators=None, **kwargs):
-		super().__init__(estimator_info, extra_estimators=1, **kwargs)
 
+	def _process_inputs(self, key, *ins):
+		if 'fit' in key:
+			infos = [ScikitEstimatorInfo(est, ins[0]) for est in self.estimators]
+			infos[0]._estimator_labels = np.cos(infos[0]._estimator_labels)
+			infos[1]._estimator_labels = np.sin(infos[1]._estimator_labels)
+			return [(ins[0], info) for info in infos]
+		return super()._process_inputs(key, *ins)
 
-	def _process(self, key, outs, dataset, **kwargs):
+	def _merge_outs(self, outs, **kwargs):
 		cos, sin = outs
 		return torch.atan2(sin, cos)
+
+
+
+@fig.Modifier('periodized', expects_config=False)
+def _make_periodized(component):
+	def _periodized(config):
+		return Periodized(config, estimators=[component(config), component(config)])
+	return _periodized
+
+
 
 
 

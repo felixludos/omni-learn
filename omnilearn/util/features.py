@@ -245,6 +245,8 @@ class Builder(Buildable):
 	def __init__(self, A, source=unspecified_argument, **kwargs):
 		if source is unspecified_argument:
 			source = A.pull('_source', None, raw=True)
+			if source is None:
+				source = A
 
 		super().__init__(A, **kwargs)
 		self._build_source = source

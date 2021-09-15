@@ -110,7 +110,6 @@ class HyperParam(Function):
 
 
 class Savable(Checkpointable, Function):
-	
 	def __init__(self, A, **kwargs):
 		strict_load_state = A.pull('strict_load_state', True)
 		
