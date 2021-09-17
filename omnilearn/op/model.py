@@ -30,7 +30,7 @@ def load_model(A, silent=None):
 	
 	model_config = A
 	
-	legacy = A.pull('legacy', False) # TODO: remove
+	# legacy = A.pull('legacy', False) # TODO: remove
 	
 	ckpt = A.pull('_load-ckpt', '<>load-model', '<>load', None)
 	if ckpt is not None:
@@ -40,10 +40,10 @@ def load_model(A, silent=None):
 			prt.warning(f'Failed to find config from: {str(ckpt)}')
 		else:
 			model_config = fig.get_config(str(path))
-			if legacy: # TODO: remove
-				addr = A.pull('load-model', None)
-				if addr is not None:
-					model_config = fig.get_config(str(Path(ckpt).parents[1]/addr))
+			# if legacy: # TODO: remove
+			# 	addr = A.pull('load-model', None)
+			# 	if addr is not None:
+			# 		model_config = fig.get_config(str(Path(ckpt).parents[1]/addr))
 			src_config = model_config.pull('_loaded_model', None, silent=True, raw=True)
 			if src_config is not None:
 				model_config = src_config

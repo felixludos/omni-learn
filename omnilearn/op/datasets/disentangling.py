@@ -664,7 +664,7 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 		'list_landmarks_align_celeba.txt': '0B7EVK8r0v71pd0FJY3Blby1HUTQ',
 	}
 	_google_drive_image_id = '0B7EVK8r0v71pZjFTYXZWM3FlRnM'
-	
+
 	@classmethod
 	def download(cls, A, dataroot=None, **kwargs):
 		
@@ -711,22 +711,26 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 			# os.remove(str(imgpath))
 			
 		raise NotImplementedError
-	
-	def get_factor_sizes(self):
-		return [2] * len(self.ATTRIBUTES)
-	
-	def get_factor_order(self):
-		return self.ATTRIBUTES
-	
-	def get_attribute_key(self, idx):
-		try:
-			return self.ATTRIBUTES[idx]
-		except IndexError:
-			pass
+
+
+	def _replace_observations(self, observations):
+		self.images = observations
+
+
+	def _replace_labels(self, labels):
+		self.labels = labels
+
+
+	def update_data(self, indices):
+		self._replace_observations(self.images[indices])
+		if self.labels is not None:
+			self._replace_labels(self.labels[indices])
+
 	
 	def __len__(self):
 		return len(self.images)
-	
+
+
 	def __getitem__(self, item):
 		
 		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)

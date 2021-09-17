@@ -115,7 +115,18 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	
 	
 	def _predict_score(self, data):
-		return self._format_scikit_output(super(ScikitWrapper, self).predict_scores(data))
+		try:
+			return self._format_scikit_output(super(ScikitWrapper, self).predict_scores(data))
+		except AttributeError:
+			return self._format_scikit_output(super(ScikitWrapper, self).predict_proba(data))
+
+
+	def predict_confidence(self, data):
+		return self._predict_confidence(data)
+
+
+	def _predict_confidence(self, data):
+		raise NotImplementedError
 
 
 	def make_prediction(self, name, data):
@@ -127,12 +138,13 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 			return method(data)
 
 
-	def _compute(self, run, dataset=None):
+	def _compute(self, run=None, dataset=None):
 		if dataset is None:
+			assert run is not None, 'missing dataset/run'
 			dataset = run.get_dataset()
 		if not self.is_fit():
 			out = self.fit(dataset)
-		return self.evaluate(run, out=out, dataset=dataset)
+		return self.evaluate(dataset, info=run, out=out)
 
 
 	def evaluate(self, dataset=None, info=None, out=None, **kwargs):
@@ -176,24 +188,26 @@ class Classifier(Supervised, base.ClassifierMixin):
 
 		precision, recall, fscore, support = metrics.precision_recall_fscore_support(labels, pred)
 
-		auc = None
+		scores = info.get_result('scores')
+		auc = metrics.roc_auc_score(labels, scores, multi_class='ovr')
+
 		roc = None
 		if labels.max() == 1:
-			scores = info.get_result('scores')
-			auc = metrics.roc_auc_score(labels, scores)
-
 			scores = scores.reshape(-1)
 			roc = metrics.roc_curve(labels, scores)
 
 		info.update({
+			'roc-auc': auc.mean(),
 			'f1': fscore.mean(),
 			'precision': precision.mean(),
 			'recall': recall.mean(),
 
+			'worst-roc-auc': auc.min(),
 			'worst-f1': fscore.min(),
 			'worst-precision': precision.min(),
 			'worst-recall': recall.min(),
 
+			'full-roc-auc': auc,
 			'full-f1': fscore,
 			'full-recall': recall,
 			'full-precision': precision,
@@ -203,10 +217,6 @@ class Classifier(Supervised, base.ClassifierMixin):
 		})
 		if roc is not None:
 			info['roc-curve'] = roc
-		if auc is not None:
-			info['roc-auc'] = auc.mean()
-			info['worst-roc-auc'] = auc.min()
-			info['full-roc-auc'] = auc
 		return info
 
 	def get_scores(self):
@@ -299,7 +309,10 @@ class ParallelEstimator(ScikitEstimatorBase):
 
 	def _process_outputs(self, key, outs):
 		if 'predict' in key:
-			return torch.stack(outs, -1)
+			try:
+				return torch.stack(outs, -1)
+			except RuntimeError:
+				return outs
 		if 'evaluate' in key:
 			return outs
 		return util.pytorch_collate(outs)
@@ -317,6 +330,10 @@ class ParallelEstimator(ScikitEstimatorBase):
 
 	def _predict(self, data, **kwargs):
 		return self._dispatch('_predict', data, **kwargs)
+
+
+	def _predict_score(self, data, **kwargs):
+		return self._dispatch('_predict_score', data, **kwargs)
 
 
 	def evaluate(self, dataset=None, info=None, **kwargs):

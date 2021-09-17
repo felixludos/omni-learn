@@ -448,6 +448,10 @@ class BinaryDim(CategoricalDim):
 	def __init__(self, n=None, **kwargs):
 		super().__init__(n=2, **kwargs)
 
+	def __str__(self):
+		return f'Binary()'
+
+
 
 class JointSpace(DimSpec):
 	def __init__(self, *dims, shape=None, max=None, min=None, **kwargs):

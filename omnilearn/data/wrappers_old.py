@@ -7,185 +7,39 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset, TensorDataset
 import h5py as hf
 
-from omnibelt import unspecified_argument, InitWall, wrap_instance, wrap_class
-import omnifig as fig
+from omnibelt import unspecified_argument, InitWall
 
-from .collectors import Supervised, Batchable, Updatable
+from .collectors import Supervised, Batchable
 
 from .. import util
 
 
-# def DatasetWrapper(name, chainable=False):
-# 	def _reg_wrapper(wrapper):
-# 		if chainable:
-# 			def _chain_wrapper(base):
-# 				return wrap_class(wrapper, base, chain=False)
-# 			fig.Modifier(name)(_chain_wrapper)
-# 		else:
-# 			fig.AutoModifier(name)(wrapper)
-# 		return wrapper
-# 	return _reg_wrapper
+
+class DatasetWrapper(ObjectProxy):
+
+	def __init__(self, wrapped):
+		super().__init__(wrapped)
 
 
+	def __getattr__(self, name):
+		# If we are being to lookup '__wrapped__' then the
+		# '__init__()' method cannot have been called.
 
-class DatasetWrapper:
-	def __init_subclass__(cls, name=None, rewrappable=False, **kwargs):
-		super().__init_subclass__(**kwargs)
-		if name is None:
-			name = cls.__name__
-		if rewrappable:
-			def _chain_wrapper(base):
-				return wrap_class(cls, base, chain=False)
-			fig.Modifier(name)(_chain_wrapper)
-		else:
-			fig.AutoModifier(name)(cls)
-		cls._rewrappable_wrapper = rewrappable
+		if name == '__wrapped__':
+			raise ValueError('wrapper has not been initialised')
+
+		return getattr(self.__wrapped__, name)
 
 
-	@classmethod
-	def wrap(cls, dataset, *args, **kwargs):
-		obj = wrap_instance(cls, dataset, chain=not cls._rewrappable_wrapper)
-		obj.__activate__(*args, **kwargs)
-		return obj
-
-
-	def __activate__(self, *args, **kwargs):
-		pass
-
-
-
-class Indexed(DatasetWrapper, name='indexed'):
-	def __getitem__(self, idx):
-		return idx, super().__getitem__(idx)
-
-
-
-class Shuffled(DatasetWrapper, name='shuffled'):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.__activate__()
-
-
-	def __activate__(self):
-		indices = torch.randperm(len(self))
-		if isinstance(self, Updatable):
-			self.update_data(indices)
-			self._is_shuffled = True
-		else:
-			self._is_shuffled = False
-			self._shuffle_indices = indices
-
-
-	def __getitem__(self, idx):
-		return super().__getitem__(idx if self._is_shuffled else self._self_indices[idx])
-
-
-
-class Subset(fig.Configurable, DatasetWrapper, name='subset', rewrappable=True):
-	def __init__(self, A, indices=unspecified_argument, num=unspecified_argument, shuffle=unspecified_argument,
-	             update_data=unspecified_argument, **kwargs):
-
-		if indices is unspecified_argument:
-			indices = A.pull('indices', None)
-
-		if num is unspecified_argument:
-			num = A.pull('num', None)
-
-		if shuffle is unspecified_argument:
-			shuffle = A.pull('shuffle-subset', True)
-
-		if update_data is unspecified_argument:
-			update_data = A.pull('update-data', True)
-
-		super().__init__(A, **kwargs)
-		self.__activate__(indices=indices, num=num, shuffle=shuffle, update_data=update_data)
-
-
-	def __activate__(self, indices=None, num=None, shuffle=True, update_data=True):
-		if indices is None and num is not None:
-			indices = torch.randperm(len(dataset))[:num] if shuffle else torch.arange(num)
-
-		if isinstance(self, Updatable):
-			# self._subset_selected = True
-			self.update_data(indices)
-			indices = None
-		else:
-			# self._subset_selected = False
-			prev = getattr(self, '_subset_indices', None)
-			if prev is not None:
-				indices = prev[indices]
-
-		self._subset_indices = indices
-
-		# try:
-		# 	device = self.get_device()
-		# 	if self._self_indices is not None:
-		# 		self._self_indices = self._self_indices.to(device)
-		# except AttributeError:
-		# 	pass
-
-		# self._subset_updated = False
-		# if update_data:
-		# 	try:
-		# 		if self._self_indices is not None:
-		# 			self.update_data(self._self_indices)
-		# 			self._subset_updated = True
-		# 	except AttributeError:
-		# 		print('WARNING: Subset failed to update underlying dataset automatically')
-		# 		pass
-		pass
-
-
-	def get_observations(self):
-		if self._subset_selected:
-			return super().get_observations()
-		if isinstance(self, Batchable):
-			return self[torch.arange(len(self))][0]
-		return util.pytorch_collate([self[i][0] for i in range(len(self))])
-
-
-	def get_labels(self):
-		if self._subset_selected:
-			return self.__wrapped__.get_labels()
-		if isinstance(self.__wrapped__, Batchable):
-			return self[torch.arange(len(self))][1]
-		return util.pytorch_collate([self[i][1] for i in range(len(self))])
-
-
-	def __getitem__(self, idx):
-		return super().__getitem__(idx if self._subset_indices is None else self._subset_indices[idx])
-
-
-	def __len__(self):
-		return len(self) if self._subset_indices is None else len(self._subset_indices)
-
-
-
-# class DatasetWrapper(ObjectProxy):
-#
-# 	def __init__(self, wrapped):
-# 		super().__init__(wrapped)
-#
-#
-# 	def __getattr__(self, name):
-# 		# If we are being to lookup '__wrapped__' then the
-# 		# '__init__()' method cannot have been called.
-#
-# 		if name == '__wrapped__':
-# 			raise ValueError('wrapper has not been initialised')
-#
-# 		return getattr(self.__wrapped__, name)
-#
-#
-# 	# 	self._self__basegetattribute__ = wrapped.__getattribute__
-# 	# 	wrapped.__getattribute__ = self._make_deep_get(wrapped)
-# 	#
-# 	# def _make_deep_get(self, wrapped):
-# 	# 	def _getattribute(item):
-# 	# 		if item == '__basegetattribute__':
-# 	# 			return self._self__basegetattribute__(item)
-# 	# 		return self.__getattribute__(item)
-# 	# 	return _getattribute
+	# 	self._self__basegetattribute__ = wrapped.__getattribute__
+	# 	wrapped.__getattribute__ = self._make_deep_get(wrapped)
+	#
+	# def _make_deep_get(self, wrapped):
+	# 	def _getattribute(item):
+	# 		if item == '__basegetattribute__':
+	# 			return self._self__basegetattribute__(item)
+	# 		return self.__getattribute__(item)
+	# 	return _getattribute
 
 
 

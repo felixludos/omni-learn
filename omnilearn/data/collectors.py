@@ -67,16 +67,31 @@ class DevicedBase(util.DeviceBase, DatasetBase):
 
 
 
-class Observation(DatasetBase):
-	_full_observation_space = None
+# class Accessible(DatasetBase):
+# 	def _get_all(self, key):
+# 		raise NotImplementedError
 
-	def get_observations(self):
-		raise NotImplementedError
+
+
+class Updatable(DatasetBase):
 	def update_data(self, indices):
 		raise NotImplementedError
 
+
+
+class Observation(Updatable):
+	_full_observation_space = None
+
+
+	def get_observations(self):
+		if isinstance(self, Batchable):
+			return self[torch.arange(len(self))][0]
+		return util.pytorch_collate([self[i][0] for i in range(len(self))])
+
+
 	def _replace_observations(self, observations):
 		raise NotImplementedError
+
 
 	def get_observation_space(self):
 		return self._full_observation_space
@@ -88,7 +103,9 @@ class Supervised(Observation):
 	_all_label_names = None
 
 	def get_labels(self):
-		raise NotImplementedError
+		if isinstance(self, Batchable):
+			return self[torch.arange(len(self))][1]
+		return util.pytorch_collate([self[i][1] for i in range(len(self))])
 
 	def _replace_labels(self, labels):
 		raise NotImplementedError

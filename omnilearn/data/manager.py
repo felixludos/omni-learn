@@ -277,10 +277,10 @@ class Splitable(SimpleDataManager):
 			n = int(np.round(len(dataset) * r))
 			if n < 1:
 				raise Exception(f'invalid ratio: {r} for dataset len {len(dataset)}')
-			part = Subset_Dataset(dataset, torch.arange(idx, idx+n))
+			part = Subset_Dataset(dataset, torch.arange(idx, idx+n), update_data=False)
 			parts.append(part)
 			idx += n
-		last = Subset_Dataset(dataset, torch.arange(idx, len(dataset)))
+		last = Subset_Dataset(dataset, torch.arange(idx, len(dataset)), update_data=False)
 		parts.append(last)
 		
 		return parts
@@ -314,6 +314,48 @@ class Sharable(SimpleDataManager):
 
 @fig.AutoModifier('datamanager/wrapable')
 class Wrapable(Sharable):
+	def __init__(self, A, wrappers=unspecified_argument, **kwargs):
+		if wrappers is unspecified_argument:
+			wrappers = A.pull('wrappers', [])
+
+		super().__init__(A, **kwargs)
+
+		self._data_wrappers = []
+		if wrappers is not None and len(wrappers):
+			for wrapper in wrappers:
+				cls = wrapper['ident']
+				del wrapper['ident']
+				self.register_wrapper(cls, **wrapper)
+
+
+	def register_wrapper(self, wrapper, args=(), kwargs={}, **resolve_kwargs):
+		cls = resolve_wrappers(wrapper, **resolve_kwargs)
+
+		info = (cls, args, kwargs)
+		self._data_wrappers.append(info)
+		for mode, data in self._modes.items():
+			self._modes[mode] = self._wrap_dataset(data, [info])
+		self.switch_to(self.get_mode())
+
+
+	def clear_wrappers(self):
+		self._data_wrappers.clear()
+
+
+	def _store_mode(self, mode, dataset):
+		return super()._store_mode(mode, self._wrap_dataset(dataset))
+
+
+	def _wrap_dataset(self, dataset, wrappers=None):
+		if wrappers is None:
+			wrappers = self._data_wrappers
+		for cls, args, kwargs in wrappers:
+			dataset = cls(dataset, *args, **kwargs)
+		return dataset
+
+
+
+class OldWrapable(Sharable):
 	def __init__(self, A, wrappers=unspecified_argument, **kwargs):
 		if wrappers is unspecified_argument:
 			wrappers = A.pull('wrappers', [])
