@@ -114,6 +114,11 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 	def _replace_labels(self, labels):
 		self.labels = labels
 
+	def _update_data(self, indices):
+		self._replace_observations(self.images[indices])
+		if self.labeled:
+			self._replace_labels(self.labels[indices])
+
 	@property
 	def raw_folder(self) -> str:
 		return os.path.join(self.root, self.__class__.__name__.split('_')[-1], 'raw')

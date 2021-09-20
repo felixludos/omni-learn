@@ -1,5 +1,5 @@
 
-import sys, os
+import sys, os, types
 from pathlib import Path
 from wrapt import ObjectProxy
 import numpy as np
@@ -7,69 +7,95 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset, TensorDataset
 import h5py as hf
 
-from omnibelt import unspecified_argument, InitWall, wrap_instance, wrap_class
+from omnibelt import unspecified_argument, InitWall, Class_Registry, \
+	wrap_instance, wrap_class, conditional_method, duplicate_instance, join_classes, replace_class
 import omnifig as fig
 
-from .collectors import Supervised, Batchable, Updatable
+from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, ListDataset
 
 from .. import util
 
 
-# def DatasetWrapper(name, chainable=False):
-# 	def _reg_wrapper(wrapper):
-# 		if chainable:
-# 			def _chain_wrapper(base):
-# 				return wrap_class(wrapper, base, chain=False)
-# 			fig.Modifier(name)(_chain_wrapper)
-# 		else:
-# 			fig.AutoModifier(name)(wrapper)
-# 		return wrapper
-# 	return _reg_wrapper
+
+class Wrapper_Registry(Class_Registry, components=['activate_fn', 'rewrappable']):
+	class DecoratorBase(Class_Registry.DecoratorBase):
+		def _register(self, val, name=None, activate_fn=None, rewrappable=False, **params):
+			if name is None:
+				name = val.__name__
+
+			if activate_fn is None:
+				activate_fn = getattr(val, '__activate__', None)
+
+			if rewrappable:
+				def _chain_wrapper(base):
+					return wrap_class(val, base, chain=False)
+				fig.Modifier(name)(_chain_wrapper)
+			else:
+				fig.AutoModifier(name)(val)
+
+			return super()._register(val, name=name, activate_fn=activate_fn, rewrappable=rewrappable, **params)
+
+
+		class condition(conditional_method):
+			def __init__(self, *bases):
+				super().__init__()
+				self.bases = bases
+
+			def condition(self, instance):
+				return any(isinstance(instance, cond) for cond in self.bases)
+
+			# def _build_method(self, instance, owner):
+			# 	return types.MethodType(duplicate_func(self.fn, cls=owner.__bases__[-1]), instance)
 
 
 
-class DatasetWrapper:
-	def __init_subclass__(cls, name=None, rewrappable=False, **kwargs):
-		super().__init_subclass__(**kwargs)
-		if name is None:
-			name = cls.__name__
-		if rewrappable:
-			def _chain_wrapper(base):
-				return wrap_class(cls, base, chain=False)
-			fig.Modifier(name)(_chain_wrapper)
-		else:
-			fig.AutoModifier(name)(cls)
-		cls._rewrappable_wrapper = rewrappable
+wrapper_registry = Wrapper_Registry()
+DatasetWrapper = wrapper_registry.get_decorator('DatasetWrapper')
 
 
-	@classmethod
-	def wrap(cls, dataset, *args, **kwargs):
-		obj = wrap_instance(cls, dataset, chain=not cls._rewrappable_wrapper)
-		obj.__activate__(*args, **kwargs)
-		return obj
+class AlreadyWrappedError(Exception):
+	def __init__(self, wrapper, obj):
+		super().__init__(f'The object {obj} is already wrapped with wrapper {wrapper.__name__}')
+		self.wrapper = wrapper
+		self.obj = obj
 
 
-	def __activate__(self, *args, **kwargs):
-		pass
+def wrap_dataset(wrapper, dataset, *args, **kwargs):
+	if not isinstance(wrapper, wrapper_registry.entry_cls):
+		wrapper = wrapper_registry.find(wrapper)
+
+	cls = wrapper.cls
+
+	if wrapper.rewrappable:
+		obj = wrap_instance(cls, dataset, chain=False, new_instance=True)
+	elif isinstance(dataset, cls):
+		raise AlreadyWrappedError(wrapper, dataset)
+	else:
+		obj = replace_class(duplicate_instance(dataset), join_classes(cls, dataset.__class__))
+
+	if wrapper.activate_fn is not None:
+		wrapper.activate_fn(obj, *args, **kwargs)
+	return obj
 
 
 
-class Indexed(DatasetWrapper, name='indexed'):
+@DatasetWrapper('indexed')
+class Indexed(DatasetBase):
 	def __getitem__(self, idx):
 		return idx, super().__getitem__(idx)
 
 
 
-class Shuffled(DatasetWrapper, name='shuffled'):
+@DatasetWrapper('shuffled')
+class Shuffled(DatasetBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.__activate__()
 
-
 	def __activate__(self):
 		indices = torch.randperm(len(self))
-		if isinstance(self, Updatable):
-			self.update_data(indices)
+		if isinstance(self, Lockable):
+			self._update_data(indices)
 			self._is_shuffled = True
 		else:
 			self._is_shuffled = False
@@ -81,7 +107,8 @@ class Shuffled(DatasetWrapper, name='shuffled'):
 
 
 
-class Subset(fig.Configurable, DatasetWrapper, name='subset', rewrappable=True):
+@DatasetWrapper('subset', rewrappable=True)
+class Subset(Dataset):
 	def __init__(self, A, indices=unspecified_argument, num=unspecified_argument, shuffle=unspecified_argument,
 	             update_data=unspecified_argument, **kwargs):
 
@@ -103,11 +130,11 @@ class Subset(fig.Configurable, DatasetWrapper, name='subset', rewrappable=True):
 
 	def __activate__(self, indices=None, num=None, shuffle=True, update_data=True):
 		if indices is None and num is not None:
-			indices = torch.randperm(len(dataset))[:num] if shuffle else torch.arange(num)
+			indices = torch.randperm(len(self))[:num] if shuffle else torch.arange(num)
 
-		if isinstance(self, Updatable):
+		if isinstance(self, Lockable):
 			# self._subset_selected = True
-			self.update_data(indices)
+			self._update_data(indices)
 			indices = None
 		else:
 			# self._subset_selected = False
@@ -117,36 +144,21 @@ class Subset(fig.Configurable, DatasetWrapper, name='subset', rewrappable=True):
 
 		self._subset_indices = indices
 
-		# try:
-		# 	device = self.get_device()
-		# 	if self._self_indices is not None:
-		# 		self._self_indices = self._self_indices.to(device)
-		# except AttributeError:
-		# 	pass
 
-		# self._subset_updated = False
-		# if update_data:
-		# 	try:
-		# 		if self._self_indices is not None:
-		# 			self.update_data(self._self_indices)
-		# 			self._subset_updated = True
-		# 	except AttributeError:
-		# 		print('WARNING: Subset failed to update underlying dataset automatically')
-		# 		pass
-		pass
-
-
+	@DatasetWrapper.condition(Observation)
 	def get_observations(self):
-		if self._subset_selected:
+		c = __class__
+		if self._subset_indices is None:
 			return super().get_observations()
 		if isinstance(self, Batchable):
 			return self[torch.arange(len(self))][0]
 		return util.pytorch_collate([self[i][0] for i in range(len(self))])
 
 
+	@DatasetWrapper.condition(Supervised)
 	def get_labels(self):
-		if self._subset_selected:
-			return self.__wrapped__.get_labels()
+		if self._subset_indices is None:
+			return super().get_labels()
 		if isinstance(self.__wrapped__, Batchable):
 			return self[torch.arange(len(self))][1]
 		return util.pytorch_collate([self[i][1] for i in range(len(self))])
@@ -157,7 +169,118 @@ class Subset(fig.Configurable, DatasetWrapper, name='subset', rewrappable=True):
 
 
 	def __len__(self):
-		return len(self) if self._subset_indices is None else len(self._subset_indices)
+		return super().__len__() if self._subset_indices is None else len(self._subset_indices)
+
+
+
+@DatasetWrapper('single-label')
+class SingleLabel(Dataset):
+	def __init__(self, A, idx=None, **kwargs):
+		if idx is None:
+			idx = A.pull('label-idx')
+
+		super().__init__(A, **kwargs)
+		self.__activate__(idx)
+
+
+	def __activate__(self, idx):
+		if isinstance(self, Supervised):
+			if self._full_label_space is not None:
+				self._full_label_space = self._full_label_space[idx]
+			if self._all_label_names is not None:
+				self._all_label_names = self._all_label_names[idx]
+		if isinstance(self, Disentanglement):
+			if self._all_mechanism_names is not None:
+				self._all_mechanism_names = self._all_mechanism_names[idx]
+			if self._all_mechanism_class_names is not None:
+				self._all_mechanism_class_names = self._all_mechanism_class_names[idx]
+			if self._full_mechanism_space is not None:
+				self._full_mechanism_space = self._full_mechanism_space[idx]
+
+		self._label_idx = idx
+		self.dout = 1
+
+
+	@DatasetWrapper.condition(Supervised)
+	def get_labels(self):
+		return super().get_labels().narrow(-1, self._label_idx, 1)
+
+
+	def __getitem__(self, item):
+		obs, *other = super().__getitem__(item)
+		if len(other):
+			lbl, *other = other
+			return obs, lbl[self._label_idx], *other
+		return obs,
+
+
+
+@DatasetWrapper('repeated')
+class Repeated(Dataset):
+	def __init__(self, A, factor=unspecified_argument, **kwargs):
+
+		if factor is unspecified_argument:
+			factor = A.pull('repeat-factor', None)
+
+		super().__init__(A, **kwargs)
+		self.__activate__(factor=factor)
+
+
+	def __activate__(self, factor=None):
+		if hasattr(self, '_repeat_factor'):
+			prev = self._repeat_factor
+			self._repeat_factor = factor
+
+		self._repeat_num_real = None
+
+
+	def __init__(self, dataset, factor):
+		super().__init__(dataset)
+		self._self_factor = factor
+		self._self_num_real = len(dataset)
+		self._self_total = self._self_factor * self._self_num_real
+		print('Repeating dataset {} times'.format(factor))
+
+
+	def __getitem__(self, idx):
+		return self.__wrapped__[idx % self._self_num_real]
+
+
+	def __len__(self):
+		return self._self_total
+
+
+
+@DatasetWrapper('format')
+class Formatted(Dataset):
+	def __init__(self, A, format_fn=unspecified_argument, format_args=None, include_original=None, **kwargs):
+
+		if format_fn is unspecified_argument:
+			format_fn = A.pull('format-fn', None)
+
+		if format_args is None:
+			format_args = A.pull('format-args', {})
+
+		if include_original is None:
+			include_original = A.pull('include-original', False)
+
+		super().__init__(A, **kwargs)
+
+
+	def __activate__(self, format_fn=None, format_args=None, include_original=False):
+
+		self._format_fn = format_fn
+		self._format_args = {} if format_args is None else format_args
+		self._include_original = include_original
+
+
+	def __getitem__(self, idx):
+		sample = super().__getitem__(idx)
+		formatted = sample if self._format_fn is None else self._format_fn(sample, **self._format_args)
+
+		if self._include_original:
+			return formatted, sample
+		return formatted
 
 
 
@@ -190,187 +313,138 @@ class Subset(fig.Configurable, DatasetWrapper, name='subset', rewrappable=True):
 
 
 
-class Indexed_Dataset(DatasetWrapper):
-	def __getitem__(self, idx):
-		return idx, self.__wrapped__[idx]
+# class Indexed_Dataset(DatasetWrapper):
+# 	def __getitem__(self, idx):
+# 		return idx, self.__wrapped__[idx]
+#
+#
+#
+# class Subset_Dataset(DatasetWrapper):
+# 	def __init__(self, dataset, indices=None, num=None, shuffle=True, update_data=True):
+# 		super().__init__(dataset)
+# 		if indices is None:
+# 			# assert num is not None, f'{num} is needed'
+# 			if num is not None:
+# 				indices = torch.randperm(len(dataset))[:num] if shuffle else torch.arange(num)
+# 		self._self_indices = indices
+#
+# 		try:
+# 			device = dataset.get_device()
+# 			if self._self_indices is not None:
+# 				self._self_indices = self._self_indices.to(device)
+# 		except AttributeError:
+# 			pass
+#
+# 		self._self_subset_updated = False
+# 		if update_data:
+# 			try:
+# 				if self._self_indices is not None:
+# 					self.update_data(self._self_indices)
+# 					self._self_subset_updated = True
+# 			except AttributeError:
+# 				print('WARNING: Subset failed to update underlying dataset automatically')
+# 				pass
+#
+# 	def get_observations(self):
+# 		if self._self_subset_updated:
+# 			return self.__wrapped__.get_observations()
+# 		if isinstance(self.__wrapped__, Batchable):
+# 			return self[torch.arange(len(self))][0]
+# 		return util.pytorch_collate([self[i][0] for i in range(len(self))])
+#
+# 	def get_labels(self):
+# 		if self._self_subset_updated:
+# 			return self.__wrapped__.get_labels()
+# 		if isinstance(self.__wrapped__, Batchable):
+# 			return self[torch.arange(len(self))][1]
+# 		return util.pytorch_collate([self[i][1] for i in range(len(self))])
+#
+# 	def __getitem__(self, idx):
+# 		return self.__wrapped__[idx] if self._self_indices is None or self._self_subset_updated else self.__wrapped__[self._self_indices[idx]]
+#
+#
+# 	def __len__(self):
+# 		return len(self.__wrapped__) if self._self_indices is None or self._self_subset_updated else len(self._self_indices)
+#
+#
+#
+# class Repeat_Dataset(DatasetWrapper):
+# 	def __init__(self, dataset, factor):
+# 		super().__init__(dataset)
+# 		self._self_factor = factor
+# 		self._self_num_real = len(dataset)
+# 		self._self_total = self._self_factor * self._self_num_real
+# 		print('Repeating dataset {} times'.format(factor))
+#
+#
+# 	def __getitem__(self, idx):
+# 		return self.__wrapped__[idx % self._self_num_real]
+#
+#
+# 	def __len__(self):
+# 		return self._self_total
+#
+#
+#
+# class Format_Dataset(DatasetWrapper):
+# 	def __init__(self, dataset, format_fn, format_args=None, include_original=False):
+# 		super().__init__(dataset)
+#
+# 		self._self_format_fn = format_fn
+# 		self._self_format_args = {} if format_args is None else format_args
+# 		self._self_include_original = include_original
+#
+#
+# 	def __getitem__(self, idx):
+#
+# 		sample = self.__wrapped__[idx]
+#
+# 		formatted = self._self_format_fn(sample, **self._self_format_args)
+#
+# 		if self._self_include_original:
+# 			return formatted, sample
+#
+# 		return formatted
+#
+#
+#
+# class Shuffle_Dataset(DatasetWrapper):
+# 	def __init__(self, dataset):
+# 		super().__init__(dataset)
+#
+# 		self._self_indices = torch.randperm(len(self.__wrapped__)).clone()
+#
+# 		try:
+# 			device = self.__wrapped__.get_device()
+# 			self._self_indices = self._self_indices.to(device).clone()
+# 		except AttributeError:
+# 			pass
+#
+#
+# 	def __getitem__(self, idx):
+# 		return self.__wrapped__[self._self_indices[idx]]
 
 
 
-class Subset_Dataset(DatasetWrapper):
-	def __init__(self, dataset, indices=None, num=None, shuffle=True, update_data=True):
-		super().__init__(dataset)
-		if indices is None:
-			# assert num is not None, f'{num} is needed'
-			if num is not None:
-				indices = torch.randperm(len(dataset))[:num] if shuffle else torch.arange(num)
-		self._self_indices = indices
-
-		try:
-			device = dataset.get_device()
-			if self._self_indices is not None:
-				self._self_indices = self._self_indices.to(device)
-		except AttributeError:
-			pass
-
-		self._self_subset_updated = False
-		if update_data:
-			try:
-				if self._self_indices is not None:
-					self.update_data(self._self_indices)
-					self._self_subset_updated = True
-			except AttributeError:
-				print('WARNING: Subset failed to update underlying dataset automatically')
-				pass
-
-	def get_observations(self):
-		if self._self_subset_updated:
-			return self.__wrapped__.get_observations()
-		if isinstance(self.__wrapped__, Batchable):
-			return self[torch.arange(len(self))][0]
-		return util.pytorch_collate([self[i][0] for i in range(len(self))])
-
-	def get_labels(self):
-		if self._self_subset_updated:
-			return self.__wrapped__.get_labels()
-		if isinstance(self.__wrapped__, Batchable):
-			return self[torch.arange(len(self))][1]
-		return util.pytorch_collate([self[i][1] for i in range(len(self))])
-
-	def __getitem__(self, idx):
-		return self.__wrapped__[idx] if self._self_indices is None or self._self_subset_updated else self.__wrapped__[self._self_indices[idx]]
-
-
-	def __len__(self):
-		return len(self.__wrapped__) if self._self_indices is None or self._self_subset_updated else len(self._self_indices)
-
-
-
-class Repeat_Dataset(DatasetWrapper):
-	def __init__(self, dataset, factor):
-		super().__init__(dataset)
-		self._self_factor = factor
-		self._self_num_real = len(dataset)
-		self._self_total = self._self_factor * self._self_num_real
-		print('Repeating dataset {} times'.format(factor))
-
-
-	def __getitem__(self, idx):
-		return self.__wrapped__[idx % self._self_num_real]
-
-
-	def __len__(self):
-		return self._self_total
-
-
-
-class Format_Dataset(DatasetWrapper):
-	def __init__(self, dataset, format_fn, format_args=None, include_original=False):
-		super().__init__(dataset)
-
-		self._self_format_fn = format_fn
-		self._self_format_args = {} if format_args is None else format_args
-		self._self_include_original = include_original
-
-
-	def __getitem__(self, idx):
-
-		sample = self.__wrapped__[idx]
-
-		formatted = self._self_format_fn(sample, **self._self_format_args)
-
-		if self._self_include_original:
-			return formatted, sample
-
-		return formatted
-
-
-
-class Shuffle_Dataset(DatasetWrapper):
-	def __init__(self, dataset):
-		super().__init__(dataset)
-
-		self._self_indices = torch.randperm(len(self.__wrapped__)).clone()
-
-		try:
-			device = self.__wrapped__.get_device()
-			self._self_indices = self._self_indices.to(device).clone()
-		except AttributeError:
-			pass
-
-
-	def __getitem__(self, idx):
-		return self.__wrapped__[self._self_indices[idx]]
-
-
-
-class SingleLabelDataset(DatasetWrapper):
-	def __init__(self, dataset, idx):
-		if not isinstance(dataset, Supervised):
-			raise NotImplementedError
-		super().__init__(dataset)
-		self._self_idx = idx
-
-		self.dout = 1
-		self._subselect_info('_all_label_names', idx)
-		self._subselect_info('_all_mechanism_names', idx)
-		self._subselect_info('_all_mechanism_class_names', idx)
-		self._subselect_info('_full_mechanism_space', idx)
-		self._subselect_info('_full_label_space', idx)
-
-
-	def get_label_names(self):
-		return self._self__all_label_names
-
-	def get_label_space(self):
-		return self._self__all_label_space
-
-	def get_mechanism_class_names(self, mechanism):
-		if isinstance(mechanism, str):
-			return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))
-		if self._self__all_mechanism_class_names is not None:
-			return self._self__all_mechanism_class_names[mechanism]
-	def get_mechanism_names(self):
-		return self._self__all_mechanism_names
-	def get_mechanism_space(self):
-		if self._self__full_mechanism_space is None:
-			return self.get_label_space()
-		return self._self__full_mechanism_space
-
-
-	def _subselect_info(self, attrname, idx):
-		try:
-			if getattr(self, attrname, None) is not None:
-				setattr(self, f'_self_{attrname}', getattr(self, attrname)[idx])
-			else:
-				setattr(self, f'_self_{attrname}', None)
-		except IndexError:
-			pass
-
-
-	def get_labels(self):
-		return self.__wrapped__.get_labels().narrow(-1, self._self_idx, 1)
-
-
-
-def resolve_wrappers(ident, **kwargs):
-
-	if not isinstance(ident, str):
-		return ident
-
-	if ident == 'single-label':
-		return SingleLabelDataset
-	if ident == 'shuffle':
-		return Shuffle_Dataset
-	if ident == 'format':
-		return Format_Dataset
-	if ident == 'repeat':
-		return Repeat_Dataset
-	if ident == 'subset':
-		return Subset_Dataset
-	if ident == 'indexed':
-		return Indexed_Dataset
-
-	raise Exception(f'wrapper not found: {ident}')
+# def resolve_wrappers(ident, **kwargs):
+#
+# 	if not isinstance(ident, str):
+# 		return ident
+#
+# 	if ident == 'single-label':
+# 		return SingleLabelDataset
+# 	if ident == 'shuffle':
+# 		return Shuffle_Dataset
+# 	if ident == 'format':
+# 		return Format_Dataset
+# 	if ident == 'repeat':
+# 		return Repeat_Dataset
+# 	if ident == 'subset':
+# 		return Subset_Dataset
+# 	if ident == 'indexed':
+# 		return Indexed_Dataset
+#
+# 	raise Exception(f'wrapper not found: {ident}')
 
 
 

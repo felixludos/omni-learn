@@ -12,7 +12,7 @@ from ... import util
 
 from omnifig import AutoModifier, Modification
 
-from ...data import register_dataset, Deviced, Dataset, Batchable, Subset_Dataset
+from ...data import register_dataset, Deviced, Dataset, Batchable, wrap_dataset
 
 @register_dataset('concat')
 class Concat(Dataset):
@@ -202,21 +202,21 @@ def blurred(dataset, config):
 
 	return dataset
 
-
-@Modification('subset')
-def make_subset(dataset, info):
-	num = info.pull('num', None)
-	
-	shuffle = info.pull('shuffle', True)
-	
-	if num is None or num == len(dataset):
-		print('WARNING: no subset provided, using original dataset')
-		return dataset
-	
-	assert num <= len(dataset), '{} vs {}'.format(num, len(dataset))
-	
-	inds = torch.randperm(len(dataset))[:num].numpy() if shuffle else np.arange(num)
-	return Subset_Dataset(dataset, inds)
+#
+# @Modification('subset')
+# def make_subset(dataset, info):
+# 	num = info.pull('num', None)
+#
+# 	shuffle = info.pull('shuffle', True)
+#
+# 	if num is None or num == len(dataset):
+# 		print('WARNING: no subset provided, using original dataset')
+# 		return dataset
+#
+# 	assert num <= len(dataset), '{} vs {}'.format(num, len(dataset))
+#
+# 	inds = torch.randperm(len(dataset))[:num].numpy() if shuffle else np.arange(num)
+# 	return wrap_dataset('subset', dataset, inds)
 
 
 

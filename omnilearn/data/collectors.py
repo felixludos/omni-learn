@@ -72,14 +72,44 @@ class DevicedBase(util.DeviceBase, DatasetBase):
 # 		raise NotImplementedError
 
 
+class DatasetLocked(Exception):
+	def __init__(self):
+		super().__init__()
 
-class Updatable(DatasetBase):
+
+class Lockable(DatasetBase):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._is_locked = False
+
+
+	def _check_lock(self):
+		if self.is_locked():
+			raise DatasetLocked
+
+
+	def is_locked(self):
+		return self._is_locked
+
+
+	def set_lock(self, l=None):
+		if l is None:
+			l = not self._is_locked
+		self._is_locked = l
+		return l
+
+
 	def update_data(self, indices):
+		self._check_lock()
+		return self._update_data(indices)
+
+
+	def _update_data(self, indices):
 		raise NotImplementedError
 
 
 
-class Observation(Updatable):
+class Observation(Lockable):
 	_full_observation_space = None
 
 
@@ -89,6 +119,9 @@ class Observation(Updatable):
 		return util.pytorch_collate([self[i][0] for i in range(len(self))])
 
 
+	def replace_observations(self, observations):
+		self._check_lock()
+		return self._replace_observations(observations)
 	def _replace_observations(self, observations):
 		raise NotImplementedError
 
@@ -107,13 +140,47 @@ class Supervised(Observation):
 			return self[torch.arange(len(self))][1]
 		return util.pytorch_collate([self[i][1] for i in range(len(self))])
 
+
+	def replace_labels(self, labels):
+		self._check_lock()
+		return self._replace_labels(labels)
 	def _replace_labels(self, labels):
 		raise NotImplementedError
+
 
 	def get_label_names(self):
 		return self._all_label_names
 	def get_label_space(self):
 		return self._full_label_space
+
+
+
+class Disentanglement(Supervised):
+	_all_mechanism_names = None
+	_all_mechanism_class_names = None
+	_full_mechanism_space = None
+
+	def get_mechanism_class_names(self, mechanism):
+		if isinstance(mechanism, str):
+			return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))
+		if self._all_mechanism_class_names is not None:
+			return self._all_mechanism_class_names[mechanism]
+	def get_mechanism_class_space(self, mechanism):
+		if isinstance(mechanism, str):
+			return self.get_mechanism_class_space(self.get_mechanism_names().index(mechanism))
+		return self.get_mechanism_space()[mechanism]
+
+	def get_mechanism_names(self):
+		return self._all_mechanism_names
+	def get_mechanism_space(self):
+		if self._full_mechanism_space is None:
+			return self.get_label_space()
+		return self._full_mechanism_space
+
+	def get_label_names(self):
+		return self._all_mechanism_names
+	def get_label_sizes(self):
+		return list(map(len, self.get_mechanism_names()))
 
 
 
@@ -151,7 +218,7 @@ class ISupervisedDataset(Supervised):
 	def _replace_observations(self, observations):
 		self.observations = observations
 
-	def update_data(self, indices):
+	def _update_data(self, indices):
 		self._replace_observations(self.observations[indices])
 		self._replace_labels(self.labels[indices])
 

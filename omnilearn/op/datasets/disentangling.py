@@ -26,7 +26,7 @@ except ImportError:
 
 from ... import util
 from ...data import register_dataset, Deviced, Batchable, Splitable, ImageDataset, \
-	Downloadable, Dataset, MissingDatasetError, Subset_Dataset, Supervised
+	Downloadable, Dataset, MissingDatasetError, Supervised, Disentanglement, wrap_dataset
 
 from .transforms import Cropped
 
@@ -45,35 +45,6 @@ def _rec_decode(obj):
 	if isinstance(obj, bytes):
 		return obj.decode()
 	return obj
-
-
-
-class Disentanglement(Supervised):
-	_all_mechanism_names = None
-	_all_mechanism_class_names = None
-	_full_mechanism_space = None
-
-	def get_mechanism_class_names(self, mechanism):
-		if isinstance(mechanism, str):
-			return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))
-		if self._all_mechanism_class_names is not None:
-			return self._all_mechanism_class_names[mechanism]
-	def get_mechanism_class_space(self, mechanism):
-		if isinstance(mechanism, str):
-			return self.get_mechanism_class_space(self.get_mechanism_names().index(mechanism))
-		return self.get_mechanism_space()[mechanism]
-
-	def get_mechanism_names(self):
-		return self._all_mechanism_names
-	def get_mechanism_space(self):
-		if self._full_mechanism_space is None:
-			return self.get_label_space()
-		return self._full_mechanism_space
-
-	def get_label_names(self):
-		return self._all_mechanism_names
-	def get_label_sizes(self):
-		return list(map(len, self.get_mechanism_names()))
 
 
 
@@ -159,10 +130,10 @@ class Selected(Splitable):
 			
 		inds = torch.arange(len(lbls), device=lbls.device)
 		
-		extra = Subset_Dataset(dataset, inds[torch.logical_not(ok)])
+		extra = wrap_dataset('subset', dataset, inds[torch.logical_not(ok)])
 		self.register_mode(self.eval_name, extra)
 		
-		dataset = Subset_Dataset(dataset, inds[ok])
+		dataset = wrap_dataset('subset', dataset, inds[ok])
 		self.register_mode(self.split_src, dataset)
 
 		return dataset
@@ -384,8 +355,9 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 			return self.images, self.labels
 		return self.images
 
-	def update_data(self, indices):
+	def _update_data(self, indices):
 		self.images = self.images[indices]
+		self.indices = self.indices[indices]
 		if self.labeled:
 			self.labels = self.labels[indices]
 
@@ -555,7 +527,7 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 	def get_labels(self):
 		raise NotImplementedError
 
-	def update_data(self, indices):
+	def _update_data(self, indices):
 		raise NotImplementedError
 
 	def close_all(self):
@@ -721,7 +693,7 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 		self.labels = labels
 
 
-	def update_data(self, indices):
+	def _update_data(self, indices):
 		self._replace_observations(self.images[indices])
 		if self.labels is not None:
 			self._replace_labels(self.labels[indices])
@@ -934,7 +906,7 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 	def get_labels(self):
 		return self.get_label(self.indices)
 
-	def update_data(self, indices):
+	def _update_data(self, indices):
 		self.images = self.images[indices]
 		if self.labeled:
 			self.indices = indices
