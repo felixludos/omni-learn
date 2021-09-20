@@ -426,6 +426,7 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 		self.partitions_dict = None
 		self.real_set = None
 		self.info = None
+		self.labels = None 
 		
 		self.labeled = labeled
 		
@@ -444,6 +445,7 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 		print("====== Opening real RFD Dataset ======")
 		images = np.load(self.raw_folder+"_images.npz", allow_pickle=True)["images"]
 		labels = np.load(self.raw_folder+"_labels.npz", allow_pickle=True)["labels"]
+		self.labels = torch.from_numpy(labels)
 		return (images, labels)
 
 	def init_partitions(self):
@@ -511,7 +513,7 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 		info = dict(np.load(self.raw_folder+"_info.npz", allow_pickle=True))
 		self.size = info["dataset_size"].item()
 		self.factor_order = list(info['factor_values'].item().keys())
-		self.factor_sizes = info['num_factor_values']
+		self.factor_sizes = list(info['num_factor_values']) #to list because default is numpy array
 		self.factor_num_values = {k:v for k,v in zip(self.factor_order, self.factor_sizes)}
 		return info
 
@@ -525,7 +527,15 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 		raise NotImplementedError
 
 	def get_labels(self):
-		raise NotImplementedError
+		""" merge all the labels in a single numpy array so as to
+		be able to uniquely identify the index of the item given the index of the label"""
+		if self.labels is not None: return self.labels
+		# not real set -> need to go through the partitions
+		_labels = []
+		for _, part in self.partitions_dict.items():
+		    _labels.append(part[0][1])
+		self.labels = torch.from_numpy(np.concatenate(_labels, axis=0))
+		return self.labels
 
 	def _update_data(self, indices):
 		raise NotImplementedError
