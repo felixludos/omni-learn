@@ -45,8 +45,8 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 	def _process_dataset(self):
 		# self.observations = self.dataset.get_observations()
 		# self.labels = self.dataset.get_labels()
-		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.dataset.get_observations())
-		self.__dict__['_estimator_labels'] = self._format_scikit_arg(self.dataset.get_labels())
+		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.dataset.get_observation())
+		self.__dict__['_estimator_labels'] = self._format_scikit_arg(self.dataset.get_target())
 
 
 	def get_observations(self):
@@ -180,7 +180,7 @@ class Classifier(Supervised, base.ClassifierMixin):
 	def _evaluate(self, info, **kwargs):
 		info = super()._evaluate(info, **kwargs)
 
-		labels, pred = info.get_labels(), info.get_result('pred')
+		labels, pred = info.get_target(), info.get_result('pred')
 
 		report = metrics.classification_report(labels, pred, target_names=info.dataset.get_label_names(),
 		                                       output_dict=True)
@@ -237,7 +237,7 @@ class Regressor(Supervised, base.RegressorMixin):
 	def _evaluate(self, info, **kwargs):
 		info = super()._evaluate(info, **kwargs)
 
-		labels, pred = info.get_labels(), info.get_result('pred')
+		labels, pred = info.get_target(), info.get_result('pred')
 
 		mse = metrics.mean_squared_error(labels, pred)
 		mxe = metrics.max_error(labels, pred)

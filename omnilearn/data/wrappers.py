@@ -8,7 +8,7 @@ from torch.utils.data import Dataset as PytorchDataset, TensorDataset
 import h5py as hf
 
 from omnibelt import unspecified_argument, InitWall, Class_Registry, \
-	wrap_instance, wrap_class, conditional_method, duplicate_instance, join_classes, replace_class
+	wrap_instance, wrap_class, conditional_method, duplicate_instance, duplicate_func, join_classes, replace_class
 import omnifig as fig
 
 from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, ListDataset
@@ -33,13 +33,25 @@ class Wrapper_Registry(Class_Registry, components=['activate_fn', 'rewrappable']
 			else:
 				fig.AutoModifier(name)(val)
 
-			return super()._register(val, name=name, activate_fn=activate_fn, rewrappable=rewrappable, **params)
+			entry = super()._register(val, name=name, activate_fn=activate_fn, rewrappable=rewrappable, **params)
+
+			for attr in val.__dict__.values():
+				if isinstance(attr, self.condition):
+					attr.wrapper(entry)
+			return entry
 
 
 		class condition(conditional_method):
 			def __init__(self, *bases):
 				super().__init__()
 				self.bases = bases
+				self.entry = None
+
+			# def _build_method(self, fn, instance, owner):
+			# 	return types.MethodType(duplicate_func(fn, cls=owner.__unwrapped__), instance)
+
+			def wrapper(self, entry):
+				self.entry = entry
 
 			def condition(self, instance):
 				return any(isinstance(instance, cond) for cond in self.bases)
@@ -64,14 +76,17 @@ def wrap_dataset(wrapper, dataset, *args, **kwargs):
 	if not isinstance(wrapper, wrapper_registry.entry_cls):
 		wrapper = wrapper_registry.find(wrapper)
 
+	base = dataset.__class__
 	cls = wrapper.cls
 
 	if wrapper.rewrappable:
-		obj = wrap_instance(cls, dataset, chain=False, new_instance=True)
+		new = wrap_class(cls, base, chain=False)
 	elif isinstance(dataset, cls):
 		raise AlreadyWrappedError(wrapper, dataset)
 	else:
-		obj = replace_class(duplicate_instance(dataset), join_classes(cls, dataset.__class__))
+		new = join_classes(cls, base)
+	new.__unwrapped__ = base
+	obj = replace_class(duplicate_instance(dataset), new)
 
 	if wrapper.activate_fn is not None:
 		wrapper.activate_fn(obj, *args, **kwargs)
@@ -101,9 +116,13 @@ class Shuffled(DatasetBase):
 			self._is_shuffled = False
 			self._shuffle_indices = indices
 
+	def get(self, name=None, idx=None):
+		if not self._is_shuffled and idx is not None:
+			idx = self._shuffle_indices[idx]
+		return super().get(name=name, idx=idx)
 
-	def __getitem__(self, idx):
-		return super().__getitem__(idx if self._is_shuffled else self._self_indices[idx])
+	# def __getitem__(self, idx):
+	# 	return super().__getitem__(idx if self._is_shuffled else self._self_indices[idx])
 
 
 
@@ -146,10 +165,12 @@ class Subset(Dataset):
 
 
 	@DatasetWrapper.condition(Observation)
-	def get_observations(self):
+	def get_observations(self, idx=None):
 		c = __class__
+		s = super()
+		s2 = super(c, self)
 		if self._subset_indices is None:
-			return super().get_observations()
+			return super().get_observations(idx=idx)
 		if isinstance(self, Batchable):
 			return self[torch.arange(len(self))][0]
 		return util.pytorch_collate([self[i][0] for i in range(len(self))])
@@ -164,12 +185,12 @@ class Subset(Dataset):
 		return util.pytorch_collate([self[i][1] for i in range(len(self))])
 
 
-	def __getitem__(self, idx):
-		return super().__getitem__(idx if self._subset_indices is None else self._subset_indices[idx])
+	# def __getitem__(self, idx):
+	# 	return super().__getitem__(idx if self._subset_indices is None else self._subset_indices[idx])
 
 
-	def __len__(self):
-		return super().__len__() if self._subset_indices is None else len(self._subset_indices)
+	# def __len__(self):
+	# 	return super().__len__() if self._subset_indices is None else len(self._subset_indices)
 
 
 
@@ -206,12 +227,12 @@ class SingleLabel(Dataset):
 		return super().get_labels().narrow(-1, self._label_idx, 1)
 
 
-	def __getitem__(self, item):
-		obs, *other = super().__getitem__(item)
-		if len(other):
-			lbl, *other = other
-			return obs, lbl[self._label_idx], *other
-		return obs,
+	# def __getitem__(self, item):
+	# 	obs, *other = super().__getitem__(item)
+	# 	if len(other):
+	# 		lbl, *other = other
+	# 		return obs, lbl[self._label_idx], *other
+	# 	return obs,
 
 
 

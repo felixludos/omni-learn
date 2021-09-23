@@ -3,15 +3,24 @@ from collections import deque
 import torch
 
 from torch.utils.data import DataLoader
-from torch.utils.data.dataloader import _SingleProcessDataLoaderIter, _MultiProcessingDataLoaderIter
+from torch.utils.data._utils.fetch import _MapDatasetFetcher
+from torch.utils.data.dataloader import _SingleProcessDataLoaderIter, _MultiProcessingDataLoaderIter, _DatasetKind
 # from .collectors import Batchable_Dataset, Device_Dataset # TODO: clean up import order
 
 from .collectors import Batchable
 
 from .. import util
 
+
+class FeaturedDataFetcher(_MapDatasetFetcher):
+	def __init__(self, dataset, auto_collation=None, collate_fn=None, drop_last=False):
+		collate_fn = getattr(dataset, 'collate', collate_fn)
+		auto_collation = auto_collation or isinstance(dataset, Batchable)
+		super().__init__(dataset, auto_collation, collate_fn, drop_last)
+
+
+
 class Featured_DataLoaderIter:
-	
 	def __init__(self, loader):
 		# loader.batched = isinstance(loader.dataset, Batchable)
 		super().__init__(loader)
@@ -26,10 +35,21 @@ class Featured_DataLoaderIter:
 	def __next__(self):
 		return util.to(super().__next__(), self.device)
 
+
+
 class Featured_SingleProcessIter(Featured_DataLoaderIter, _SingleProcessDataLoaderIter):
-	pass
+	def __init__(self, loader):
+		super().__init__(loader)
+
+		self._dataset_fetcher = FeaturedDataFetcher(self._dataset_kind, self._dataset, self._auto_collation,
+		                                            self._collate_fn, self._drop_last)
+
+
+
 class Featured_MultiProcessIter(Featured_DataLoaderIter, _MultiProcessingDataLoaderIter):
 	pass
+
+
 
 class Featured_DataLoader(DataLoader):
 	def __init__(self, dataset, *args, device=None, seed=None, generator=None, **kwargs):

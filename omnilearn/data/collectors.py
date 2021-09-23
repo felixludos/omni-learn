@@ -1,35 +1,162 @@
 
 import sys, os
 from pathlib import Path
+from collections import OrderedDict
 from wrapt import ObjectProxy
 import numpy as np
 import torch
 from torch.utils.data import Dataset as PytorchDataset, TensorDataset
+from torch.utils.data.dataloader import default_collate as pytorch_collate
 import h5py as hf
 
 from omnibelt import unspecified_argument, InitWall
 
+# from .collate import SampleFormat
+
 from .. import util
-
-
-class ExistingModes(util.SwitchableBase):
-	def __init_subclass__(cls, **kwargs):
-		cls.available_modes = {'train'}
-	
-	@classmethod
-	def add_existing_modes(cls, *modes):
-		cls.available_modes.update(modes)
-	
-	@classmethod
-	def get_available_modes(cls):
-		return cls.available_modes
 
 
 
 # region DatasetBases
 
-class DatasetBase(ExistingModes, util.DimensionBase, InitWall, PytorchDataset):
-	pass
+class MissingDataError(Exception):
+	def __init__(self, *names):
+		super().__init__('Missing data: {}'.format(', '.join(names)))
+		self.names = names
+
+
+class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
+	_available_modes = {'train'}
+	_available_data = {}
+	_sample_format = None
+
+	def __init_subclass__(cls, available_data={}, available_modes=[],
+	                      sample_format=None, sample_format_type=None, **kwargs):
+		super().__init_subclass__(**kwargs)
+
+		if sample_format is None:
+			sample_format = []
+		if cls._sample_format is None:
+			cls._sample_format = sample_format
+		cls._available_modes = {*available_modes, *cls._available_modes}
+		cls._available_data =  {**available_data, **cls._available_data}
+		for key in cls._sample_format:
+			if key not in cls._available_data:
+				cls._available_data[key] = None
+		cls._sample_format_type = sample_format_type
+
+
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self._available_modes = self.__class__._available_modes.copy()
+		self._available_data = self.__class__._available_data.copy()
+		self._sample_format = self.__class__._sample_format.copy()
+
+
+	def get(self, name=None, idx=None, **kwargs):
+		if name is not None:
+			alias = name
+			while alias is not None and name in self._available_data:
+				name = alias
+				getter = getattr(self, f'get_{name}', None)
+				if getter is None:
+					data = getattr(self, name, None) # check for tensor
+					if data is not None:
+						getter = lambda idx, **_: data[idx]
+				if getter is not None:
+					return getter(idx, **kwargs)
+				alias = self._available_data[name]
+			raise MissingDataError(name)
+
+		needed = self._sample_format
+		if needed is None or len(needed) == 0:
+			needed = list(key for key in self._available_data if self._available_data[key] is None)
+		return self.format({name: self.get(name=name, idx=idx) for name in needed})
+
+
+	def __len__(self):
+		for key in self._sample_format:
+			data = getattr(self, key, None)
+			if data is not None:
+				return len(data)
+
+
+	def __getitem__(self, item):
+		return self.get(idx=item)
+
+
+	# def __getattr__(self, item):
+	# 	try:
+	# 		return super().__getattribute__(item)
+	# 	except AttributeError:
+	# 		alias = super().__getattribute__('_available_data_aliases').get(item, None)
+	# 		if aslias is not None:
+	# 			return super().__getattribute__(alias)
+	# 		raise
+
+
+	def register_data(self, name, data=None, strict=True): # either provide the tensor, or implement get_{data}
+		if data is not None:
+			setattr(self, name, data)
+		elif strict and not (hasattr(self, f'get_{name}') or hasattr(self, name)):
+			raise MissingDataError(name)
+		if name not in self._available_data:
+			self._available_data[name] = None
+
+
+	def register_data_aliases(self, base, *aliases):
+		# if base not in self._available_data:
+		# 	raise MissingDataError(base)
+		for alias in aliases:
+			self._available_data[alias] = base
+
+
+	def get_available_data(self):
+		return set(self._available_data.keys())
+
+
+	def _filter_sample_format(self, names):
+		new, missing = [], []
+		for name in names:
+			(new if name in self._available_data else missing).append(name)
+		if len(missing):
+			raise MissingDataError(*missing)
+		return new
+
+
+	def set_sample_format(self, *names):
+		names = self._filter_sample_format(names)
+		self._sample_format.clear()
+		self._sample_format.extend(names)
+		return self._sample_format
+
+
+	def include_sample_data(self, *names):
+		for name in names:
+			if name not in self._available_data:
+				self.register_data(name, strict=False)
+		self._sample_format.extend(name for name in self._filter_sample_format(names))
+		return self._sample_format
+
+
+	def collate(self, samples):
+		return pytorch_collate(samples)
+
+
+	def format(self, sample):
+		if self._sample_format_type is not None:
+			return self._sample_format_type(**sample)
+		return tuple(sample[n] for n in self._sample_format)
+
+
+	@classmethod
+	def add_available_modes(cls, *modes):
+		cls._available_modes.update(modes)
+
+
+	@classmethod
+	def get_available_modes(cls):
+		return cls._available_modes
 
 
 
@@ -38,6 +165,7 @@ class DevicedBase(util.DeviceBase, DatasetBase):
 
 		super().__init__(*args, **kwargs)
 		self._buffers = []
+
 
 	def register_buffer(self, name, buffer):
 		'''
@@ -49,7 +177,8 @@ class DevicedBase(util.DeviceBase, DatasetBase):
 		:return:
 		'''
 		self._buffers.append(name)
-		self.__setattr__(name, buffer)
+		return self.register_data(name, data=buffer)
+
 
 	def to(self, device):
 		super().to(device)
@@ -77,6 +206,7 @@ class DatasetLocked(Exception):
 		super().__init__()
 
 
+
 class Lockable(DatasetBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -99,31 +229,44 @@ class Lockable(DatasetBase):
 		return l
 
 
-	def update_data(self, indices):
+	def update_data(self, indices, **kwargs):
 		self._check_lock()
-		return self._update_data(indices)
+		return self._update_data(indices, **kwargs)
 
 
-	def _update_data(self, indices):
-		raise NotImplementedError
+	def _update_data(self, indices, **kwargs):
+		for key in self.get_available_data():
+			data = getattr(self, key, None)
+			fn = getattr(self, f'_update_{key}', None)
+			if data is not None:
+				setattr(self, key, data[indices])
+			elif fn is not None:
+				fn(indices, **kwargs)
 
 
 
 class Observation(Lockable):
+	_sample_format = ['observations']
 	_full_observation_space = None
 
 
-	def get_observations(self):
-		if isinstance(self, Batchable):
-			return self[torch.arange(len(self))][0]
-		return util.pytorch_collate([self[i][0] for i in range(len(self))])
+	# def get_observation(self, idx=None):
+	# 	if isinstance(self, Batchable):
+	# 		return self[torch.arange(len(self))][0]
+	# 	return util.pytorch_collate([self[i][0] for i in range(len(self))])
 
 
-	def replace_observations(self, observations):
-		self._check_lock()
-		return self._replace_observations(observations)
-	def _replace_observations(self, observations):
-		raise NotImplementedError
+	# def replace_observations(self, observations):
+	# 	self._check_lock()
+	# 	return self._replace_observations(observations)
+	# def _replace_observations(self, observations):
+	# 	raise NotImplementedError
+
+
+	def get_observations(self, idx=None):
+		if idx is None:
+			return self.observations
+		return self.observations[idx]
 
 
 	def get_observation_space(self):
@@ -135,17 +278,34 @@ class Supervised(Observation):
 	_full_label_space = None
 	_all_label_names = None
 
-	def get_labels(self):
-		if isinstance(self, Batchable):
-			return self[torch.arange(len(self))][1]
-		return util.pytorch_collate([self[i][1] for i in range(len(self))])
+	def __init__(self, supervised=True, **kwargs):
+		super().__init__(**kwargs)
+		self._is_supervised = supervised
+		if supervised:
+			self.include_sample_data('targets')
+			self.dout = self.din
 
 
-	def replace_labels(self, labels):
-		self._check_lock()
-		return self._replace_labels(labels)
-	def _replace_labels(self, labels):
-		raise NotImplementedError
+	def is_supervised(self):
+		return self._is_supervised
+
+
+	def get_targets(self, idx=None):
+		if idx is None:
+			return self.targets
+		return self.targets[idx]
+
+	# def get_target(self):
+	# 	if isinstance(self, Batchable):
+	# 		return self[torch.arange(len(self))][1]
+	# 	return util.pytorch_collate([self[i][1] for i in range(len(self))])
+
+
+	# def replace_labels(self, labels):
+	# 	self._check_lock()
+	# 	return self._replace_labels(labels)
+	# def _replace_labels(self, labels):
+	# 	raise NotImplementedError
 
 
 	def get_label_names(self):
@@ -156,9 +316,17 @@ class Supervised(Observation):
 
 
 class Disentanglement(Supervised):
+	_available_data = {'targets':'labels'}
 	_all_mechanism_names = None
 	_all_mechanism_class_names = None
 	_full_mechanism_space = None
+
+
+	def get_labels(self, idx=None):
+		if idx is None:
+			return self.labels
+		return self.labels[idx]
+
 
 	def get_mechanism_class_names(self, mechanism):
 		if isinstance(mechanism, str):
@@ -195,32 +363,10 @@ class ISupervisedDataset(Supervised):
 		super().__init__(observations, labels, din=din, dout=dout)
 
 		self.register_buffer('observations', observations)
-		self.register_buffer('labels', labels)
+		self.register_buffer('targets', labels)
 
 		self._full_label_space = label_space
 		self._all_label_names = label_names
-
-	def __len__(self):
-		return self.observations.size(0)
-
-	def __getitem__(self, item):
-		return self.observations[item], self.labels[item]
-
-	def get_observations(self):
-		return self.observations
-
-	def get_labels(self):
-		return self.labels
-
-	def _replace_labels(self, labels):
-		self.labels = labels
-
-	def _replace_observations(self, observations):
-		self.observations = observations
-
-	def _update_data(self, indices):
-		self._replace_observations(self.observations[indices])
-		self._replace_labels(self.labels[indices])
 
 
 
@@ -278,6 +424,7 @@ class ImageDataset(Dataset):
 		if fid_ident is unspecified_argument:
 			fid_ident = A.pull('fid_ident', None)
 		super().__init__(A, **other)
+		self.register_data_aliases('observations', 'images')
 		self.fid_ident = fid_ident
 
 	def get_available_fid(self, name=None):
@@ -315,6 +462,13 @@ class ImageDataset(Dataset):
 
 		raise MissingFIDStatsError(self.root, dim, modes, available)
 
+	def get_images(self, idx=None):
+		if idx is None:
+			return self.images
+		return self.images[idx]
+
+	def __len__(self):
+		return len(self.images)
 
 
 class MissingDatasetError(Exception):

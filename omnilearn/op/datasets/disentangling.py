@@ -146,60 +146,59 @@ class dSprites(Downloadable, Batchable, ImageDataset, Disentanglement):
 	dout = 5
 	# label_space = util.JointSpace()
 
-	def __init__(self, A, **kwargs):
+	def __init__(self, A, slim=None, supervised=None, target_type=unspecified_argument,
+	             din=None, dout=None, **kwargs):
 
-		label_type = A.pull('label_type', None)
+		if slim is None:
+			slim = A.pull('slim', False)
 
-		din = A.pull('din', self.din)
-		dout = A.pull('dout', din if label_type is None else self.dout)
+		if supervised is None:
+			supervised = A.pull('supervised', False)
 
-		filename = A.pull('filename', 'dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz')
+		if target_type is unspecified_argument:
+			target_type = A.pull('target_type', 'value' if supervised else None)
+		assert target_type in {None, 'value', 'class'}, f'Unknown type of label: {target_type}'
 
-		assert label_type in {None, 'value', 'class'}, 'Unknown type of label: {}'.format(label_type)
-		# assert images is not None or dataroot is not None, 'nothing to use/load'
+		if din is None: din = A.pull('din', self.din)
+		if dout is None: dout = A.pull('dout', self.dout if supervised else din)
 
-		if dout is None and label_type is not None:
-			dout = 5 if label_type == 'value' else 113
+		super().__init__(A, supervised=target_type is not None, **kwargs)
 
-		super().__init__(A, din=din, dout=din if dout is None else dout, **kwargs)
+		if target_type == 'class':
+			self.dout = 113
 
-		dataroot = self.root
+		dataroot = self.root / 'dsprites'
+		dataroot.mkdir(exist_ok=True)
+		self.root = dataroot
 
-		if dataroot is not None:
-			root = os.path.join(dataroot, 'dsprites')
-			path = os.path.join(root, filename)
-			print('Loading dSprites dataset from disk: {}'.format(path))
-			data = np.load(path, allow_pickle=True, encoding='bytes')
+		path = dataroot / 'dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz'
+		if not path.is_file():
+			download = A.pull('download', False)
+			if download:
+				self.download(A)
+			else:
+				raise MissingDatasetError('dsprites')
 
-			self.meta = _rec_decode(data['metadata'][()])
+		print(f'Loading dSprites dataset from disk: {path}')
+		data = np.load(path, allow_pickle=True, encoding='bytes')
 
-			images = torch.from_numpy(data['imgs']).unsqueeze(1)
+		self.meta = _rec_decode(data['metadata'][()])
 
-			self.register_buffer('images', images)
+		images = torch.from_numpy(data['imgs']).unsqueeze(1)
+		self.register_buffer('images', images)
 
-			if label_type is not None:
-				if label_type == 'value':
-					labels = torch.from_numpy(data['latents_values'][:,1:]).float()
-				else:
-					labels = torch.from_numpy(data['latents_classes'][:,1:]).int()
-				self.register_buffer('labels', labels)
+		if not slim or target_type == 'value':
+			self.register_data('value', torch.from_numpy(data['latents_values'][:, 1:]).float())
+		if not slim or target_type == 'class':
+			self.register_data('class', torch.from_numpy(data['latents_classes'][:, 1:]).int())
 
-		self.labeled = hasattr(self, 'labels')
-		self.root = root
+		if self.is_supervised():
+			self.register_data_aliases('labels', target_type)
 
-	def get_raw_data(self):
-		if self.labeled:
-			return self.images, self.labels
-		return self.images
 
-	def __len__(self):
-		return len(self.images)
-
-	def __getitem__(self, item):
-		imgs = self.images[item].float()
-		if self.labeled:
-			return imgs, self.labels[item]
-		return imgs,
+	@classmethod
+	def download(cls, A, dataroot=None, **kwargs):
+		raise NotImplementedError
 
 
 
@@ -224,22 +223,24 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 	]
 	del _hue_names
 
-	def __init__(self, A, mode=None, labeled=None, load_labels=None, din=None, dout=None, **kwargs):
+	def __init__(self, A, mode=None, slim=None, supervised=None, target_type=unspecified_argument,
+	             din=None, dout=None, **kwargs):
+
+		if slim is None:
+			slim = A.pull('slim', False)
 
 		if mode is None:
 			mode = A.pull('mode', 'full')
-		if labeled is None:
-			labeled = A.pull('labeled', False)
-		if load_labels is None and not labeled:
-			load_labels = A.pull('load-labels', False)
-		load_labels = load_labels or labeled
-		label_type = A.pull('label_type', 'class') if load_labels else None
+		if supervised is None:
+			supervised = A.pull('supervised', False)
+		if target_type is unspecified_argument:
+			target_type = A.pull('target_type', 'class' if supervised else None)
 
 		if din is None: din = A.pull('din', self.din)
-		if dout is None: dout = A.pull('dout', self.dout if labeled else din)
+		if dout is None: dout = A.pull('dout', self.dout if supervised else din)
 
-		super().__init__(A, din=din, dout=dout, **kwargs)
-		self.add_existing_modes('test')
+		super().__init__(A, din=din, dout=dout, supervised=supervised, **kwargs)
+		self.add_available_modes('test')
 		
 		# self.factor_order = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
 		# self.factor_sizes = [10, 10, 10, 8, 4, 15]
@@ -260,13 +261,11 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 				self.download(A)
 			else:
 				raise MissingDatasetError('3dshapes')
-		
-		self.images, self.labels, self.indices = None, None, None
+
 		with hf.File(path, 'r') as data:
-			
 			images = torch.from_numpy(data['images'][()])
-			labels = torch.from_numpy(data['labels'][()]).float() if load_labels else None
-			
+			labels = torch.from_numpy(data['labels'][()]).float() if not slim or self.is_supervised() else None
+
 			indices = None if mode == 'full' else \
 				(data['test_idx'][()] if mode == 'test' else data['train_idx'][()])
 			if indices is not None:
@@ -282,17 +281,11 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 			self.register_buffer('images', images)
 			
 			if labels is not None:
-				if label_type == 'class':
+				if target_type == 'class':
 					labels = self.get_label_space().transform(labels, self.get_mechanism_space())
-					# nums = torch.tensor(self.factor_sizes).float() - 1
-					# labels -= raw_mins
-					# labels /= raw_maxs - raw_mins
-					# labels *= nums
-					# labels = labels.round().long()
 				self.register_buffer('labels', labels)
-				
-		self.labeled = labeled
-		self.label_type = label_type
+
+		self.target_type = target_type
 
 		
 	_source_url = 'gs://3d-shapes/3dshapes.h5'
@@ -337,44 +330,6 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 	# def get_factor_order(self):
 	# 	return self.factor_order
 
-
-	def get_labels(self):
-		return self.labels
-
-	def get_observations(self):
-		return self.images
-
-	def _replace_labels(self, labels):
-		self.labels = labels
-
-	def _replace_observations(self, observations):
-		self.images = observations
-
-	def get_raw_data(self):
-		if self.labeled:
-			return self.images, self.labels
-		return self.images
-
-	def _update_data(self, indices):
-		self.images = self.images[indices]
-		self.indices = self.indices[indices]
-		if self.labeled:
-			self.labels = self.labels[indices]
-
-	def __len__(self):
-		return len(self.images)
-
-	def __getitem__(self, item):
-		# if isinstance(item, (np.ndarray, torch.Tensor)):
-		# 	item = item.tolist()
-		images = self.images[item]
-		# if self.noise is not None:
-		# 	images = images.add(torch.randn_like(images).mul(self.noise)).clamp(0,1)
-		if self.labeled:
-			labels = self.labels[item]
-			# labels = torch.from_numpy(self.labels[item]).float()
-			return images, labels
-		return images,
 
 
 
@@ -421,7 +376,7 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 
 		super().__init__(A, din=din, dout=din if dout is None else dout, **kwargs)
 		self.root = self.root / 'RFD'
-		self.add_existing_modes(*self.raw_subfolders.keys())
+		self.add_available_modes(*self.raw_subfolders.keys())
 		
 		self.partitions_dict = None
 		self.real_set = None
@@ -521,10 +476,10 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 	def get_factor_order(self):
 		return self.factor_order
 
-	def get_observations(self):
+	def get_observation(self):
 		raise NotImplementedError
 
-	def get_labels(self):
+	def get_target(self):
 		raise NotImplementedError
 
 	def _update_data(self, indices):
@@ -560,8 +515,8 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
-	
-	ATTRIBUTES = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
+
+	_all_mechanism_names = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
 	              'Bald', 'Bangs', 'Big_Lips', 'Big_Nose', 'Black_Hair', 'Blond_Hair',
 	              'Blurry', 'Brown_Hair', 'Bushy_Eyebrows', 'Chubby', 'Double_Chin',
 	              'Eyeglasses', 'Goatee', 'Gray_Hair', 'Heavy_Makeup', 'High_Cheekbones',
@@ -569,62 +524,74 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
 	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
 	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
+	_all_mechanism_class_names = [[f'no:{l}', f'yes:{l}'] for l in _all_mechanism_names]
+	_full_label_space = util.JointSpace(*[util.BinaryDim() for _ in range(len(_all_mechanism_names))])
 
 
-	_all_mechanism_names = ATTRIBUTES.copy()
-	_all_mechanism_class_names = [[f'no:{l}', f'yes:{l}'] for l in ATTRIBUTES]
-	_full_label_space = util.JointSpace(*[util.BinaryDim() for _ in range(len(ATTRIBUTES))])
-
-	def __init__(self, A, resize=unspecified_argument, label_type=unspecified_argument, mode=None,
+	def __init__(self, A, resize=unspecified_argument, slim=None, supervised=None,
+	             target_type=unspecified_argument, mode=None,
 	             din=None, dout=None, **kwargs):
-		
-		if label_type is unspecified_argument:
-			label_type = A.pull('label_type', None)
-		
+
+		if slim is None:
+			slim = A.pull('slim', False)
+
 		if mode is None:
 			mode = A.pull('mode', 'train')
+
+		if supervised is None:
+			supervised = A.pull('supervised', False)
+		if target_type is unspecified_argument:
+			target_type = A.pull('target_type', 'class' if supervised else None)
+
 		if resize is unspecified_argument:
 			resize = A.pull('resize', (256, 256))
-		
-		if din is None:
-			din = A.pull('din', self.din)
-		
+		if resize is not None:  # TODO: use Interpolated as modifier
+			din = 3, *resize
+
+		if din is None: din = A.pull('din', self.din)
+		if dout is None: dout = A.pull('dout', self.dout if supervised else din)
+
 		if dout is None:
-			if label_type is None:
+			if target_type is None:
 				dout = din
-			elif label_type == 'attr':
+			elif target_type == 'attr':
 				dout = 40
-			elif label_type == 'landmark':
+			elif target_type == 'landmark':
 				dout = 10
-			elif label_type == 'identity':
+			elif target_type == 'identity':
 				dout = 1
 			else:
-				raise Exception('unknown {}'.format(label_type))
-			
+				raise Exception(f'unknown {target_type}')
+
 			dout = A.pull('dout', dout)
-		
+
 		_labels = {
 			'attr': 'attrs',
 			'identity': 'identities',
 			'landmark': 'landmarks',
 		}
-		
-		if resize is not None:  # TODO: use Interpolated as modifier
-			din = 3, *resize
-		
-		super().__init__(A, din=din, dout=dout, **kwargs)
-		# self.add_existing_modes('val', 'test')
-		self.root = Path(self.root) / 'celeba'
-		dataroot = self.root
-		name = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
-		
-		with hf.File(dataroot/name, 'r') as f:
+
+		super().__init__(A, din=din, dout=dout, supervised=supervised, **kwargs)
+		self.add_available_modes('test')
+
+		dataroot = self.root / 'celeba'
+		dataroot.mkdir(exist_ok=True)
+		self.root = dataroot
+		filename = 'celeba_test.h5' if mode == 'test' else 'celeba_train.h5'
+
+		with hf.File(dataroot/filename, 'r') as f:
 			self.images = f['images'][()]  # encoded as str
-			self.labels = f[_labels[label_type]][()] if label_type is not None else None
-			
+
+			for key, fkey in _labels.items():
+				if not slim or target_type == key:
+					self.register_data(key, torch.from_numpy(f[fkey][()]))
+
 			self.attr_names = f.attrs['attr_names']
 			self.landmark_names = f.attrs['landmark_names']
-		
+
+		if self.is_supervised():
+			self.register_data_aliases('labels', target_type)
+
 		self.resize = resize
 	
 	# google drive ids
@@ -685,37 +652,15 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 		raise NotImplementedError
 
 
-	def _replace_observations(self, observations):
-		self.images = observations
+	def get_images(self, idx=None):
+		if idx is None:
+			return torch.stack([self.get_observations(i) for i in range(len(self))])
 
-
-	def _replace_labels(self, labels):
-		self.labels = labels
-
-
-	def _update_data(self, indices):
-		self._replace_observations(self.images[indices])
-		if self.labels is not None:
-			self._replace_labels(self.labels[indices])
-
-	
-	def __len__(self):
-		return len(self.images)
-
-
-	def __getitem__(self, item):
-		
-		img = torch.from_numpy(util.str_to_jpeg(self.images[item])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
-		
+		img = torch.from_numpy(util.str_to_jpeg(self.images[idx])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
 		if self.resize is not None:
 			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
-		
-		if self.labels is None:
-			return img,
-		
-		lbl = torch.from_numpy(self.labels[item])
-		
-		return img, lbl
+		return img
+
 
 
 
@@ -752,40 +697,31 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 		                       util.CategoricalDim(3), util.CategoricalDim(3),
 		                       util.CategoricalDim(40), util.CategoricalDim(40))
 
-	def __init__(self, A, mode=None, fid_ident=None, **kwargs):
+
+	def __init__(self, A, slim=None, mode=None, fid_ident=None,
+	             supervised=None, din=None, dout=None, **kwargs):
+
+		if slim is None:
+			slim = A.pull('slim', False)
 
 		if mode is None:
 			mode = A.pull('mode', 'train')
-		labeled = A.pull('labeled', False)
+		if supervised is None:
+			supervised = A.pull('supervised', False)
 
-		din = A.pull('din', self.din)
-		dout = A.pull('dout', self.dout if labeled else din)
+		if din is None: din = A.pull('din', self.din)
+		if dout is None: dout = A.pull('dout', self.dout if supervised else din)
 
 		cat = A.pull('category', 'toy')
-
-		assert cat in {'toy', 'sim', 'realistic', 'real', 'complex'}, 'invalid category: {}'.format(cat)
+		assert cat in {'toy', 'sim', 'realistic', 'real', 'complex'}, f'invalid category: {cat}'
 		if cat == 'sim':
 			cat = 'realistic'
 
-		super().__init__(A, din=din, dout=dout, fid_ident=cat, **kwargs)
-		self.add_existing_modes('test')
+		super().__init__(A, din=din, dout=dout, supervised=supervised, fid_ident=cat, **kwargs)
+		self.add_available_modes('test')
 		dataroot = self.root / 'mpi3d'
 		self.root = dataroot
-		
-		# self.factor_order = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
-		#                      'horizonal_axis', 'vertical_axis']
-		# self.factor_sizes = [6,6,2,3,3,40,40]
-		#
-		# self.factor_values = {
-		# 	'object_color': ['white', 'green', 'red', 'blue', 'brown', 'olive'],
-		# 	'object_shape': ['cone', 'cube', 'cylinder', 'hexagonal', 'pyramid', 'sphere'],
-		# 	'object_size': ['small', 'large'],
-		# 	'camera_height': ['top', 'center', 'bottom'],
-		# 	'background_color': ['purple', 'sea_green', 'salmon'],
-		# 	'horizonal_axis': list(map(str, range(40))),
-		# 	'vertical_axis': list(map(str, range(40))),
-		# }
-		
+
 		if cat == 'complex':
 			self._all_mechanism_class_names[0] = ['mug', 'ball', 'banana', 'cup']
 			self._all_mechanism_class_names[1] = ['yellow', 'green', 'olive', 'red']
@@ -798,21 +734,12 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 			                                         util.CategoricalDim(3), util.CategoricalDim(40),
 			                                         util.CategoricalDim(40))
 
-		
-			# self.factor_sizes[0], self.factor_sizes[1] = 4, 4
-			# self.factor_values['object_shape'] = ['mug', 'ball', 'banana', 'cup']
-			# self.factor_values['object_color'] = ['yellow', 'green', 'olive', 'red']
-
 		sizes = np.array(self.get_label_sizes())
-
 		flr = np.cumprod(sizes[::-1])[::-1]
 		flr[:-1] = flr[1:]
 		flr[-1] = 1
-
 		self._sizes = torch.from_numpy(sizes.copy()).long()
 		self._flr = torch.from_numpy(flr.copy()).long()
-
-		self.labeled = labeled
 
 		path = dataroot / f'mpi3d_{cat}.h5'
 		
@@ -826,7 +753,7 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 		with hf.File(path, 'r') as f:
 			if mode == 'full':
 				images = np.concatenate([f['train_images'][()], f['test_images'][()]])
-				indices = np.concatenate([f['train_idx'], f['test_idx'][()]])
+				indices = np.concatenate([f['train_idx'][()], f['test_idx'][()]])
 			elif mode == 'test':
 				images = f['test_images'][()]
 				indices = f['test_idx'][()]
@@ -898,20 +825,8 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 				
 			os.remove(str(rawpath))
 
-	# def get_factor_sizes(self):
-	# 	return self.factor_sizes
-	# def get_factor_order(self):
-	# 	return self.factor_order
 
-	def get_labels(self):
-		return self.get_label(self.indices)
-
-	def _update_data(self, indices):
-		self.images = self.images[indices]
-		if self.labeled:
-			self.indices = indices
-
-	def get_label(self, inds):
+	def _get_label(self, inds):
 		try:
 			len(inds)
 			inds = inds.view(-1,1)
@@ -920,20 +835,41 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 
 		lvls = inds // self._flr
 		labels = lvls % self._sizes
-
 		return labels
 
-	def __len__(self):
-		return len(self.images)
 
-	def __getitem__(self, idx):
-		if self.sel_index is not None:
-			idx = self.sel_index[idx]
-		imgs = self.images[idx].float().div(255).clamp(1e-7, 1-1e-7)
-		if self.labeled:
-			labels = self.get_label(self.indices[idx])
-			return imgs, labels
-		return imgs,
+	def get_labels(self, idx):
+		if idx is None:
+			inds = self.indices
+			if self.sel_index is not None:
+				inds = inds[self.sel_index]
+		else:
+			if self.sel_index is not None:
+				idx = self.sel_index[idx]
+			inds = self.indices[idx]
+		return self._get_label(inds)
+
+
+	def get_images(self, idx=None):
+		if idx is None:
+			imgs = self.images
+			if self.sel_index is not None:
+				imgs = imgs[self.sel_index]
+		else:
+			if self.sel_index is not None:
+				idx = self.sel_index[idx]
+			imgs = self.images[idx]
+		return imgs.float().div(255).clamp(1e-7, 1 - 1e-7)
+
+
+	# def __getitem__(self, idx):
+	# 	if self.sel_index is not None:
+	# 		idx = self.sel_index[idx]
+	# 	imgs = self.images[idx].float().div(255).clamp(1e-7, 1-1e-7)
+	# 	if self.labeled:
+	# 		labels = self.get_label(self.indices[idx])
+	# 		return imgs, labels
+	# 	return imgs,
 
 
 

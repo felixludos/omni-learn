@@ -14,7 +14,7 @@ from ... import util
 from ...data import register_dataset, Batchable, Deviced, Downloadable, ImageDataset, Supervised
 
 
-from .transforms import Interpolated
+# from .transforms import Interpolated
 
 
 
@@ -22,11 +22,11 @@ from .transforms import Interpolated
 
 class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised):
 	# TODO: enable (pytorch) transforms
-	available_modes = {'train', 'test'}
+	_available_modes = {'train', 'test'}
 
 	_default_label_attr = 'targets'
 
-	def __init__(self, A, dataroot=None, mode=None, labeled=None, label_attr=unspecified_argument,
+	def __init__(self, A, dataroot=None, mode=None, supervised=None, target_attr=unspecified_argument,
 	             din=None, dout=None,
 	             dataset_kwargs=None, _req_kwargs=None, **unused):
 		'''
@@ -47,7 +47,7 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 			
 		if mode is None:
 			mode = A.pull('mode', 'train')
-		
+
 		if dataset_kwargs is None:
 			dataset_kwargs = self._get_dataset_kwargs(A, mode=mode, **unused)
 		if 'root' not in dataset_kwargs:
@@ -58,12 +58,13 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 		if resize and (H != 32 or W != 32):
 			self.din = C, 32, 32
 
-		if label_attr is unspecified_argument:
-			if labeled is None:
-				labeled = A.pull('labeled', True)
-			label_attr = A.pull('label_attr', self._default_label_attr) if labeled else None
+		if target_attr is unspecified_argument:
+			if supervised is None:
+				supervised = A.pull('supervised', True)
+			target_attr = A.pull('target_attr', self._default_label_attr if supervised else None)
+			supervised = target_attr is not None
 
-		if label_attr is None:
+		if target_attr is None:
 			dout = self.din if din is None else din
 
 		if _req_kwargs is None:
@@ -71,12 +72,9 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 		else:
 			_req_kwargs.update(dataset_kwargs)
 
-		super().__init__(A, din=din, dout=dout, dataroot=dataroot,
-		                 _req_kwargs=_req_kwargs,
-		                 **unused)
-		self.add_existing_modes('test')
-
-		self.labeled = label_attr is not None
+		super().__init__(A, din=din, dout=dout, dataroot=dataroot, supervised=supervised,
+		                 _req_kwargs=_req_kwargs, **unused)
+		self.add_available_modes('test')
 
 		# self.root = root
 
@@ -90,34 +88,20 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 		if resize:
 			images = F.interpolate(images, (32, 32), mode='bilinear')
 		
-		if label_attr is None:
-			self.labels = None
-		else:
-			labels = getattr(self, label_attr)
+		if target_attr is not None:
+			labels = getattr(self, target_attr)
 			if not isinstance(labels, torch.Tensor):
 				labels = torch.tensor(labels)
-			self.register_buffer('labels', labels)
+			self.register_buffer('targets', labels)
 			# delattr(self, label_attr)
 
-		self.register_buffer('images', images)
+		self.register_buffer('observations', images)
 		# del self.data
 
-	def get_observations(self):
-		return self.images
-
-	def get_labels(self):
-		return self.labels
-
-	def _replace_observations(self, observations):
-		self.images = observations
-
-	def _replace_labels(self, labels):
-		self.labels = labels
-
-	def _update_data(self, indices):
-		self._replace_observations(self.images[indices])
-		if self.labeled:
-			self._replace_labels(self.labels[indices])
+	# def _update_data(self, indices):
+	# 	self._replace_observations(self.images[indices])
+	# 	if self.labeled:
+	# 		self._replace_labels(self.labels[indices])
 
 	@property
 	def raw_folder(self) -> str:
@@ -130,19 +114,19 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 	def download(cls, A, **kwargs):
 		cls(A, download=True)
 
-	def get_raw_data(self):
-		if self.labeled:
-			return self.images, self.labels
-		return self.images
+	# def get_raw_data(self):
+	# 	if self.labeled:
+	# 		return self.images, self.labels
+	# 	return self.images
 
-	def __len__(self):
-		return len(self.images)
+	# def __len__(self):
+	# 	return len(self.images)
 
-	def __getitem__(self, item):
-		img = self.images[item]
-		if self.labeled:
-			return img, self.labels[item]
-		return img
+	# def __getitem__(self, item):
+	# 	img = self.images[item]
+	# 	if self.labeled:
+	# 		return img, self.labels[item]
+	# 	return img
 	
 	@classmethod
 	def _get_dataroot(cls, A=None, ident=None, silent=False):
@@ -216,51 +200,12 @@ class EMNIST(Torchvision_Toy_Dataset, util.InitWall, torchvision.datasets.EMNIST
 	_all_label_names = list(_split_keys['letters'])
 	
 	def __init__(self, A, **kwargs):
-		
-		# split = A.pull('group', 'letters')
-		# if split != 'letters':
-		# 	raise NotImplementedError
-		
-		# dataset = torchvision.datasets.EMNIST(str(dataroot), split=split, **kwargs)
-
-
-		# labeled = A.pull('labeled', False)
-		
-		
-		# labels_key = self._split_keys.get(split, None) if labeled else None
-		# dout = len(labels_key) if labeled else None
-		
-		# TODO: Automodifier for selected_classes
-		# selected_classes = A.pull('selected_classes', None)
-		# if selected_classes is not None:
-		# 	sel = None
-		# 	lbls = dataset.targets.clone()
-		# 	full_key = labels_key
-		# 	labels_key = []
-		#
-		# 	for i, c in enumerate(selected_classes):
-		#
-		# 		s = lbls == c
-		# 		if sel is None:
-		# 			sel = s
-		# 		else:
-		# 			sel += s
-		# 		dataset.targets[s] = i
-		# 		if full_key is not None:
-		# 			labels_key.append(full_key[c])
-		#
-		# 	dataset.targets = dataset.targets[sel]
-		# 	dataset.data = dataset.data[sel]
-		#
-		# 	if labeled:
-		# 		dout = len(selected_classes)
-
 		super().__init__(A, **kwargs)
 		
-		self.images = self.images.permute(0,1,3,2)
+		self.observations = self.observation.permute(0,1,3,2)
 		
-		if self.split == 'letters' and self.labels is not None:
-			self.labels -= 1  # targets use 1-based indexing :(
+		if self.split == 'letters' and self.targets is not None:
+			self.targets -= 1  # targets use 1-based indexing :(
 		
 		self.labels_key = self._split_keys[self.split]
 		self.dout = len(self.labels_key)

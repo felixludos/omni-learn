@@ -2,6 +2,8 @@
 import torch
 import re
 from torch._six import container_abcs, string_classes, int_classes
+from omnibelt import unspecified_argument
+import omnifig as fig
 
 from ..util import TensorDict, TensorList
 
@@ -51,3 +53,50 @@ def _collate_movable(batch):
 		return TensorList([_collate_movable(samples) for samples in transposed])
 
 	raise TypeError(default_collate_err_msg_format.format(elem_type))
+
+
+
+# class SampleFormat:
+# 	def __init__(self, *names, typ=None):
+# 		self.available = set(names)
+# 		self.format = list(names)
+# 		self.typ = typ
+#
+#
+# 	def format_type(self, typ=unspecified_argument):
+# 		if typ is not unspecified_argument:
+# 			self.typ = typ
+# 		return self.typ
+#
+#
+# 	def reformat(self, *names):
+# 		new, missing = [], []
+# 		for name in names:
+# 			(new if name in self.available else missing).append(name)
+# 		if len(missing):
+# 			raise MissingDataError(*missing)
+# 		self.format = new
+#
+#
+# 	def add(self, *data):
+# 		self.available.update(data)
+#
+#
+# 	def format(self, sample):
+#
+# 		pass
+#
+#
+# 	def collate(self, samples):
+# 		pass
+#
+# 	pass
+
+
+
+
+
+
+
+
+

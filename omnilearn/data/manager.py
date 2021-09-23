@@ -70,7 +70,7 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced):
 		self._modes.clear()
 
 
-	def available_modes(self):
+	def get_loaded_modes(self):
 		return list(self._modes.keys())
 
 
@@ -233,7 +233,7 @@ class Splitable(SimpleDataManager):
 		if self.split_src == self.get_mode():
 			
 			skip_modes = dataset.get_available_modes()
-			done_modes = self.available_modes()
+			done_modes = self.get_loaded_modes()
 
 			split_ratios = {mode: ratio for mode, ratio in self.split_info.items()
 			                if mode not in skip_modes and mode not in done_modes}
@@ -282,10 +282,6 @@ class Splitable(SimpleDataManager):
 			idx += n
 		last = wrap_dataset('subset', dataset, torch.arange(idx, len(dataset)), update_data=False)
 		parts.append(last)
-
-		# TESTING
-		# last = wrap_dataset('subset', last, num=100)
-		# print(last.get_observations())
 		
 		return parts
 

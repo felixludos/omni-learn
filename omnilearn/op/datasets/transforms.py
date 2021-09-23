@@ -12,7 +12,7 @@ from ... import util
 
 from omnifig import AutoModifier, Modification
 
-from ...data import register_dataset, Deviced, Dataset, Batchable, wrap_dataset
+from ...data import register_dataset, Deviced, ImageDataset, Dataset, Batchable, wrap_dataset, DatasetWrapper
 
 @register_dataset('concat')
 class Concat(Dataset):
@@ -31,8 +31,9 @@ class Concat(Dataset):
 		idx = bisect_right(self.cumlens, item)
 		return self.datasets[idx][item - int(self.cumlens[int(idx-1)]) if idx > 0 else item]
 
-@AutoModifier('cropped')
-class Cropped(Dataset):
+
+@DatasetWrapper('cropped')
+class Cropped(ImageDataset):
 	'''
 	Parent dataset must have a din that is an image
 
@@ -78,129 +79,136 @@ class Cropped(Dataset):
 			self.r = crop_size[0] // 2
 
 
-	def __getitem__(self, item):
-		sample = super().__getitem__(item)
+	def get_images(self, idx=None):
+		imgs = super().get_images(idx)
+
 		if self.r is None:
-			return sample
-		
-		img, *other = sample
+			return imgs
 
-		img = img[..., self.cy-self.r:self.cy+self.r, self.cx-self.r:self.cx+self.r]
-
-		return (img, *other)
+		imgs = imgs[..., self.cy-self.r:self.cy+self.r, self.cx-self.r:self.cx+self.r]
+		return imgs
 
 
 
-@AutoModifier('interpolated')
-class Interpolated(Dataset):
-	def __init__(self, A, interpolate_size=unspecified_argument, interpolate_mode=None, din=None, **kwargs):
+# @AutoModifier('interpolated')
+# class Interpolated(Dataset):
+# 	def __init__(self, A, interpolate_size=unspecified_argument, interpolate_mode=None, din=None, **kwargs):
+#
+# 		if interpolate_size is unspecified_argument:
+# 			interpolate_size = A.pull('interpolate-size', '<>size', None)
+#
+# 		if interpolate_mode is None:
+# 			interpolate_mode = A.pull('interpolate-mode', 'bilinear')
+#
+# 		if interpolate_size is not None:
+# 			try:
+# 				len(interpolate_size)
+# 			except TypeError:
+# 				interpolate_size = interpolate_size, interpolate_size
+# 			assert len(interpolate_size) == 2, 'invalid cropping size: {}'.format(interpolate_size)
+# 			if din is None:
+# 				din = self.din
+# 			din = din[0], *interpolate_size
+#
+#
+# 		super().__init__(A, din=din, **kwargs)
+#
+# 		self.interpolate_size = interpolate_size
+# 		self.interpolate_mode = interpolate_mode
+#
+# 	def __getitem__(self, item):
+#
+# 		sample = super().__getitem__(item)
+# 		img, *other = sample
+#
+# 		if self.interpolate_size is not None:
+# 			sqz = False
+# 			if len(img.size()) == 3:
+# 				sqz = True
+# 				img = img.unsqueeze(0)
+# 			img = F.interpolate(img, self.interpolate_size, mode=self.interpolate_mode)
+# 			if sqz:
+# 				img = img.squeeze(0)
+#
+# 		return (img, *other)
+#
+#
+# @AutoModifier('resamplable')
+# class Resamplable(Dataset):
+# 	def __init__(self, A, budget=None):
+# 		if budget is None:
+# 			budget = A.pull('budget', None)
+#
+# 		super().__init__(A)
+#
+# 		self.budget = budget
+# 		self.inds = self.resample(self.budget)
+#
+# 	def resample(self, budget=None):
+# 		if budget is None:
+# 			budget = self.budget
+# 		inds = None
+# 		if budget is not None:
+# 			inds = torch.randint(0, super().__len__(), size=(budget,))
+# 		return inds
+#
+# 	def __len__(self):
+# 		return super().__len__() if self.budget is None else self.budget
+#
+# 	def pre_epoch(self, mode, epoch):
+# 		if self.budget is not None and mode == 'train':
+# 			self.inds = self.resample()
+# 		super().pre_epoch(mode, epoch)
+#
+# 	def __getitem__(self, item):
+# 		if self.budget is not None:
+# 			item = self.inds[item]
+# 		return super().__getitem__(item)
+#
+#
+#
+# @Modification('blurred')
+# def blurred(dataset, config):
+#
+# 	if not isinstance(dataset, Deviced):
+# 		raise NotImplementedError
+#
+# 	level = config.pull('blur-level', 5)
+# 	assert level % 2 == 1, f'bad blur level: {level}'
+# 	blur_type = config.pull('blur-type', 'uniform')
+#
+# 	assert blur_type == 'uniform', f'not implemented: {blur_type}'
+#
+# 	pad_type = config.pull('pad-type', 'reflect')
+# 	padding = (level-1)//2
+#
+# 	C = dataset.din[0]
+#
+# 	blur = nn.Conv2d(C, 1, groups=C, bias=False, kernel_size=level,
+# 	                      padding=padding, padding_mode=pad_type)
+# 	blur.weight.requires_grad = False
+# 	blur.weight.copy_(torch.ones_like(blur.weight)).div_(level**2)
+#
+# 	blur.to(dataset.device)
+#
+# 	key = config.pull('data_key', 'images')
+# 	full = getattr(dataset, key)
+#
+# 	with torch.no_grad():
+# 		full = blur(full).detach()
+#
+# 	setattr(dataset, key, full)
+#
+# 	return dataset
 
-		if interpolate_size is unspecified_argument:
-			interpolate_size = A.pull('interpolate-size', '<>size', None)
-
-		if interpolate_mode is None:
-			interpolate_mode = A.pull('interpolate-mode', 'bilinear')
-		
-		if interpolate_size is not None:
-			try:
-				len(interpolate_size)
-			except TypeError:
-				interpolate_size = interpolate_size, interpolate_size
-			assert len(interpolate_size) == 2, 'invalid cropping size: {}'.format(interpolate_size)
-			if din is None:
-				din = self.din
-			din = din[0], *interpolate_size
-
-		
-		super().__init__(A, din=din, **kwargs)
-		
-		self.interpolate_size = interpolate_size
-		self.interpolate_mode = interpolate_mode
-
-	def __getitem__(self, item):
-
-		sample = super().__getitem__(item)
-		img, *other = sample
-		
-		if self.interpolate_size is not None:
-			sqz = False
-			if len(img.size()) == 3:
-				sqz = True
-				img = img.unsqueeze(0)
-			img = F.interpolate(img, self.interpolate_size, mode=self.interpolate_mode)
-			if sqz:
-				img = img.squeeze(0)
-
-		return (img, *other)
-
-
-@AutoModifier('resamplable')
-class Resamplable(Dataset):
-	def __init__(self, A, budget=None):
-		if budget is None:
-			budget = A.pull('budget', None)
-
-		super().__init__(A)
-
-		self.budget = budget
-		self.inds = self.resample(self.budget)
-
-	def resample(self, budget=None):
-		if budget is None:
-			budget = self.budget
-		inds = None
-		if budget is not None:
-			inds = torch.randint(0, super().__len__(), size=(budget,))
-		return inds
-
-	def __len__(self):
-		return super().__len__() if self.budget is None else self.budget
-
-	def pre_epoch(self, mode, epoch):
-		if self.budget is not None and mode == 'train':
-			self.inds = self.resample()
-		super().pre_epoch(mode, epoch)
-
-	def __getitem__(self, item):
-		if self.budget is not None:
-			item = self.inds[item]
-		return super().__getitem__(item)
 
 
 
-@Modification('blurred')
-def blurred(dataset, config):
 
-	if not isinstance(dataset, Deviced):
-		raise NotImplementedError
 
-	level = config.pull('blur-level', 5)
-	assert level % 2 == 1, f'bad blur level: {level}'
-	blur_type = config.pull('blur-type', 'uniform')
 
-	assert blur_type == 'uniform', f'not implemented: {blur_type}'
+# old
 
-	pad_type = config.pull('pad-type', 'reflect')
-	padding = (level-1)//2
-
-	C = dataset.din[0]
-
-	blur = nn.Conv2d(C, 1, groups=C, bias=False, kernel_size=level,
-	                      padding=padding, padding_mode=pad_type)
-	blur.weight.requires_grad = False
-	blur.weight.copy_(torch.ones_like(blur.weight)).div_(level**2)
-
-	blur.to(dataset.device)
-
-	key = config.pull('data_key', 'images')
-	full = getattr(dataset, key)
-
-	with torch.no_grad():
-		full = blur(full).detach()
-
-	setattr(dataset, key, full)
-
-	return dataset
 
 #
 # @Modification('subset')

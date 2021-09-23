@@ -78,14 +78,14 @@ class Subset_Dataset(DatasetWrapper):
 
 	def get_observations(self):
 		if self._self_subset_updated:
-			return self.__wrapped__.get_observations()
+			return self.__wrapped__.get_observation()
 		if isinstance(self.__wrapped__, Batchable):
 			return self[torch.arange(len(self))][0]
 		return util.pytorch_collate([self[i][0] for i in range(len(self))])
 
 	def get_labels(self):
 		if self._self_subset_updated:
-			return self.__wrapped__.get_labels()
+			return self.__wrapped__.get_target()
 		if isinstance(self.__wrapped__, Batchable):
 			return self[torch.arange(len(self))][1]
 		return util.pytorch_collate([self[i][1] for i in range(len(self))])
@@ -202,7 +202,7 @@ class SingleLabelDataset(DatasetWrapper):
 
 
 	def get_labels(self):
-		return self.__wrapped__.get_labels().narrow(-1, self._self_idx, 1)
+		return self.__wrapped__.get_target().narrow(-1, self._self_idx, 1)
 
 
 
