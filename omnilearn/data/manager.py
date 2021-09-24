@@ -282,7 +282,7 @@ class Splitable(SimpleDataManager):
 			idx += n
 		last = wrap_dataset('subset', dataset, torch.arange(idx, len(dataset)), update_data=False)
 		parts.append(last)
-		
+
 		return parts
 
 
@@ -554,7 +554,9 @@ def load_data(A):
 	else:
 		A = info
 
-	return A.pull_self()
+	dataset = A.pull_self()
+
+	return dataset
 
 
 

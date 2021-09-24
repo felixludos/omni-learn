@@ -36,8 +36,7 @@ class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 
 		if sample_format is None:
 			sample_format = []
-		if cls._sample_format is None:
-			cls._sample_format = sample_format
+		cls._sample_format = sample_format
 		cls._available_modes = {*available_modes, *cls._available_modes}
 		cls._available_data =  {**available_data, **cls._available_data}
 		for key in cls._sample_format:
@@ -246,8 +245,12 @@ class Lockable(DatasetBase):
 
 
 class Observation(Lockable):
-	_sample_format = ['observations']
+	# _sample_format = ['observations']
 	_full_observation_space = None
+
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self.include_sample_data('observations')
 
 
 	# def get_observation(self, idx=None):
@@ -316,11 +319,13 @@ class Supervised(Observation):
 
 
 class Disentanglement(Supervised):
-	_available_data = {'targets':'labels'}
 	_all_mechanism_names = None
 	_all_mechanism_class_names = None
 	_full_mechanism_space = None
 
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.register_data_aliases('labels', 'targets')
 
 	def get_labels(self, idx=None):
 		if idx is None:
@@ -419,13 +424,17 @@ class MissingFIDStatsError(Exception):
 
 
 
-class ImageDataset(Dataset):
+class ImageDataset(Dataset, Observation):
 	def __init__(self, A, root=None, fid_ident=unspecified_argument, **other):
 		if fid_ident is unspecified_argument:
 			fid_ident = A.pull('fid_ident', None)
 		super().__init__(A, **other)
-		self.register_data_aliases('observations', 'images')
+		self.register_data('images')
+		self.register_data_aliases('images', 'observations')
 		self.fid_ident = fid_ident
+
+	def get_observations(self, idx=None):
+		return self.get_images(idx=idx)
 
 	def get_available_fid(self, name=None):
 		if name is None:

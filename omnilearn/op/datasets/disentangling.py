@@ -541,7 +541,7 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 		if supervised is None:
 			supervised = A.pull('supervised', False)
 		if target_type is unspecified_argument:
-			target_type = A.pull('target_type', 'class' if supervised else None)
+			target_type = A.pull('target_type', 'attr' if supervised else None)
 
 		if resize is unspecified_argument:
 			resize = A.pull('resize', (256, 256))
@@ -590,7 +590,7 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 			self.landmark_names = f.attrs['landmark_names']
 
 		if self.is_supervised():
-			self.register_data_aliases('labels', target_type)
+			self.register_data_aliases(target_type, 'labels')
 
 		self.resize = resize
 	
@@ -652,14 +652,17 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 		raise NotImplementedError
 
 
-	def get_images(self, idx=None):
-		if idx is None:
-			return torch.stack([self.get_observations(i) for i in range(len(self))])
-
+	def _load_jpeg_image(self, idx):
 		img = torch.from_numpy(util.str_to_jpeg(self.images[idx])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
 		if self.resize is not None:
 			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
 		return img
+
+
+	def get_images(self, idx=None):
+		if idx is None:
+			return torch.stack([self._load_jpeg_image(i) for i in range(len(self))])
+		return self._load_jpeg_image(idx)
 
 
 

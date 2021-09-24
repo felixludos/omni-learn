@@ -166,9 +166,6 @@ class Subset(Dataset):
 
 	@DatasetWrapper.condition(Observation)
 	def get_observations(self, idx=None):
-		c = __class__
-		s = super()
-		s2 = super(c, self)
 		if self._subset_indices is None:
 			return super().get_observations(idx=idx)
 		if isinstance(self, Batchable):
