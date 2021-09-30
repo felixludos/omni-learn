@@ -26,7 +26,7 @@ except ImportError:
 
 from ... import util
 from ...data import register_dataset, Deviced, Batchable, Splitable, ImageDataset, \
-	Downloadable, Dataset, MissingDatasetError, Supervised, Disentanglement, wrap_dataset
+	Downloadable, Dataset, MissingDatasetError, Supervised, Disentanglement, Topological, wrap_dataset
 
 from .transforms import Cropped
 
@@ -141,7 +141,7 @@ class Selected(Splitable):
 
 
 @register_dataset('dsprites')
-class dSprites(Downloadable, Batchable, ImageDataset, Disentanglement):
+class dSprites(Downloadable, Batchable, ImageDataset, Topological):
 	din = (1, 64, 64)
 	dout = 5
 	# label_space = util.JointSpace()
@@ -203,19 +203,20 @@ class dSprites(Downloadable, Batchable, ImageDataset, Disentanglement):
 
 
 @register_dataset('3dshapes')
-class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
+class Shapes3D(Downloadable, Batchable, ImageDataset, Topological):
 
 	din = (3, 64, 64)
 	dout = 6
 
-	_all_mechanism_names = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
 	_full_mechanism_space = util.JointSpace(util.PeriodicDim(), util.PeriodicDim(), util.PeriodicDim(),
 		                       util.BoundDim(0.75, 1.25), util.CategoricalDim(4), util.BoundDim(-30., 30.))
+
+	_all_label_names = ['floor_hue', 'wall_hue', 'object_hue', 'scale', 'shape', 'orientation']
 	_full_label_space = util.JointSpace(util.CategoricalDim(10), util.CategoricalDim(10), util.CategoricalDim(10),
-		                       util.CategoricalDim(8), util.CategoricalDim(4), util.CategoricalDim(15))
+	                                     util.CategoricalDim(8), util.CategoricalDim(4), util.CategoricalDim(15))
 
 	_hue_names = ['red', 'orange', 'yellow', 'green', 'seagreen', 'cyan', 'blue', 'dark-blue', 'purple', 'pink']
-	_all_mechanism_class_names = [
+	_all_label_class_names = [
 		_hue_names, _hue_names, _hue_names,
 		list(map(str,range(8))),
 		['cube', 'cylinder', 'ball', 'capsule'],
@@ -282,7 +283,7 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 			
 			if labels is not None:
 				if target_type == 'class':
-					labels = self.get_label_space().transform(labels, self.get_mechanism_space())
+					labels = self.get_target_space().transform(labels, self.get_mechanism_space())
 				self.register_buffer('labels', labels)
 
 		self.target_type = target_type
@@ -512,11 +513,11 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 
 
 @register_dataset('full-celeba')  # probably shouldnt be used
-class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate downloading and formatting
+class FullCelebA(Downloadable, ImageDataset, Topological):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
 
-	_all_mechanism_names = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
+	_all_label_names = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Under_Eyes',
 	              'Bald', 'Bangs', 'Big_Lips', 'Big_Nose', 'Black_Hair', 'Blond_Hair',
 	              'Blurry', 'Brown_Hair', 'Bushy_Eyebrows', 'Chubby', 'Double_Chin',
 	              'Eyeglasses', 'Goatee', 'Gray_Hair', 'Heavy_Makeup', 'High_Cheekbones',
@@ -524,8 +525,8 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 	              'Oval_Face', 'Pale_Skin', 'Pointy_Nose', 'Receding_Hairline', 'Rosy_Cheeks',
 	              'Sideburns', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Earrings',
 	              'Wearing_Hat', 'Wearing_Lipstick', 'Wearing_Necklace', 'Wearing_Necktie', 'Young', ]
-	_all_mechanism_class_names = [[f'no:{l}', f'yes:{l}'] for l in _all_mechanism_names]
-	_full_label_space = util.JointSpace(*[util.BinaryDim() for _ in range(len(_all_mechanism_names))])
+	_all_label_class_names = [[f'no:{l}', f'yes:{l}'] for l in _all_label_names]
+	_full_label_space = util.JointSpace(*[util.BinaryDim() for _ in range(len(_all_label_names))])
 
 
 	def __init__(self, A, resize=unspecified_argument, slim=None, supervised=None,
@@ -666,7 +667,6 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 
 
 
-
 @register_dataset('celeba')
 class CelebA(Cropped, FullCelebA):
 	def __init__(self, A, resize=None, crop_size=128, **kwargs):
@@ -678,14 +678,14 @@ class CelebA(Cropped, FullCelebA):
 
 
 @register_dataset('mpi3d')
-class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
+class MPI3D(Downloadable, Batchable, ImageDataset, Topological):
 
 	din = (3, 64, 64)
 	dout = 7
 
-	_all_mechanism_names = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
+	_all_label_names = ['object_color', 'object_shape', 'object_size', 'camera_height', 'background_color',
 		                     'horizonal_axis', 'vertical_axis']
-	_all_mechanism_class_names = [
+	_all_label_class_names = [
 		['white', 'green', 'red', 'blue', 'brown', 'olive'],
 		['cone', 'cube', 'cylinder', 'hexagonal', 'pyramid', 'sphere'],
 		['small', 'large'],
@@ -697,8 +697,8 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 		                       util.BoundDim(), util.CategoricalDim(3),
 		                       util.BoundDim(), util.BoundDim())
 	_full_label_space = util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.CategoricalDim(2),
-		                       util.CategoricalDim(3), util.CategoricalDim(3),
-		                       util.CategoricalDim(40), util.CategoricalDim(40))
+	                                util.CategoricalDim(3), util.CategoricalDim(3),
+	                                util.CategoricalDim(40), util.CategoricalDim(40))
 
 
 	def __init__(self, A, slim=None, mode=None, fid_ident=None,
@@ -726,8 +726,8 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 		self.root = dataroot
 
 		if cat == 'complex':
-			self._all_mechanism_class_names[0] = ['mug', 'ball', 'banana', 'cup']
-			self._all_mechanism_class_names[1] = ['yellow', 'green', 'olive', 'red']
+			self._all_label_class_names[0] = ['mug', 'ball', 'banana', 'cup']
+			self._all_label_class_names[1] = ['yellow', 'green', 'olive', 'red']
 
 			self._full_mechanism_space = util.JointSpace(util.CategoricalDim(4), util.CategoricalDim(4),
 			                                             util.BoundDim(), util.BoundDim(), util.CategoricalDim(3),
@@ -841,7 +841,7 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Disentanglement):
 		return labels
 
 
-	def get_labels(self, idx):
+	def get_labels(self, idx=None):
 		if idx is None:
 			inds = self.indices
 			if self.sel_index is not None:

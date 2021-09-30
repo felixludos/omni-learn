@@ -7,16 +7,28 @@ from torch.utils.data._utils.fetch import _MapDatasetFetcher
 from torch.utils.data.dataloader import _SingleProcessDataLoaderIter, _MultiProcessingDataLoaderIter, _DatasetKind
 # from .collectors import Batchable_Dataset, Device_Dataset # TODO: clean up import order
 
-from .collectors import Batchable
+# from .collectors import Batchable
 
 from .. import util
 
 
 class FeaturedDataFetcher(_MapDatasetFetcher):
-	def __init__(self, dataset, auto_collation=None, collate_fn=None, drop_last=False):
-		collate_fn = getattr(dataset, 'collate', collate_fn)
-		auto_collation = auto_collation or isinstance(dataset, Batchable)
+	def __init__(self, dataset, auto_collation=None, collate_fn=None,
+	             drop_last=False, sample_format=None):
 		super().__init__(dataset, auto_collation, collate_fn, drop_last)
+		self.sample_format = sample_format
+
+
+	def fetch(self, possibly_batched_index):
+
+		if self.auto_collation:
+			batch = self.dataset.get(idx=possibly_batched_index, format=self.sample_format)
+
+		else:
+			batch = [self.dataset.get(idx=i, format=self.sample_format) for i in possibly_batched_index]
+
+		# print(type(batch), len(batch))
+		return self.collate_fn(batch)
 
 
 
@@ -41,8 +53,10 @@ class Featured_SingleProcessIter(Featured_DataLoaderIter, _SingleProcessDataLoad
 	def __init__(self, loader):
 		super().__init__(loader)
 
-		self._dataset_fetcher = FeaturedDataFetcher(self._dataset_kind, self._dataset, self._auto_collation,
-		                                            self._collate_fn, self._drop_last)
+		self.sample_format = loader.sample_format
+
+		self._dataset_fetcher = FeaturedDataFetcher(self._dataset, self._auto_collation,
+		                                            self._collate_fn, self._drop_last, self.sample_format)
 
 
 
@@ -52,22 +66,27 @@ class Featured_MultiProcessIter(Featured_DataLoaderIter, _MultiProcessingDataLoa
 
 
 class Featured_DataLoader(DataLoader):
-	def __init__(self, dataset, *args, device=None, seed=None, generator=None, **kwargs):
+	def __init__(self, dataset, *args, sample_format=None, collate_fn=None,
+	             device=None, seed=None, generator=None, **kwargs):
 
 		if seed is not None and generator is None:
 			generator = torch.Generator()
 			generator.manual_seed(seed)
 
-		self.batched = not isinstance(dataset, Batchable)
-		# self.batched = None
+		if collate_fn is None:
+			collate_fn = getattr(dataset, 'collate', None)
 
-		super().__init__(dataset, *args, generator=generator, **kwargs)
-		
-		# self._auto_collation = False
+		super().__init__(dataset, *args, generator=generator, collate_fn=collate_fn, **kwargs)
+		self.sample_format = sample_format
+
+		try:
+			self.batched = dataset.allow_batched_get()
+		except AttributeError:
+			self.batched = False
 
 		if device is None:
 			try:
-				device = self.dataset.device
+				device = self.dataset.get_device()
 			except AttributeError:
 				device = 'cpu'
 		self.device = device
@@ -118,6 +137,7 @@ class Featured_DataLoader(DataLoader):
 		if self.num_workers == 0:
 			return Featured_SingleProcessIter(self)
 		else:
+			raise NotImplementedError
 			return Featured_MultiProcessIter(self)
 
 
@@ -160,6 +180,8 @@ class BatchedDataLoader(Featured_DataLoader): # loads full batches at a time (da
 
 	def __iter__(self):
 		return _BatchedDataLoaderIter(self.dataset, self.batch_size, self.shuffle, self.drop_last, self.auto_reset, self.device)
+
+
 
 class _BatchedDataLoaderIter(object):
 	def __init__(self, dataset, batch_size, shuffle=True, drop_last=False, auto_reset=False, device=None):

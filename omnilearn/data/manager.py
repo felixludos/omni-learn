@@ -225,7 +225,7 @@ class Splitable(SimpleDataManager):
 		self.shuffle_split = shuffle_split
 		self.split_info = split
 		self.split_src = split_src
-		self._split_done = False
+		self._split_done = split is None
 
 
 	def _split_load(self, dataset):
@@ -282,6 +282,19 @@ class Splitable(SimpleDataManager):
 			idx += n
 		last = wrap_dataset('subset', dataset, torch.arange(idx, len(dataset)), update_data=False)
 		parts.append(last)
+
+		# # TESTING
+		# last = wrap_dataset('subset', last, num=100)
+		# last = last.to_loader(batch_size=32, format='observations')
+		#
+		# print(last)
+		#
+		# x = next(iter(last))
+		#
+		# print(x)
+		# print(len(x))
+		#
+		# print(x.shape)
 
 		return parts
 

@@ -11,7 +11,8 @@ from omnibelt import unspecified_argument, InitWall, Class_Registry, \
 	wrap_instance, wrap_class, conditional_method, duplicate_instance, duplicate_func, join_classes, replace_class
 import omnifig as fig
 
-from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, ListDataset
+from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, \
+	Topological, ListDataset
 
 from .. import util
 
@@ -105,7 +106,8 @@ class Indexed(DatasetBase):
 class Shuffled(DatasetBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.__activate__()
+		Shuffled.__activate__(self)
+
 
 	def __activate__(self):
 		indices = torch.randperm(len(self))
@@ -116,10 +118,11 @@ class Shuffled(DatasetBase):
 			self._is_shuffled = False
 			self._shuffle_indices = indices
 
-	def get(self, name=None, idx=None):
+
+	def get(self, name=None, idx=None, **kwargs):
 		if not self._is_shuffled and idx is not None:
 			idx = self._shuffle_indices[idx]
-		return super().get(name=name, idx=idx)
+		return super().get(name=name, idx=idx, **kwargs)
 
 	# def __getitem__(self, idx):
 	# 	return super().__getitem__(idx if self._is_shuffled else self._self_indices[idx])
@@ -144,7 +147,7 @@ class Subset(Dataset):
 			update_data = A.pull('update-data', True)
 
 		super().__init__(A, **kwargs)
-		self.__activate__(indices=indices, num=num, shuffle=shuffle, update_data=update_data)
+		Subset.__activate__(self, indices=indices, num=num, shuffle=shuffle, update_data=update_data)
 
 
 	def __activate__(self, indices=None, num=None, shuffle=True, update_data=True):
@@ -164,22 +167,22 @@ class Subset(Dataset):
 		self._subset_indices = indices
 
 
-	@DatasetWrapper.condition(Observation)
-	def get_observations(self, idx=None):
-		if self._subset_indices is None:
-			return super().get_observations(idx=idx)
-		if isinstance(self, Batchable):
-			return self[torch.arange(len(self))][0]
-		return util.pytorch_collate([self[i][0] for i in range(len(self))])
-
-
-	@DatasetWrapper.condition(Supervised)
-	def get_labels(self):
-		if self._subset_indices is None:
-			return super().get_labels()
-		if isinstance(self.__wrapped__, Batchable):
-			return self[torch.arange(len(self))][1]
-		return util.pytorch_collate([self[i][1] for i in range(len(self))])
+	# @DatasetWrapper.condition(Observation)
+	# def get_observations(self, idx=None):
+	# 	if self._subset_indices is None:
+	# 		return super().get_observations(idx=idx)
+	# 	if isinstance(self, Batchable):
+	# 		return self[torch.arange(len(self))][0]
+	# 	return util.pytorch_collate([self[i][0] for i in range(len(self))])
+	#
+	#
+	# @DatasetWrapper.condition(Supervised)
+	# def get_targets(self, idx=None):
+	# 	if self._subset_indices is None:
+	# 		return super().get_targets(idx=idx)
+	# 	if isinstance(self.__wrapped__, Batchable):
+	# 		return self[torch.arange(len(self))][1]
+	# 	return util.pytorch_collate([self[i][1] for i in range(len(self))])
 
 
 	# def __getitem__(self, idx):
@@ -198,30 +201,43 @@ class SingleLabel(Dataset):
 			idx = A.pull('label-idx')
 
 		super().__init__(A, **kwargs)
-		self.__activate__(idx)
+		SingleLabel.__activate__(self, idx)
 
 
 	def __activate__(self, idx):
 		if isinstance(self, Supervised):
-			if self._full_label_space is not None:
-				self._full_label_space = self._full_label_space[idx]
-			if self._all_label_names is not None:
-				self._all_label_names = self._all_label_names[idx]
-		if isinstance(self, Disentanglement):
+			if self._target_space is not None:
+				self._target_space = self._target_space[idx]
+			if self._target_names is not None:
+				self._target_names = self._target_names[idx]
+		if isinstance(self, Topological):
 			if self._all_mechanism_names is not None:
-				self._all_mechanism_names = self._all_mechanism_names[idx]
+				self._all_mechanism_names = self.get_mechanism_class_names(idx)
 			if self._all_mechanism_class_names is not None:
-				self._all_mechanism_class_names = self._all_mechanism_class_names[idx]
+				self._all_mechanism_class_names = None# {0: self.get_mechanism_class_names(idx)}
 			if self._full_mechanism_space is not None:
-				self._full_mechanism_space = self._full_mechanism_space[idx]
+				self._full_mechanism_space = self.get_mechanism_class_space(idx)
+		if isinstance(self, Disentanglement):
+			self._target_names = self.get_label_class_names(idx)
+			self._target_space = self.get_label_class_space(idx)
+			if self._all_label_names is not None:
+				self._all_label_names = self._target_names
+			if self._all_label_class_names is not None:
+				self._all_label_class_names = self._target_names
+			if self._full_label_space is not None:
+				self._full_label_space = self._target_space
 
 		self._label_idx = idx
 		self.dout = 1
 
+		targets = self.get('targets').narrow(-1, self._label_idx, 1)
+		self._available_data = self._available_data.copy()
+		self.register_data('targets', data=targets)
 
-	@DatasetWrapper.condition(Supervised)
-	def get_labels(self):
-		return super().get_labels().narrow(-1, self._label_idx, 1)
+
+	# @DatasetWrapper.condition(Supervised)
+	# def get_targets(self, idx=None):
+	# 	return super().get_targets(idx=idx).narrow(-1, self._label_idx, 1)
 
 
 	# def __getitem__(self, item):
@@ -233,15 +249,17 @@ class SingleLabel(Dataset):
 
 
 
-@DatasetWrapper('repeated')
+# @DatasetWrapper('repeated')
 class Repeated(Dataset):
 	def __init__(self, A, factor=unspecified_argument, **kwargs):
+
+		raise NotImplementedError
 
 		if factor is unspecified_argument:
 			factor = A.pull('repeat-factor', None)
 
 		super().__init__(A, **kwargs)
-		self.__activate__(factor=factor)
+		Repeated.__activate__(self, factor=factor)
 
 
 	def __activate__(self, factor=None):
@@ -252,12 +270,12 @@ class Repeated(Dataset):
 		self._repeat_num_real = None
 
 
-	def __init__(self, dataset, factor):
-		super().__init__(dataset)
-		self._self_factor = factor
-		self._self_num_real = len(dataset)
-		self._self_total = self._self_factor * self._self_num_real
-		print('Repeating dataset {} times'.format(factor))
+	# def __init__(self, dataset, factor):
+	# 	super().__init__(dataset)
+	# 	self._self_factor = factor
+	# 	self._self_num_real = len(dataset)
+	# 	self._self_total = self._self_factor * self._self_num_real
+	# 	print('Repeating dataset {} times'.format(factor))
 
 
 	def __getitem__(self, idx):
@@ -269,9 +287,11 @@ class Repeated(Dataset):
 
 
 
-@DatasetWrapper('format')
+# @DatasetWrapper('format')
 class Formatted(Dataset):
 	def __init__(self, A, format_fn=unspecified_argument, format_args=None, include_original=None, **kwargs):
+
+		raise NotImplementedError
 
 		if format_fn is unspecified_argument:
 			format_fn = A.pull('format-fn', None)

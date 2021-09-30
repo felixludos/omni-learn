@@ -45,16 +45,19 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 	def _process_dataset(self):
 		# self.observations = self.dataset.get_observations()
 		# self.labels = self.dataset.get_labels()
-		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.dataset.get_observation())
-		self.__dict__['_estimator_labels'] = self._format_scikit_arg(self.dataset.get_target())
+		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.dataset.get('observations'))
+		targets = self._format_scikit_arg(self.dataset.get('targets'))
+		if len(targets.shape) == 2 and targets.shape[1] == 1:
+			targets = targets.reshape(-1)
+		self.__dict__['_estimator_targets'] = targets
 
 
 	def get_observations(self):
 		return self._estimator_observations
 
 
-	def get_labels(self):
-		return self._estimator_labels
+	def get_targets(self):
+		return self._estimator_targets
 
 
 	def get_result(self, key):
@@ -88,7 +91,7 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 	def _fit(self, dataset, out=None):
 		if out is None:
 			out = ScikitEstimatorInfo(self, dataset)
-		super(Learnable, self).fit(out.get_observations(), out.get_labels())
+		super(Learnable, self).fit(out.get_observations(), out.get_targets())
 		return out
 
 
@@ -118,7 +121,11 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 		try:
 			return self._format_scikit_output(super(ScikitWrapper, self).predict_scores(data))
 		except AttributeError:
-			return self._format_scikit_output(super(ScikitWrapper, self).predict_proba(data))
+			probs = self._format_scikit_output(super(ScikitWrapper, self).predict_proba(data))
+			# if isinstance(self._outspace, util.BinaryDim):
+			if probs.size(-1) == 2:
+				return probs[:,-1]
+			return probs
 
 
 	def predict_confidence(self, data):
@@ -143,7 +150,11 @@ class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
 			assert run is not None, 'missing dataset/run'
 			dataset = run.get_dataset()
 		if not self.is_fit():
+			mode = dataset.get_mode()
+			if mode != 'train':
+				dataset.switch_to('train')
 			out = self.fit(dataset)
+			dataset.switch_to(mode)
 		return self.evaluate(dataset, info=run, out=out)
 
 
@@ -180,15 +191,16 @@ class Classifier(Supervised, base.ClassifierMixin):
 	def _evaluate(self, info, **kwargs):
 		info = super()._evaluate(info, **kwargs)
 
-		labels, pred = info.get_target(), info.get_result('pred')
+		labels, pred = info.get_targets(), info.get_result('pred')
 
-		report = metrics.classification_report(labels, pred, target_names=info.dataset.get_label_names(),
+		report = metrics.classification_report(labels, pred, target_names=info.dataset.get_target_names(),
 		                                       output_dict=True)
 		confusion = metrics.confusion_matrix(labels, pred)
 
 		precision, recall, fscore, support = metrics.precision_recall_fscore_support(labels, pred)
 
 		scores = info.get_result('scores')
+		# multi_class = 'ovr' if
 		auc = metrics.roc_auc_score(labels, scores, multi_class='ovr')
 
 		roc = None
@@ -237,7 +249,7 @@ class Regressor(Supervised, base.RegressorMixin):
 	def _evaluate(self, info, **kwargs):
 		info = super()._evaluate(info, **kwargs)
 
-		labels, pred = info.get_target(), info.get_result('pred')
+		labels, pred = info.get_targets(), info.get_result('pred')
 
 		mse = metrics.mean_squared_error(labels, pred)
 		mxe = metrics.max_error(labels, pred)
@@ -400,8 +412,8 @@ class Periodized(MultiEstimator): # create a copy of the estimator for the sin c
 	def _process_inputs(self, key, *ins):
 		if 'fit' in key:
 			infos = [ScikitEstimatorInfo(est, ins[0]) for est in self.estimators]
-			infos[0]._estimator_labels = np.cos(infos[0]._estimator_labels)
-			infos[1]._estimator_labels = np.sin(infos[1]._estimator_labels)
+			infos[0]._estimator_targets = np.cos(infos[0]._estimator_targets)
+			infos[1]._estimator_targets = np.sin(infos[1]._estimator_targets)
 			return [(ins[0], info) for info in infos]
 		return super()._process_inputs(key, *ins)
 

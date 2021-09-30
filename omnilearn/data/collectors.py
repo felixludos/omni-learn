@@ -7,11 +7,13 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset as PytorchDataset, TensorDataset
 from torch.utils.data.dataloader import default_collate as pytorch_collate
+from torch.utils.data._utils.collate import default_convert as pytorch_convert
 import h5py as hf
 
 from omnibelt import unspecified_argument, InitWall
 
 # from .collate import SampleFormat
+from .loaders import Featured_DataLoader
 
 from .. import util
 
@@ -21,7 +23,7 @@ from .. import util
 
 class MissingDataError(Exception):
 	def __init__(self, *names):
-		super().__init__('Missing data: {}'.format(', '.join(names)))
+		super().__init__(', '.join(names))
 		self.names = names
 
 
@@ -30,8 +32,7 @@ class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 	_available_data = {}
 	_sample_format = None
 
-	def __init_subclass__(cls, available_data={}, available_modes=[],
-	                      sample_format=None, sample_format_type=None, **kwargs):
+	def __init_subclass__(cls, available_data={}, available_modes=[], sample_format=None,  **kwargs):
 		super().__init_subclass__(**kwargs)
 
 		if sample_format is None:
@@ -42,7 +43,6 @@ class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 		for key in cls._sample_format:
 			if key not in cls._available_data:
 				cls._available_data[key] = None
-		cls._sample_format_type = sample_format_type
 
 
 	def __init__(self, **kwargs):
@@ -52,25 +52,39 @@ class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 		self._sample_format = self.__class__._sample_format.copy()
 
 
-	def get(self, name=None, idx=None, **kwargs):
+	def get(self, name=None, idx=None, format=None, **kwargs):
 		if name is not None:
-			alias = name
-			while alias is not None and name in self._available_data:
-				name = alias
-				getter = getattr(self, f'get_{name}', None)
-				if getter is None:
-					data = getattr(self, name, None) # check for tensor
-					if data is not None:
-						getter = lambda idx, **_: data[idx]
-				if getter is not None:
-					return getter(idx, **kwargs)
-				alias = self._available_data[name]
+			return getattr(self, f'get_{name}')(idx=idx, **kwargs)
+		if format is None:
+			format = self._sample_format
+		if format is None or len(format) == 0:
+			format = list(key for key in self._available_data if self._available_data[key] is None)
+		keys = [format] if isinstance(format, str) else format
+		return self.format({key: self.get(name=key, idx=idx) for key in keys}, format=format)
+
+
+	def _default_get(self, name, idx=None, **kwargs):
+		alias = self._available_data.get(name, None)
+		if alias is None:
+			data = getattr(self, name, None)  # check for tensor
+			if data is not None:
+				return data if idx is None else data[idx]
 			raise MissingDataError(name)
 
-		needed = self._sample_format
-		if needed is None or len(needed) == 0:
-			needed = list(key for key in self._available_data if self._available_data[key] is None)
-		return self.format({name: self.get(name=name, idx=idx) for name in needed})
+		getter = getattr(self, f'get_{alias}', None)
+		if getter is None:
+			return self._default_get(alias, idx=idx, **kwargs)
+		return getter(idx=idx, **kwargs)
+
+
+	def to_loader(self, *args, format=None, **kwargs):
+		if format is None:
+			format = self._sample_format
+		return Featured_DataLoader(self, *args, sample_format=format, **kwargs)
+
+
+	def allow_batched_get(self):
+		return False
 
 
 	def __len__(self):
@@ -84,19 +98,10 @@ class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 		return self.get(idx=item)
 
 
-	# def __getattr__(self, item):
-	# 	try:
-	# 		return super().__getattribute__(item)
-	# 	except AttributeError:
-	# 		alias = super().__getattribute__('_available_data_aliases').get(item, None)
-	# 		if aslias is not None:
-	# 			return super().__getattribute__(alias)
-	# 		raise
-
-
 	def register_data(self, name, data=None, strict=True): # either provide the tensor, or implement get_{data}
 		if data is not None:
 			setattr(self, name, data)
+			self._available_data[name] = None
 		elif strict and not (hasattr(self, f'get_{name}') or hasattr(self, name)):
 			raise MissingDataError(name)
 		if name not in self._available_data:
@@ -142,10 +147,15 @@ class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 		return pytorch_collate(samples)
 
 
-	def format(self, sample):
-		if self._sample_format_type is not None:
-			return self._sample_format_type(**sample)
-		return tuple(sample[n] for n in self._sample_format)
+	def format(self, sample, format=None):
+		if format is None:
+			format = self._sample_format
+
+		if isinstance(format, str):
+			return sample[format]
+		if isinstance(format, set):
+			return {key:sample[key] for key in format}
+		return tuple(sample[key] for key in format)
 
 
 	@classmethod
@@ -156,6 +166,40 @@ class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
 	@classmethod
 	def get_available_modes(cls):
 		return cls._available_modes
+
+
+	# def __getattr__(self, item):
+	#
+	# 	try:
+	# 		return super().__getattribute__(item)
+	# 	except AttributeError:
+	# 		if item.startswith('get_'):
+	# 			name = item[4:]
+	# 			if name not in self._available_data:
+	# 				raise
+	# 			alias = self._available_data[name]
+	# 			if alias is not None:
+	# 				return getattr(self, f'get_{alias}')
+	# 			data = getattr(self, name, None)  # check for tensor
+	# 			if data is not None:
+	# 				return lambda idx, **_: data if idx is None else data[idx]
+	# 			raise MissingDataError(name)
+	#
+	#
+	# 			# alias = name
+	# 			# while alias is not None and name in self._available_data:
+	# 			# 	name = alias
+	# 			# 	alias = self._available_data[name]
+	# 			# getter = getattr(self, f'get_{name}', None)
+	# 			# if getter is None:
+	# 			# 	data = getattr(self, name, None)  # check for tensor
+	# 			# 	if data is not None:
+	# 			# 		getter = lambda idx, **_: data if idx is None else data[idx]
+	# 			# if getter is not None:
+	# 			# 	return getter(idx, **kwargs)
+	# 			# raise MissingDataError(name)
+	#
+	# 			pass
 
 
 
@@ -192,6 +236,16 @@ class DevicedBase(util.DeviceBase, DatasetBase):
 							self.__setattr__(name, new)
 				except AttributeError:
 					pass
+
+
+
+class Batchable(DevicedBase): # you can select using a full batch
+	def allow_batched_get(self):
+		return True
+
+
+	def collate(self, samples):
+		return pytorch_convert(samples)
 
 
 
@@ -246,40 +300,25 @@ class Lockable(DatasetBase):
 
 class Observation(Lockable):
 	# _sample_format = ['observations']
-	_full_observation_space = None
+	_observation_space = None
 
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
 		self.include_sample_data('observations')
 
 
-	# def get_observation(self, idx=None):
-	# 	if isinstance(self, Batchable):
-	# 		return self[torch.arange(len(self))][0]
-	# 	return util.pytorch_collate([self[i][0] for i in range(len(self))])
-
-
-	# def replace_observations(self, observations):
-	# 	self._check_lock()
-	# 	return self._replace_observations(observations)
-	# def _replace_observations(self, observations):
-	# 	raise NotImplementedError
-
-
-	def get_observations(self, idx=None):
-		if idx is None:
-			return self.observations
-		return self.observations[idx]
+	def get_observations(self, idx=None, **kwargs):
+		return self._default_get('observations', idx=idx, **kwargs)
 
 
 	def get_observation_space(self):
-		return self._full_observation_space
+		return self._observation_space
 
 
 
 class Supervised(Observation):
-	_full_label_space = None
-	_all_label_names = None
+	_target_space = None
+	_target_names = None
 
 	def __init__(self, supervised=True, **kwargs):
 		super().__init__(**kwargs)
@@ -293,44 +332,85 @@ class Supervised(Observation):
 		return self._is_supervised
 
 
-	def get_targets(self, idx=None):
-		if idx is None:
-			return self.targets
-		return self.targets[idx]
-
-	# def get_target(self):
-	# 	if isinstance(self, Batchable):
-	# 		return self[torch.arange(len(self))][1]
-	# 	return util.pytorch_collate([self[i][1] for i in range(len(self))])
+	def get_targets(self, idx=None, **kwargs):
+		return self._default_get('targets', idx=idx, **kwargs)
 
 
-	# def replace_labels(self, labels):
-	# 	self._check_lock()
-	# 	return self._replace_labels(labels)
-	# def _replace_labels(self, labels):
-	# 	raise NotImplementedError
+	def get_target_names(self):
+		return self._target_names
+	def get_target_space(self):
+		return self._target_space
+	def get_target_size(self):
+		return len(self.get_target_space())
+
+
+
+class Disentanglement(Supervised):
+	_all_label_class_names = None
+	_all_label_names = None
+	_full_label_space = None
+
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.register_data_aliases('labels', 'targets')
+
+
+	def generate_observations(self, labels):
+		raise NotImplementedError
+
+
+	def get_labels(self, idx=None, **kwargs):
+		return self._default_get('labels', idx=idx, **kwargs)
+
+
+	def get_target_names(self):
+		names = super().get_target_names()
+		if names is None:
+			return self.get_label_names()
+		return names
+	def get_target_space(self):
+		space = super().get_target_space()
+		if space is None:
+			return self.get_label_space()
+		return space
 
 
 	def get_label_names(self):
 		return self._all_label_names
 	def get_label_space(self):
 		return self._full_label_space
+	def get_label_sizes(self):
+		return [dim.expanded_len() for dim in self.get_label_space()]
+
+
+	def get_label_class_names(self, factor):
+		if isinstance(factor, str):
+			return self.get_label_class_names(self.get_label_names().index(factor))
+		return self._all_label_class_names[factor]
+	def get_label_class_space(self, factor):
+		if isinstance(factor, str):
+			return self.get_label_class_space(self.get_label_names().index(factor))
+		return self.get_label_space()[factor]
 
 
 
-class Disentanglement(Supervised):
-	_all_mechanism_names = None
+class Topological(Disentanglement):
 	_all_mechanism_class_names = None
+	_all_mechanism_names = None
 	_full_mechanism_space = None
 
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.register_data_aliases('labels', 'targets')
 
-	def get_labels(self, idx=None):
-		if idx is None:
-			return self.labels
-		return self.labels[idx]
+	def get_mechanism_names(self):
+		if self._all_mechanism_names is None:
+			return self.get_label_names()
+		return self._all_mechanism_names
+	def get_mechanism_space(self):
+		if self._full_mechanism_space is None:
+			return self.get_label_space()
+		return self._full_mechanism_space
+	def get_mechanism_sizes(self):
+		return [dim.expanded_len() for dim in self.get_mechanism_space()]
 
 
 	def get_mechanism_class_names(self, mechanism):
@@ -343,35 +423,23 @@ class Disentanglement(Supervised):
 			return self.get_mechanism_class_space(self.get_mechanism_names().index(mechanism))
 		return self.get_mechanism_space()[mechanism]
 
-	def get_mechanism_names(self):
-		return self._all_mechanism_names
-	def get_mechanism_space(self):
-		if self._full_mechanism_space is None:
-			return self.get_label_space()
-		return self._full_mechanism_space
-
-	def get_label_names(self):
-		return self._all_mechanism_names
-	def get_label_sizes(self):
-		return list(map(len, self.get_mechanism_names()))
-
 
 
 class ISupervisedDataset(Supervised):
-	def __init__(self, observations=None, labels=None,
-	             label_space=None, label_names=None,
+	def __init__(self, observations=None, targets=None,
+	             target_space=None, target_names=None,
 	             din=None, dout=None, **kwargs):
 		if din is None:
 			din = tuple(observations.shape[1:])
 		if dout is None:
 			dout = tuple(labels.shape[1:])
-		super().__init__(observations, labels, din=din, dout=dout)
+		super().__init__(din=din, dout=dout)
 
 		self.register_buffer('observations', observations)
-		self.register_buffer('targets', labels)
+		self.register_buffer('targets', targets)
 
-		self._full_label_space = label_space
-		self._all_label_names = label_names
+		self._full_target_space = target_space
+		self._all_target_names = target_names
 
 
 
@@ -384,12 +452,6 @@ class Dataset(util.Dimensions, util.Configurable, DatasetBase):
 
 class Deviced(util.Deviced, Dataset, DevicedBase): # Full dataset is in memory, so it can be moved to GPU
 	pass
-
-
-
-class Batchable(Deviced): # you can select using a full batch
-	def allow_batched(self):
-		return True
 
 
 
@@ -433,8 +495,6 @@ class ImageDataset(Dataset, Observation):
 		self.register_data_aliases('images', 'observations')
 		self.fid_ident = fid_ident
 
-	def get_observations(self, idx=None):
-		return self.get_images(idx=idx)
 
 	def get_available_fid(self, name=None):
 		if name is None:
@@ -455,6 +515,7 @@ class ImageDataset(Dataset, Observation):
 						pass
 				return out
 
+
 	def get_fid_stats(self, dim, *modes, name=None):
 		if name is None:
 			name = 'fid_stats.h5' if self.fid_ident is None else f'{self.fid_ident}_fid_stats.h5'
@@ -471,18 +532,19 @@ class ImageDataset(Dataset, Observation):
 
 		raise MissingFIDStatsError(self.root, dim, modes, available)
 
-	def get_images(self, idx=None):
-		if idx is None:
-			return self.images
-		return self.images[idx]
+
+	def get_images(self, idx=None, **kwargs):
+		return self._default_get('images', idx=idx, **kwargs)
+
 
 	def __len__(self):
 		return len(self.images)
 
 
+
 class MissingDatasetError(Exception):
 	def __init__(self, name):
-		super().__init__(f'Missing dataset {name} (it can be downloaded using the "download-dataset" script)')
+		super().__init__(f'{name} (it can be downloaded using the "download-dataset" script)')
 
 
 

@@ -153,7 +153,7 @@ class Priority(Configurable):
 		return self.priority
 
 
-class SwitchableBase:
+class SwitchableBase: # TODO: include context manager
 	def __init__(self, mode='train', **kwargs):
 		super().__init__(**kwargs)
 		self.mode = mode
