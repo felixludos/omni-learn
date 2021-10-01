@@ -17,7 +17,8 @@ from .loaders import Featured_DataLoader
 
 from .. import util
 
-
+class DataLike:
+	pass
 
 # region DatasetBases
 
@@ -27,7 +28,7 @@ class MissingDataError(Exception):
 		self.names = names
 
 
-class DatasetBase(util.DimensionBase, InitWall, PytorchDataset):
+class DatasetBase(DataLike, util.DimensionBase, InitWall, PytorchDataset):
 	_available_modes = {'train'}
 	_available_data = {}
 	_sample_format = None
@@ -395,10 +396,20 @@ class Disentanglement(Supervised):
 
 
 
-class Topological(Disentanglement):
+class TopologicalBase(Disentanglement):
 	_all_mechanism_class_names = None
 	_all_mechanism_names = None
 	_full_mechanism_space = None
+
+	def __init__(self, *args, use_mechanisms=False, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._use_mechanisms = use_mechanisms
+
+
+	def get_label_space(self):
+		if not self._use_mechanisms or self._full_mechanism_space is None:
+			return super().get_label_names()
+		return self._full_mechanism_space
 
 
 	def get_mechanism_names(self):
@@ -452,6 +463,14 @@ class Dataset(util.Dimensions, util.Configurable, DatasetBase):
 
 class Deviced(util.Deviced, Dataset, DevicedBase): # Full dataset is in memory, so it can be moved to GPU
 	pass
+
+
+
+class Topological(Dataset, TopologicalBase):
+	def __init__(self, A, use_mechanisms=None, **kwargs):
+		if use_mechanisms is None:
+			use_mechanisms = A.pull('use-mechanisms', False)
+		super().__init__(A, use_mechanisms=use_mechanisms, **kwargs)
 
 
 

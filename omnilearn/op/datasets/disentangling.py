@@ -694,8 +694,8 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Topological):
 		list(map(str,range(40))), list(map(str,range(40))),
 	]
 	_full_mechanism_space = util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.BoundDim(),
-		                       util.BoundDim(), util.CategoricalDim(3),
-		                       util.BoundDim(), util.BoundDim())
+		                       util.BoundDim(0,1), util.CategoricalDim(3),
+		                       util.BoundDim(0,1), util.BoundDim(0,1))
 	_full_label_space = util.JointSpace(util.CategoricalDim(6), util.CategoricalDim(6), util.CategoricalDim(2),
 	                                util.CategoricalDim(3), util.CategoricalDim(3),
 	                                util.CategoricalDim(40), util.CategoricalDim(40))
