@@ -26,7 +26,7 @@ except ImportError:
 
 from ... import util
 from ...data import register_dataset, Deviced, Batchable, Splitable, ImageDataset, \
-	Downloadable, Dataset, MissingDatasetError, Supervised, Disentanglement, Topological, wrap_dataset
+	Downloadable, Dataset, MissingDatasetError, Supervised, Disentanglement, Mechanistic, wrap_dataset
 
 from .transforms import Cropped
 
@@ -141,7 +141,7 @@ class Selected(Splitable):
 
 
 @register_dataset('dsprites')
-class dSprites(Downloadable, Batchable, ImageDataset, Topological):
+class dSprites(Downloadable, Batchable, ImageDataset, Mechanistic):
 	din = (1, 64, 64)
 	dout = 5
 	# label_space = util.JointSpace()
@@ -203,7 +203,7 @@ class dSprites(Downloadable, Batchable, ImageDataset, Topological):
 
 
 @register_dataset('3dshapes')
-class Shapes3D(Downloadable, Batchable, ImageDataset, Topological):
+class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 
 	din = (3, 64, 64)
 	dout = 6
@@ -282,6 +282,7 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Topological):
 			self.register_buffer('images', images)
 			
 			if labels is not None:
+				self.register_data('mechanisms', labels)
 				if target_type == 'class':
 					labels = self.get_target_space().transform(labels, self.get_mechanism_space())
 				self.register_buffer('labels', labels)
@@ -513,7 +514,7 @@ class RFD(Downloadable, ImageDataset, Disentanglement):
 
 
 @register_dataset('full-celeba')  # probably shouldnt be used
-class FullCelebA(Downloadable, ImageDataset, Topological):  # TODO: automate downloading and formatting
+class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate downloading and formatting
 	
 	din = (3, 218, 178)
 
@@ -678,7 +679,7 @@ class CelebA(Cropped, FullCelebA):
 
 
 @register_dataset('mpi3d')
-class MPI3D(Downloadable, Batchable, ImageDataset, Topological):
+class MPI3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 
 	din = (3, 64, 64)
 	dout = 7

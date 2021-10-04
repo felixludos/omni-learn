@@ -2,12 +2,14 @@ import random
 import torch
 
 from wrapt import ObjectProxy
-from omnibelt import Value as ValueWrapper, primitives, InitWall, unspecified_argument
+from omnibelt import Value as ValueWrapper, primitives, InitWall, unspecified_argument, get_printer
 
 import omnifig as fig
 from omnifig import Configurable
 
 from .math import set_seed
+
+prt = get_printer(__file__)
 
 # region Attributes
 
@@ -231,6 +233,29 @@ class Seeded(Deviced):
 	# 	self.gen = gen
 	#
 	# 	return super().to(device)
+
+
+
+class Preparable:
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args,**kwargs)
+		self._is_prepared = False
+		
+	
+	def check_prepared(self):
+		if not self._is_prepared:
+			prt.warning(f'{self} has not been prepared (run .prepare() sometime before this warning is shown)')
+		return self._is_prepared
+		
+	
+	def prepare(self):
+		out = None if self._is_prepared else self._prepare()
+		self._is_prepared = True
+		return out
+	
+	
+	def _prepare(self):
+		pass
 
 
 

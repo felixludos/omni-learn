@@ -12,7 +12,7 @@ from omnibelt import unspecified_argument, InitWall, Class_Registry, \
 import omnifig as fig
 
 from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, \
-	Topological, ListDataset
+	Mechanistic, ListDataset
 
 from .. import util
 
@@ -210,7 +210,7 @@ class SingleLabel(Dataset):
 				self._target_space = self._target_space[idx]
 			if self._target_names is not None:
 				self._target_names = self._target_names[idx]
-		if isinstance(self, Topological):
+		if isinstance(self, Mechanistic):
 			if self._all_mechanism_names is not None:
 				self._all_mechanism_names = self.get_mechanism_class_names(idx)
 			if self._all_mechanism_class_names is not None:

@@ -396,43 +396,55 @@ class Disentanglement(Supervised):
 
 
 
-class TopologicalBase(Disentanglement):
-	_all_mechanism_class_names = None
-	_all_mechanism_names = None
+class MechanisticBase(Disentanglement):
 	_full_mechanism_space = None
 
 	def __init__(self, *args, use_mechanisms=False, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._use_mechanisms = use_mechanisms
+		if use_mechanisms:
+			self.register_data_aliases('mechanisms', 'labels')
+
+
+	# def _prepare(self):
+	# 	super()._prepare()
+	# 	if not self._use_mechanisms:
+	# 		self.register_data()
 
 
 	def get_label_space(self):
-		if not self._use_mechanisms or self._full_mechanism_space is None:
+		if not self._use_mechanisms:
 			return super().get_label_names()
 		return self._full_mechanism_space
 
-
-	def get_mechanism_names(self):
-		if self._all_mechanism_names is None:
-			return self.get_label_names()
-		return self._all_mechanism_names
-	def get_mechanism_space(self):
-		if self._full_mechanism_space is None:
-			return self.get_label_space()
+	
+	def transform_to_alternative(self, data):
+		return self.get_alternative_space().transform(data, self.get_label_space())
+	def transform_to_mechanisms(self, data):
+		return self.get_alternative_space('mech').transform(data, self.get_alternative_space('label'))
+	def transform_to_labels(self, data):
+		return self.get_alternative_space('label').transform(data, self.get_alternative_space('mech'))
+	
+	
+	def get_alternative_space(self, force=None):
+		if force == 'label' or (force is None and self._use_mechanisms):
+			return super().get_label_space()
 		return self._full_mechanism_space
-	def get_mechanism_sizes(self):
-		return [dim.expanded_len() for dim in self.get_mechanism_space()]
+	
+	
+	def get_alternative_sizes(self, force=None):
+		return [dim.expanded_len() for dim in self.get_alternative_space(force=force)]
 
 
-	def get_mechanism_class_names(self, mechanism):
-		if isinstance(mechanism, str):
-			return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))
-		if self._all_mechanism_class_names is not None:
-			return self._all_mechanism_class_names[mechanism]
-	def get_mechanism_class_space(self, mechanism):
-		if isinstance(mechanism, str):
-			return self.get_mechanism_class_space(self.get_mechanism_names().index(mechanism))
-		return self.get_mechanism_space()[mechanism]
+	# def get_mechanism_class_names(self, mechanism):
+	# 	if isinstance(mechanism, str):
+	# 		return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))
+	# 	if self._all_mechanism_class_names is not None:
+	# 		return self._all_mechanism_class_names[mechanism]
+	# def get_mechanism_class_space(self, mechanism):
+	# 	if isinstance(mechanism, str):
+	# 		return self.get_mechanism_class_space(self.get_mechanism_names().index(mechanism))
+	# 	return self.get_mechanism_space()[mechanism]
 
 
 
@@ -466,7 +478,7 @@ class Deviced(util.Deviced, Dataset, DevicedBase): # Full dataset is in memory, 
 
 
 
-class Topological(Dataset, TopologicalBase):
+class Mechanistic(Dataset, MechanisticBase):
 	def __init__(self, A, use_mechanisms=None, **kwargs):
 		if use_mechanisms is None:
 			use_mechanisms = A.pull('use-mechanisms', False)

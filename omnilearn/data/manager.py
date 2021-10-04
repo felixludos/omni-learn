@@ -22,7 +22,7 @@ from .collectors import DataLike
 from ..op.clock import AlertBase
 
 @fig.Component('datamanager/simple-dataset')
-class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
+class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, util.Preparable, DataLike):
 	def __init__(self, A, mode='train', dataset_config=unspecified_argument,
 	             aliases=None, default_mode=None, **kwargs):
 
@@ -82,6 +82,7 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 		# 	self.dataset_config.update(self.dataset_config.sub(mode))
 		self.dataset_config.push('mode', mode, silent=True)
 		dataset = self.dataset_config.pull_self()
+		dataset.prepare()
 		# self.A.abort()
 
 		return self._store_mode(mode, dataset)
