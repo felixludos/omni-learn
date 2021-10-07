@@ -17,7 +17,7 @@ from .loaders import Featured_DataLoader
 
 from .. import util
 
-class DataLike:
+class DataLike(util.Preparable):
 	pass
 
 # region DatasetBases
@@ -30,26 +30,26 @@ class MissingDataError(Exception):
 
 class DatasetBase(DataLike, util.DimensionBase, InitWall, PytorchDataset):
 	_available_modes = {'train'}
-	_available_data = {}
+	_available_data_keys = {}
 	_sample_format = None
 
-	def __init_subclass__(cls, available_data={}, available_modes=[], sample_format=None,  **kwargs):
+	def __init_subclass__(cls, available_keys={}, available_modes=[], sample_format=None,  **kwargs):
 		super().__init_subclass__(**kwargs)
 
 		if sample_format is None:
 			sample_format = []
 		cls._sample_format = sample_format
 		cls._available_modes = {*available_modes, *cls._available_modes}
-		cls._available_data =  {**available_data, **cls._available_data}
+		cls._available_data_keys =  {**available_keys, **cls._available_data_keys}
 		for key in cls._sample_format:
-			if key not in cls._available_data:
-				cls._available_data[key] = None
+			if key not in cls._available_data_keys:
+				cls._available_data_keys[key] = None
 
 
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
 		self._available_modes = self.__class__._available_modes.copy()
-		self._available_data = self.__class__._available_data.copy()
+		self._available_data_keys = self.__class__._available_data_keys.copy()
 		self._sample_format = self.__class__._sample_format.copy()
 
 
@@ -59,13 +59,13 @@ class DatasetBase(DataLike, util.DimensionBase, InitWall, PytorchDataset):
 		if format is None:
 			format = self._sample_format
 		if format is None or len(format) == 0:
-			format = list(key for key in self._available_data if self._available_data[key] is None)
+			format = list(key for key in self._available_data_keys if self._available_data_keys[key] is None)
 		keys = [format] if isinstance(format, str) else format
 		return self.format({key: self.get(name=key, idx=idx) for key in keys}, format=format)
 
 
 	def _default_get(self, name, idx=None, **kwargs):
-		alias = self._available_data.get(name, None)
+		alias = self._available_data_keys.get(name, None)
 		if alias is None:
 			data = getattr(self, name, None)  # check for tensor
 			if data is not None:
@@ -102,28 +102,32 @@ class DatasetBase(DataLike, util.DimensionBase, InitWall, PytorchDataset):
 	def register_data(self, name, data=None, strict=True): # either provide the tensor, or implement get_{data}
 		if data is not None:
 			setattr(self, name, data)
-			self._available_data[name] = None
+			self._available_data_keys[name] = None
 		elif strict and not (hasattr(self, f'get_{name}') or hasattr(self, name)):
 			raise MissingDataError(name)
-		if name not in self._available_data:
-			self._available_data[name] = None
+		if name not in self._available_data_keys:
+			self._available_data_keys[name] = None
 
 
 	def register_data_aliases(self, base, *aliases):
 		# if base not in self._available_data:
 		# 	raise MissingDataError(base)
 		for alias in aliases:
-			self._available_data[alias] = base
+			self._available_data_keys[alias] = base
 
 
-	def get_available_data(self):
-		return set(self._available_data.keys())
+	def get_available_keys(self):
+		return set(self._available_data_keys.keys())
+
+
+	def has_data_key(self, key):
+		return key in self._available_data_keys
 
 
 	def _filter_sample_format(self, names):
 		new, missing = [], []
 		for name in names:
-			(new if name in self._available_data else missing).append(name)
+			(new if name in self._available_data_keys else missing).append(name)
 		if len(missing):
 			raise MissingDataError(*missing)
 		return new
@@ -138,7 +142,7 @@ class DatasetBase(DataLike, util.DimensionBase, InitWall, PytorchDataset):
 
 	def include_sample_data(self, *names):
 		for name in names:
-			if name not in self._available_data:
+			if name not in self._available_data_keys:
 				self.register_data(name, strict=False)
 		self._sample_format.extend(name for name in self._filter_sample_format(names))
 		return self._sample_format
@@ -289,7 +293,7 @@ class Lockable(DatasetBase):
 
 
 	def _update_data(self, indices, **kwargs):
-		for key in self.get_available_data():
+		for key in self.get_available_keys():
 			data = getattr(self, key, None)
 			fn = getattr(self, f'_update_{key}', None)
 			if data is not None:
@@ -377,12 +381,12 @@ class Disentanglement(Supervised):
 		return space
 
 
-	def get_label_names(self):
+	def get_label_names(self, **kwargs):
 		return self._all_label_names
-	def get_label_space(self):
+	def get_label_space(self, **kwargs):
 		return self._full_label_space
-	def get_label_sizes(self):
-		return [dim.expanded_len() for dim in self.get_label_space()]
+	def get_label_sizes(self, **kwargs):
+		return [dim.expanded_len() for dim in self.get_label_space(**kwargs)]
 
 
 	def get_label_class_names(self, factor):
@@ -402,38 +406,61 @@ class MechanisticBase(Disentanglement):
 	def __init__(self, *args, use_mechanisms=False, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._use_mechanisms = use_mechanisms
-		if use_mechanisms:
-			self.register_data_aliases('mechanisms', 'labels')
+		if self._use_mechanisms:
+			self.register_data_aliases('mechanisms', 'targets')
 
 
-	# def _prepare(self):
-	# 	super()._prepare()
-	# 	if not self._use_mechanisms:
-	# 		self.register_data()
+	def uses_mechanisms(self):
+		return self._use_mechanisms
 
 
-	def get_label_space(self):
-		if not self._use_mechanisms:
-			return super().get_label_names()
+	# def get_labels(self, idx=None, **kwargs):
+	# 	if self._use_mechanisms and self.has_data_key('mechanisms'):
+	# 		return self.get('mechanisms', idx=idx, **kwargs)
+	#
+	# 	labels = super().get_labels(idx=idx, **kwargs)
+	#
+	# 	if self._use_mechanisms:
+	# 		return self.transform_to_mechanisms(labels)
+	# 	return labels
+
+
+	def get_mechanisms(self, idx=None, **kwargs):
+		try:
+			return self._default_get('mechanisms', idx=idx, **kwargs)
+		except MissingDataError:
+			labels = self.get('labels', idx=idx, **kwargs)
+			return self.transform_to_mechanisms(labels)
+
+
+	# def get_label_space(self, force=None, **kwargs):
+	# 	if (force is not None and force in {'mech', 'mechanism'}) or (force is None and self._use_mechanisms):
+	# 		return self._full_mechanism_space
+	# 	return super().get_label_space()
+
+
+	def get_target_space(self):
+		if self.uses_mechanisms():
+			return self.get_mechanism_space()
+		return super().get_target_space()
+
+
+	def get_mechanism_space(self):
 		return self._full_mechanism_space
 
-	
-	def transform_to_alternative(self, data):
-		return self.get_alternative_space().transform(data, self.get_label_space())
 	def transform_to_mechanisms(self, data):
-		return self.get_alternative_space('mech').transform(data, self.get_alternative_space('label'))
+		return self.get_mechanism_space().transform(data, self.get_label_space())
 	def transform_to_labels(self, data):
-		return self.get_alternative_space('label').transform(data, self.get_alternative_space('mech'))
-	
-	
-	def get_alternative_space(self, force=None):
-		if force == 'label' or (force is None and self._use_mechanisms):
-			return super().get_label_space()
-		return self._full_mechanism_space
-	
-	
-	def get_alternative_sizes(self, force=None):
-		return [dim.expanded_len() for dim in self.get_alternative_space(force=force)]
+		return self.get_label_space().transform(data, self.get_mechanism_space())
+
+
+	def get_mechanism_class_space(self, factor):
+		if isinstance(factor, str):
+			return self.get_mechanism_class_space(self.get_label_names().index(factor))
+		return self.get_mechanism_space()[factor]
+
+	def get_mechanism_sizes(self):
+		return [dim.expanded_len() for dim in self.get_mechanism_space()]
 
 
 	# def get_mechanism_class_names(self, mechanism):

@@ -12,7 +12,7 @@ from omnibelt import unspecified_argument, InitWall, Class_Registry, \
 import omnifig as fig
 
 from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, \
-	Mechanistic, ListDataset
+	MechanisticBase, ListDataset
 
 from .. import util
 
@@ -68,7 +68,7 @@ DatasetWrapper = wrapper_registry.get_decorator('DatasetWrapper')
 
 class AlreadyWrappedError(Exception):
 	def __init__(self, wrapper, obj):
-		super().__init__(f'The object {obj} is already wrapped with wrapper {wrapper.__name__}')
+		super().__init__(f'The object {obj} is already wrapped with wrapper "{wrapper.name}"')
 		self.wrapper = wrapper
 		self.obj = obj
 
@@ -205,34 +205,35 @@ class SingleLabel(Dataset):
 
 
 	def __activate__(self, idx):
+
+		targets = self.get('targets').narrow(-1, idx, 1)
+		self._available_data_keys = self._available_data_keys.copy()
+		self.register_data('targets', data=targets)
+
+		# housekeeping
+
 		if isinstance(self, Supervised):
 			if self._target_space is not None:
 				self._target_space = self._target_space[idx]
 			if self._target_names is not None:
 				self._target_names = self._target_names[idx]
-		if isinstance(self, Mechanistic):
-			if self._all_mechanism_names is not None:
-				self._all_mechanism_names = self.get_mechanism_class_names(idx)
-			if self._all_mechanism_class_names is not None:
-				self._all_mechanism_class_names = None# {0: self.get_mechanism_class_names(idx)}
+		if isinstance(self, MechanisticBase):
 			if self._full_mechanism_space is not None:
 				self._full_mechanism_space = self.get_mechanism_class_space(idx)
 		if isinstance(self, Disentanglement):
-			self._target_names = self.get_label_class_names(idx)
-			self._target_space = self.get_label_class_space(idx)
+			names = self.get_label_class_names(idx)
+			space = self.get_label_class_space(idx)
 			if self._all_label_names is not None:
-				self._all_label_names = self._target_names
+				self._all_label_names = names
 			if self._all_label_class_names is not None:
-				self._all_label_class_names = self._target_names
+				self._all_label_class_names = names
 			if self._full_label_space is not None:
-				self._full_label_space = self._target_space
+				self._full_label_space = space
 
 		self._label_idx = idx
 		self.dout = 1
 
-		targets = self.get('targets').narrow(-1, self._label_idx, 1)
-		self._available_data = self._available_data.copy()
-		self.register_data('targets', data=targets)
+
 
 
 	# @DatasetWrapper.condition(Supervised)

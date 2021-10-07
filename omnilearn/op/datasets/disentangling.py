@@ -224,8 +224,7 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 	]
 	del _hue_names
 
-	def __init__(self, A, mode=None, slim=None, supervised=None, target_type=unspecified_argument,
-	             din=None, dout=None, **kwargs):
+	def __init__(self, A, mode=None, slim=None, supervised=None, din=None, dout=None, **kwargs):
 
 		if slim is None:
 			slim = A.pull('slim', False)
@@ -234,8 +233,6 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 			mode = A.pull('mode', 'full')
 		if supervised is None:
 			supervised = A.pull('supervised', False)
-		if target_type is unspecified_argument:
-			target_type = A.pull('target_type', 'class' if supervised else None)
 
 		if din is None: din = A.pull('din', self.din)
 		if dout is None: dout = A.pull('dout', self.dout if supervised else din)
@@ -282,12 +279,10 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 			self.register_buffer('images', images)
 			
 			if labels is not None:
-				self.register_data('mechanisms', labels)
-				if target_type == 'class':
-					labels = self.get_target_space().transform(labels, self.get_mechanism_space())
-				self.register_buffer('labels', labels)
-
-		self.target_type = target_type
+				self.register_buffer('mechanisms', labels)
+				if not slim or not self.uses_mechanisms():
+					labels = self.transform_to_labels(labels)
+					self.register_buffer('labels', labels)
 
 		
 	_source_url = 'gs://3d-shapes/3dshapes.h5'

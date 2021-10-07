@@ -274,6 +274,15 @@ class PeriodicDim(BoundDim):
 		return angle_diff(self.standardize(x), self.standardize(y), period=1.) * self.period
 
 
+	def transform(self, vals, spec):
+		if isinstance(spec, CategoricalDim):
+			spec.n += 1
+		out = super().transform(vals, spec)
+		if isinstance(spec, CategoricalDim):
+			spec.n -= 1
+		return out
+
+
 
 class MultiDimSpace(DimSpec):
 	def __init__(self, channels, shape=None, channel_first=False, **kwargs):
@@ -391,11 +400,11 @@ class CategoricalDim(DimSpec):
 
 
 	def standardize(self, vals):
-		return vals/self.n
+		return vals/(self.n-1)
 	
 	
 	def unstandardize(self, vals):
-		return (vals * self.n).long()
+		return (vals * self.n).long().clamp(max=self.n-1)
 	
 	
 	@property

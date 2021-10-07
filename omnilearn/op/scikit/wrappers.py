@@ -354,6 +354,14 @@ class ParallelEstimator(ScikitEstimatorBase):
 		return self._dispatch('evaluate', dataset, **kwargs)
 
 
+	def get_scores(self):
+		return list({name for est in self.estimators for name in est.get_scores()})
+
+	def get_results(self):
+		return list({name for est in self.estimators for name in est.get_results()})
+
+
+
 
 @fig.Component('joint-estimator')
 class JointEstimator(ScikitEstimator, ParallelEstimator): # collection of single dim estimators (can be different spaces)
@@ -370,6 +378,20 @@ class JointEstimator(ScikitEstimator, ParallelEstimator): # collection of single
 		for idx, (ds,) in enumerate(datasets):
 			ds.register_wrapper('single-label', kwargs={'idx': idx})
 		return datasets
+
+
+	def _process_results(self, out):
+		individuals = [estimator._process_results(res) for estimator, res in zip(self.estimators, out)]
+
+		merged = {}
+		for scs, _ in individuals:
+			for key, val in scs.items():
+				if key not in merged:
+					merged[key] = []
+				merged[key].append(self._breakdown_val(val))
+
+		return {key: sum(vals) / len(vals) for key, vals in merged.items()}, {'individual': individuals}
+
 
 
 
