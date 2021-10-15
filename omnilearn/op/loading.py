@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from omnibelt import load_txt, save_txt
+from omnibelt import load_txt, save_txt, HierarchyPersistent
 import omnifig as fig
 
 from .. import util
@@ -23,19 +23,20 @@ CompatibilityUnpickler.Unpickler = CompatibilityUnpickler
 # @fig.AutoModifier('torch')
 @fig.Component('run')
 class Torch_Run(Run):
-	
-	def has_results(self, ident, path=None, ext=None, persistent=False):
+	def has_datafile(self, ident, path=None, ext=None, persistent=False):
 		if ext is None:
 			ext = 'pth.tar'
 		return super().has_results(ident, path=path, ext=ext, persistent=persistent)
-	
-	def _save_results(self, data, path=None, name=None, ext='pth.tar', overwrite=False):
+
+
+	def _save_datafile(self, data, path=None, name=None, ext='pth.tar', overwrite=False):
 		path = self._get_results_path(path, name=name, ext=ext)
 		if not path.exists() or overwrite:
 			torch.save(data, str(path))
 			return path
-	
-	def _load_results(self, path=None, name=None, ext='pth.tar', device=None, **kwargs):
+
+
+	def _load_datafile(self, path=None, name=None, ext='pth.tar', device=None, **kwargs):
 		path = self._get_results_path(path, name=name, ext=ext)
 		
 		special = {'map_location':device} if device is not None else {}
@@ -46,10 +47,10 @@ class Torch_Run(Run):
 			return torch.load(str(path), **special)
 
 
+
 @fig.AutoModifier('smart-results')
-class SmartResults(Torch_Run):
-	
-	def _save_results(self, data, path=None, name=None, ext=None, overwrite=False,
+class SmartResults(HierarchyPersistent, Torch_Run):
+	def _save_datafile(self, data, path=None, name=None, ext=None, overwrite=False,
 	                  separate_dict=True, recursive=False):
 		
 		if separate_dict and isinstance(data, dict):
@@ -79,7 +80,7 @@ class SmartResults(Torch_Run):
 		return path
 	
 	
-	def _load_results(self, path=None, name=None, ext=None, device=None, delimiter='/', **kwargs):
+	def _load_datafile(self, path=None, name=None, ext=None, device=None, delimiter='/', **kwargs):
 		
 		assert path is not None or name is not None, 'no info'
 		

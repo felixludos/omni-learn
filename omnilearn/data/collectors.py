@@ -10,14 +10,15 @@ from torch.utils.data.dataloader import default_collate as pytorch_collate
 from torch.utils.data._utils.collate import default_convert as pytorch_convert
 import h5py as hf
 
-from omnibelt import unspecified_argument, InitWall
+from omnibelt import unspecified_argument, InitWall, HierarchyPersistent
+import omnifig as fig
 
 # from .collate import SampleFormat
 from .loaders import Featured_DataLoader
 
 from .. import util
 
-class DataLike(util.Preparable):
+class DataLike(util.Preparable, fig.Cerifiable):
 	pass
 
 # region DatasetBases
@@ -78,10 +79,13 @@ class DatasetBase(DataLike, util.DimensionBase, InitWall, PytorchDataset):
 		return getter(idx=idx, **kwargs)
 
 
-	def to_loader(self, *args, format=None, **kwargs):
-		if format is None:
-			format = self._sample_format
-		return Featured_DataLoader(self, *args, sample_format=format, **kwargs)
+	def to_loader(self, *args, sample_format=None, infinite=False, extractor=None, **kwargs):
+		if sample_format is None:
+			sample_format = self._sample_format
+		loader = Featured_DataLoader(self, *args, sample_format=sample_format, **kwargs)
+		if infinite:
+			loader = util.make_infinite(loader, extractor=extractor)
+		return loader
 
 
 	def allow_batched_get(self):
@@ -517,9 +521,16 @@ class Sourced(Dataset):
 	def __init__(self, A, dataroot=None, **kwargs):
 		super().__init__(A, **kwargs)
 		self.root = util.get_data_dir(A) if dataroot is None else dataroot
-	
+
+
 	def get_root(self):
 		return self.root
+
+
+	def get_state_path(self):
+		path = self.root / '.state'
+		path.mkdir(exist_ok=True)
+		return path
 
 
 

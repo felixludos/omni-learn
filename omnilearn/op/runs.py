@@ -7,7 +7,7 @@ import random
 from collections import OrderedDict
 
 import omnibelt as belt
-from omnibelt import load_yaml, save_yaml, get_now, create_dir, get_printer, unspecified_argument
+from omnibelt import load_yaml, save_yaml, get_now, create_dir, get_printer, unspecified_argument, Persistent
 
 import omnifig as fig
 from omnifig import Configurable
@@ -148,7 +148,7 @@ def load_run(A):
 	
 	
 @fig.Component('run')
-class Run(Configurable):
+class Run(Configurable, Persistent):
 	'''
 	Holds all the data and functions to load, save, train, and evaluate runs.
 	Runs include the model, datasets, dataloaders, the logger, and stats
@@ -236,7 +236,7 @@ class Run(Configurable):
 		self.validation = None
 		self.vizualizer = None
 		
-		self.results = {}
+		# self.results = {}
 	
 		self._started = False
 		
@@ -350,8 +350,8 @@ class Run(Configurable):
 		dataset.switch_to(mode)
 		return dataset.to_loader(**kwargs)
 		
-	def create_results(self, A=None, **meta):
-		raise NotImplementedError # TODO
+	# def create_results(self, A=None, **meta):
+	# 	raise NotImplementedError # TODO
 	
 	def get_name(self):
 		return self.name
@@ -393,73 +393,86 @@ class Run(Configurable):
 	
 	def get_loader(self, mode=None, **kwargs):
 		return self.get_dataset().get_loader(mode, **kwargs)
-	
-	
-	def get_results(self, ident, path=None, remove_ext=True, **kwargs): # you must specify which results (ident used when results were created)
-		
-		if ident in self.results:
-			return self.results[ident]
-
-		fixed = ident.split('.')[0] if remove_ext else ident
-
-		if fixed in self.results:
-			return self.results[fixed]
-
-		# print(f'loading {fixed}')
-		self.results[fixed] = self._load_results(name=ident, path=path, **kwargs)
-
-		return self.results[fixed]
 
 
-	def update_results(self, ident, data, path=None, overwrite=False, remove_ext=True, **kwargs):
-
-		fixed = ident.split('.')[0] if remove_ext else ident
-
-		self.results[fixed] = data
-		return self._save_results(data, name=fixed, path=path, overwrite=overwrite, **kwargs)
-		
-		
-	def store_results(self, data=None, path=None, overwrite=False, remove_ext=True, **kwargs):
-		if data is None:
-			data = self.results
-		return {name:self.update_results(name, value, path=path, overwrite=overwrite, remove_ext=remove_ext, **kwargs)
-		        for name, value in data.items()}
-	
-	
-	def _get_results_path(self, path=None, name=None, ext=None):
-		results_path = self.get_path() if path is None else Path(path)
-		if name is None:
-			if path is None:
-				if (results_path/'last').exists():
-					results_path = results_path/'last'
-				results_path = results_path / 'results'
-				if not results_path.exists():
-					results_path.mkdir()
-			return results_path
-		
-		file_name = name if ext is None else f'{str(name)}.{ext}'
-		
-		file_path = results_path / file_name
-		if file_path.exists():
-			return file_path
-		
+	def _get_datafile_path(self, path=None, name=None, ext=None):
 		if path is None:
-			if (results_path / 'last').exists():
-				results_path = results_path / 'last'
-			results_path = results_path / 'results'
-			if not results_path.exists():
-				results_path.mkdir()
-		return results_path / file_name
-	
-	
-	def has_results(self, ident, path=None, ext=None, persistent=False):
-		fixed = ident.split('.')[0] if ext is not None else ident
-		
-		if fixed in self.results and not persistent:
-			return True
-		
-		return self._get_results_path(path=path, name=ident, ext=ext).exists()
-		
+			path = self.get_path()
+		return super()._get_datafile_path(path=path, name=name, ext=ext)
+
+
+	@property
+	def results(self):
+		return self._datafiles
+
+
+	# def _get_results_path(self, path=None, name=None, ext=None):
+	# 	results_path = self.get_path() if path is None else Path(path)
+	# 	if name is None:
+	# 		if path is None:
+	# 			if (results_path / 'last').exists():
+	# 				results_path = results_path / 'last'
+	# 			results_path = results_path / 'results'
+	# 			if not results_path.exists():
+	# 				results_path.mkdir()
+	# 		return results_path
+	#
+	# 	file_name = name if ext is None else f'{str(name)}.{ext}'
+	#
+	# 	file_path = results_path / file_name
+	# 	if file_path.exists():
+	# 		return file_path
+	#
+	# 	if path is None:
+	# 		if (results_path / 'last').exists():
+	# 			results_path = results_path / 'last'
+	# 		results_path = results_path / 'results'
+	# 		if not results_path.exists():
+	# 			results_path.mkdir()
+	# 	return results_path / file_name
+	#
+	# def has_results(self, ident, path=None, ext=None, persistent=False):
+	# 	fixed = ident.split('.')[0] if ext is not None else ident
+	#
+	# 	if fixed in self.results and not persistent:
+	# 		return True
+	#
+	# 	return self._get_results_path(path=path, name=ident, ext=ext).exists()
+	#
+	#
+	# def get_results(self, ident, path=None, remove_ext=True,
+	#                 **kwargs):  # you must specify which results (ident used when results were created)
+	#
+	# 	if ident in self.results:
+	# 		return self.results[ident]
+	#
+	# 	fixed = ident.split('.')[0] if remove_ext else ident
+	#
+	# 	if fixed in self.results:
+	# 		return self.results[fixed]
+	#
+	# 	# print(f'loading {fixed}')
+	# 	self.results[fixed] = self._load_results(name=ident, path=path, **kwargs)
+	#
+	# 	return self.results[fixed]
+	#
+	#
+	# def update_results(self, ident, data, path=None, overwrite=False, remove_ext=True, **kwargs):
+	#
+	# 	fixed = ident.split('.')[0] if remove_ext else ident
+	#
+	# 	self.results[fixed] = data
+	# 	return self._save_results(data, name=fixed, path=path, overwrite=overwrite, **kwargs)
+	#
+	#
+	# def store_results(self, data=None, path=None, overwrite=False, remove_ext=True, **kwargs):
+	# 	if data is None:
+	# 		data = self.results
+	# 	return {name: self.update_results(name, value, path=path, overwrite=overwrite, remove_ext=remove_ext, **kwargs)
+	# 	        for name, value in data.items()}
+
+
+
 	# endregion
 	
 	# region Signals
@@ -678,7 +691,7 @@ class Run(Configurable):
 				print(f'Already evaluated "{ident}" after {N} steps, and overwrite is False')
 				results = None
 				if config is not None and config.pull('load-results', False):
-					results = self.get_results(ident)
+					results = self.get_datafile(ident)
 				return results
 			print(f'Overwriting {ident} at step {N}')
 		else:
@@ -724,7 +737,7 @@ class Run(Configurable):
 		if store_batch and output is not None:
 			output['batch'] = batch
 		if path is not None:
-			self.update_results(ident, dict(output), path=path)
+			self.update_datafile(ident, dict(output), path=path)
 			cpath = self.get_ckpt_path()
 			if cpath is not None:
 				records.checkpoint(cpath)

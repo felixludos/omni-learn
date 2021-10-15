@@ -15,6 +15,11 @@ import omnifig as fig
 # region Simple math
 #####################
 
+def cov(X, population=True):
+	V = X.sub(X.mean(0,keepdim=True))
+	return V.t() @ V / (X.size(0) - int(population))
+
+
 def factors(n): # has duplicates, starts from the extremes and ends with the middle
 	return (x for tup in ([i, n//i]
 				for i in range(1, int(n**0.5)+1) if n % i == 0) for x in tup)
@@ -978,7 +983,7 @@ class Joint_Distribution(distrib.Distribution):
 		if separate:
 			return [get_best_samples(p) for p, s in zip(self.base, self.douts)]
 		mle = torch.cat([get_best_samples(p).type(self._dtype) if s > 1 else get_best_samples(p).unsqueeze(-1).type(self._dtype) for p, s in
-		                 zip(self.base, self.douts)], -1)
+						 zip(self.base, self.douts)], -1)
 		return mle.view(self._extended_shape())
 
 	def __repr__(self):
@@ -1044,6 +1049,63 @@ def standard_kl(p, q=None):
 	mu, sigma = p.loc, p.scale
 	return (mu.pow(2) - sigma.clamp(min=1e-20).log() + sigma - 1) / 2
 distrib.kl.register_kl(distrib.Normal, type(None))(standard_kl)
+
+
+
+# def frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
+def frechet_distance(p, q, eps=1e-6):
+	"""Numpy implementation of the Frechet Distance.
+	The Frechet distance between two multivariate Gaussians X_1 ~ N(mu_1, C_1)
+	and X_2 ~ N(mu_2, C_2) is
+			d^2 = ||mu_1 - mu_2||^2 + Tr(C_1 + C_2 - 2*sqrt(C_1*C_2)).
+	Stable version by Dougal J. Sutherland.
+	Params:
+	-- mu1   : Numpy array containing the activations of a layer of the
+			   inception net (like returned by the function 'get_predictions')
+			   for generated samples.
+	-- mu2   : The sample mean over activations, precalculated on an
+			   representative data set.
+	-- sigma1: The covariance matrix over activations for generated samples.
+	-- sigma2: The covariance matrix over activations, precalculated on an
+			   representative data set.
+	Returns:
+	--   : The Frechet Distance.
+	"""
+
+	# TODO: convert full calculation to native pytorch
+	# see: https://arxiv.org/pdf/2009.14075.pdf
+
+	mu1, sigma1 = (p.mean, p.covariance_matrix) if isinstance(p, distrib.MultivariateNormal) else (p[0], p[1])
+	mu2, sigma2 = (q.mean, q.covariance_matrix) if isinstance(q, distrib.MultivariateNormal) else (q[0], q[1])
+
+	mu1, sigma1 = mu1.numpy(), sigma1.numpy()
+	mu2, sigma2 = mu2.numpy(), sigma2.numpy()
+
+	diff = mu1 - mu2
+
+	# Product might be almost singular
+	covmean, _ = linalg.sqrtm(sigma1.dot(sigma2), disp=False)
+	if not np.isfinite(covmean).all():
+		msg = ('fid calculation produces singular product; '
+			   'adding %s to diagonal of cov estimates') % eps
+		print(msg)
+		offset = np.eye(sigma1.shape[0]) * eps
+		covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
+
+	# Numerical error might give slight imaginary component
+	if np.iscomplexobj(covmean):
+		if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
+			m = np.max(np.abs(covmean.imag))
+			raise ValueError('Imaginary component {}'.format(m))
+		covmean = covmean.real
+
+	tr_covmean = np.trace(covmean)
+
+	return (diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean)
+
+
+
+
 
 
 def get_best_samples(q):

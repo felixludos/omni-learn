@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset, DataLoader, RandomSampler
 import h5py as hf
 
-from omnibelt import save_yaml, load_yaml, unspecified_argument
+from omnibelt import save_yaml, load_yaml, unspecified_argument, HierarchyPersistent
 
 import omnifig as fig
 
@@ -174,7 +174,9 @@ class Loadable(SimpleDataManager):
 		return self._loader_settings.get('batch_size', None)
 
 
-	def to_loader(self, dataset, infinite=None, extractor=None, **updates):
+	def to_loader(self, dataset=None, infinite=None, extractor=None, **updates):
+		if dataset is None:
+			dataset = self._active
 		settings = self._loader_settings.copy()
 		settings.update(updates)
 		
@@ -367,6 +369,51 @@ class Wrapable(Sharable):
 		for cls, args, kwargs in wrappers:
 			dataset = wrap_dataset(cls, dataset, *args, **kwargs)
 		return dataset
+
+
+
+class Statistics(HierarchyPersistent, SimpleDataManager):
+
+	def _get_datafile_path(self, path=None, name=None, ext=None):
+		if path is None:
+			path = self.get_data().get_root()
+		return super()._get_datafile_path(path=path, name=name, ext=ext)
+
+
+	@staticmethod
+	def _check_stat_reqs(props, reqs):
+		return str(props) == str(reqs)
+
+
+	def _find_stat_ID(self, details, create=False):
+		name = details.get('name', details.get('ID'), details.get('ident'))
+		ID = self.get_mode() if name is None else f'{self.get_mode()}-{name}'
+		table = self.get_datafile('stats-table', default={})
+		if ID not in table:
+			table[ID] = []
+
+		for reqs, ident in table[ID]:
+			if self._check_stat_reqs(details, reqs):
+				return ident
+
+		new = f'{ID}-{len(table[ID])}'
+		if not create:
+			raise FileNotFoundError(new)
+
+		table[ID].append([details, new])
+		self.update_datafile('stats-table', table)
+		return new
+
+
+	def save_stats(self, details, stats, overwrite=True):
+		ID = self._find_stat_ID(details)
+		return self.update_datafile(ID, stats, overwrite=overwrite)
+
+
+	def load_stats(self, details):
+		ID = self._find_stat_ID(details, create=False)
+		return self.get_datafile(ID, skip_cache=True)
+
 
 
 
@@ -576,7 +623,7 @@ def load_data(A):
 
 
 @fig.Component('dataset')
-class DataManager(InfoManager, Splitable, Wrapable, SimpleDataManager):
+class DataManager(InfoManager, Splitable, Wrapable, Statistics, SimpleDataManager):
 	def __init__(self, A, skip_load=None, **kwargs):
 		super().__init__(A, **kwargs)
 

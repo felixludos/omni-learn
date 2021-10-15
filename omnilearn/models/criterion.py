@@ -53,10 +53,9 @@ class MultiGroupClassification(fm.FunctionBase):
 		return torch.stack(self._get_info(pred)[1], dim=1)
 
 
-class Feature_Match(nn.Module):
 
-	def __init__(self, layers, criterion='mse', weights=None,
-	             out_wt=None, out_criterion=None,
+class Feature_Match(nn.Module):
+	def __init__(self, layers, criterion='mse', weights=None, out_wt=None, out_criterion=None,
 	             model=None, reduction='mean'):
 		super().__init__()
 

@@ -14,7 +14,7 @@ from sklearn.metrics import accuracy_score, auc, average_precision_score, balanc
 	normalized_mutual_info_score, rand_score, silhouette_score, silhouette_samples, v_measure_score
 from sklearn.metrics.cluster import consensus_score, contingency_matrix
 
-from .wrappers import Metric
+from .wrappers import Computable
 
 
 _classification_metrics = {
@@ -45,7 +45,7 @@ _classification_metrics = {
 	'zero-one': zero_one_loss,
 }
 
-class AccuracyScore(Metric):
+class AccuracyScore(Computable):
 	_name = 'accuracy'
 	_fn = accuracy_score
 	_arg_reqs = {'y_true':'labels'}

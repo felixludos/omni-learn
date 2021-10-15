@@ -12,7 +12,7 @@ from ... import util
 from .. import losses
 
 from ..features import Prior, Gaussian
-from ... import eval
+from ... import community
 
 @fig.Component('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
@@ -45,7 +45,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		if self.reg_wt is not None and self.reg_wt > 0:
 			self.register_stats('reg-loss')
-			self.register_hparam('reg_wt', reg_wt)
+			self.register_hparams('reg_wt', reg_wt)
 		self.register_stats('rec-loss')
 
 		self.latent_dim = self.decoder.din
@@ -248,9 +248,9 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 		out = super()._step(batch, out=out)
 
 		if self.has_stat('bpd'):
-			self.mete('bpd', eval.bits_per_dim(out.original, out.reconstruction))
+			self.mete('bpd', community.bits_per_dim(out.original, out.reconstruction))
 		if self.has_stat('elbo'):
-			self.mete('elbo', eval.elbo(out.original, out.reconstruction, out.reg_loss))
+			self.mete('elbo', community.elbo(out.original, out.reconstruction, out.reg_loss))
 
 		return out
 

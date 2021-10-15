@@ -11,21 +11,37 @@ from omnibelt import get_printer
 import omnifig as fig
 
 from ... import util
+from ...op.pretrained import FeatureExtractor
 from . import utils
 
 prt = get_printer(__name__)
 
-def load_inception_model(dim=2048, device='cuda'): # 64, 192, 768, 2048
 
-	if not torch.cuda.is_available(): # cuda not found
-		prt.warning('cuda not found')
-		device = 'cpu'
-	if device == 'cpu':
-		prt.warning('using cpu for inception model - this will take a long time!')
+@fig.Component('inception-fid')
+class InceptionV3(FeatureExtractor):
+	def __init__(self, A, dim=None, function=unspecified_argument, **kwargs):
+		if dim is None:
+			dim = A.pull('dim', 2048)
+
+		function = load_inception_model(dim)
+		super().__init__(A, function=function, **kwargs)
+
+
+
+def load_inception_model(dim=2048, device='cuda'): # 64, 192, 768, 2048
+	if device is not None:
+		if not torch.cuda.is_available(): # cuda not found
+			prt.warning('cuda not found')
+			device = 'cpu'
+		if device == 'cpu':
+			prt.warning('using cpu for inception model - this will take a long time!')
 
 	block_idx = utils.InceptionV3.BLOCK_INDEX_BY_DIM[dim]
 
-	model = utils.InceptionV3([block_idx]).to(device).eval()
+	model = utils.InceptionV3([block_idx]).eval()
+	if device is not None:
+		model = model.to(device)
+	model.name = 'inception-v3'
 	model._dim = dim
 	model._device = device
 	return model

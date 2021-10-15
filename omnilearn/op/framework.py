@@ -11,6 +11,7 @@ from omnibelt import primitives, InitWall, Simple_Child, unspecified_argument
 import omnifig as fig
 
 from .. import util
+from .. import models
 from ..util import Configurable, Seed, Checkpointable, Switchable, TrackedAttrs, \
 	Dimensions, Deviced, DeviceBase, DimensionBase
 import torch.multiprocessing as mp
@@ -19,84 +20,57 @@ from itertools import chain
 from .clock import AlertBase
 
 
-class FunctionBase(DimensionBase, DeviceBase, InitWall, nn.Module):  # any differentiable vector function
+class FunctionBase(SwitchableBase, TrackedAttrs, DimensionBase, DeviceBase, InitWall, nn.Module):  # any differentiable vector function
 	def __init__(self, din=None, dout=None, device=None, **unused):
 		super().__init__(din=din, dout=dout, device=device, **unused)
-	
 
 
-class Function(Switchable, TrackedAttrs, Dimensions, Deviced, Configurable, FunctionBase):
-	
 	def switch_to(self, mode):
 		super().switch_to(mode)
 		if mode == 'train':
 			self.train()
 		else:
 			self.eval()
-	
+
+
 	def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
-                              missing_keys, unexpected_keys, error_msgs):
-		
+	                          missing_keys, unexpected_keys, error_msgs):
+
 		super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
-                              missing_keys, unexpected_keys, error_msgs)
-	
-		if len(unexpected_keys): # because pytorch doesn't like persistent buffers that are None
-			persistent_buffers = {k: v for k, v in self._buffers.items() if k not in self._non_persistent_buffers_set}
+		                              missing_keys, unexpected_keys, error_msgs)
+
+		if len(unexpected_keys):  # because pytorch doesn't like persistent buffers that are None
+			persistent_buffers = {k: v for k, v in self._buffers.items() if
+			                      k not in self._non_persistent_buffers_set}
 			for name, val in persistent_buffers.items():
 				if val is None:
 					key = prefix + name
 					if key in unexpected_keys:
 						setattr(self, name, state_dict[key])
 						unexpected_keys.remove(key)
-				
-	
-	def get_hparams(self):
-		return {}
 
 
-
-class FunctionWrapperBase(Simple_Child, FunctionBase):
-	def __init__(self, function, **kwargs):
-		super().__init__(_parent=function, **kwargs)
-		self.__dict__['_parent'] = self._parent
-		del self._modules['_parent']
-		self.function = function
-	
-	def forward(self, *args, **kwargs):
-		return self.function(*args, **kwargs)
-	
-
-
-class FunctionWrapper(Configurable, FunctionWrapperBase):
-	def __init__(self, A, function=unspecified_argument, **kwargs):
-		if function is None:
-			function = A.pull('function', None)
-		super().__init__(A, function=function, **kwargs)
-
-
-
-class HyperParam(Function):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self._hparams = set()
-	
-	def register_hparam(self, name, val):
+	def register_hparams(self, **items):
 		# if not isinstance(val, util.ValueBase):
 		# 	val = util.ValueBase(val)
-		self._hparams.add(name)
-		self.register_attr(name, val)
-		
+		for name, val in items:
+			self._hparams.add(name)
+			self.register_attr(name, val)
+
+
 	def state_dict(self, *args, **kwargs):
 		state = super().state_dict(*args, **kwargs)
 		state['hparams'] = list(self._hparams)
 		return state
-		
+
+
 	def load_state_dict(self, state_dict, strict=True):
 		if strict:
 			assert len(self._hparams) == len(state_dict['hparams']) \
 			       == len(self._hparams.intersection(set(state_dict['hparams'])))
 		return super().load_state_dict(state_dict, strict=strict)
-	
+
+
 	def get_hparams(self):
 		hparams = {}
 		for name in self._hparams:
@@ -106,6 +80,31 @@ class HyperParam(Function):
 				continue
 			hparams[name] = val if type(val) in primitives else val.item()
 		return hparams
+
+
+
+class FunctionWrapperBase(Simple_Child, FunctionBase):
+	def __init__(self, function, **kwargs):
+		super().__init__(_parent=function, **kwargs)
+		self.__dict__['_parent'] = self._parent
+		del self._modules['_parent']
+		self.function = function
+
+	def forward(self, *args, **kwargs):
+		return self.function(*args, **kwargs)
+
+
+
+class Function(Switchable, Dimensions, Deviced, Configurable, FunctionBase):
+	pass
+
+
+
+class FunctionWrapper(Switchable, Dimensions, Deviced, Configurable, FunctionWrapperBase):
+	def __init__(self, A, function=unspecified_argument, **kwargs):
+		if function is None:
+			function = A.pull('function', None)
+		super().__init__(A, function=function, **kwargs)
 
 
 
@@ -178,6 +177,44 @@ class Learnable(Evaluatable): # non-iterative method
 		if out is None:
 			out = util.TensorDict()
 		return out
+
+
+
+class Computable:
+	def compute(self, *args, **kwargs):
+		out = self._compute(*args, **kwargs)
+		return self._process_results(out)
+
+
+	def _breakdown_val(self, val):
+		try:
+			return val.mean().item()
+		except AttributeError:
+			try:
+				return val.item()
+			except AttributeError:
+				return val
+
+
+	def _process_results(self, out):
+		if isinstance(out, dict):
+			scores = {score: out.get(score, None) for score in self.get_scores() if out.get(score, None) is not None}
+			results = {result: out.get(result, None) for result in self.get_results()
+			           if out.get(result, None) is not None}
+			out = scores, results
+		return out
+
+
+	def _compute(self, *args, **kwargs):
+		raise NotImplementedError
+
+
+	def get_scores(self):
+		return []
+
+
+	def get_results(self):
+		return []
 
 
 
@@ -280,7 +317,7 @@ class Optimizable(Function):
 
 
 
-class Trainable(Maintained, HyperParam, Recordable, Optimizable, Function, AlertBase):
+class Trainable(Maintained, Recordable, Optimizable, Function, AlertBase):
 	def __init__(self, A, **kwargs):
 		
 		optim_metric = A.pull('optim-metric', 'loss')
@@ -361,7 +398,7 @@ class Regularizable(object):
 
 
 
-class Stochastic(Function):
+class Stochastic(FunctionBase):
 	def sample(self, *shape, seed=None):
 		N = int(np.product(shape))
 		samples = self._sample(max(N, 1), seed=seed)
@@ -380,16 +417,35 @@ class Generative(Stochastic):
 
 
 @fig.AutoModifier('encodable')
-class Encodable(object):
+class Encodable(FunctionBase):
 	def encode(self, x): # by default this is just forward pass
 		return self(x)
 
 
 
 @fig.AutoModifier('decodable')
-class Decodable(object): # by default this is just the forward pass
+class Decodable(FunctionBase): # by default this is just the forward pass
 	def decode(self, q):
 		return self(q)
+
+
+
+class Metric(FunctionBase):
+	def distance(self, a, b):
+		raise NotImplementedError
+
+
+
+class EncodedMetric(Function, Metric, Encodable):
+	def __init__(self, A, criterion=unspecified_argument, **kwargs):
+		if criterion is unspecified_argument:
+			criterion = A.pull('criterion', 'mse')
+		super().__init__(A, **kwargs)
+		self.criterion = models.get_loss_type(criterion, reduction='none')
+
+
+	def distance(self, a, b):
+		return self.criterion(self.encode(a), self.encode(b))
 
 
 

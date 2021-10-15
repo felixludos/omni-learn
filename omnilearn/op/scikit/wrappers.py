@@ -5,8 +5,7 @@ import omnifig as fig
 import torch
 from torch import nn
 from sklearn import base, metrics
-from ..framework import Learnable, FunctionBase, Evaluatable, Recordable, Function
-from ...eval import MetricBase
+from ..framework import Learnable, FunctionBase, Evaluatable, Recordable, Function, Computable
 
 from ... import util
 
@@ -33,6 +32,7 @@ class ScikitWrapper(belt.InitWall):
 		if out is not None and isinstance(out, np.ndarray):
 			out = torch.from_numpy(out)
 		return out
+
 
 
 class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
@@ -68,7 +68,7 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 
 
 
-class ScikitEstimatorBase(Learnable, MetricBase, ScikitWrapper):
+class ScikitEstimatorBase(Learnable, Computable, ScikitWrapper):
 	
 	def register_out_space(self, space):
 		self._outspace = space
@@ -286,7 +286,6 @@ class Transformer(ScikitEstimatorBase, base.TransformerMixin):
 
 
 
-
 class SingleLabelEstimator(ScikitEstimator): # dout must be 1 (dof)
 	pass
 
@@ -357,9 +356,9 @@ class ParallelEstimator(ScikitEstimatorBase):
 	def get_scores(self):
 		return list({name for est in self.estimators for name in est.get_scores()})
 
+
 	def get_results(self):
 		return list({name for est in self.estimators for name in est.get_results()})
-
 
 
 

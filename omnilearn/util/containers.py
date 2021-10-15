@@ -19,7 +19,6 @@ class Movable(DeviceBase):
 		raise NotImplementedError
 
 class TensorDict(Movable, OrderedDict):
-
 	def __init__(self, *args, _size_key=None, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.__dict__['_size_key'] = _size_key
@@ -150,8 +149,8 @@ class Cached(DeviceBase):
 
 
 class TrackedAttrs(Statelike, Cached):
-	def __init__(self, A, **kwargs):
-		super().__init__(A, **kwargs)
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
 		
 		self._saveable_attrs = set()
 	
@@ -177,10 +176,14 @@ class TrackedAttrs(Statelike, Cached):
 				pass
 			else:
 				attrs[name] = val.state_dict() if isinstance(val, Statelike) else val
-		
+
+		out = {'attrs':attrs}
+		if data is not None:
+			out['parameters'] = data
+
 		self.volatile = volatile
-		return {'parameters': data, 'attrs': attrs}
-	
+		return out
+
 	def load_state_dict(self, state_dict, strict=True):
 		missing_attrs = []
 		for name, data in state_dict.get('attrs', {}).items():

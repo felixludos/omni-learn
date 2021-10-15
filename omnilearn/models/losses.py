@@ -10,6 +10,9 @@ from torch.nn import functional as F
 from torch import distributions as distrib
 from torch.nn.modules.loss import _Loss
 
+from .. import util
+
+
 class Loss(_Loss):
 	def __init__(self, reduction='mean', div_batch=False, **kwargs):
 		if reduction == 'batch-mean':
@@ -21,15 +24,20 @@ class Loss(_Loss):
 	def extra_repr(self) -> str:
 		reduction = 'batch-mean' if self._div_batch else self.reduction
 		return f'reduction={reduction}'
-	
+
+	def _forward(self, input, *args, **kwargs):
+		return super().forward(input, *args, **kwargs)
+
 	def forward(self, input, *args, **kwargs):
 		if isinstance(input, distrib.Distribution):
 			input = input.rsample()
 		B = input.size(0) if self._div_batch else None
-		loss = super().forward(input, *args, **kwargs)
+		loss = self._forward(input, *args, **kwargs)
 		if B is not None:
 			loss = loss / B
 		return loss
+
+
 
 @fig.AutoComponent('distrib-nll')
 class DistributionNLLLoss(Loss):
@@ -51,36 +59,61 @@ class DistributionNLLLoss(Loss):
 			loss = -ll.sum()
 			return loss.div(ll.size(0)) if self._div_batch else loss
 		return -ll
-		
+
+
+
+@fig.Component('frechet-distance')
+class FrechetDistance(Loss):
+	def _forward(self, p, q):
+		return util.frechet_distance(p, q)
+
+
 
 class MSELoss(Loss, nn.MSELoss):
 	pass
+
+
 
 class RMSELoss(MSELoss):
 	def forward(self, *args, **kwargs):
 		loss = super().forward(*args, **kwargs)
 		return loss.sqrt()
 
+
+
 class L1Loss(Loss, nn.L1Loss):
 	pass
+
+
 
 class SmoothL1Loss(Loss, nn.SmoothL1Loss):
 	pass
 
+
+
 class NLLLoss(Loss, nn.NLLLoss):
 	pass
+
+
 
 class CrossEntropyLoss(Loss, nn.CrossEntropyLoss):
 	pass
 
+
+
 class KLDivLoss(Loss, nn.KLDivLoss):
 	pass
+
+
 
 class BCELoss(Loss, nn.BCELoss):
 	pass
 
+
+
 class BCEWithLogitsLoss(Loss, nn.BCEWithLogitsLoss):
 	pass
+
 
 
 @fig.AutoComponent('criterion') # TODO: legacy
@@ -112,8 +145,11 @@ def get_loss_type(ident, **kwargs):
 		return BCELoss(**kwargs)
 	elif ident == 'bce-log':
 		return BCEWithLogitsLoss(**kwargs)
+	elif ident == 'frechet-distance':
+		return FrechetDistance(**kwargs)
 	else:
 		assert False, "Unknown loss type: " + ident
+
 
 
 @fig.AutoComponent('viz-criterion')
