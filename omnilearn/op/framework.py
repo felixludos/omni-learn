@@ -186,6 +186,13 @@ class Computable:
 		return self._process_results(out)
 
 
+	@classmethod
+	def run(cls, *args, _compute_args=(), _compute_kwargs={}, **kwargs):
+		if isinstance(self, fig.Configurable) and (len(args) < 1 or not isinstance(args[0], fig.ConfigType)):
+			args = fig.get_config(), *args
+		return cls(*args, **kwargs).compute(*_compute_args, **_compute_kwargs)
+
+
 	def _breakdown_val(self, val):
 		try:
 			return val.mean().item()
@@ -427,25 +434,6 @@ class Encodable(FunctionBase):
 class Decodable(FunctionBase): # by default this is just the forward pass
 	def decode(self, q):
 		return self(q)
-
-
-
-class Metric(FunctionBase):
-	def distance(self, a, b):
-		raise NotImplementedError
-
-
-
-class EncodedMetric(Function, Metric, Encodable):
-	def __init__(self, A, criterion=unspecified_argument, **kwargs):
-		if criterion is unspecified_argument:
-			criterion = A.pull('criterion', 'mse')
-		super().__init__(A, **kwargs)
-		self.criterion = models.get_loss_type(criterion, reduction='none')
-
-
-	def distance(self, a, b):
-		return self.criterion(self.encode(a), self.encode(b))
 
 
 

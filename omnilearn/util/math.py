@@ -200,29 +200,6 @@ class Lp_Normalization(nn.Module):
 	def forward(self, x):
 		return F.normalize(x, p=self.p, dim=self.dim, eps=self.eps)
 
-class Lp_Norm(nn.Module):
-	def __init__(self, p=2, dim=None, reduction='mean'):
-		super().__init__()
-		self.p = p
-		self.dim = dim
-		self.reduction = reduction
-
-	def extra_repr(self):
-		return 'p={}'.format(self.p)
-
-	def forward(self, x):
-
-		mag = x.norm(p=self.p, dim=self.dim)
-
-		if self.dim is None:
-			return mag
-
-		if self.reduction == 'mean':
-			return mag.mean()
-		elif self.reduction == 'sum':
-			return mag.sum()
-		else:
-			return mag
 
 @fig.AutoComponent('normalization')
 def get_normalization(ident, channels, groups=8, p=2, **kwargs):

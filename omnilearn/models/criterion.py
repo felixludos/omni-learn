@@ -9,6 +9,75 @@ from . import losses
 from .. import util
 
 
+
+class Metric(fm.FunctionBase):
+	def distance(self, a, b):
+		raise NotImplementedError
+
+
+
+class EncodedMetric(fm.Function, Metric, fm.Encodable):
+	def __init__(self, A, criterion=unspecified_argument, **kwargs):
+		if criterion is unspecified_argument:
+			criterion = A.pull('criterion', 'mse')
+		super().__init__(A, **kwargs)
+		self.criterion = models.get_loss_type(criterion, reduction='none')
+
+
+	def distance(self, a, b):
+		return self.criterion(self.encode(a), self.encode(b))
+
+
+
+class Norm(Criterion):
+	def forward(self, x):
+		raise NotImplementedError
+
+
+
+class Lp_Norm(Norm):
+	def __init__(self, p=2, dim=None, reduction='mean'):
+		super().__init__()
+		self.p = p
+		self.dim = dim
+		self.reduction = reduction
+
+	def extra_repr(self):
+		return 'p={}'.format(self.p)
+
+	def forward(self, x):
+
+		mag = x.norm(p=self.p, dim=self.dim)
+
+		if self.dim is None:
+			return mag
+
+		if self.reduction == 'mean':
+			return mag.mean()
+		elif self.reduction == 'sum':
+			return mag.sum()
+		else:
+			return mag
+
+
+
+class Criterion(fm.FunctionBase):
+	def forward(self, *args, **kwargs):
+		pass
+
+
+
+class Distance(Criterion):
+	def forward(self, x, reference):
+		pass
+
+
+
+
+######################
+
+
+
 @fig.AutoComponent('multigroup-cls')
 class MultiGroupClassification(fm.FunctionBase):
 	def __init__(self, group_sizes, group_weights=None):
