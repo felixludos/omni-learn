@@ -115,6 +115,10 @@ class BCEWithLogitsLoss(Loss, nn.BCEWithLogitsLoss):
 	pass
 
 
+class CosineSimilarity(Loss, nn.CosineSimilarity):
+	pass
+
+
 
 @fig.AutoComponent('criterion') # TODO: legacy
 @fig.AutoComponent('loss')
@@ -147,6 +151,8 @@ def get_loss_type(ident, **kwargs):
 		return BCEWithLogitsLoss(**kwargs)
 	elif ident == 'frechet-distance':
 		return FrechetDistance(**kwargs)
+	elif ident == 'cosine-similarity':
+		return CosineSimilarity(**kwargs)
 	else:
 		assert False, "Unknown loss type: " + ident
 
