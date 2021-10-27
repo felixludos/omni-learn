@@ -152,7 +152,10 @@ class make_infinite(DataLoader):
 		if isinstance(batch, (TensorDict, TensorList)):
 			return batch.split(num)
 		return batch[:num], batch[num:]
-	
+
+	def generate(self, N):
+		return self.demand(N)
+
 	def demand(self, N, extract=None, collate=None):
 		'''
 		

@@ -13,6 +13,27 @@ from torch.nn.modules.loss import _Loss
 from .. import util
 
 
+
+class Metric:
+	def distance(self, a, b):
+		raise NotImplementedError
+
+
+
+class EncodedMetric(fm.Function, Metric, fm.Encodable):
+	def __init__(self, A, criterion=unspecified_argument, **kwargs):
+		if criterion is unspecified_argument:
+			criterion = A.pull('criterion', 'mse')
+		super().__init__(A, **kwargs)
+		self.criterion = models.get_loss_type(criterion, reduction='none')
+
+
+	def distance(self, a, b):
+		return self.criterion(self.encode(a), self.encode(b))
+
+
+
+
 class Loss(_Loss):
 	def __init__(self, reduction='mean', div_batch=False, **kwargs):
 		if reduction == 'batch-mean':
@@ -66,6 +87,29 @@ class DistributionNLLLoss(Loss):
 class FrechetDistance(Loss):
 	def _forward(self, p, q):
 		return util.frechet_distance(p, q)
+
+
+
+class NormMetric(Metric):
+	def distance(self, a, b):
+		return self(a-b)
+
+
+
+class Lp_Norm(NormMetric, Loss):
+	def __init__(self, p=2, dim=None, reduction='mean', **kwargs):
+		super().__init__(reduction=reduction, **kwargs)
+		self.p = p
+		self.dim = dim
+
+
+
+	def extra_repr(self):
+		return 'p={}'.format(self.p)
+
+
+	def _forward(self, input, *args, **kwargs):
+		return input.norm(p=self.p, dim=self.dim)
 
 
 
@@ -135,6 +179,10 @@ def get_loss_type(ident, **kwargs):
 		return RMSELoss(**kwargs)
 	elif ident == 'l1':
 		return L1Loss(**kwargs)
+	elif ident == 'lp':
+		return Lp_Norm(**kwargs)
+	elif ident == 'l2':
+		return Lp_Norm(p=2, **kwargs)
 	elif ident == 'huber':
 		return SmoothL1Loss(**kwargs)
 	elif ident == 'nll':

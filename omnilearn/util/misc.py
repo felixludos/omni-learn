@@ -31,6 +31,19 @@ DEFAULT_DATA_PATH = os.path.join(os.path.dirname(FD_PATH),'local_data')
 DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH),'trained_nets')
 
 
+def combine_dims(tensor, start=1, end=None):
+	if end is None:
+		end = len(tensor.shape)
+	combined_shape = [*tensor.shape[:start], -1, *tensor.shape[end:]]
+	return tensor.view(*combined_shape)
+
+
+def split_dim(tensor, *splits, dim=0):
+	split_shape = [*tensor.shape[:start], *splits, *tensor.shape[end:]]
+	return tensor.view(*split_shape)
+
+
+
 def to_np(tensor):
 	return tensor.detach().cpu().numpy()
 
@@ -45,6 +58,8 @@ def create_param(*sizes, requires_grad=True):
 	t = torch.empty(*sizes)
 	nn.init.xavier_normal_(t)
 	return nn.Parameter(t, requires_grad=requires_grad)
+
+
 
 @fig.Component('progress-bar')
 class Progress_Bar(Singleton):
