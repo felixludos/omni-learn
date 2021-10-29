@@ -10,7 +10,44 @@ from torch.nn import functional as F
 from torch import distributions as distrib
 from torch.nn.modules.loss import _Loss
 
+
+try:
+	import pytorch_msssim
+except ImportError:
+	prt.warning('Pytorch MS-SSIM not found: install with "pip install pytorch-msssim"')
+
+
+from ..op import framework as fm
 from .. import util
+
+
+
+def log_likelihood(reconstruction, original, reduction='batch'):
+	if isinstance(reconstruction, util.Distribution):
+		ll = reconstruction.log_prob(original)
+	elif len(reconstruction.shape) > 2:
+		ll = F.binary_cross_entropy(reconstruction, original, reduction='none')
+	else:
+		ll = F.mse_loss(reconstruction, original)
+
+	if reduction == 'none':
+		return ll
+	ll = ll.view(original.size(0),-1).sum(-1)
+	if reduction == 'sum':
+		return ll.sum()
+	return ll.mean()
+
+
+
+def elbo(reconstruction, original, kl, reduction='batch'):
+	ll = log_likelihood(reconstruction, original, reduction=reduction)
+	return ll - kl
+
+
+
+def bits_per_dim(reconstruction, original, reduction='batch'):
+	ll = log_likelihood(reconstruction, original, reduction=reduction)
+	return ll / np.log(2) / int(np.prod(original.shape))
 
 
 
@@ -33,25 +70,105 @@ class EncodedMetric(fm.Function, Metric, fm.Encodable):
 
 
 
+class Loss(fm.FunctionBase):
+	def __init__(self, reduction='mean', **kwargs):
+		super().__init__(**kwargs)
+		self.reduction = reduction
 
-class Loss(_Loss):
+
+	def extra_repr(self) -> str:
+		return f'reduction={self.reduction}'
+
+
+	def _forward(self, input, *args, **kwargs):
+		raise NotImplementedError
+
+
+	def forward(self, input, *args, **kwargs):
+		B = input.size(0) if 'batch' in self.reduction else None
+		loss = self._forward(input, *args, **kwargs)
+		if self.reduction == 'mean':
+			loss = loss.mean()
+		elif self.reduction == 'sum':
+			loss = loss.sum()
+		if B is not None:
+			loss = loss / B
+		return loss
+
+
+
+@fig.AutoModifier('loss/invert')
+class Inverted(Loss):
+	def forward(self, *args, **kwargs):
+		return 1 / super().forward(*args, **kwargs)
+
+
+
+@fig.AutoModifier('loss/negative')
+class Negative(Loss):
+	def forward(self, *args, **kwargs):
+		return - super().forward(*args, **kwargs)
+
+
+
+@fig.Component('ms-ssim')
+class MSSSIM(Loss, pytorch_msssim.MSSSIM):
+	def _forward(self, img1, img2):
+		return super().forward(img1, img2)
+
+
+
+@fig.Component('psnr')
+class PSNR(Loss):
+    @staticmethod
+    def _forward(img1, img2):
+        mse = torch.mean((img1 - img2) ** 2)
+        return 20 * torch.log10(255.0 / torch.sqrt(mse))
+
+
+
+@fig.Component('frechet-distance')
+class FrechetDistance(Loss):
+	def _forward(self, p, q):
+		return util.frechet_distance(p, q)
+
+
+
+@fig.Component('bits-per-dim')
+class BitsPerDim(Loss):
+	def _forward(self, reconstruction, original, **kwargs):
+		return bits_per_dim(reconstruction, original, reduction='none')
+
+
+
+@fig.Component('elbo')
+class ELBO(Loss):
+	def _forward(self, reconstruction, original, **kwargs):
+		return elbo(reconstruction, original, reduction='none')
+
+
+
+class PytorchLoss(Loss, _Loss):
 	def __init__(self, reduction='mean', div_batch=False, **kwargs):
-		if reduction == 'batch-mean':
+		if 'batch' in reduction:
 			div_batch = True
 			reduction = 'sum'
 		super().__init__(reduction=reduction, **kwargs)
 		self._div_batch = div_batch
-	
+
+
 	def extra_repr(self) -> str:
 		reduction = 'batch-mean' if self._div_batch else self.reduction
 		return f'reduction={reduction}'
 
-	def _forward(self, input, *args, **kwargs):
-		return super().forward(input, *args, **kwargs)
 
-	def forward(self, input, *args, **kwargs):
+	def _forward(self, input, *args, **kwargs):
 		if isinstance(input, distrib.Distribution):
 			input = input.rsample()
+		return super().forward(input, *args, **kwargs)
+
+
+	def forward(self, input, *args, **kwargs):
 		B = input.size(0) if self._div_batch else None
 		loss = self._forward(input, *args, **kwargs)
 		if B is not None:
@@ -61,7 +178,7 @@ class Loss(_Loss):
 
 
 @fig.AutoComponent('distrib-nll')
-class DistributionNLLLoss(Loss):
+class DistributionNLLLoss(PytorchLoss):
 	def __init__(self, mn_lim=None, mx_lim=None, **kwargs):
 		super().__init__(**kwargs)
 		self._mn_lim = mn_lim
@@ -83,13 +200,6 @@ class DistributionNLLLoss(Loss):
 
 
 
-@fig.Component('frechet-distance')
-class FrechetDistance(Loss):
-	def _forward(self, p, q):
-		return util.frechet_distance(p, q)
-
-
-
 class NormMetric(Metric):
 	def distance(self, a, b):
 		return self(a-b)
@@ -103,7 +213,6 @@ class Lp_Norm(NormMetric, Loss):
 		self.dim = dim
 
 
-
 	def extra_repr(self):
 		return 'p={}'.format(self.p)
 
@@ -113,7 +222,7 @@ class Lp_Norm(NormMetric, Loss):
 
 
 
-class MSELoss(Loss, nn.MSELoss):
+class MSELoss(PytorchLoss, nn.MSELoss):
 	pass
 
 
@@ -125,41 +234,41 @@ class RMSELoss(MSELoss):
 
 
 
-class L1Loss(Loss, nn.L1Loss):
+class L1Loss(PytorchLoss, nn.L1Loss):
 	pass
 
 
 
-class SmoothL1Loss(Loss, nn.SmoothL1Loss):
+class SmoothL1Loss(PytorchLoss, nn.SmoothL1Loss):
 	pass
 
 
 
-class NLLLoss(Loss, nn.NLLLoss):
+class NLLLoss(PytorchLoss, nn.NLLLoss):
 	pass
 
 
 
-class CrossEntropyLoss(Loss, nn.CrossEntropyLoss):
+class CrossEntropyLoss(PytorchLoss, nn.CrossEntropyLoss):
 	pass
 
 
 
-class KLDivLoss(Loss, nn.KLDivLoss):
+class KLDivLoss(PytorchLoss, nn.KLDivLoss):
 	pass
 
 
 
-class BCELoss(Loss, nn.BCELoss):
+class BCELoss(PytorchLoss, nn.BCELoss):
 	pass
 
 
 
-class BCEWithLogitsLoss(Loss, nn.BCEWithLogitsLoss):
+class BCEWithLogitsLoss(PytorchLoss, nn.BCEWithLogitsLoss):
 	pass
 
 
-class CosineSimilarity(Loss, nn.CosineSimilarity):
+class CosineSimilarity(PytorchLoss, nn.CosineSimilarity):
 	pass
 
 
@@ -199,6 +308,8 @@ def get_loss_type(ident, **kwargs):
 		return BCEWithLogitsLoss(**kwargs)
 	elif ident == 'frechet-distance':
 		return FrechetDistance(**kwargs)
+	elif ident == 'ms-ssim':
+		return MSSSIM(**kwargs)
 	elif ident == 'cosine-similarity':
 		return CosineSimilarity(**kwargs)
 	else:

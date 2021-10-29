@@ -4,19 +4,19 @@ import omnifig as fig
 from wrapt import ObjectProxy
 import numpy as np
 
+prt = get_printer(__file__)
+
 try:
 	import timm
 except ImportError:
 	prt.warning('Unable to import "timm"')
 
 from .. import util
-from .framework import Function, FunctionWrapper, EncodedMetric
-
-prt = get_printer(__file__)
+from .framework import Function, FunctionWrapper
 
 
 @fig.AutoModifier('extractor')
-class Extractor(Named, EncodedMetric, Function):
+class Extractor(Named, Function):
 	pass
 
 

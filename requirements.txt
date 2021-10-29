@@ -18,3 +18,4 @@ pandas
 scikit-learn
 seaborn
 moviepy
+pytorch-msssim

@@ -11,8 +11,8 @@ from omnibelt import primitives, InitWall, Simple_Child, unspecified_argument
 import omnifig as fig
 
 from .. import util
-from .. import models
-from ..util import Configurable, Seed, Checkpointable, Switchable, TrackedAttrs, \
+# from .. import models
+from ..util import Configurable, Seed, Checkpointable, Switchable, SwitchableBase, TrackedAttrs, \
 	Dimensions, Deviced, DeviceBase, DimensionBase
 import torch.multiprocessing as mp
 from itertools import chain

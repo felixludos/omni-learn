@@ -49,8 +49,8 @@ class GBTRegressor(Regressor, SingleLabelEstimator, GradientBoostingRegressor):
 		if min_impurity_decrease is None:
 			min_impurity_decrease = A.pull('max_impurity_decrease', 0.)
 
-		if min_impurity_split is unspecified_argument:
-			min_impurity_split = A.pull('min_impurity_split', None)
+		# if min_impurity_split is unspecified_argument:
+		# 	min_impurity_split = A.pull('min_impurity_split', None)
 
 		if init is unspecified_argument:
 			init = A.pull('init', None)
@@ -88,7 +88,7 @@ class GBTRegressor(Regressor, SingleLabelEstimator, GradientBoostingRegressor):
 		super().__init__(A, loss=loss, learning_rate=learning_rate, n_estimators=n_estimators, subsample=subsample,
 		                 criterion=criterion, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
 		                 min_weight_fraction_leaf=min_weight_fraction_leaf, max_depth=max_depth,
-		                 min_impurity_decrease=min_impurity_decrease, min_impurity_split=min_impurity_split, init=init,
+		                 min_impurity_decrease=min_impurity_decrease, init=init,
 	                     random_state=random_state, max_features=max_features, alpha=alpha, verbose=verbose,
 	                     max_leaf_nodes=max_leaf_nodes, warm_start=warm_start, validation_fraction=validation_fraction,
 	                     n_iter_no_change=n_iter_no_change, tol=tol, ccp_alpha=ccp_alpha, **kwargs)
@@ -134,8 +134,8 @@ class GBTClassifier(Classifier, SingleLabelEstimator, GradientBoostingClassifier
 		if min_impurity_decrease is None:
 			min_impurity_decrease = A.pull('max_impurity_decrease', 0.)
 
-		if min_impurity_split is unspecified_argument:
-			min_impurity_split = A.pull('min_impurity_split', None)
+		# if min_impurity_split is unspecified_argument:
+		# 	min_impurity_split = A.pull('min_impurity_split', None)
 
 		if init is unspecified_argument:
 			init = A.pull('init', None)
@@ -170,7 +170,7 @@ class GBTClassifier(Classifier, SingleLabelEstimator, GradientBoostingClassifier
 		super().__init__(A, loss=loss, learning_rate=learning_rate, n_estimators=n_estimators, subsample=subsample,
 		                 criterion=criterion, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
 		                 min_weight_fraction_leaf=min_weight_fraction_leaf, max_depth=max_depth,
-		                 min_impurity_decrease=min_impurity_decrease, min_impurity_split=min_impurity_split, init=init,
+		                 min_impurity_decrease=min_impurity_decrease, init=init,
 		                 random_state=random_state, max_features=max_features, verbose=verbose,
 		                 max_leaf_nodes=max_leaf_nodes, warm_start=warm_start, validation_fraction=validation_fraction,
 		                 n_iter_no_change=n_iter_no_change, tol=tol, ccp_alpha=ccp_alpha, **kwargs)
