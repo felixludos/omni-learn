@@ -272,12 +272,17 @@ class Regressor(Supervised, base.RegressorMixin):
 
 
 
-class Clustering(ScikitEstimatorBase, base.ClusterMixin):
+class Clustering(ScikitEstimator, base.ClusterMixin):
 	pass
 
 
 
-class Transformer(ScikitEstimatorBase, base.TransformerMixin):
+class Outlier(ScikitEstimator, base.OutlierMixin):
+	pass
+
+
+
+class Transformer(ScikitEstimator, base.TransformerMixin):
 	def transform(self, data):
 		raise NotImplementedError
 	
