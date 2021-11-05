@@ -21,6 +21,7 @@ class Compressor:
 
 
 
+@fig.Component('lzma-compressor')
 class LZMACompressor(Compressor):
 	def __init__(self, **kwargs):
 		super().__init__()
@@ -70,6 +71,7 @@ class Quantizer:
 
 
 
+@fig.Component('sigfig-quantizer')
 class SigfigQuantizer(Quantizer):
 	def __init__(self, sigfigs=3, **kwargs):
 		super().__init__(**kwargs)
