@@ -84,6 +84,23 @@ def MMD(p, q, reduction='mean', C=None):
 	else:
 		return ps + qs - 2*pq
 
+
+
+def round_sigfigs(x, sigfigs=3):
+	mag = x.abs().log10().floor()
+	mag[mag.isinf()] = 0
+	reg = 10 ** (sigfigs - mag - 1)
+	return x.mul(reg).round().div(reg)
+
+
+def sigfig_noise(x, n, sigfigs=3):
+	mag = x.abs().log10().floor()
+	mag[mag.isinf()] = 0
+	reg = 10 ** (sigfigs - mag - 1)
+	return x.mul(reg).add(n).div(reg)
+
+
+
 # endregion
 #####################
 # region Neural Networks
