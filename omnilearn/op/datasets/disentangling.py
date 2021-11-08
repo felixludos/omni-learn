@@ -275,7 +275,7 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 			else:
 				prt.warning('using the full dataset (train+test)')
 
-			images = images.permute(0, 3, 1, 2).float().div(255).clamp(1e-7, 1-1e-7)#.float().div(255)
+			images = images.permute(0, 3, 1, 2)
 			self.register_buffer('images', images)
 			
 			if labels is not None:
@@ -283,6 +283,11 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 				if not slim or not self.uses_mechanisms():
 					labels = self.transform_to_labels(labels)
 					self.register_buffer('labels', labels)
+
+
+	def get_images(self, idx=None, **kwargs):
+		images = super().get_images(idx=idx, **kwargs)
+		return images.float().div(255).clamp(1e-7, 1-1e-7)#.float().div(255)
 
 		
 	_source_url = 'gs://3d-shapes/3dshapes.h5'

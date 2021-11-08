@@ -339,7 +339,7 @@ class StatsClientBase:
 
 
 
-class StatsClient(Configurable, StatsClientBase, InitWall):
+class StatsClient(Configurable, StatsClientBase):
 	def __init__(self, A, stats=unspecified_argument, default_tau=unspecified_argument,
 	             stats_fmt=unspecified_argument, **kwargs):
 		stats = A.pull('stats', None, ref=True)

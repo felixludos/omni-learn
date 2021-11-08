@@ -20,6 +20,7 @@ class Movable(DeviceBase):
 
 class TensorDict(Movable, OrderedDict):
 	def __init__(self, *args, _size_key=None, **kwargs):
+		self.__dict__['device'] = None
 		super().__init__(*args, **kwargs)
 		self.__dict__['_size_key'] = _size_key
 
@@ -60,9 +61,13 @@ class TensorDict(Movable, OrderedDict):
 
 	@staticmethod
 	def merge(ds):
+		if len(ds) == 1:
+			return ds[0]
 		merged = TensorDict()
 		for key in ds[0].keys():
-			merged[key] = torch.cat([d[key] for d in ds])
+			merged[key] = [d[key] for d in ds]
+			if isinstance(ds[0][key], torch.Tensor):
+				merged[key] = torch.cat(merged[key])
 		return merged
 
 	def size(self, *args, **kwargs):
@@ -109,6 +114,8 @@ class TensorList(Movable, list):
 
 	@staticmethod
 	def merge(ls):
+		if len(ls) == 1:
+			return ls[0]
 		return TensorList([torch.cat(el) for el in zip(*ls)])
 
 	def split(self, num):

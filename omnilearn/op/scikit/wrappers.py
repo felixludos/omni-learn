@@ -263,6 +263,8 @@ class Regressor(Supervised, base.RegressorMixin):
 			'mae': mae,
 			'medae': medae,
 			'r2-score': r2,
+			'sigma_pred': pred.std(),
+			'sigma_true': labels.std(),
 		})
 
 		return info

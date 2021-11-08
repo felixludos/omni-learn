@@ -45,7 +45,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		if self.reg_wt is not None and self.reg_wt > 0:
 			self.register_stats('reg-loss')
-			self.register_hparams('reg_wt', reg_wt)
+			self.register_hparams(reg_wt=reg_wt)
 		self.register_stats('rec-loss')
 
 		self.latent_dim = self.decoder.din

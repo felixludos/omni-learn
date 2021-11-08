@@ -23,6 +23,7 @@ from .clock import AlertBase
 class FunctionBase(SwitchableBase, TrackedAttrs, DimensionBase, DeviceBase, InitWall, nn.Module):  # any differentiable vector function
 	def __init__(self, din=None, dout=None, device=None, **unused):
 		super().__init__(din=din, dout=dout, device=device, **unused)
+		self._hparams = set()
 
 
 	def switch_to(self, mode):
@@ -53,7 +54,7 @@ class FunctionBase(SwitchableBase, TrackedAttrs, DimensionBase, DeviceBase, Init
 	def register_hparams(self, **items):
 		# if not isinstance(val, util.ValueBase):
 		# 	val = util.ValueBase(val)
-		for name, val in items:
+		for name, val in items.items():
 			self._hparams.add(name)
 			self.register_attr(name, val)
 
@@ -66,7 +67,8 @@ class FunctionBase(SwitchableBase, TrackedAttrs, DimensionBase, DeviceBase, Init
 
 	def load_state_dict(self, state_dict, strict=True):
 		if strict:
-			assert len(self._hparams) == len(state_dict['hparams']) \
+			if 'hparams' in state_dict:
+				assert len(self._hparams) == len(state_dict['hparams']) \
 			       == len(self._hparams.intersection(set(state_dict['hparams'])))
 		return super().load_state_dict(state_dict, strict=strict)
 

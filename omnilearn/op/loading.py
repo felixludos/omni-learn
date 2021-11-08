@@ -26,18 +26,18 @@ class Torch_Run(Run):
 	def has_datafile(self, ident, path=None, ext=None, persistent=False):
 		if ext is None:
 			ext = 'pth.tar'
-		return super().has_results(ident, path=path, ext=ext, persistent=persistent)
+		return super().has_datafile(ident, path=path, ext=ext, persistent=persistent)
 
 
 	def _save_datafile(self, data, path=None, name=None, ext='pth.tar', overwrite=False):
-		path = self._get_results_path(path, name=name, ext=ext)
+		path = self._get_datafile_path(path, name=name, ext=ext)
 		if not path.exists() or overwrite:
 			torch.save(data, str(path))
 			return path
 
 
 	def _load_datafile(self, path=None, name=None, ext='pth.tar', device=None, **kwargs):
-		path = self._get_results_path(path, name=name, ext=ext)
+		path = self._get_datafile_path(path, name=name, ext=ext)
 		
 		special = {'map_location':device} if device is not None else {}
 		try:
@@ -62,13 +62,16 @@ class SmartResults(HierarchyPersistent, Torch_Run):
 		else:
 			ext = 'pth.tar'
 		
-		path = self._get_results_path(path, name=name, ext=ext)
-		
+		path = self._get_datafile_path(path, name=name, ext=ext)
+
+		if not path.parents[0].exists():
+			path.parents[0].mkdir()
+
 		if ext is None:
 			if not path.exists():
 				path.mkdir()
 			for key, value in data.items():
-				self._save_results(value, path=path, name=key, overwrite=overwrite,
+				self._save_datafile(value, path=path, name=key, overwrite=overwrite,
 				                   separate_dict=separate_dict and recursive, recursive=recursive)
 		elif ext == 'txt':
 			save_txt(data, path)
@@ -89,9 +92,9 @@ class SmartResults(HierarchyPersistent, Torch_Run):
 		if name is not None:
 			name = Path(*name)
 		
-		path = self._get_results_path(path=path, name=name, ext=ext)
+		path = self._get_datafile_path(path=path, name=name, ext=ext)
 		if path.is_dir():
-			return {p.stem.split('.')[0]: self._load_results(path=p, device=device, delimiter=delimiter, **kwargs)
+			return {p.stem.split('.')[0]: self._load_datafile(path=p, device=device, delimiter=delimiter, **kwargs)
 			        for p in path.glob('*')}
 		elif not path.is_file():
 			fix = list(path.parents[0].glob(f'{path.name}*'))

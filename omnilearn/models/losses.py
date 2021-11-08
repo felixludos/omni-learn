@@ -113,8 +113,12 @@ class Negative(Loss):
 
 @fig.Component('ms-ssim')
 class MSSSIM(Loss, pytorch_msssim.MSSSIM):
+	def __init__(self, size_average=False, _req_kwargs={}, **kwargs):
+		super().__init__(_req_kwargs={'size_average':size_average, **_req_kwargs}, **kwargs)
+
+
 	def _forward(self, img1, img2):
-		return super().forward(img1, img2)
+		return super(Loss, self).forward(img1, img2)
 
 
 
@@ -122,8 +126,8 @@ class MSSSIM(Loss, pytorch_msssim.MSSSIM):
 class PSNR(Loss):
     @staticmethod
     def _forward(img1, img2):
-        mse = torch.mean((img1 - img2) ** 2)
-        return 20 * torch.log10(255.0 / torch.sqrt(mse))
+        mse = img1.sub(img2).pow(2).view(img1.size(0), -1).mean(-1)
+        return 20 * torch.log10(255.0**(img1.dtype == torch.uint8) / mse.sqrt())
 
 
 

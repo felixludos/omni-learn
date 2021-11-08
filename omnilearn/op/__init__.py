@@ -15,6 +15,7 @@ from .analysis import Run_Manager
 from . import records
 from . import download
 from . import scikit
+from . import quantization
 try:
 	from .pretrained import Pretrained
 except ImportError:

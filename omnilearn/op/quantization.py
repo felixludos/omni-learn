@@ -21,10 +21,9 @@ class Compressor:
 
 
 
-@fig.Component('lzma-compressor')
-class LZMACompressor(Compressor):
-	def __init__(self, **kwargs):
-		super().__init__()
+class LZMACompression(Compressor):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
 		self._cached_meta = None
 
 
@@ -38,8 +37,10 @@ class LZMACompressor(Compressor):
 		return lzma.decompress(bytes)
 
 
-	@staticmethod
-	def compress(data, cache_meta=True):
+	# @staticmethod
+	def compress(self, data, cache_meta=True):
+		if isinstance(data, util.Distribution): # TODO: provide option to compress full distribution
+			data = data.bsample()
 		data = data.detach().cpu().numpy()
 		if cache_meta:
 			self._cached_meta = data.dtype, data.shape
@@ -57,6 +58,11 @@ class LZMACompressor(Compressor):
 			shape = (-1,)
 		return torch.from_numpy(np.frombuffer(self._decompress_bytes(code), dtype=dtype).reshape(*shape))
 
+
+
+@fig.Component('lzma-compression')
+class LZMACompressionC(fig.Configurable, LZMACompression):
+	pass
 
 
 class Quantizer:
@@ -106,7 +112,7 @@ class QuantizedCompressor(Quantizer, Compressor):
 
 
 @fig.Component('sigfig-lzma')
-class SigfigLZMA(fig.Configurable, QuantizedCompressor, SigfigQuantizer, LZMACompressor):
+class SigfigLZMA(LZMACompressionC, QuantizedCompressor, SigfigQuantizer):
 	def __init__(self, A, sigfigs=None, **kwargs):
 		if sigfigs is None:
 			sigfigs = A.pull('sigfigs', 3)
