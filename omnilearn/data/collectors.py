@@ -556,13 +556,20 @@ class MissingFIDStatsError(Exception):
 
 
 class ImageDataset(Dataset, Observation):
-	def __init__(self, A, root=None, fid_ident=unspecified_argument, **other):
+	def __init__(self, A, root=None, fid_ident=unspecified_argument, as_bytes=None,
+	             eps=None, **other):
 		if fid_ident is unspecified_argument:
 			fid_ident = A.pull('fid_ident', None)
+		if as_bytes is None:
+			as_bytes = A.pull('as_bytes', False)
+		if eps is None:
+			eps = A.pull('epsilon', 1e-8)
 		super().__init__(A, **other)
 		self.register_data('images')
 		self.register_data_aliases('images', 'observations')
 		self.fid_ident = fid_ident
+		self._img_as_bytes = as_bytes
+		self._epsilon = eps
 
 
 	def get_available_fid(self, name=None):
@@ -603,7 +610,10 @@ class ImageDataset(Dataset, Observation):
 
 
 	def get_images(self, idx=None, **kwargs):
-		return self._default_get('images', idx=idx, **kwargs)
+		images = self._default_get('images', idx=idx, **kwargs)
+		if not self._img_as_bytes:
+			return images.float().div(255).clamp(self._epsilon, 1-self._epsilon)
+		return images
 
 
 	def __len__(self):

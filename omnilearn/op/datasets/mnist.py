@@ -81,7 +81,7 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 		images = self.data
 		if isinstance(images, np.ndarray):
 			images = torch.from_numpy(images)
-		images = images.float().div(255).clamp(1e-7, 1-1e-7)
+		images = images#.float().div(255).clamp(1e-7, 1-1e-7)
 		if images.ndimension() == 3:
 			images = images.unsqueeze(1)
 
@@ -89,7 +89,7 @@ class Torchvision_Toy_Dataset(Downloadable, Batchable, ImageDataset, Supervised)
 			images = images.permute(0,3,1,2)
 
 		if resize:
-			images = F.interpolate(images, (32, 32), mode='bilinear')
+			images = F.interpolate(images.float(), (32, 32), mode='bilinear').round().byte()
 		
 		if target_attr is not None:
 			labels = getattr(self, target_attr)

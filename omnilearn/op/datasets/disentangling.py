@@ -285,9 +285,9 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 					self.register_buffer('labels', labels)
 
 
-	def get_images(self, idx=None, **kwargs):
-		images = super().get_images(idx=idx, **kwargs)
-		return images.float().div(255).clamp(1e-7, 1-1e-7)#.float().div(255)
+	# def get_images(self, idx=None, **kwargs):
+	# 	images = super().get_images(idx=idx, **kwargs)
+	# 	return images.float().div(255)#.float().div(255)
 
 		
 	_source_url = 'gs://3d-shapes/3dshapes.h5'
@@ -335,7 +335,7 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 
 
 
-@register_dataset('rfd')
+# @register_dataset('rfd') # TODO: update to new dataset
 class RFD(Downloadable, ImageDataset, Disentanglement):
 
 	""" Implementing RA dataset for RFD based on .h5 storage"""
@@ -655,7 +655,7 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 
 
 	def _load_jpeg_image(self, idx):
-		img = torch.from_numpy(util.str_to_jpeg(self.images[idx])).permute(2, 0, 1).float().div(255).clamp(1e-7, 1-1e-7)
+		img = torch.from_numpy(util.str_to_jpeg(self.images[idx])).permute(2, 0, 1)#.float().div(255).clamp(1e-7, 1-1e-7)
 		if self.resize is not None:
 			img = F.interpolate(img.unsqueeze(0), size=self.resize, mode='bilinear').squeeze(0)
 		return img
@@ -863,7 +863,7 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 			if self.sel_index is not None:
 				idx = self.sel_index[idx]
 			imgs = self.images[idx]
-		return imgs.float().div(255).clamp(1e-7, 1 - 1e-7)
+		return imgs#.float().div(255).clamp(1e-7, 1 - 1e-7)
 
 
 	# def __getitem__(self, idx):
