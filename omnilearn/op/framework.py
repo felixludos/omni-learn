@@ -20,10 +20,16 @@ from itertools import chain
 from .clock import AlertBase
 
 
-class FunctionBase(SwitchableBase, TrackedAttrs, DimensionBase, DeviceBase, InitWall, nn.Module):  # any differentiable vector function
+# any differentiable vector function
+class FunctionBase(SwitchableBase, TrackedAttrs, util.Hparams, DimensionBase, DeviceBase, InitWall, nn.Module):
 	def __init__(self, din=None, dout=None, device=None, **unused):
 		super().__init__(din=din, dout=dout, device=device, **unused)
-		self._hparams = set()
+
+
+	def register_hparams(self, **items):
+		super().register_hparams(**items)
+		for name, val in items.items():
+			self.register_attr(name, val)
 
 
 	def switch_to(self, mode):
@@ -51,14 +57,6 @@ class FunctionBase(SwitchableBase, TrackedAttrs, DimensionBase, DeviceBase, Init
 						unexpected_keys.remove(key)
 
 
-	def register_hparams(self, **items):
-		# if not isinstance(val, util.ValueBase):
-		# 	val = util.ValueBase(val)
-		for name, val in items.items():
-			self._hparams.add(name)
-			self.register_attr(name, val)
-
-
 	def state_dict(self, *args, **kwargs):
 		state = super().state_dict(*args, **kwargs)
 		state['hparams'] = list(self._hparams)
@@ -71,17 +69,6 @@ class FunctionBase(SwitchableBase, TrackedAttrs, DimensionBase, DeviceBase, Init
 				assert len(self._hparams) == len(state_dict['hparams']) \
 			       == len(self._hparams.intersection(set(state_dict['hparams'])))
 		return super().load_state_dict(state_dict, strict=strict)
-
-
-	def get_hparams(self):
-		hparams = {}
-		for name in self._hparams:
-			try:
-				val = getattr(self, name, None)
-			except AttributeError:
-				continue
-			hparams[name] = val if type(val) in primitives else val.item()
-		return hparams
 
 
 
@@ -183,9 +170,9 @@ class Learnable(Evaluatable): # non-iterative method
 
 
 class Computable:
-	def compute(self, *args, **kwargs):
+	def compute(self, *args, filter_outputs=True, **kwargs):
 		out = self._compute(*args, **kwargs)
-		return self._process_results(out)
+		return self._process_results(out, filter_outputs=filter_outputs)
 
 
 	@classmethod
@@ -205,11 +192,11 @@ class Computable:
 				return val
 
 
-	def _process_results(self, out):
+	def _process_results(self, out, filter_outputs=True):
 		if isinstance(out, dict):
 			scores = {score: out.get(score, None) for score in self.get_scores() if out.get(score, None) is not None}
 			results = {result: out.get(result, None) for result in self.get_results()
-			           if out.get(result, None) is not None}
+			           if out.get(result, None) is not None} if filter_outputs else dict(out.items())
 			out = scores, results
 		return out
 

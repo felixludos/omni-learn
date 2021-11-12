@@ -773,6 +773,7 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 		
 		self.register_buffer('images', torch.from_numpy(images).permute(0,3,1,2))
 		self.register_buffer('indices', torch.from_numpy(indices))
+		self.register_hparams(cat=cat)
 
 	
 	_source_url = {

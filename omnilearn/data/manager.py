@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset as PytorchDataset, DataLoader, RandomSampler
 import h5py as hf
 
-from omnibelt import save_yaml, load_yaml, unspecified_argument, HierarchyPersistent
+from omnibelt import save_yaml, load_yaml, unspecified_argument
 
 import omnifig as fig
 
@@ -331,9 +331,12 @@ class Sharable(SimpleDataManager):
 
 @fig.AutoModifier('datamanager/wrapable')
 class Wrapable(Sharable):
-	def __init__(self, A, wrappers=unspecified_argument, **kwargs):
+	def __init__(self, A, wrappers=unspecified_argument, mode_wrappers=unspecified_argument, **kwargs):
 		if wrappers is unspecified_argument:
 			wrappers = A.pull('wrappers', [])
+
+		if mode_wrappers is unspecified_argument:
+			mode_wrappers = A.pull('mode-wrappers', {})
 
 		super().__init__(A, **kwargs)
 
@@ -342,16 +345,30 @@ class Wrapable(Sharable):
 			for wrapper in wrappers:
 				cls = wrapper['ident']
 				del wrapper['ident']
-				self.register_wrapper(cls, **wrapper)
+				self.register_wrapper(cls, *wrapper.get('args', ()), **wrapper.get('kwargs', {}))
+		self._mode_wrappers = mode_wrappers
 
 
-	def register_wrapper(self, wrapper, args=(), kwargs={}, **resolve_kwargs):
+	def startup(self):
+		out = super().startup()
+		for mode, dataset in self._modes.items():
+			if mode in self._mode_wrappers:
+				self._modes[mode] = self._wrap_dataset(self._modes[mode], [
+					(wrapper['ident'], wrapper.get('args', ()), wrapper.get('kwargs', {}))
+					for wrapper in self._mode_wrappers[mode]])
+
+		self.switch_to(self.mode)
+
+		return out
+
+
+	def register_wrapper(self, wrapper, *args, **kwargs):
 		wrapper_registry.find(wrapper)
 
 		info = (wrapper, args, kwargs)
 		self._data_wrappers.append(info)
 		for mode, data in self._modes.items():
-			self._modes[mode] = self._wrap_dataset(data, [info])
+			self._modes[mode] = self._wrap_dataset(self._modes[mode], [info])
 		self.switch_to(self.get_mode())
 
 
@@ -372,23 +389,37 @@ class Wrapable(Sharable):
 
 
 
-class Statistics(HierarchyPersistent, SimpleDataManager):
+class Statistics(util.SmartResults, SimpleDataManager):
 
-	def _get_datafile_path(self, path=None, name=None, ext=None):
-		if path is None:
-			path = self.get_data().get_root()
-		return super()._get_datafile_path(path=path, name=name, ext=ext)
+	def has_datafile(self, ident, root=None, **kwargs):
+		return super().has_datafile(ident, root=(self.get_data().get_root() if root is None else root), **kwargs)
+
+
+	def update_datafile(self, ident, data, root=None, **kwargs):
+		return super().update_datafile(ident, data, root=(self.get_data().get_root() if root is None else root), **kwargs)
+
+
+	def get_datafile(self, ident, root=None, **kwargs):
+		return super().get_datafile(ident, root=(self.get_data().get_root() if root is None else root), **kwargs)
 
 
 	@staticmethod
 	def _check_stat_reqs(props, reqs):
-		return str(props) == str(reqs)
+		return props == reqs
 
 
 	def _find_stat_ID(self, details, create=False):
-		name = details.get('name', details.get('ID'), details.get('ident'))
-		ID = self.get_mode() if name is None else f'{self.get_mode()}-{name}'
-		table = self.get_datafile('stats-table', default={})
+		# name = details.get('name', details.get('ID', details.get('ident', None)))
+		if 'mode' not in details:
+			details['mode'] = self.get_mode()
+		details.update(self.get_hparams())
+		name = details.get('name', details.get('ID', details.get('ident', None)))
+		mode = details['mode']
+		ID = mode if name is None else f'{mode}-{name}'
+
+		if not self.has_datafile('stats/table'):
+			self.update_datafile('stats/table', {}, separate_dict=False)
+		table = self.get_datafile('stats/table')
 		if ID not in table:
 			table[ID] = []
 
@@ -401,18 +432,18 @@ class Statistics(HierarchyPersistent, SimpleDataManager):
 			raise FileNotFoundError(new)
 
 		table[ID].append([details, new])
-		self.update_datafile('stats-table', table)
+		self.update_datafile('stats/table', table, separate_dict=False)
 		return new
 
 
 	def save_stats(self, details, stats, overwrite=True):
-		ID = self._find_stat_ID(details)
-		return self.update_datafile(ID, stats, overwrite=overwrite)
+		ID = self._find_stat_ID(details, create=True)
+		return self.update_datafile(f'stats/{ID}', stats, overwrite=overwrite)
 
 
 	def load_stats(self, details):
 		ID = self._find_stat_ID(details, create=False)
-		return self.get_datafile(ID, skip_cache=True)
+		return self.get_datafile(f'stats/{ID}', skip_cache=True)
 
 
 
@@ -623,7 +654,7 @@ def load_data(A):
 
 
 @fig.Component('dataset')
-class DataManager(InfoManager, Splitable, Wrapable, Statistics, SimpleDataManager):
+class DataManager(InfoManager, Wrapable, Splitable, Statistics, SimpleDataManager):
 	def __init__(self, A, skip_load=None, **kwargs):
 		super().__init__(A, **kwargs)
 

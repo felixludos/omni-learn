@@ -229,10 +229,12 @@ class Classifier(Supervised, base.ClassifierMixin):
 		})
 		if roc is not None:
 			info['roc-curve'] = roc
+
+		info['score'] = report['accuracy']
 		return info
 
 	def get_scores(self):
-		return ['roc-auc', 'f1', 'precision', 'recall',
+		return ['score', 'roc-auc', 'f1', 'precision', 'recall',
 			'worst-roc-auc', 'worst-f1', 'worst-precision', 'worst-recall',
 			*super().get_scores()]
 
@@ -245,23 +247,62 @@ class Classifier(Supervised, base.ClassifierMixin):
 
 
 class Regressor(Supervised, base.RegressorMixin):
+	def __init__(self, A, cutoff=unspecified_argument, **kwargs):
+		if cutoff is unspecified_argument:
+			cutoff = A.pull('cutoff', 0.05) # in ranges for bount vars
+		super().__init__(A, **kwargs)
+		self._eval_cutoff = cutoff
+
 
 	def _evaluate(self, info, **kwargs):
 		info = super()._evaluate(info, **kwargs)
 
 		labels, pred = info.get_targets(), info.get_result('pred')
 
-		mse = metrics.mean_squared_error(labels, pred)
-		mxe = metrics.max_error(labels, pred)
-		mae = metrics.mean_absolute_error(labels, pred)
-		medae = metrics.median_absolute_error(labels, pred)
-		r2 = metrics.r2_score(labels, pred)
+		pred = torch.from_numpy(pred).float()
+		labels = torch.from_numpy(labels).float().view(*pred.shape)
+
+		diffs = self._outspace.difference(pred, labels)
+		info.diffs = diffs
+		errs = diffs.abs()
+
+		mse = errs.pow(2).mean().item()
+		mae = errs.mean().item()
+		mxe = errs.max().item()
+		medae = errs.median().item()
 
 		info.update({
 			'mse': mse,
 			'mxe': mxe,
 			'mae': mae,
 			'medae': medae,
+		})
+
+		if isinstance(self._outspace, util.BoundDim):
+			mx_error = self._outspace.range
+		else:
+			mx_error = labels.max(0)[0] - labels.min(0)[0]
+		mx_error *= self._eval_cutoff
+		mx_error = mx_error.unsqueeze(0)
+
+		score = (mx_error>errs).sum() / errs.numel()
+		info.score = score.item()
+		return info
+
+
+	def get_scores(self):
+		return ['score', 'mse', 'mxe', 'mae', 'medae']
+
+
+
+class FlatRegressor(Regressor): # topology of predicted variable is flat (not periodic)
+	def _evaluate(self, info, **kwargs):
+		info = super()._evaluate(info, **kwargs)
+
+		labels, pred = info.get_targets(), info.get_result('pred')
+		r2 = metrics.r2_score(labels, pred)
+
+		info.update({
 			'r2-score': r2,
 			'sigma_pred': pred.std(),
 			'sigma_true': labels.std(),
@@ -270,12 +311,52 @@ class Regressor(Supervised, base.RegressorMixin):
 		return info
 
 	def get_scores(self):
-		return ['mse', 'mxe', 'mae', 'medae', 'r2-score', *super().get_scores()]
+		return [*super().get_scores(), 'r2-score', 'sigma_pred', 'sigma_true']
 
 
 
 class Clustering(ScikitEstimator, base.ClusterMixin):
-	pass
+
+	def _evaluate(self, info, **kwargs):
+		info = super()._evaluate(info, **kwargs)
+
+		labels, pred = info.get_targets(), info.get_result('pred')
+
+		pred = torch.from_numpy(pred).float()
+		labels = torch.from_numpy(labels).float().view(*pred.shape)
+
+		diffs = self._outspace.difference(pred, labels)
+		info.diffs = diffs
+		errs = diffs.abs()
+
+		mse = errs.pow(2).mean().item()
+		mae = errs.mean().item()
+		mxe = errs.max().item()
+		medae = errs.median().item()
+
+		info.update({
+			'mse': mse,
+			'mxe': mxe,
+			'mae': mae,
+			'medae': medae,
+		})
+
+
+		if isinstance(self._outspace, util.BoundDim):
+			mx_error = self._outspace.range
+		else:
+			mx_error = labels.max(0)[0] - labels.min(0)[0]
+		mx_error *= self._eval_cutoff
+		mx_error = mx_error.unsqueeze(0)
+
+		score = (mx_error>errs).sum() / errs.numel()
+		info.score = score.item()
+		return info
+
+
+	def get_scores(self):
+		return ['score', 'mse', 'mxe', 'mae', 'medae']
+
 
 
 
@@ -319,6 +400,12 @@ class ParallelEstimator(ScikitEstimatorBase):
 
 	def include_estimators(self, *estimators):
 		self.estimators.extend(estimators)
+
+
+	def register_out_space(self, space):
+		super().register_out_space(space)
+		for estimator, dim in zip(self.estimators, space):
+			estimator.register_out_space(dim)
 
 
 	def _process_inputs(self, key, *ins):
@@ -382,12 +469,13 @@ class JointEstimator(ScikitEstimator, ParallelEstimator): # collection of single
 			return [(dataset,) for _ in self.estimators]
 		datasets = [(dataset.duplicate(),) for _ in self.estimators]
 		for idx, (ds,) in enumerate(datasets):
-			ds.register_wrapper('single-label', kwargs={'idx': idx})
+			ds.register_wrapper('single-label', idx=idx)
 		return datasets
 
 
-	def _process_results(self, out):
-		individuals = [estimator._process_results(res) for estimator, res in zip(self.estimators, out)]
+	def _process_results(self, out, filter_outputs=True):
+		individuals = [estimator._process_results(res, filter_outputs=filter_outputs)
+		               for estimator, res in zip(self.estimators, out)]
 
 		merged = {}
 		for scs, _ in individuals:
@@ -435,19 +523,33 @@ class MultiEstimator(SingleLabelEstimator, ParallelEstimator): # all estimators 
 
 
 
-class Periodized(MultiEstimator): # create a copy of the estimator for the sin component
+class Periodized(MultiEstimator, Regressor): # create a copy of the estimator for the sin component
+	def __init__(self, A, cutoff=unspecified_argument, **kwargs):
+		super().__init__(A, cutoff=cutoff, **kwargs)
 
 	def _process_inputs(self, key, *ins):
 		if 'fit' in key:
 			infos = [ScikitEstimatorInfo(est, ins[0]) for est in self.estimators]
-			infos[0]._estimator_targets = np.cos(infos[0]._estimator_targets)
-			infos[1]._estimator_targets = np.sin(infos[1]._estimator_targets)
+			infos[0]._estimator_targets, infos[1]._estimator_targets = \
+				self._outspace.expand(torch.from_numpy(infos[0]._estimator_targets)).permute(2,0,1).numpy()
 			return [(ins[0], info) for info in infos]
 		return super()._process_inputs(key, *ins)
 
+
+	def evaluate(self, dataset=None, info=None, **kwargs):
+		return super(ParallelEstimator, self).evaluate(dataset=dataset, info=info, **kwargs)
+
+
+	def register_out_space(self, space):
+		assert isinstance(space, util.PeriodicDim)
+		super().register_out_space(util.JointSpace(util.BoundDim(-1,1), util.BoundDim(-1,1)))
+		self._outspace = space
+
+
 	def _merge_outs(self, outs, **kwargs):
 		cos, sin = outs
-		return torch.atan2(sin, cos)
+		theta = self._outspace.compress(torch.stack([cos, sin], -1))
+		return theta
 
 
 

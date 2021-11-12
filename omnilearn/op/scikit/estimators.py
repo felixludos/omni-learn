@@ -4,13 +4,13 @@ import omnifig as fig
 
 from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
 
-from .wrappers import SingleLabelEstimator, Regressor, Classifier
+from .wrappers import SingleLabelEstimator, Regressor, Classifier, FlatRegressor
 
 # A.push('default-regressor', 'gbt-regressor', overwrite=False)
 # A.push('default-classifier', 'gbt-classifier', overwrite=False)
 
 @fig.Component('gbt-regressor')
-class GBTRegressor(Regressor, SingleLabelEstimator, GradientBoostingRegressor):
+class GBTRegressor(FlatRegressor, SingleLabelEstimator, GradientBoostingRegressor):
 	def __init__(self, A, loss=None, learning_rate=None, n_estimators=None,
 	             subsample=None, criterion=None, min_samples_split=None,
 	             min_samples_leaf=None, min_weight_fraction_leaf=None, max_depth=None, min_impurity_decrease=None,
@@ -20,7 +20,7 @@ class GBTRegressor(Regressor, SingleLabelEstimator, GradientBoostingRegressor):
 	             ccp_alpha=None, **kwargs):
 
 		if loss is None:
-			loss = A.pull('gb_loss', '<>loss', 'ls')
+			loss = A.pull('gb_loss', '<>loss', 'squared_error')
 
 		if learning_rate is None:
 			learning_rate = A.pull('gb_learning_rate', '<>learning_rate', 0.1)

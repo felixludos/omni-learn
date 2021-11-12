@@ -1,6 +1,9 @@
-
+from pathlib import Path
+import numpy as np
 import torch
 from collections import OrderedDict
+from omnibelt import HierarchyPersistent, unspecified_argument
+import omnifig as fig
 
 from .features import DeviceBase, Statelike, Deviced
 
@@ -144,6 +147,41 @@ class TensorList(Movable, list):
 				self.append(x)
 			else:
 				self[i] = x
+
+
+@fig.AutoModifier('smart-results')
+class SmartResults(HierarchyPersistent):
+	def _save_datafile(self, data, path, ext=unspecified_argument, overwrite=False,
+	                   separate_dict=True, recursive=False, _save_fn=None):
+		# if ext is unspecified_argument:
+		if isinstance(data, str):
+			ext = 'txt'
+			_save_fn = save_txt
+		elif isinstance(data, (np.ndarray, int, float)):
+			ext = 'npy'
+			_save_fn = lambda d, p: np.save(p, d)
+		else:
+			ext = 'pth.tar'
+			_save_fn = torch.save
+
+		return super()._save_datafile(data, path, ext=ext, overwrite=overwrite,
+		                              separate_dict=separate_dict, recursive=recursive,
+		                              _save_fn=_save_fn)
+
+
+	def _load_datafile(self, path, ext=unspecified_argument, _load_fn=None, delimiter='/', **kwargs):
+		if isinstance(path, str) and delimiter is not None:
+			path = Path(*path.split(delimiter))
+		path = self._get_datafile_path(path=path, ext=ext)
+
+		_load_fn = torch.load
+		if path.suffix == '.txt':
+			_load_fn = load_txt
+		elif path.suffix == '.npy':
+			_load_fn = np.load
+		return super()._load_datafile(path, ext=None, delimiter=delimiter, _load_fn=_load_fn, **kwargs)
+
+
 
 class Cached(DeviceBase):
 	def __init__(self, *args, **kwargs):

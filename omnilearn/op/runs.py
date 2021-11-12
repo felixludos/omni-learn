@@ -395,10 +395,17 @@ class Run(Configurable, Persistent):
 		return self.get_dataset().get_loader(mode, **kwargs)
 
 
-	def _get_datafile_path(self, path=None, name=None, ext=None):
-		if path is None:
-			path = self.get_path()
-		return super()._get_datafile_path(path=path, name=name, ext=ext)
+	def has_datafile(self, ident, root=None, **kwargs):
+		return super().has_datafile(ident, root=(self.get_path() if root is None else root), **kwargs)
+
+
+	def update_datafile(self, ident, data, root=None, **kwargs):
+		return super().update_datafile(ident, data, root=(self.get_path() if root is None else root), **kwargs)
+
+
+	def get_datafile(self, ident, root=None, **kwargs):
+		return super().get_datafile(ident, root=(self.get_path() if root is None else root), **kwargs)
+
 
 
 	@property

@@ -12,11 +12,11 @@ except ImportError:
 	prt.warning('Unable to import "timm"')
 
 from .. import util
-from .framework import Function, FunctionWrapper
+from .framework import Function, FunctionWrapper, Encodable
 
 
 @fig.AutoModifier('extractor')
-class Extractor(Named, Function):
+class Extractor(Named, Encodable, Function):
 	pass
 
 
@@ -54,7 +54,7 @@ def build_pretrained(A, ID=None, pretrained=None, model_kwargs=None, include_con
 
 @fig.Component('pretrained')
 class Pretrained(FunctionWrapper):
-	def __init__(self, A, function=None, ID=None, pretrained=None, model_kwargs=None, include_config_args=None,
+	def __init__(self, A, function=None, ID=None, pretrained=None, model_kwargs={}, include_config_args=None,
 	             fine_tune=None,
 	             **kwargs):
 
@@ -64,17 +64,17 @@ class Pretrained(FunctionWrapper):
 			                         model_kwargs=model_kwargs)
 
 		if fine_tune is None:
-			fine_tune = A.pull('fine-tune', True)
+			fine_tune = A.pull('fine-tune', False)
 
 		if not fine_tune:
 			for param in function.parameters():
 				param.requires_grad = False
 
-		super().__init__(A, function=function, name=self.function.identifier, **kwargs)
+		super().__init__(A, function=function, name=function.identifier, **kwargs)
 
 		self.fine_tune = fine_tune
-		self.name = self.function.identifier
-		self.pretrained = self.function.pretrained
+		self.name = getattr(self.function, 'identifier', ID)
+		self.pretrained = getattr(self.function, 'pretrained', False)
 		self.register_hparams(ID=self.name, pretrained=self.pretrained, **model_kwargs)
 
 
@@ -96,9 +96,10 @@ class FeatureExtractor(Pretrained, Extractor):
 		if features_only is unspecified_argument:
 			features_only = A.pull('features-only', feature_sel is not None)
 
+		if model_kwargs is None:
+			model_kwargs = {}
+
 		if features_only:
-			if model_kwargs is None:
-				model_kwargs = {}
 			model_kwargs['features_only'] = True
 
 		if reshape is None:

@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from omnibelt import get_printer
+from omnibelt import get_printer, unspecified_argument
 import omnifig as fig
 
 from ... import util
@@ -25,6 +25,11 @@ class InceptionV3(FeatureExtractor):
 
 		function = load_inception_model(dim)
 		super().__init__(A, function=function, **kwargs)
+		self.register_hparams(dim=dim)
+
+
+	def forward(self, x):
+		return apply_inception(x, self.function, include_grad=self.fine_tune)
 
 
 
@@ -42,6 +47,8 @@ def load_inception_model(dim=2048, device='cuda'): # 64, 192, 768, 2048
 	if device is not None:
 		model = model.to(device)
 	model.name = 'inception-v3'
+	model.identifier = model.name
+	model.pretrained = True
 	model._dim = dim
 	model._device = device
 	return model
@@ -63,7 +70,7 @@ def apply_inception(samples, inception, include_grad=False):
 	if pred.shape[2] != 1 or pred.shape[3] != 1:
 		pred = F.adaptive_avg_pool2d(pred, output_size=(1, 1))
 
-	return pred
+	return pred.view(N,-1)
 
 
 def calculate_inception_score(p_yx, p_y=None, reduction='mean', eps=1e-16):

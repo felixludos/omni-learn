@@ -133,6 +133,27 @@ class DeviceBase:
 		self.to('cpu')
 
 
+class Hparams:
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._hparams = set()
+
+
+	def get_hparams(self):
+		hparams = {}
+		for name in self._hparams:
+			try:
+				val = getattr(self, name, None)
+			except AttributeError:
+				continue
+			hparams[name] = val if type(val) in primitives else val.item()
+		return hparams
+
+
+	def register_hparams(self, **items):
+		for name, val in items.items():
+			self._hparams.add(name)
+			setattr(self, name, val)
 
 
 class Named(Configurable):
