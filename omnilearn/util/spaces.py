@@ -88,10 +88,14 @@ class DimSpec:
 		return self.unstandardize(spec.standardize(vals))
 
 
-	def difference(self, x, y): # x-y
+	def difference(self, x, y, standardize=False): # x-y
 		x = self.standardize(x)
 		y = self.standardize(y)
 		return x-y
+
+
+	def distance(self, x, y, standardize=False):
+		return self.difference(x,y, standardize=standardize).pow(2).sum(-1).sqrt()
 
 	
 	def standardize(self, vals):
@@ -217,8 +221,8 @@ class BoundDim(DenseDim):
 			.mul(self.range.unsqueeze(0)).add(self.min.unsqueeze(0))
 
 
-	def difference(self, x, y):
-		return super().difference(x, y) * self.range.unsqueeze(0)
+	def difference(self, x, y, standardize=False):
+		return super().difference(x, y, standardize=standardize) * (self.range.unsqueeze(0) ** float(not standardize))
 
 
 
@@ -270,8 +274,8 @@ class PeriodicDim(BoundDim):
 		return torch.atan2(vals[...,1], vals[...,0]).div(2*np.pi/self.period).remainder(self.period).add(self.min)
 
 
-	def difference(self, x, y):
-		return angle_diff(self.standardize(x), self.standardize(y), period=1.) * self.period
+	def difference(self, x, y, standardize=False):
+		return angle_diff(self.standardize(x), self.standardize(y), period=1.) * (self.period ** float(not standardize))
 
 
 	def transform(self, vals, spec):
@@ -344,16 +348,16 @@ class SphericalSpace(MultiDimSpace, UnboundDim):
 		return self.standardize(vals)
 
 
-	def euclidean_difference(self, x, y):
-		return super().difference(x, y)
+	def euclidean_difference(self, x, y, standardize=False):
+		return super().difference(x, y, standardize=False)
 
 
-	def geodesic_difference(self, x, y):
+	def geodesic_difference(self, x, y, standardize=False):
 		raise NotImplementedError
 
 
-	def difference(self, x, y): # geodesic by default
-		return self.geodesic_difference(x, y)
+	def difference(self, x, y, standardize=False): # geodesic by default
+		return self.geodesic_difference(x, y, standardize=False)
 
 
 
@@ -436,7 +440,7 @@ class CategoricalDim(DimSpec):
 		return vals.argmax(-1)
 
 
-	def difference(self, x, y):
+	def difference(self, x, y, standardize=False):
 		return x.sub(y).bool().long()
 
 
@@ -538,8 +542,8 @@ class JointSpace(DimSpec):
 		return self._dispatch('sample', N=N, gen=gen, seed=seed)
 
 
-	def difference(self, x, y):
-		return self._dispatch('difference', x, y)
+	def difference(self, x, y, standardize=False):
+		return self._dispatch('difference', x, y, standardize=standardize)
 
 
 	def __getitem__(self, item):
@@ -547,7 +551,7 @@ class JointSpace(DimSpec):
 
 
 
-class _DimSpec(Configurable, DimSpec):
+class DimSpecC(Configurable, DimSpec):
 	def __init__(self, A, min=unspecified_argument, max=unspecified_argument,
 	             shape=unspecified_argument, **kwargs):
 		
@@ -564,7 +568,7 @@ class _DimSpec(Configurable, DimSpec):
 
 
 @fig.Component('space/half-bound')
-class _HalfBoundDim(_DimSpec, HalfBoundDim):
+class HalfBoundDimC(DimSpecC, HalfBoundDim):
 	def __init__(self, A, bound=unspecified_argument, side=unspecified_argument,
 	             bound_type=unspecified_argument, epsilon=unspecified_argument, **kwargs):
 		
@@ -583,7 +587,7 @@ class _HalfBoundDim(_DimSpec, HalfBoundDim):
 
 
 @fig.Component('space/bound')
-class _BoundDim(_DimSpec, BoundDim):
+class BoundDimC(DimSpecC, BoundDim):
 	def __init__(self, A, epsilon=unspecified_argument, **kwargs):
 		if epsilon is unspecified_argument:
 			epsilon = A.pull('epsilon', 1e-10)
@@ -592,13 +596,13 @@ class _BoundDim(_DimSpec, BoundDim):
 
 
 @fig.Component('space/unbound')
-class _UnboundDim(_DimSpec, UnboundDim):
+class UnboundDimC(DimSpecC, UnboundDim):
 	pass
 
 
 
 @fig.Component('space/periodic')
-class _PeriodicDim(_DimSpec, PeriodicDim):
+class PeriodicDimC(DimSpecC, PeriodicDim):
 	def __init__(self, A, period=unspecified_argument, **kwargs):
 		if period is unspecified_argument:
 			period = A.pull('period', 1.)
@@ -608,7 +612,7 @@ class _PeriodicDim(_DimSpec, PeriodicDim):
 
 
 @fig.Component('space/categorical')
-class _CategoricalDim(_DimSpec, CategoricalDim):
+class CategoricalDimC(DimSpecC, CategoricalDim):
 	def __init__(self, A, n=unspecified_argument, **kwargs):
 		if n is unspecified_argument:
 			n = A.pull('n')
@@ -618,7 +622,7 @@ class _CategoricalDim(_DimSpec, CategoricalDim):
 
 
 @fig.Component('space/joint')
-class _JointSpace(_DimSpec, JointSpace):
+class JointSpaceC(DimSpecC, JointSpace):
 	def __init__(self, A, dims=unspecified_argument, **kwargs):
 		if dims is unspecified_argument:
 			dims = A.pull('dims')

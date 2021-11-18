@@ -153,30 +153,46 @@ class ELBO(Loss):
 
 
 class PytorchLoss(Loss, _Loss):
-	def __init__(self, reduction='mean', div_batch=False, **kwargs):
-		if 'batch' in reduction:
-			div_batch = True
-			reduction = 'sum'
-		super().__init__(reduction=reduction, **kwargs)
-		self._div_batch = div_batch
+	def __init__(self, reduction='mean', **kwargs):
+		# div_batch = False
+		# sample_batch = False
+		# if 'batch' in reduction:
+		# 	div_batch = True
+		# 	reduction = 'sum'
+		# if 'sample' in reduction:
+		# 	sample_batch = True
+		# 	reduction = 'none'
+		# 	div_batch = False
+		super().__init__(reduction='none', **kwargs)
+		self._reduction = reduction
+		# self._div_batch = div_batch
+		# self._sample_batch = sample_batch
 
 
 	def extra_repr(self) -> str:
-		reduction = 'batch-mean' if self._div_batch else self.reduction
-		return f'reduction={reduction}'
+		return f'reduction={self._reduction}'
+		# reduction = 'batch-mean' if self._div_batch else self.reduction
+		# reduction = 'sample-mean' if self._sample_batch else reduction
+		# return f'reduction={reduction}'
 
 
 	def _forward(self, input, *args, **kwargs):
 		if isinstance(input, distrib.Distribution):
 			input = input.rsample()
-		return super().forward(input, *args, **kwargs)
+		return super(Loss, self).forward(input, *args, **kwargs)
 
 
 	def forward(self, input, *args, **kwargs):
-		B = input.size(0) if self._div_batch else None
-		loss = self._forward(input, *args, **kwargs)
-		if B is not None:
-			loss = loss / B
+		loss = self._forward(input, *args, **kwargs).view(input.size(0), -1)
+
+		if self._reduction == 'batch-mean':
+			loss = loss.sum(-1).mean()
+		if self._reduction == 'sample-sum':
+			loss = loss.sum(-1)
+		if self._reduction == 'sum':
+			loss = loss.sum()
+		if self._reduction == 'mean':
+			loss = loss.mean()
 		return loss
 
 
@@ -204,13 +220,14 @@ class DistributionNLLLoss(PytorchLoss):
 
 
 
-class NormMetric(Metric):
+class NormMetric(Metric, Loss):
 	def distance(self, a, b):
-		return self(a-b)
+		dists = self._forward(a-b).view(a.size(0))
+		return dists
 
 
 
-class Lp_Norm(NormMetric, Loss):
+class Lp_Norm(NormMetric):
 	def __init__(self, p=2, dim=None, reduction='mean', **kwargs):
 		super().__init__(reduction=reduction, **kwargs)
 		self.p = p
@@ -218,7 +235,7 @@ class Lp_Norm(NormMetric, Loss):
 
 
 	def extra_repr(self):
-		return 'p={}'.format(self.p)
+		return f'p={self.p}'
 
 
 	def _forward(self, input, *args, **kwargs):

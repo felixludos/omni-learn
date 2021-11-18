@@ -364,9 +364,29 @@ class Disentanglement(Supervised):
 		super().__init__(*args, **kwargs)
 		self.register_data_aliases('labels', 'targets')
 
+		sizes = np.array(self.get_label_sizes())
+		flr = np.cumprod(sizes[::-1])[::-1]
+		flr[:-1] = flr[1:]
+		flr[-1] = 1
+		# self._label_idx_sizes = torch.from_numpy(sizes.copy()).long()
+		self._label_idx_flrs = torch.from_numpy(flr.copy()).long()
 
-	def generate_observations(self, labels):
-		raise NotImplementedError
+
+	def generate_labels(self, N, gen=None, seed=None):
+		return self.get_target_space().sample(N, gen=gen, seed=seed)
+
+
+	def _label_to_index(self, labels):
+		labels = labels.view(-1, len(self.get_label_space()))
+		idx = labels @ self._label_idx_flrs.view(-1,1)
+		idx = idx.squeeze(-1)#.long()
+		# if isinstance(Shuffled): # TODO: add check to Shuffled wrapper
+		return idx
+
+
+	def true_generative_process(self, labels, **kwargs):
+		idx = self._label_to_index(labels)
+		return self.get('observations', idx=idx)
 
 
 	def get_labels(self, idx=None, **kwargs):
@@ -407,26 +427,32 @@ class Disentanglement(Supervised):
 class MechanisticBase(Disentanglement):
 	_full_mechanism_space = None
 
-	def __init__(self, *args, use_mechanisms=False, **kwargs):
+	def __init__(self, *args, use_mechanisms=False, standardize_scale=False, **kwargs):
 		super().__init__(*args, **kwargs)
+		self._standardize_scale = standardize_scale
 		self._use_mechanisms = use_mechanisms
 		if self._use_mechanisms:
 			self.register_data_aliases('mechanisms', 'targets')
 
 
+	def difference(self, a, b, standardize=None):
+		if standardize is None:
+			standardize = self._standardize_scale
+		if not self.uses_mechanisms():
+			a, b = self.transform_to_mechanisms(a), self.transform_to_mechanisms(b)
+		return self.get_mechanism_space().difference(a,b, standardize=standardize)
+
+
+	def distance(self, a, b, standardize=None):
+		if standardize is None:
+			standardize = self._standardize_scale
+		if not self.uses_mechanisms():
+			a, b = self.transform_to_mechanisms(a), self.transform_to_mechanisms(b)
+		return self.get_mechanism_space().distance(a,b, standardize=standardize)
+
+
 	def uses_mechanisms(self):
 		return self._use_mechanisms
-
-
-	# def get_labels(self, idx=None, **kwargs):
-	# 	if self._use_mechanisms and self.has_data_key('mechanisms'):
-	# 		return self.get('mechanisms', idx=idx, **kwargs)
-	#
-	# 	labels = super().get_labels(idx=idx, **kwargs)
-	#
-	# 	if self._use_mechanisms:
-	# 		return self.transform_to_mechanisms(labels)
-	# 	return labels
 
 
 	def get_mechanisms(self, idx=None, **kwargs):
@@ -437,20 +463,11 @@ class MechanisticBase(Disentanglement):
 			return self.transform_to_mechanisms(labels)
 
 
-	# def get_label_space(self, force=None, **kwargs):
-	# 	if (force is not None and force in {'mech', 'mechanism'}) or (force is None and self._use_mechanisms):
-	# 		return self._full_mechanism_space
-	# 	return super().get_label_space()
-
-
 	def get_target_space(self):
 		if self.uses_mechanisms():
 			return self.get_mechanism_space()
 		return super().get_target_space()
 
-
-	def get_mechanism_space(self):
-		return self._full_mechanism_space
 
 	def transform_to_mechanisms(self, data):
 		return self.get_mechanism_space().transform(data, self.get_label_space())
@@ -458,24 +475,14 @@ class MechanisticBase(Disentanglement):
 		return self.get_label_space().transform(data, self.get_mechanism_space())
 
 
+	def get_mechanism_space(self):
+		return self._full_mechanism_space
+	def get_mechanism_sizes(self):
+		return [dim.expanded_len() for dim in self.get_mechanism_space()]
 	def get_mechanism_class_space(self, factor):
 		if isinstance(factor, str):
 			return self.get_mechanism_class_space(self.get_label_names().index(factor))
 		return self.get_mechanism_space()[factor]
-
-	def get_mechanism_sizes(self):
-		return [dim.expanded_len() for dim in self.get_mechanism_space()]
-
-
-	# def get_mechanism_class_names(self, mechanism):
-	# 	if isinstance(mechanism, str):
-	# 		return self.get_mechanism_class_names(self.get_mechanism_names().index(mechanism))
-	# 	if self._all_mechanism_class_names is not None:
-	# 		return self._all_mechanism_class_names[mechanism]
-	# def get_mechanism_class_space(self, mechanism):
-	# 	if isinstance(mechanism, str):
-	# 		return self.get_mechanism_class_space(self.get_mechanism_names().index(mechanism))
-	# 	return self.get_mechanism_space()[mechanism]
 
 
 
@@ -510,10 +517,12 @@ class Deviced(util.Deviced, Dataset, DevicedBase): # Full dataset is in memory, 
 
 
 class Mechanistic(Dataset, MechanisticBase):
-	def __init__(self, A, use_mechanisms=None, **kwargs):
+	def __init__(self, A, use_mechanisms=None, standardize_scale=None, **kwargs):
 		if use_mechanisms is None:
 			use_mechanisms = A.pull('use-mechanisms', False)
-		super().__init__(A, use_mechanisms=use_mechanisms, **kwargs)
+		if standardize_scale is None:
+			standardize_scale = A.pull('standardize-scale', False)
+		super().__init__(A, use_mechanisms=use_mechanisms, standardize_scale=standardize_scale, **kwargs)
 
 
 

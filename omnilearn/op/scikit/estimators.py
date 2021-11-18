@@ -176,6 +176,8 @@ class GBTClassifier(Classifier, SingleLabelEstimator, GradientBoostingClassifier
 		                 n_iter_no_change=n_iter_no_change, tol=tol, ccp_alpha=ccp_alpha, **kwargs)
 
 
+	def _predict_score(self, data, key=None):
+		return super()._predict_score(data, key='decision_function' if key is None else key)
 
 
 

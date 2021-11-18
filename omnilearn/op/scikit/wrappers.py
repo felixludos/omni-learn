@@ -4,8 +4,10 @@ from omnibelt import unspecified_argument
 import omnifig as fig
 import torch
 from torch import nn
-from sklearn import base, metrics
+from sklearn import base, metrics, cluster
+
 from ..framework import Learnable, FunctionBase, Evaluatable, Recordable, Function, Computable
+from ...data import MissingDataError
 
 from ... import util
 
@@ -46,9 +48,14 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 		# self.observations = self.dataset.get_observations()
 		# self.labels = self.dataset.get_labels()
 		self.__dict__['_estimator_observations'] = self._format_scikit_arg(self.dataset.get('observations'))
-		targets = self._format_scikit_arg(self.dataset.get('targets'))
-		if len(targets.shape) == 2 and targets.shape[1] == 1:
-			targets = targets.reshape(-1)
+		try:
+			targets = self.dataset.get('targets')
+		except MissingDataError:
+			targets = None
+		else:
+			targets = self._format_scikit_arg(targets)
+			if len(targets.shape) == 2 and targets.shape[1] == 1:
+				targets = targets.reshape(-1)
 		self.__dict__['_estimator_targets'] = targets
 
 
@@ -65,6 +72,39 @@ class ScikitEstimatorInfo(ScikitWrapper, util.TensorDict):
 			out = self._estimator.make_prediction(key, self._estimator_observations)
 			self[key] = self._format_scikit_arg(out)
 		return self[key]
+
+
+
+class AutomaticOutlierInfo(ScikitEstimatorInfo):
+	def __init__(self, estimator, dataset, auto=None, remove_training=False):
+		self.__dict__['_auto_class'] = auto
+		self.__dict__['_auto_remove'] = remove_training
+		super().__init__(estimator=estimator, dataset=dataset)
+
+
+	def _process_dataset(self):
+		# self.observations = self.dataset.get_observations()
+		# self.labels = self.dataset.get_labels()
+		obs = self.dataset.get('observations')
+		try:
+			targets = self.dataset.get('targets')
+		except MissingDataError:
+			targets = None
+		else:
+			if len(targets.shape) == 2 and targets.shape[1] == 1:
+				targets = targets.view(-1)
+			if self._auto_class is not None:
+				if self._auto_remove and 'train' in self.dataset.get_mode():
+					inds = targets != self._auto_class
+					obs = obs[inds]
+					targets = targets[inds]
+				else:
+					targets = targets == self._auto_class
+			targets = self._format_scikit_arg(targets)
+
+		self.__dict__['_estimator_observations'] = self._format_scikit_arg(obs)
+		self.__dict__['_estimator_targets'] = targets
+
 
 
 
@@ -91,41 +131,45 @@ class ScikitEstimatorBase(Learnable, Computable, ScikitWrapper):
 	def _fit(self, dataset, out=None):
 		if out is None:
 			out = ScikitEstimatorInfo(self, dataset)
-		super(Learnable, self).fit(out.get_observations(), out.get_targets())
+		targets = out.get_targets()
+		if targets is None:
+			super(Learnable, self).fit(out.get_observations())
+		else:
+			super(Learnable, self).fit(out.get_observations(), targets)
 		return out
+
+
+	def _call_base_sk_fn(self, key, *args, **kwargs):
+		return getattr(super(ScikitWrapper, self), key, None)(*args, **kwargs)
 
 
 	def predict(self, data):
 		return self._predict(data)
 	
 	
-	def _predict(self, data):
-		data = self._format_scikit_arg(data)
-		return self._format_scikit_output(super(ScikitWrapper, self).predict(data))
+	def _predict(self, data, key='predict'):
+		return self._call_base_sk_fn(key, data)
 	
 	
 	def predict_probs(self, data):
-		return self._predict_probs(data)
+		return self._format_scikit_output(self._predict_probs(self._format_scikit_arg(data)))
 	
 	
-	def _predict_probs(self, data):
-		data = self._format_scikit_arg(data)
-		return self._format_scikit_output(super(ScikitWrapper, self).predict_proba(data))
-	
-	
+	def _predict_probs(self, data, key='predict_proba'):
+		return self._call_base_sk_fn(key, data)
+
+
 	def predict_score(self, data):
-		return self._predict_score(data)
+		return self._format_scikit_output(self._predict_score(self._format_scikit_arg(data)))
+
 	
-	
-	def _predict_score(self, data):
-		try:
-			return self._format_scikit_output(super(ScikitWrapper, self).predict_scores(data))
-		except AttributeError:
-			probs = self._format_scikit_output(super(ScikitWrapper, self).predict_proba(data))
-			# if isinstance(self._outspace, util.BinaryDim):
-			if probs.size(-1) == 2:
+	def _predict_score(self, data, key='predict_scores'):
+		pred = getattr(super(ScikitWrapper, self), key, None)
+		if pred is None:
+			probs = self._predict_probs(data)
+			if probs.shape[-1] == 2:
 				return probs[:,-1]
-			return probs
+		return pred(data)
 
 
 	def predict_confidence(self, data):
@@ -136,11 +180,12 @@ class ScikitEstimatorBase(Learnable, Computable, ScikitWrapper):
 		raise NotImplementedError
 
 
+	def _prediction_methods(self):
+		return {'pred': self.predict, 'scores': self.predict_score, 'probs': self.predict_probs}
+
+
 	def make_prediction(self, name, data):
-		methods = {'pred': self.predict,
-		           'scores': self.predict_score,
-		           'probs': self.predict_probs}
-		method = methods.get(name, None)
+		method = self._prediction_methods().get(name, None)
 		if method is not None:
 			return method(data)
 
@@ -155,7 +200,7 @@ class ScikitEstimatorBase(Learnable, Computable, ScikitWrapper):
 				dataset.switch_to('train')
 			out = self.fit(dataset)
 			dataset.switch_to(mode)
-		return self.evaluate(dataset, info=run, out=out)
+		return self.evaluate(dataset, info=run)
 
 
 	def evaluate(self, dataset=None, info=None, out=None, **kwargs):
@@ -199,9 +244,9 @@ class Classifier(Supervised, base.ClassifierMixin):
 
 		precision, recall, fscore, support = metrics.precision_recall_fscore_support(labels, pred)
 
-		scores = info.get_result('scores')
+		probs = info.get_result('probs')
 		# multi_class = 'ovr' if
-		auc = metrics.roc_auc_score(labels, scores, multi_class='ovr')
+		auc = metrics.roc_auc_score(labels, probs, multi_class='ovr')
 
 		roc = None
 		if labels.max() == 1:
@@ -230,13 +275,15 @@ class Classifier(Supervised, base.ClassifierMixin):
 		if roc is not None:
 			info['roc-curve'] = roc
 
-		info['score'] = report['accuracy']
+		info['accuracy'] = report['accuracy']
 		return info
 
+
 	def get_scores(self):
-		return ['score', 'roc-auc', 'f1', 'precision', 'recall',
+		return ['accuracy', 'roc-auc', 'f1', 'precision', 'recall',
 			'worst-roc-auc', 'worst-f1', 'worst-precision', 'worst-recall',
 			*super().get_scores()]
+
 
 	def get_results(self):
 		return ['report', 'confusion',
@@ -320,48 +367,131 @@ class Clustering(ScikitEstimator, base.ClusterMixin):
 	def _evaluate(self, info, **kwargs):
 		info = super()._evaluate(info, **kwargs)
 
-		labels, pred = info.get_targets(), info.get_result('pred')
+		obs, pred = info.get_observations(), info.get_result('pred')
 
-		pred = torch.from_numpy(pred).float()
-		labels = torch.from_numpy(labels).float().view(*pred.shape)
-
-		diffs = self._outspace.difference(pred, labels)
-		info.diffs = diffs
-		errs = diffs.abs()
-
-		mse = errs.pow(2).mean().item()
-		mae = errs.mean().item()
-		mxe = errs.max().item()
-		medae = errs.median().item()
+		silhouette = metrics.silhouette_score(obs, pred, metric='euclidean')
+		calinski_harabasz = metrics.calinski_harabasz_score(obs, pred)
+		davies_bouldin = metrics.davies_bouldin_score(obs, pred)
 
 		info.update({
-			'mse': mse,
-			'mxe': mxe,
-			'mae': mae,
-			'medae': medae,
+			'silhouette': silhouette,
+			'calinski_harabasz': calinski_harabasz,
+			'davies_bouldin': davies_bouldin,
 		})
 
+		true = info.get_targets()
+		if true is not None:
+			adjusted_rand = metrics.adjusted_rand_score(true, pred)
+			ami = metrics.adjusted_mutual_info_score(true, pred)
+			nmi = metrics.normalized_mutual_info_score(true, pred)
+			homogeneity, completeness, v_measure = metrics.homogeneity_completeness_v_measure(true, pred)
 
-		if isinstance(self._outspace, util.BoundDim):
-			mx_error = self._outspace.range
-		else:
-			mx_error = labels.max(0)[0] - labels.min(0)[0]
-		mx_error *= self._eval_cutoff
-		mx_error = mx_error.unsqueeze(0)
+			true_silhouette = metrics.silhouette_score(obs, true, metric='euclidean')
+			true_calinski_harabasz = metrics.calinski_harabasz_score(obs, true)
+			true_davies_bouldin = metrics.davies_bouldin_score(obs, true)
 
-		score = (mx_error>errs).sum() / errs.numel()
-		info.score = score.item()
+			contingency = metrics.cluster.contingency_matrix(true, pred)
+			pair_confusion = metrics.cluster.pair_confusion_matrix(true, pred)
+
+			info.update({
+				'adjusted_rand': adjusted_rand,
+				'ami': ami,
+				'nmi': nmi,
+				'homogeneity': homogeneity,
+				'completeness': completeness,
+				'v_measure': v_measure,
+
+				'true_silhouette': true_silhouette,
+				'true_calinski_harabasz': true_calinski_harabasz,
+				'true_davies_bouldin': true_davies_bouldin,
+
+				'contingency_matrix': contingency,
+				'pair_confusion': pair_confusion,
+			})
+
+			# info.score = ami
+
 		return info
 
 
 	def get_scores(self):
-		return ['score', 'mse', 'mxe', 'mae', 'medae']
+		return ['silhouette', 'calinski_harabasz', 'davies_bouldin',
+		        'adjusted_rand', 'ami', 'nmi', 'homogeneity', 'completeness', 'v_measure',
+		        'true_silhouette', 'true_calinski_harabasz', 'true_davies_bouldin',
+			*super().get_scores()]
+
+
+	def get_results(self):
+		return ['contingency_matrix', 'pair_confusion', *super().get_results()]
+
+
+	def _predict_score(self, data, key=None):
+		return super()._predict_score(data, key='scores' if key is None else key)
 
 
 
 
 class Outlier(ScikitEstimator, base.OutlierMixin):
-	pass
+	def __init__(self, A, auto_anomalous_class=unspecified_argument, auto_remove_training=None, **kwargs):
+		if auto_anomalous_class is unspecified_argument:
+			auto_anomalous_class = A.pull('auto-anomaly-class', None)
+		if auto_remove_training is None:
+			auto_remove_training = A.pull('auto-remove-training', True)
+		super().__init__(A, **kwargs)
+		self._auto_anomalous_class = auto_anomalous_class
+		self._auto_remove_training = auto_remove_training
+
+
+	def _predict_score(self, data, key=None):
+		return super()._predict_score(data, key='decision_function' if key is None else key)
+
+
+	def _fit(self, dataset, out=None):
+		if out is None:
+			out = AutomaticOutlierInfo(self, dataset, auto=self._auto_anomalous_class,
+			                           remove_training=self._auto_remove_training)
+		return super()._fit(dataset, out=out)
+
+
+	def evaluate(self, dataset=None, info=None, out=None, **kwargs):
+		if dataset is None:
+			dataset = info.get_dataset()
+		if out is None:
+			out = AutomaticOutlierInfo(self, dataset, auto=self._auto_anomalous_class,
+			                           remove_training=self._auto_remove_training)
+		return super().evaluate(dataset=dataset, out=out, **kwargs)
+
+
+	def _evaluate(self, info, **kwargs):
+		info = super()._evaluate(info, **kwargs)
+
+		labels, pred = info.get_targets(), info.get_result('pred')
+
+		pred = pred<0
+
+		scores = info.get_result('scores')
+		# multi_class = 'ovr' if
+		auc = metrics.roc_auc_score(labels, scores)
+
+		scores = scores.reshape(-1)
+		roc = metrics.roc_curve(labels, scores)
+
+		info.update({
+			'auroc': auc.mean(),
+			'roc_curve': roc,
+		})
+		# info['score'] = info['auroc']
+		return info
+
+
+	def get_scores(self):
+		return ['auroc', *super().get_scores()]
+
+
+	def get_results(self):
+		return ['roc_curve', *super().get_results()]
+
+# decision_function
 
 
 

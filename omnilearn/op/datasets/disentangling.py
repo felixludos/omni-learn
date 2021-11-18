@@ -196,6 +196,8 @@ class dSprites(Downloadable, Batchable, ImageDataset, Mechanistic):
 			self.register_data_aliases('labels', target_type)
 
 
+
+
 	@classmethod
 	def download(cls, A, dataroot=None, **kwargs):
 		raise NotImplementedError

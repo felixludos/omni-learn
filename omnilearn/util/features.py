@@ -308,6 +308,7 @@ class Builder(Buildable):
 
 
 	def build(self, *args, **kwargs):
+		return self._build(self._build_source, *args, **kwargs)
 		if len(args) or len(kwargs):
 			self._build_args = args
 			self._build_kwargs = kwargs

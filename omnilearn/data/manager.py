@@ -75,6 +75,10 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 		return list(self._modes.keys())
 
 
+	def _prep_new_mode(self, dataset):
+		return dataset
+
+
 	def _create_mode(self, mode):
 
 		# self.A.begin()
@@ -84,6 +88,7 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 		dataset = self.dataset_config.pull_self()
 		dataset.prepare()
 		# self.A.abort()
+		dataset = self._prep_new_mode(dataset)
 
 		return self._store_mode(mode, dataset)
 
@@ -376,8 +381,8 @@ class Wrapable(Sharable):
 		self._data_wrappers.clear()
 
 
-	def _store_mode(self, mode, dataset):
-		return super()._store_mode(mode, self._wrap_dataset(dataset))
+	def _prep_new_mode(self, dataset):
+		return self._wrap_dataset(dataset)
 
 
 	def _wrap_dataset(self, dataset, wrappers=None):
