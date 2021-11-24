@@ -39,8 +39,14 @@ def combine_dims(tensor, start=1, end=None):
 
 
 def split_dim(tensor, *splits, dim=0):
-	split_shape = [*tensor.shape[:start], *splits, *tensor.shape[end:]]
+	split_shape = [*tensor.shape[:dim], *splits, *tensor.shape[dim+1:]]
 	return tensor.view(*split_shape)
+
+
+def swap_dim(tensor, d1=0, d2=1):
+	dims = list(range(len(tensor.size())))
+	dims[d1], dims[d2] = dims[d2], dims[d1]
+	return tensor.permute(*dims)
 
 
 

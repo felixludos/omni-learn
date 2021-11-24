@@ -50,7 +50,7 @@ class DimSpec:
 	@property
 	def shape(self):
 		return self._shape
-	
+
 	
 	@property
 	def expanded_shape(self):
@@ -84,8 +84,10 @@ class DimSpec:
 		return self.max - self.min
 	
 	
-	def transform(self, vals, spec):
-		return self.unstandardize(spec.standardize(vals))
+	def transform(self, vals, spec=None):
+		if spec is not None:
+			vals = spec.standardize(vals)
+		return self.unstandardize(vals)
 
 
 	def difference(self, x, y, standardize=False): # x-y

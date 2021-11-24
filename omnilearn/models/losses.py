@@ -76,24 +76,31 @@ class Loss(fm.FunctionBase):
 		self.reduction = reduction
 
 
+	def set_reduction(self, reduction):
+		self.reduction = reduction
+
+
 	def extra_repr(self) -> str:
 		return f'reduction={self.reduction}'
 
 
+	def forward(self, input, *args, **kwargs):
+		loss = self._forward(input, *args, **kwargs)
+
+		if self._reduction == 'batch-mean':
+			loss = loss.contiguous().view(input.size(0), -1).sum(-1).mean()
+		if self._reduction == 'sample-mean':
+			loss = loss.contiguous().view(input.size(0), -1).mean(-1)
+		if self._reduction == 'sample-sum':
+			loss = loss.contiguous().view(input.size(0), -1).sum(-1)
+		if self._reduction == 'sum':
+			loss = loss.sum()
+		if self._reduction == 'mean':
+			loss = loss.mean()
+		return loss
+
 	def _forward(self, input, *args, **kwargs):
 		raise NotImplementedError
-
-
-	def forward(self, input, *args, **kwargs):
-		B = input.size(0) if 'batch' in self.reduction else None
-		loss = self._forward(input, *args, **kwargs)
-		if self.reduction == 'mean':
-			loss = loss.mean()
-		elif self.reduction == 'sum':
-			loss = loss.sum()
-		if B is not None:
-			loss = loss / B
-		return loss
 
 
 
@@ -169,6 +176,10 @@ class PytorchLoss(Loss, _Loss):
 		# self._sample_batch = sample_batch
 
 
+	def set_reduction(self, reduction):
+		self._reduction = reduction
+
+
 	def extra_repr(self) -> str:
 		return f'reduction={self._reduction}'
 		# reduction = 'batch-mean' if self._div_batch else self.reduction
@@ -182,23 +193,10 @@ class PytorchLoss(Loss, _Loss):
 		return super(Loss, self).forward(input, *args, **kwargs)
 
 
-	def forward(self, input, *args, **kwargs):
-		loss = self._forward(input, *args, **kwargs).view(input.size(0), -1)
-
-		if self._reduction == 'batch-mean':
-			loss = loss.sum(-1).mean()
-		if self._reduction == 'sample-sum':
-			loss = loss.sum(-1)
-		if self._reduction == 'sum':
-			loss = loss.sum()
-		if self._reduction == 'mean':
-			loss = loss.mean()
-		return loss
-
 
 
 @fig.AutoComponent('distrib-nll')
-class DistributionNLLLoss(PytorchLoss):
+class DistributionNLLLoss(Loss):
 	def __init__(self, mn_lim=None, mx_lim=None, **kwargs):
 		super().__init__(**kwargs)
 		self._mn_lim = mn_lim
@@ -358,5 +356,11 @@ class Viz_Criterion(nn.Module):
 		
 		with torch.no_grad():
 			return self.criterion(*args, **kwargs)
+
+
+
+
+
+
 
 
