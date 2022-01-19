@@ -90,47 +90,45 @@ class Cropped(ImageDataset):
 
 
 
-# @AutoModifier('interpolated')
-# class Interpolated(Dataset):
-# 	def __init__(self, A, interpolate_size=unspecified_argument, interpolate_mode=None, din=None, **kwargs):
-#
-# 		if interpolate_size is unspecified_argument:
-# 			interpolate_size = A.pull('interpolate-size', '<>size', None)
-#
-# 		if interpolate_mode is None:
-# 			interpolate_mode = A.pull('interpolate-mode', 'bilinear')
-#
-# 		if interpolate_size is not None:
-# 			try:
-# 				len(interpolate_size)
-# 			except TypeError:
-# 				interpolate_size = interpolate_size, interpolate_size
-# 			assert len(interpolate_size) == 2, 'invalid cropping size: {}'.format(interpolate_size)
-# 			if din is None:
-# 				din = self.din
-# 			din = din[0], *interpolate_size
-#
-#
-# 		super().__init__(A, din=din, **kwargs)
-#
-# 		self.interpolate_size = interpolate_size
-# 		self.interpolate_mode = interpolate_mode
-#
-# 	def __getitem__(self, item):
-#
-# 		sample = super().__getitem__(item)
-# 		img, *other = sample
-#
-# 		if self.interpolate_size is not None:
-# 			sqz = False
-# 			if len(img.size()) == 3:
-# 				sqz = True
-# 				img = img.unsqueeze(0)
-# 			img = F.interpolate(img, self.interpolate_size, mode=self.interpolate_mode)
-# 			if sqz:
-# 				img = img.squeeze(0)
-#
-# 		return (img, *other)
+@AutoModifier('interpolated')
+class Interpolated(ImageDataset):
+	def __init__(self, A, interpolate_size=unspecified_argument, interpolate_mode=None, din=None, **kwargs):
+
+		if interpolate_size is unspecified_argument:
+			interpolate_size = A.pull('interpolate-size', '<>size', None)
+
+		if interpolate_mode is None:
+			interpolate_mode = A.pull('interpolate-mode', 'bilinear')
+
+		if interpolate_size is not None:
+			try:
+				len(interpolate_size)
+			except TypeError:
+				interpolate_size = interpolate_size, interpolate_size
+			assert len(interpolate_size) == 2, 'invalid cropping size: {}'.format(interpolate_size)
+			if din is None:
+				din = self.din
+			din = din[0], *interpolate_size
+
+
+		super().__init__(A, din=din, **kwargs)
+
+		self.interpolate_size = interpolate_size
+		self.interpolate_mode = interpolate_mode
+
+	def get_images(self, idx=None, **kwargs):
+		imgs = super().get_images(idx, **kwargs)
+
+		if self.interpolate_size is not None:
+			sqz = False
+			if len(imgs.size()) == 3:
+				sqz = True
+				imgs = imgs.unsqueeze(0)
+			img = F.interpolate(imgs, self.interpolate_size, mode=self.interpolate_mode)
+			if sqz:
+				imgs = img.squeeze(0)
+
+		return imgs
 #
 #
 # @AutoModifier('resamplable')

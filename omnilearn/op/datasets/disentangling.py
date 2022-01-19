@@ -665,8 +665,13 @@ class FullCelebA(Downloadable, ImageDataset, Disentanglement):  # TODO: automate
 
 	def get_images(self, idx=None):
 		if idx is None:
-			return torch.stack([self._load_jpeg_image(i) for i in range(len(self))])
-		return self._load_jpeg_image(idx)
+			images = torch.stack([self._load_jpeg_image(i) for i in range(len(self))])
+		else:
+			images = self._load_jpeg_image(idx)
+	
+		if not self._img_as_bytes:
+			return images.float().div(255).clamp(self._epsilon, 1 - self._epsilon)
+		return images
 
 
 

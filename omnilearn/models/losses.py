@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from omnibelt import unspecified_argument
+from omnibelt import unspecified_argument, get_printer
 import omnifig as fig
 
 import torch
@@ -10,6 +10,7 @@ from torch.nn import functional as F
 from torch import distributions as distrib
 from torch.nn.modules.loss import _Loss
 
+prt = get_printer(__file__)
 
 try:
 	import pytorch_msssim
@@ -112,7 +113,7 @@ class Negative(Loss):
 
 
 @fig.Component('ms-ssim')
-class MSSSIM(Loss, pytorch_msssim.MSSSIM):
+class MSSSIM(Loss, pytorch_msssim.MS_SSIM):
 	def __init__(self, size_average=False, _req_kwargs={}, **kwargs):
 		super().__init__(_req_kwargs={'size_average':size_average, **_req_kwargs}, **kwargs)
 
@@ -124,10 +125,10 @@ class MSSSIM(Loss, pytorch_msssim.MSSSIM):
 
 @fig.Component('psnr')
 class PSNR(Loss):
-    @staticmethod
-    def _forward(img1, img2):
-        mse = img1.sub(img2).pow(2).view(img1.size(0), -1).mean(-1)
-        return 20 * torch.log10(255.0**(img1.dtype == torch.uint8) / mse.sqrt())
+	@staticmethod
+	def _forward(img1, img2):
+		mse = img1.sub(img2).pow(2).view(img1.size(0), -1).mean(-1)
+		return 20 * torch.log10(255.0**(img1.dtype == torch.uint8) / mse.sqrt())
 
 
 
@@ -341,7 +342,7 @@ def get_loss_type(ident, **kwargs):
 @fig.AutoComponent('viz-criterion')
 class Viz_Criterion(nn.Module):
 	def __init__(self, criterion, arg_names=[], kwarg_names=[],
-	             allow_grads=False):
+				 allow_grads=False):
 		super().__init__()
 		
 		self.criterion = get_loss_type(criterion)

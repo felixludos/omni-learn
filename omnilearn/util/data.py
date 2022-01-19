@@ -84,7 +84,7 @@ def cat_default_collate(batch): # copy of pytorch's default collate except assum
 
 def process_in_batches(fn, *inputs, input_kwargs={},
 					   batch_size=64, collate_fn='default',
-					   safe=False, batchable_keys=None,
+					   safe=False, batchable_keys=None, pbar=None,
 					   **loader_kwargs):
 	B = None
 	if len(inputs):
@@ -110,7 +110,10 @@ def process_in_batches(fn, *inputs, input_kwargs={},
 	dataset = TensorDataset(*inputs, *[input_kwargs[key] for key in batchable_keys])
 	
 	outs = []
-	for batch in DataLoader(dataset, batch_size=batch_size, **loader_kwargs):
+	itr = DataLoader(dataset, batch_size=batch_size, **loader_kwargs)
+	if pbar is not None:
+		itr = pbar(itr)
+	for batch in itr:
 		kwargs = settings.copy()
 		args = batch[:len(inputs)]
 		kwargs.update({key:val for key, val in zip(batchable_keys, batch[len(inputs):])})
@@ -332,7 +335,7 @@ def to_one_hot(idx, max_idx=None):
 def discretize(input, N, range=None):
 
 	if range is None:
-		range = input.min_val(), input.max()
+		range = input.min(), input.max()
 
 	input = input.clamp(*range)
 	input -= range[0]

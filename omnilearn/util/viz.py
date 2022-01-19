@@ -347,7 +347,7 @@ def plot_imgs(imgs, titles=None, H=None, W=None,
 		figsize = aw, ah
 
 	fg, axes = plt.subplots(H, W, figsize=figsize)
-	axes = [axes] if len(imgs) == 1 else axes.flat
+	axes = [axes] if len(imgs) == 1 else list(axes.flat)
 
 	hastitles = titles is not None and len(titles)
 	if titles is None:

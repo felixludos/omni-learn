@@ -461,7 +461,7 @@ class AverageMeter(Configurable):
 		elif other.max is not None:
 			self.max = max(self.max, other.max)
 		if self.min is None:
-			self.min = other.min_val
-		elif other.min_val is not None:
-			self.min = min(self.min, other.min_val)
+			self.min = other.min
+		elif other.min is not None:
+			self.min = min(self.min, other.min)
 

@@ -193,7 +193,7 @@ class TBLogger(object):
 
 		# Fill the fields of the histogram proto
 		hist = tf.HistogramProto()
-		hist.min_val = float(np.min_val(values))
+		hist.min = float(np.min(values))
 		hist.max = float(np.max(values))
 		hist.num = int(np.prod(values.shape))
 		hist.sum = float(np.sum(values))
