@@ -60,6 +60,35 @@ def pairwise_distance(ps, qs=None, p=2): # last dim is summed
 	ps, qs = ps.unsqueeze(-2), qs.unsqueeze(-3)
 	return (ps - qs).pow(p).sum(-1).pow(1/p)
 
+def pairwise(criterion, ps, qs=None, dim=0, include_self=False, narrow=None, as_mat=True):
+	if narrow is None:
+		narrow = dim == 0
+
+	if qs is not None or include_self:
+		raise NotImplementedError
+
+	sel = (lambda idx: ps.narrow(dim, idx, 1)) if narrow else (lambda idx: ps.narrow(dim, idx, 1).squeeze(dim))
+
+	N = ps.size(dim)
+	_u = None
+
+	rows = []
+	for i in range(N):
+		p = sel(i)
+		vals = [criterion(p, ps[j]) for j in range(i+1-int(include_self),N)]
+		if _u is None:
+			_u = vals[0]
+
+		if as_mat:
+			row = torch.stack([torch.zeros_like(_u)]*(N-len(vals)) + vals, dim=dim)
+			rows.append(row)
+		else:
+			rows.extend(vals)
+
+	return torch.stack(rows, dim=dim) if as_mat else torch.cat(rows, dim=dim)
+
+
+
 def lorentzian(ps, qs=None, C=None):
 
 	dists = pairwise_distance(ps, qs).pow(2)
