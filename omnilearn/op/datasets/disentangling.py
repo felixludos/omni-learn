@@ -82,7 +82,7 @@ class Selected(Splitable):
 		
 	def _split_load(self, dataset):
 		
-		sizes = self.get_factor_sizes()
+		sizes = self.get_label_sizes()
 		flts = {}
 		
 		if self.reject is not None:

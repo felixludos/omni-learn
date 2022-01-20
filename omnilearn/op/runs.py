@@ -372,6 +372,9 @@ class Run(Configurable, Persistent):
 	
 	# region "Payload" objects - not loaded automatically
 
+	def get_checkpoint_path(self):
+		return self._ckpt_path
+
 	def get_config(self):
 		return self.A
 	
@@ -396,15 +399,18 @@ class Run(Configurable, Persistent):
 
 
 	def has_datafile(self, ident, root=None, **kwargs):
-		return super().has_datafile(ident, root=(self.get_path() if root is None else root), **kwargs)
+		return super().has_datafile(ident, root=(self.get_checkpoint_path()/'results'
+		                                         if root is None else root), **kwargs)
 
 
 	def update_datafile(self, ident, data, root=None, **kwargs):
-		return super().update_datafile(ident, data, root=(self.get_path() if root is None else root), **kwargs)
+		return super().update_datafile(ident, data, root=(self.get_checkpoint_path()/'results'
+		                                                  if root is None else root), **kwargs)
 
 
 	def get_datafile(self, ident, root=None, **kwargs):
-		return super().get_datafile(ident, root=(self.get_path() if root is None else root), **kwargs)
+		return super().get_datafile(ident, root=(self.get_checkpoint_path()/'results'
+		                                         if root is None else root), **kwargs)
 
 
 

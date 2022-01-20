@@ -74,6 +74,8 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 	def get_loaded_modes(self):
 		return list(self._modes.keys())
 
+	def register_mode(self, name, mode):
+		self._modes[name] = mode
 
 	def _prep_new_mode(self, dataset):
 		return dataset

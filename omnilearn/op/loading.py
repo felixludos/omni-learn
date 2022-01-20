@@ -37,7 +37,7 @@ class Torch_Run(Run):
 				special['pickle_module'] = CompatibilityUnpickler
 				return torch.load(p, **special)
 
-		return super()._load_datafile(data, path, _load_fn=_load_fn, **kwargs)
+		return super()._load_datafile(path, name=name, _load_fn=_load_fn, ext=ext, **kwargs)
 
 
 
