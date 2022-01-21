@@ -2,7 +2,7 @@
 from collections import deque
 import torch
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data._utils.fetch import _MapDatasetFetcher
 from torch.utils.data.dataloader import _SingleProcessDataLoaderIter, _MultiProcessingDataLoaderIter, _DatasetKind
 # from .collectors import Batchable_Dataset, Device_Dataset # TODO: clean up import order
@@ -81,8 +81,8 @@ class Featured_DataLoader(DataLoader):
 
 		try:
 			self.batched = dataset.allow_batched_get()
-		except AttributeError:
-			self.batched = False
+		except:
+			self.batched = isinstance(dataset, TensorDataset)
 
 		if device is None:
 			try:

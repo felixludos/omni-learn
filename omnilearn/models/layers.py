@@ -20,6 +20,7 @@ from .. import util
 def make_MLP(din, dout, hidden=None,
 			 initializer=None,
 			 nonlin='elu', output_nonlin=None,
+             norm=None, output_norm=None,
 			 logify_in=False, unlogify_out=False,
 			 bias=True, output_bias=None):
 	'''
@@ -53,6 +54,7 @@ def make_MLP(din, dout, hidden=None,
 		dout = int(np.product(dout))
 
 	nonlins = [nonlin] * len(hidden) + [output_nonlin]
+	norms = [norm] * len(hidden) + [output_norm]
 	biases = [bias] * len(hidden) + [output_bias]
 	hidden = din, *hidden, dout
 
@@ -62,11 +64,13 @@ def make_MLP(din, dout, hidden=None,
 
 	if logify_in:
 		layers.append(util.Logifier())
-	for in_dim, out_dim, nonlin, bias in zip(hidden, hidden[1:], nonlins, biases):
+	for in_dim, out_dim, nonlin, norm, bias in zip(hidden, hidden[1:], nonlins, norms, biases):
 		layer = nn.Linear(in_dim, out_dim, bias=bias)
 		if initializer is not None:
 			layer = initializer(layer, nonlin)
 		layers.append(layer)
+		if norm is not None:
+			layers.append(util.get_normalization1d(norm, out_dim))
 		if nonlin is not None:
 			layers.append(util.get_nonlinearity(nonlin))
 

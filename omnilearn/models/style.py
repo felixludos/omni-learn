@@ -9,7 +9,7 @@ from .nets import MultiLayer
 from ..op.framework import Function
 from .. import util
 
-from .features import Prior, Gaussian, Uniform
+from .features import Prior, Gaussian#, Uniform
 
 class StyleFusionLayer(Function):
 	def __init__(self, A, style_dim=None, **kwargs):
@@ -75,9 +75,9 @@ class PriorStyleFusionLayer(Prior, StyleFusionLayer):
 class Gaussian(Gaussian, PriorStyleFusionLayer):
 	pass
 
-@fig.AutoModifier('uniform-style')
-class Uniform(Uniform, PriorStyleFusionLayer):
-	pass
+# @fig.AutoModifier('uniform-style')
+# class Uniform(Uniform, PriorStyleFusionLayer):
+# 	pass
 
 
 class StyleExtractorLayer(Function):

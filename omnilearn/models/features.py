@@ -3,7 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import torch
 from torch import nn
-from torch import distributions as distrib
+# from torch import distributions as distrib
 
 import omnifig as fig
 
@@ -20,6 +20,7 @@ import omnifig as fig
 from ..op.framework import Function, Generative, Stochastic
 from .nets import MultiLayer
 from .. import util
+from ..util import distrib
 
 ###############
 # region Prior
@@ -35,6 +36,9 @@ class Prior(Generative):
 	def generate(self, N=1, prior=None):
 		return self._sample(N=1, prior=prior)
 
+	def get_prior(self, N=1):
+		raise NotImplementedError
+
 	def _sample(self, N, seed=None, prior=None):
 		if prior is None:
 			prior = self._sample_prior(N, seed=seed)
@@ -47,31 +51,36 @@ class Prior(Generative):
 		return samples.reshape(*shape)
 
 	def _sample_prior(self, N, seed=None):
-		raise NotImplementedError
+		return self.get_prior(N).sample()
 
-class SimplePrior(Prior):
-	def _sample_prior(self, N, seed=None):
-		gen = None
-		if seed is not None:
-			gen = torch.Generator(self.device)
-			gen.manual_seed(seed)
-		D = self.prior_dim
-		if isinstance(D, int):
-			D = (D,)
-		return self._simple_prior_sampling(N, *D, device=self.device, generator=gen)
-		
-	def _simple_prior_sampling(self, *shape, **kwargs):
-		raise NotImplementedError
+# class SimplePrior(Prior):
+# 	def _sample_prior(self, N, seed=None):
+# 		gen = None
+# 		if seed is not None:
+# 			gen = torch.Generator(self.device)
+# 			gen.manual_seed(seed)
+# 		D = self.prior_dim
+# 		if isinstance(D, int):
+# 			D = (D,)
+# 		return self._simple_prior_sampling(N, *D, device=self.device, generator=gen)
+#
+# 	def _simple_prior_sampling(self, *shape, **kwargs):
+# 		raise NotImplementedError
 
 @fig.AutoModifier('gaussian-prior')
-class Gaussian(SimplePrior):
-	def _simple_prior_sampling(self, *shape, **kwargs):
-		return torch.randn(*shape, **kwargs)
+class Gaussian(Prior):
+	def get_prior(self, N=1, *shape):
+		if len(shape) == 0:
+			shape = (self.prior_dim,)
+		param = torch.zeros(N, *shape, device=self.device)
+		return distrib.Normal(param, param.exp())
+	# def _simple_prior_sampling(self, *shape, **kwargs):
+	# 	return torch.randn(*shape, **kwargs)
 
-@fig.AutoModifier('uniform-prior')
-class Uniform(SimplePrior):
-	def _simple_prior_sampling(self, *shape, **kwargs):
-		return torch.rand(*shape, **kwargs)
+# @fig.AutoModifier('uniform-prior')
+# class Uniform(SimplePrior):
+# 	def _simple_prior_sampling(self, *shape, **kwargs):
+# 		return torch.rand(*shape, **kwargs)
 
 
 @fig.AutoModifier('prior-tfm') # for the generator

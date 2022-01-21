@@ -4,7 +4,7 @@ from .layers import make_MLP, batched_grouped_linear, Reshaper, Recurrence, \
 from .nets import MLP, Multihead, MultiLayer
 from .criterion import MultiGroupClassification, Feature_Match
 # from .prior import PriorTfm, StorablePrior, AdaIN, StyleModel
-from .features import Prior, Gaussian, Uniform, Normal
+from .features import Prior, Gaussian, Normal#, Uniform
 from .style import StyleFusionLayer, StyleFusion, PriorStyleFusionLayer, StyleExtractorLayer, StyleExtractor
 from . import curriculum
 from .regression import NSegReg_Base

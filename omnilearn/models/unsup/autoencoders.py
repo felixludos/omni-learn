@@ -130,13 +130,12 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		B = x.size(0)
 
+		if 'latent' not in out:
+			out.latent = self.encode(x)
+			out.latent_samples = out.latent.rsample() if isinstance(out.latent, util.Distribution) else out.latent
+
 		if 'reconstruction' not in out:
-
-			rec, q = self(x, ret_q=True)
-
-			if 'latent' not in out:
-				out.latent = q
-			out.reconstruction = rec
+			out.reconstruction = self.decode(out.latent_samples)
 
 		rec = out.reconstruction
 
@@ -150,6 +149,7 @@ class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 
 		if 'latent' not in out:
 			out.latent = self.encode(out.original)
+			out.latent_samples = out.latent.rsample() if isinstance(out.latent, util.Distribution) else out.latent
 
 		q = out.latent
 
@@ -224,11 +224,11 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 		# 	else:
 		# 		A.push('encoder._mod.normal', 1)
 
-		if include_elbo is None:
-			include_elbo = A.pull('include-elbo', True)
-
-		if include_bpd is None:
-			include_bpd = A.pull('include-bpd', True)
+		# if include_elbo is None:
+		# 	include_elbo = A.pull('include-elbo', True)
+		#
+		# if include_bpd is None:
+		# 	include_bpd = A.pull('include-bpd', True)
 
 		A.push('reg', None)  # already taken care of
 		wt = A.pull('reg-wt', None, silent=True)
@@ -238,21 +238,21 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 
 		super().__init__(A, **kwargs)
 
-		if include_bpd:
-			self.register_stats('bpd')
-		if include_elbo:
-			self.register_stats('elbo')
+		# if include_bpd:
+		# 	self.register_stats('bpd')
+		# if include_elbo:
+		# 	self.register_stats('elbo')
 
 
-	def _step(self, batch, out=None):
-		out = super()._step(batch, out=out)
-
-		if self.has_stat('bpd'):
-			self.mete('bpd', community.bits_per_dim(out.original, out.reconstruction))
-		if self.has_stat('elbo'):
-			self.mete('elbo', community.elbo(out.original, out.reconstruction, out.reg_loss))
-
-		return out
+	# def _step(self, batch, out=None):
+	# 	out = super()._step(batch, out=out)
+	#
+	# 	# if self.has_stat('bpd'):
+	# 	# 	self.mete('bpd', community.bits_per_dim(out.original, out.reconstruction))
+	# 	# if self.has_stat('elbo'):
+	# 	# 	self.mete('elbo', community.elbo(out.original, out.reconstruction, out.reg_loss))
+	#
+	# 	return out
 
 
 	def decode(self, q):

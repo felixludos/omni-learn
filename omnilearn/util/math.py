@@ -247,6 +247,25 @@ class Lp_Normalization(nn.Module):
 	def forward(self, x):
 		return F.normalize(x, p=self.p, dim=self.dim, eps=self.eps)
 
+@fig.AutoComponent('normalization1d')
+def get_normalization1d(ident, width, groups=8, p=2, **kwargs):
+	if not isinstance(ident, str):
+		return ident
+
+	if ident == 'batch':
+		return nn.BatchNorm1d(width, **kwargs)
+	if ident == 'instance':
+		return nn.InstanceNorm2d(width, **kwargs)
+	if ident == 'l1':
+		return Lp_Normalization(1)
+	if ident == 'l2':
+		return Lp_Normalization(2)
+	if ident == 'lp':
+		return Lp_Normalization(p=p, **kwargs)
+	if ident == 'group':
+		return nn.GroupNorm(groups, width, **kwargs)
+	raise Exception(f'unknown norm type: {ident}')
+
 
 @fig.AutoComponent('normalization')
 def get_normalization(ident, channels, groups=8, p=2, **kwargs):

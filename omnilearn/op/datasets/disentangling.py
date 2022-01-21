@@ -871,6 +871,9 @@ class MPI3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 			if self.sel_index is not None:
 				idx = self.sel_index[idx]
 			imgs = self.images[idx]
+
+		if not self._img_as_bytes:
+			return imgs.float().div(255).clamp(self._epsilon, 1 - self._epsilon)
 		return imgs#.float().div(255).clamp(1e-7, 1 - 1e-7)
 
 

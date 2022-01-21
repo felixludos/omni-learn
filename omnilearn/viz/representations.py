@@ -88,24 +88,27 @@ def get_traversal_vecs(Q, steps=32, bounds=None, mnmx=None):
 
 	return vecs
 
-def get_traversals(vecs, model, device='cpu', pbar=None): # last dim must be latent dim (model input)
+def get_traversals(vecs, model, device='cpu', pbar=None, batch_size=64): # last dim must be latent dim (model input)
 
 	*shape, D = vecs.shape
 
-	dataset = TensorDataset(vecs.view(-1,D))
+	# dataset = TensorDataset(vecs.view(-1,D))
 
-	loader = datautils.get_loaders(dataset, device=device, batch_size=64, shuffle=False)
+	# loader = datautils.get_loaders(dataset, device=device, shuffle=False)
+	#
+	# if pbar is not None:
+	# 	loader = pbar(loader)
+	#
+	# imgs = []
+	# for Q, in loader:
+	# 	with torch.no_grad():
+	# 		imgs.append(model(Q))
+	#
+	# imgs = torch.cat(imgs)
 
-	if pbar is not None:
-		loader = pbar(loader)
+	with torch.no_grad():
+		imgs = util.process_in_batches(model, vecs.view(-1,D), batch_size=batch_size, pbar=pbar)
 
-	imgs = []
-
-	for Q, in loader:
-		with torch.no_grad():
-			imgs.append(model(Q))
-
-	imgs = torch.cat(imgs)
 
 	_, *img_shape = imgs.shape
 

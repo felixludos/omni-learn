@@ -16,12 +16,14 @@ from .layers import make_MLP
 class MLPBase(fm.FunctionBase, InitWall, nn.Sequential):
 	def __init__(self, din, dout, hidden=None, initializer=None,
 	             nonlin='elu', output_nonlin=None,
+	             norm=None, output_norm=None,
 	             bias=True, output_bias=None, make_kwargs={}, _req_args=(), **kwargs):
 
 		assert len(_req_args) == 0, str(_req_args)
 
 		net = make_MLP(din=din, dout=dout, hidden=hidden, initializer=initializer,
 		               nonlin=nonlin, output_nonlin=output_nonlin,
+		               norm=norm, output_norm=output_norm,
 		               bias=bias, output_bias=output_bias, **make_kwargs)
 		super().__init__(din=net.din, dout=net.dout, _req_args=tuple(net), **kwargs)
 
@@ -30,6 +32,7 @@ class MLP(fm.Function, MLPBase):
 	def __init__(self, A, din=unspecified_argument, dout=unspecified_argument,
 	             hidden=unspecified_argument, initializer=unspecified_argument,
 	             nonlin=unspecified_argument, output_nonlin=unspecified_argument,
+	             norm=unspecified_argument, output_norm=unspecified_argument,
 	             bias=unspecified_argument, output_bias=unspecified_argument,
 	             make_kwargs=unspecified_argument, **kwargs):
 
@@ -47,6 +50,10 @@ class MLP(fm.Function, MLPBase):
 			nonlin = A.pull('nonlin', 'elu')
 		if output_nonlin is unspecified_argument:
 			output_nonlin = A.pull('output_nonlin', '<>out_nonlin', None)
+		if norm is unspecified_argument:
+			norm = A.pull('norm', None)
+		if output_norm is unspecified_argument:
+			output_norm = A.pull('output_norm', '<>out_norm', None)
 		if bias is unspecified_argument:
 			bias = A.pull('bias', True)
 		if output_bias is unspecified_argument:
@@ -59,6 +66,7 @@ class MLP(fm.Function, MLPBase):
 		super().__init__(A, din=din, dout=dout,
 		                 hidden=hidden, initializer=initializer,
 		                 nonlin=nonlin, output_nonlin=output_nonlin,
+		                 norm=norm, output_norm=output_norm,
 		                 bias=bias, output_bias=output_bias,
 		                 make_kwargs=make_kwargs, **kwargs)
 
