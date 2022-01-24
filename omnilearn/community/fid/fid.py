@@ -120,19 +120,19 @@ def compute_inception_stat(generate, inception=None, batch_size=50, n_samples=50
 	elif name is not None:
 		print(title)
 
-	j = 0
-	while j < n_samples:
-		N = min(batch_size, n_samples - j)
+	with torch.no_grad():
+		j = 0
+		while j < n_samples:
+			N = min(batch_size, n_samples - j)
 
-		samples = generate(N)
+			samples = generate(N)
+			pred = apply_inception(samples, inception)
 
-		pred = apply_inception(samples, inception)
+			pred_arr[j:j+N] = pred.cpu().numpy().reshape(N, -1)
 
-		pred_arr[j:j+N] = pred.cpu().numpy().reshape(N, -1)
-
-		j += N
-		if pbar is not None:
-			pbar.update(N)
+			j += N
+			if pbar is not None:
+				pbar.update(N)
 
 	if pbar is not None:
 		pbar.close()

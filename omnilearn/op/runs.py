@@ -397,6 +397,10 @@ class Run(Configurable, Persistent):
 	def get_loader(self, mode=None, **kwargs):
 		return self.get_dataset().get_loader(mode, **kwargs)
 
+	def _get_datafile_path(self, path=None, ext=unspecified_argument, quiet=False):
+		if path is None:
+			path = self.get_checkpoint_path()/'results'
+		return super()._get_datafile_path(path=path, ext=ext, quiet=quiet)
 
 	def has_datafile(self, ident, root=None, **kwargs):
 		return super().has_datafile(ident, root=(self.get_checkpoint_path()/'results'
@@ -670,7 +674,7 @@ class Run(Configurable, Persistent):
 		if path is None:
 			save_results = config.pull('save-results', True)
 			if save_results:
-				path = self._get_results_path()
+				path = self._get_datafile_path()
 		if path is not None:
 			path = Path(path)
 			print(f'Will save results to {str(path)}')
@@ -709,7 +713,9 @@ class Run(Configurable, Persistent):
 			print(f'Overwriting {ident} at step {N}')
 		else:
 			records['evaluations'][ident].append(N)
-		
+
+		skip_exceptions = config.pull('skip-exceptions', False)
+
 		store_batch = store_batch if config is None else config.pull('store_batch', store_batch)
 		
 		if evaluation is None and config is not None:
@@ -738,7 +744,8 @@ class Run(Configurable, Persistent):
 		try:
 			eval_out = model.evaluate(info=self)
 		except AttributeError:
-			pass
+			if not skip_exceptions:
+				raise
 		else:
 			if output is None:
 				output = eval_out
@@ -750,7 +757,7 @@ class Run(Configurable, Persistent):
 		if store_batch and output is not None:
 			output['batch'] = batch
 		if path is not None:
-			self.update_datafile(ident, dict(output), path=path)
+			self.update_datafile(ident, dict(output), root=path)
 			cpath = self.get_ckpt_path()
 			if cpath is not None:
 				records.checkpoint(cpath)

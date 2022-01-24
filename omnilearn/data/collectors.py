@@ -567,8 +567,8 @@ class MissingFIDStatsError(Exception):
 class ImageDataset(Dataset, Observation):
 	def __init__(self, A, root=None, fid_ident=unspecified_argument, as_bytes=None,
 	             eps=None, **other):
-		# if fid_ident is unspecified_argument:
-		# 	fid_ident = A.pull('fid_ident', None)
+		if fid_ident is unspecified_argument:
+			fid_ident = A.pull('fid_ident', None)
 		if as_bytes is None:
 			as_bytes = A.pull('as_bytes', False)
 		if eps is None:
@@ -576,47 +576,47 @@ class ImageDataset(Dataset, Observation):
 		super().__init__(A, **other)
 		self.register_data('images')
 		self.register_data_aliases('images', 'observations')
-		# self.fid_ident = fid_ident
+		self.fid_ident = fid_ident
 		self._img_as_bytes = as_bytes
 		self._epsilon = eps
 
 
 
-	# def get_available_fid(self, name=None):
-	# 	if name is None:
-	# 		name = 'fid_stats.h5' if self.fid_ident is None else f'{self.fid_ident}_fid_stats.h5'
-	# 	if self.root is not None:
-	# 		path = self.root / name
-	# 		if path.is_file():
-	# 			with hf.File(path, 'r') as f:
-	# 				available = list(f.keys())
-	#
-	# 			available = [a.split('_')[:-1] for a in available if 'mu' in a]
-	# 			out = []
-	# 			for a in available:
-	# 				try:
-	# 					m, d = a
-	# 					out.append((int(d), m))
-	# 				except:
-	# 					pass
-	# 			return out
-	#
-	#
-	# def get_fid_stats(self, dim, *modes, name=None):
-	# 	if name is None:
-	# 		name = 'fid_stats.h5' if self.fid_ident is None else f'{self.fid_ident}_fid_stats.h5'
-	# 	available = None
-	# 	if self.root is not None:
-	# 		path = self.root / name
-	# 		if path.is_file():
-	# 			with hf.File(path, 'r') as f:
-	# 				available = f.keys()
-	# 				for mode in modes:
-	# 					key = f'{mode}_{dim}'
-	# 					if f'{key}_mu' in f:
-	# 						return f[f'{key}_mu'][()], f[f'{key}_sigma'][()]
-	#
-	# 	raise MissingFIDStatsError(self.root, dim, modes, available)
+	def get_available_fid(self, name=None):
+		if name is None:
+			name = 'fid_stats.h5' if self.fid_ident is None else f'{self.fid_ident}_fid_stats.h5'
+		if self.root is not None:
+			path = self.root / name
+			if path.is_file():
+				with hf.File(path, 'r') as f:
+					available = list(f.keys())
+
+				available = [a.split('_')[:-1] for a in available if 'mu' in a]
+				out = []
+				for a in available:
+					try:
+						m, d = a
+						out.append((int(d), m))
+					except:
+						pass
+				return out
+
+
+	def get_fid_stats(self, dim, *modes, name=None):
+		if name is None:
+			name = 'fid_stats.h5' if self.fid_ident is None else f'{self.fid_ident}_fid_stats.h5'
+		available = None
+		if self.root is not None:
+			path = self.root / name
+			if path.is_file():
+				with hf.File(path, 'r') as f:
+					available = f.keys()
+					for mode in modes:
+						key = f'{mode}_{dim}'
+						if f'{key}_mu' in f:
+							return f[f'{key}_mu'][()], f[f'{key}_sigma'][()]
+
+		raise MissingFIDStatsError(self.root, dim, modes, available)
 
 
 	def get_images(self, idx=None, **kwargs):
