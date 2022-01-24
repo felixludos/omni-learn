@@ -742,7 +742,7 @@ class Run(Configurable, Persistent):
 			self.output = output
 		
 		try:
-			eval_out = model.evaluate(info=self)
+			eval_out = model.evaluate(info=self, config=config)
 		except AttributeError:
 			if not skip_exceptions:
 				raise
