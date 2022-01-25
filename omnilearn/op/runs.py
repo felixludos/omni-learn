@@ -668,9 +668,7 @@ class Run(Configurable, Persistent):
 		ident = config.push('ident', ident, overwrite=False)
 		mode = config.pull('mode', 'val')
 		assert ident is not None, 'No ident specified'
-		
-		config.push('mode', mode, force_root=True, silent=True)
-		
+
 		if path is None:
 			save_results = config.pull('save-results', True)
 			if save_results:
@@ -684,7 +682,8 @@ class Run(Configurable, Persistent):
 		dataset = self.get_dataset()
 		model = self.get_model()
 		records = self.get_records()
-		
+
+		config.push('mode', mode, force_root=True, silent=True)
 		dataset.switch_to(mode)
 		model.switch_to(mode)
 		records.switch_to(mode)
@@ -735,8 +734,9 @@ class Run(Configurable, Persistent):
 					batch = _batch
 					output = out
 				return out
-			
-			evaluation.run_epoch(dataset=dataset, model=model, records=None, step_fn=step)
+
+			# TODO: change this so that the training dataset is only used if no dataset is provided in config! -> Epoch loads dataset
+			evaluation.run_epoch(dataset=dataset, model=model, records=records, step_fn=step)
 		
 			self.batch = batch
 			self.output = output
@@ -753,7 +753,7 @@ class Run(Configurable, Persistent):
 				output.update(eval_out)
 
 		hparams = model.get_hparams()
-		records.step(fmt=fmt, avgs=True, hparams=hparams)
+		records.step(fmt=fmt, avgs=True, ident=ident, hparams=hparams)
 		
 		if store_batch and output is not None:
 			output['batch'] = batch

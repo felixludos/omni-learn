@@ -286,7 +286,6 @@ class Shapes3D(Downloadable, Batchable, ImageDataset, Mechanistic):
 					labels = self.transform_to_labels(labels)
 					self.register_buffer('labels', labels)
 
-
 	# def get_images(self, idx=None, **kwargs):
 	# 	images = super().get_images(idx=idx, **kwargs)
 	# 	return images.float().div(255)#.float().div(255)

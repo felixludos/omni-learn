@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
-from .math import angle_diff
+from .math import angle_diff, gen_deterministic_seed
 from .features import DeviceBase, Configurable
 
 # TODO: include dtypes
@@ -501,15 +501,17 @@ class JointSpace(DimSpec):
 		return self._expanded_shape
 	
 	
-	def _dispatch(self, method, *vals, use_expanded=False, **base_kwargs):
+	def _dispatch(self, method, *vals, use_expanded=False, split_kwargs=[], **base_kwargs):
 		
 		outs = []
 		idx = 0
 		B = None
-		for dim in self.dims:
+		for i, dim in enumerate(self.dims):
 			D = dim.expanded_len() if use_expanded else len(dim)
-			args = tuple(v.narrow(-1, idx, D) for v in vals)
+			args = tuple((v.narrow(-1, idx, D) if isinstance(v, torch.Tensor) else v[i]) for v in vals)
 			kwargs = base_kwargs.copy()
+			for key in split_kwargs:
+				kwargs[key] = kwargs[key][i]
 			
 			out = getattr(dim, method)(*args, **kwargs)
 			if B is None:
@@ -541,6 +543,12 @@ class JointSpace(DimSpec):
 	
 	
 	def sample(self, N=None, gen=None, seed=None):
+		assert gen is None # TODO
+		if seed is not None:
+			seeds = [seed % (2**32-1)]
+			for _ in range(len(self)-1):
+				seeds.append(gen_deterministic_seed(seeds[-1]))
+			return self._dispatch('sample', split_kwargs=['seed'], N=N, seed=seeds)
 		return self._dispatch('sample', N=N, gen=gen, seed=seed)
 
 

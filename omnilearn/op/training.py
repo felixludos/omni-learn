@@ -37,10 +37,13 @@ class Epoch(RunEvent):
 		print_results = A.pull('print_metric', True)
 		fixed_loader_seed = A.pull('loader-seed', None)
 
-		dataset = A.pull('dataset', None, ref=True)
-		model = A.pull('model', None, ref=True)
-		records = A.pull('records', None, ref=True)
-		
+		if A.pull('headless', False):
+			dataset, model, records = None, None, None
+		else:
+			dataset = A.pull('dataset', None, ref=True)
+			model = A.pull('model', None, ref=True)
+			records = A.pull('records', None, ref=True)
+
 		super().__init__(A, **kwargs)
 		
 		self.mode = mode

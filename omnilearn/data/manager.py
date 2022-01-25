@@ -42,6 +42,7 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 		super().__init__(A, mode=mode, **kwargs)
 
 		self._default_mode = default_mode
+		self._dataset_type, self._dataset_mods = None, None
 
 		if dataset_config is unspecified_argument:
 			cmpn_name = dataset_registry.get(name, None)
@@ -50,8 +51,10 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 
 			dataset_config = A
 
-			dataset_config.push('_type', cmpn_name, silent=True)
-			dataset_config.push('_mod', mods, silent=True)
+			# dataset_config.push('_type', cmpn_name, silent=True)
+			# dataset_config.push('_mod', mods, silent=True)
+
+			self._dataset_type, self._dataset_mods = cmpn_name, mods
 
 		self.dataset_config = dataset_config
 
@@ -86,6 +89,10 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 		# self.A.begin()
 		# if self.dataset_config.contains_nodefault(mode):
 		# 	self.dataset_config.update(self.dataset_config.sub(mode))
+		if self._dataset_type is not None:
+			self.dataset_config.push('_type', self._dataset_type, silent=True)
+		if self._dataset_mods is not None:
+			self.dataset_config.push('_mod', self._dataset_mods, silent=True)
 		self.dataset_config.push('mode', mode, silent=True)
 		dataset = self.dataset_config.pull_self()
 		dataset.prepare()

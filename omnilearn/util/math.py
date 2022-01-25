@@ -350,10 +350,13 @@ def set_seed(seed=None):
 		torch.cuda.manual_seed(seed)
 	return seed
 
-def gen_random_seed():
-	return random.getrandbits(32)
+def gen_random_seed(state=None):
+	if state is None:
+		state = random
+	return state.getrandbits(32)
 
 def gen_deterministic_seed(seed):
+	return gen_random_seed(random.Random(seed))
 	set_seed(seed)
 	return gen_random_seed()
 

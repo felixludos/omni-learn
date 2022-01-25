@@ -81,7 +81,7 @@ class Records(Freq, Switchable, Seed, Configurable, dict):
 	def activate(self, tick, info=None):
 		self.step(tick)
 
-	def step(self, num=None, fmt=None, avgs=False, hparams=None):
+	def step(self, num=None, fmt=None, avgs=False, ident=None, hparams=None):
 		if self.logger is not None:
 			if num is not None:
 				self.set_step(num)
@@ -95,7 +95,9 @@ class Records(Freq, Switchable, Seed, Configurable, dict):
 			for name, val in display.items():
 				self.log('scalar', name, val)
 			if hparams is not None and len(hparams):
-				self.logger.add_hparams(hparams, display)
+				if ident is None:
+					ident = self.get_mode()
+				self.logger.add_hparams(hparams, display, run_name=ident)
 		
 	def set_fmt(self, fmt=None):
 		if self.logger is not None:
