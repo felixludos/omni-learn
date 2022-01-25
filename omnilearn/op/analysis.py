@@ -176,7 +176,7 @@ class Run_Manager(object):
 		self.map(lambda run: run.purge(), **kwargs)
 
 	def load_results(self, ident, load_kwargs={}, **kwargs):
-		return self.map(lambda run: run.get_results(ident, **load_kwargs), **kwargs)
+		return self.map(lambda run: run.get_datafile(ident, **load_kwargs), **kwargs)
 
 	# def stats_dataframe(self): # gets all stats
 	#

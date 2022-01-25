@@ -751,8 +751,9 @@ class Run(Configurable, Persistent):
 				output = eval_out
 			elif eval_out is not None:
 				output.update(eval_out)
-		
-		records.step(fmt=fmt)
+
+		hparams = model.get_hparams()
+		records.step(fmt=fmt, avgs=True, hparams=hparams)
 		
 		if store_batch and output is not None:
 			output['batch'] = batch

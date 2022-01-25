@@ -51,9 +51,9 @@ class MLP(fm.Function, MLPBase):
 		if output_nonlin is unspecified_argument:
 			output_nonlin = A.pull('output_nonlin', '<>out_nonlin', None)
 		if norm is unspecified_argument:
-			norm = A.pull('norm', None)
+			norm = A.pull('fc-norm', None)
 		if output_norm is unspecified_argument:
-			output_norm = A.pull('output_norm', '<>out_norm', None)
+			output_norm = A.pull('output_fc-norm', '<>out_fc-norm', None)
 		if bias is unspecified_argument:
 			bias = A.pull('bias', True)
 		if output_bias is unspecified_argument:
