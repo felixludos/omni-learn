@@ -94,6 +94,8 @@ class Run_Manager(object):
 		self._load_runs()
 		
 	def reset(self):
+		self.name2idx = None
+		self.output = None
 		self._runs = []
 		self.active = self._runs
 		
