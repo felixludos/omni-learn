@@ -442,14 +442,14 @@ class AverageMeter(Configurable):
 		'''other is another average meter, assumed to be more uptodate (for val)
 			this does not mutate other'''
 		self.val = other.val
-		if self.count+other.count == 0: # both are empty
+		if self.count+other.size == 0: # both are empty
 			self.reset()
 			return
 
 		delta = other.avg - self.avg
 		prev_count = self.count
-		self.count += other.count
-		self.S += other.S + delta ** 2 * other.count * prev_count / self.count
+		self.count += other.size
+		self.S += other.S + delta ** 2 * other.size * prev_count / self.count
 		self.var = self.S / self.count
 		self.std = np.sqrt(self.var)
 

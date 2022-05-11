@@ -8,7 +8,7 @@ from torch.utils.data import Dataset as PytorchDataset, TensorDataset
 import h5py as hf
 
 from omnibelt import unspecified_argument, InitWall, Class_Registry, \
-	wrap_instance, wrap_class, conditional_method, duplicate_instance, duplicate_func, join_classes, replace_class
+	mix_into, wrap_class, conditional_method, duplicate_instance, duplicate_func, join_classes, replace_class
 import omnifig as fig
 
 from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, \
