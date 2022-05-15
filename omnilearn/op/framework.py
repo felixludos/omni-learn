@@ -348,7 +348,7 @@ class Trainable(Maintained, Recordable, Optimizable, Function, AlertBase):
 		progress = ''
 		if self.optim_metric is not None:
 			metric = self.get_metric()
-			if metric is not None and metric.size > 0:
+			if metric is not None and metric.count > 0:
 				progress = f'{self.optim_metric}: {metric.val:.3f} ({metric.smooth:.3f})'
 				
 		return progress
