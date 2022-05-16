@@ -33,7 +33,7 @@ def log_likelihood(reconstruction, original, reduction='batch'):
 
 	if reduction == 'none':
 		return ll
-	ll = ll.view(original.size(0),-1).sum(-1)
+	ll = ll.view(original.size(0), -1).sum(-1)
 	if reduction == 'sum':
 		return ll.sum()
 	return ll.mean()

@@ -599,7 +599,7 @@ def aff_transform(points, transforms):
 		if points.size(0) == 1:
 			points = points.expand(transforms.size(0), D, 1)
 		elif transforms.size(0) == 1:
-			transforms = transforms.expand(points.size(0),D,D+1)
+			transforms = transforms.expand(points.size(0), D, D + 1)
 		else:
 			raise NotImplementedError(f'{transforms.size()} {points.size()}')
 	
@@ -866,7 +866,7 @@ def c6d2mat(c6d): # called f_gs in the paper https://arxiv.org/pdf/1812.07035.pd
 
 
 def quat2mat(quat): # w, x, y, z
-	assert quat.size(-1) == 4,'wrong shape: {}'.format(quat.shape)
+	assert quat.size(-1) == 4, 'wrong shape: {}'.format(quat.shape)
 
 	quat = F.normalize(quat,p=2,dim=-1)
 

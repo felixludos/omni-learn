@@ -8,11 +8,11 @@ from ..util import Distribution
 
 def log_likelihood(original, reconstruction, batch_mean=True):
 	if isinstance(reconstruction, Distribution):
-		return reconstruction.log_prob(original).view(original.size(0),-1).sum(-1).mean()
+		return reconstruction.log_prob(original).view(original.size(0), -1).sum(-1).mean()
 	if len(reconstruction.shape) > 2:
 		return F.binary_cross_entropy(reconstruction, original, reduction='none')\
-			.view(original.size(0),-1).sum(-1).mean()
-	return F.mse_loss(reconstruction, original).view(original.size(0),-1).sum(-1).mean()
+			.view(original.size(0), -1).sum(-1).mean()
+	return F.mse_loss(reconstruction, original).view(original.size(0), -1).sum(-1).mean()
 
 
 def elbo(original, reconstruction, kl, batch_mean=True):

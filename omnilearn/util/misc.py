@@ -44,7 +44,7 @@ def split_dim(tensor, *splits, dim=0):
 
 
 def swap_dim(tensor, d1=0, d2=1):
-	dims = list(range(len(tensor.size())))
+	dims = list(range(len(tensor.shape)))
 	dims[d1], dims[d2] = dims[d2], dims[d1]
 	return tensor.permute(*dims)
 
