@@ -375,8 +375,8 @@ class PrintStep(RunEvent):
 			sys.stdout.flush()
 
 
-@fig.Script('train', description='Train new/existing models')
-def iterative_training(A=None, run=None):
+@fig.Script('legacy-train', description='Train new/existing models')
+def old_iterative_training(A=None, run=None):
 	'''
 	This is the entry for the training script for new or existing runs.
 	Existing runs (or models) can be specified using "path", "load",
@@ -402,4 +402,16 @@ def iterative_training(A=None, run=None):
 	
 	return run
 
+
+@fig.Script('train', description='Train new/existing models')
+def trainer_fit(A):
+	
+	trainer = A.pull('trainer', None)
+	
+	if trainer is None:
+		raise ValueError('trainer must be specified')
+	
+	out = trainer.fit()
+	
+	return trainer, out
 

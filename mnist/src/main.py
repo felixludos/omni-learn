@@ -3,14 +3,107 @@ import sys, os
 import time
 
 import torch
+from torch import nn
 import omnifig as fig
 
 import omnilearn as learn
 from omnilearn import util
 from omnilearn import models
+from omnidata.framework import hparam, inherit_hparams, spaces, get_builder
+from omnidata import framework as fm
+from omnidata.nn import MLP
 
-@fig.Component('simple')
-class Simple_Model(learn.Model):
+
+class Supervised_Model(fm.SimplePytorchModel):
+	def __init__(self, *args, target_space=None, criterion=None, **kwargs):
+		if target_space is None:
+			target_space = self.dout
+		if criterion is None:
+			criterion = get_builder('loss').build(target_space)
+		super().__init__(*args, **kwargs)
+		self.criterion = criterion
+	
+	
+	optim_type = hparam('adam', ref=get_builder('optimizer').get_hparam('optim_type'))
+	lr = hparam(1e-3, ref=get_builder('optimizer').get_hparam('lr'))
+	weight_decay = hparam(1e-4, ref=get_builder('optimizer').get_hparam('weight_decay'))
+	@hparam
+	def optimizer(self):
+		return get_builder('optimizer').build(self.parameters(), optim_type=self.optim_type,
+		                                      lr=self.lr, weight_decay=self.weight_decay)
+	
+	
+	class Statistics(fm.SimplePytorchModel.Statistics):
+		
+		def _compute_simple_stats(self, info, **kwargs):
+			return Ord
+		
+		def mete(self, info, **kwargs):
+			
+			pass
+	
+	
+	def _compute_loss(self, info, **kwargs):
+		info['pred'] = self(info['observation'])
+		
+		if 'loss' not in info:
+			info['loss'] = 0.
+		info['loss'] += self.criterion(info['pred'], info['target'])
+		
+		return info
+	
+	
+	# _input_key = 'observation'
+	# _pred_key = 'pred'
+	# _target_key = 'target'
+	#
+	#
+	# def _step(self, info, take_step=True, **kwargs):
+	# 	info[self._pred_key] = self(info[self._input_key])
+	#
+	# 	if 'loss' not in info:
+	# 		info['loss'] = 0.
+	# 	info['loss'] += self.criterion(info[self._pred_key], info[self._target_key])
+	#
+	# 	if take_step and self.training:
+	# 		self.optimizer.zero_grad()
+	# 		info['loss'].backward()
+	# 		self.optimizer.step()
+	#
+	# 	return info
+
+
+
+@inherit_hparams('lr', 'weight_decay', 'nonlin', 'norm', 'dropout', 'bias', 'out_nonlin', 'out_norm', 'out_bias')
+class Supervised_Model(Supervised_Model, MLP):
+	width = hparam(64, space=[64, 128, 256, 512, 1024])
+	depth = hparam(1, space=[0, 1, 2, 3, 4, 6, 8])
+
+	
+	@hparam
+	def hidden(self):
+		return [self.width] * self.depth
+	
+	
+	class Statistics(Supervised_Model.Statistics):
+	
+	
+	def _extract_stats(self, info):
+		stats = super()._extract_stats(info)
+		
+		if isinstance(self.dout, spaces.Categorical):
+			confs, picks = info['pred'].max(-1)
+			stats['accuracy'] = (picks == info['target']).float().mean()
+			stats['confidence'] = confs#.mean()
+		else:
+			raise NotImplementedError
+		
+		return stats
+
+
+
+# @fig.Component('simple')
+class Old_Simple_Model(learn.Model):
 	def __init__(self, info):
 
 		net = info.pull('net')
@@ -64,6 +157,9 @@ class Simple_Model(learn.Model):
 			self.optim.step()
 
 		return out
+
+
+
 
 
 
