@@ -1,4 +1,4 @@
-
+from .modules import MLP
 
 
 
