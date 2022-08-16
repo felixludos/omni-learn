@@ -186,10 +186,6 @@ class Rprop(PytorchOptimizer, O.Rprop):
 
 @register_builder('optimizer')
 class BasicOptimizer(Builder):
-	parameters = hparam(required=True)
-
-	optim_type = hparam('adam', space=['adam', 'rmsprop', 'sgd', 'asgd', 'adamw', 'adamax', 'rprop',
-	                                   'adagrad', 'adadelta'])
 
 	known_optim_types = {
 		'adam': Adam,
@@ -203,6 +199,7 @@ class BasicOptimizer(Builder):
 		'adadelta': Adadelta,
 	}
 
+	optim_type = hparam('adam', space=list(known_optim_types.keys()))
 
 	@classmethod
 	def _build(cls, *args, parameters=None, optim_type='adam', **kwargs):

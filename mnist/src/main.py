@@ -11,7 +11,8 @@ from omnilearn import util
 from omnilearn import models
 from omnidata.framework import hparam, inherit_hparams, spaces, get_builder
 from omnidata import framework as fm
-from omnidata.nn import MLP
+# from omnidata.nn import MLP
+from omnilearn.novo import MLP
 
 
 class Supervised_Model(fm.SimplePytorchModel):
@@ -33,14 +34,14 @@ class Supervised_Model(fm.SimplePytorchModel):
 		                                      lr=self.lr, weight_decay=self.weight_decay)
 	
 	
-	class Statistics(fm.SimplePytorchModel.Statistics):
-		
-		def _compute_simple_stats(self, info, **kwargs):
-			return Ord
-		
-		def mete(self, info, **kwargs):
-			
-			pass
+	# class Statistics(fm.SimplePytorchModel.Statistics):
+	#
+	# 	def _compute_simple_stats(self, info, **kwargs):
+	# 		return Ord
+	#
+	# 	def mete(self, info, **kwargs):
+	#
+	# 		pass
 	
 	
 	def _compute_loss(self, info, **kwargs):
@@ -85,7 +86,7 @@ class Supervised_Model(Supervised_Model, MLP):
 		return [self.width] * self.depth
 	
 	
-	class Statistics(Supervised_Model.Statistics):
+	# class Statistics(Supervised_Model.Statistics):
 	
 	
 	def _extract_stats(self, info):
