@@ -11,8 +11,7 @@ from omnidata.framework.building import Builder, get_builder, register_builder, 
 
 
 @register_builder('nonlinearity')
-class BasicNonlinearlity(ClassBuilder):
-	ident = hparam('elu', space=['elu'])
+class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
 	inplace = hparam(True, space=spaces.Binary())
 	
 
@@ -41,10 +40,7 @@ class BasicNonlinearlity(ClassBuilder):
 	
 	
 @register_builder('normalization')
-class BasicNormalization(Builder):
-	# known_nonlinearities = ('batch', 'instance', 'layer', 'group')
-	known_nonlinearities = ('batch', 'instance', 'group')
-
+class BasicNormalization(Builder, default_ident='batch'):
 
 	@agnosticmethod
 	def product_registry(self):
@@ -59,8 +55,6 @@ class BasicNormalization(Builder):
 			**super().product_registry()
 		}
 
-
-	ident = hparam('batch1d', space=['batch1d'])
 	# lazy = hparam(True, space=spaces.Binary())
 
 	width = hparam(None)
@@ -138,8 +132,11 @@ class MLP(Builder, Function, nn.Sequential):
 
 	hidden = hparam(())
 
-	nonlin = hparam('elu', ref=get_builder('nonlinearity').get_hparam('ident'))
-	norm = hparam(None, ref=get_builder('normalization').get_hparam('ident'))
+	_nonlin_builder = get_builder('nonlinearity')
+	_norm_builder = get_builder('normalization')
+
+	nonlin = hparam('elu', ref=_nonlin_builder.get_hparam('ident'))
+	norm = hparam(None, ref=_norm_builder.get_hparam('ident'))
 	dropout = hparam(0., space=spaces.Bound(0., 0.5))
 
 	bias = hparam(True)
@@ -147,9 +144,7 @@ class MLP(Builder, Function, nn.Sequential):
 	out_nonlin = hparam(None)
 	out_norm = hparam(None)
 	out_bias = hparam(True)
-	
-	_nonlin_builder = get_builder('nonlinearity')
-	_norm_builder = get_builder('normalization')
+
 
 	@agnosticmethod
 	def _expand_dim(self, dim):

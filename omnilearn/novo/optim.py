@@ -2,7 +2,7 @@ import torch
 from torch import optim as O
 from omnibelt import agnosticmethod, unspecified_argument
 from omnidata.framework import hparam, inherit_hparams, Parametrized, Builder, register_builder, spaces
-from omnidata.framework.building import ClassBuilder
+from omnidata.framework.building import ClassBuilder, AutoClassBuilder
 from omnidata.framework.features import Prepared
 
 
@@ -25,12 +25,21 @@ class Optimizer(Parametrized, Prepared):
 
 
 
-class PytorchOptimizer(Optimizer, O.Optimizer):
+@register_builder('optimizer')
+class PytorchOptimizer(AutoClassBuilder, Optimizer, O.Optimizer, create_registry=True):
 	def __init__(self, params=None, **kwargs):
 		if params is None:
 			params = [torch.zeros(0)]
 		super().__init__(params=params, **kwargs)
 		self.param_groups.clear()
+
+
+	@agnosticmethod
+	def _build(self, ident='adam', parameters=None, **kwargs):
+		optim = super()._build(ident=ident, **kwargs)
+		if parameters is not None:
+			optim.prepare(parameters=parameters)
+		return optim
 
 
 	_loss_key = 'loss'
@@ -63,7 +72,7 @@ class PytorchOptimizer(Optimizer, O.Optimizer):
 
 
 # @fig.AutoComponent('sgd', auto_name=False)
-class SGD(PytorchOptimizer, O.SGD):
+class SGD(PytorchOptimizer, O.SGD, ident='sgd'):
 	lr = hparam(required=True)
 	momentum = hparam(0.)
 	dampening = hparam(0.)
@@ -74,7 +83,7 @@ class SGD(PytorchOptimizer, O.SGD):
 	# 	super().__init__(lr=lr, momentum=momentum, dampening=dampening, weight_decay=weight_decay, nesterov=nesterov)
 
 
-class ASGD(PytorchOptimizer, O.ASGD):
+class ASGD(PytorchOptimizer, O.ASGD, ident='asgd'):
 	lr = hparam(0.01)
 	lambd = hparam(0.0001)
 	alpha = hparam(0.75)
@@ -85,7 +94,7 @@ class ASGD(PytorchOptimizer, O.ASGD):
 	# 	super().__init__(lr=lr, lambd=lambd, alpha=alpha, t0=t0, weight_decay=weight_decay)
 
 
-class Adadelta(PytorchOptimizer, O.Adadelta):
+class Adadelta(PytorchOptimizer, O.Adadelta, ident='adadelta'):
 	lr = hparam(1.0)
 	rho = hparam(0.9)
 	eps = hparam(1e-06)
@@ -95,7 +104,7 @@ class Adadelta(PytorchOptimizer, O.Adadelta):
 	# 	super().__init__(lr=lr, rho=rho, weight_decay=weight_decay, eps=eps)
 
 
-class Adagrad(PytorchOptimizer, O.Adagrad):
+class Adagrad(PytorchOptimizer, O.Adagrad, ident='adagrad'):
 	lr = hparam(0.01)
 	lr_decay = hparam(0)
 	weight_decay = hparam(0.)
@@ -123,7 +132,7 @@ class AdamLike(PytorchOptimizer):
 
 
 @inherit_hparams('lr', 'beta1', 'beta2', 'eps', 'weight_decay')
-class Adam(AdamLike, O.Adam):
+class Adam(AdamLike, O.Adam, ident='adam'):
 	amsgrad = hparam(False)
 
 	# def __init__(self, lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8, weight_decay=0, amsgrad=False):
@@ -131,7 +140,7 @@ class Adam(AdamLike, O.Adam):
 
 
 @inherit_hparams('lr', 'beta1', 'beta2', 'eps')
-class AdamW(AdamLike, O.AdamW):
+class AdamW(AdamLike, O.AdamW, ident='adamw'):
 	weight_decay = hparam(0.01)
 	amsgrad = hparam(False)
 
@@ -140,14 +149,14 @@ class AdamW(AdamLike, O.AdamW):
 
 
 @inherit_hparams('beta1', 'beta2', 'eps', 'weight_decay')
-class Adamax(AdamLike, O.Adamax):
+class Adamax(AdamLike, O.Adamax, ident='adamax'):
 	lr = hparam(0.002)
 
 	# def __init__(self, lr=0.002, beta1=0.9, beta2=0.999, eps=1e-08, weight_decay=0):
 	# 	super().__init__(lr=lr, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay)
 
 
-class RMSprop(PytorchOptimizer, O.RMSprop):
+class RMSprop(PytorchOptimizer, O.RMSprop, ident='rmsprop'):
 	lr = hparam(0.01)
 	alpha = hparam(0.99)
 	eps = hparam(1e-8)
@@ -159,7 +168,7 @@ class RMSprop(PytorchOptimizer, O.RMSprop):
 	# 	super().__init__(lr=lr, alpha=alpha, eps=eps, weight_decay=weight_decay, momentum=momentum, centered=centered)
 
 
-class Rprop(PytorchOptimizer, O.Rprop):
+class Rprop(PytorchOptimizer, O.Rprop, ident='rprop'):
 	lr = hparam(0.01)
 	eta1 = hparam(0.5)
 	eta2 = hparam(1.2)
@@ -186,37 +195,37 @@ class Rprop(PytorchOptimizer, O.Rprop):
 
 
 
-@register_builder('optimizer')
-class BasicOptimizer(ClassBuilder):
-	ident = hparam('adam', space=['adam'])
-	
-	
-	@agnosticmethod
-	def product_registry(self):
-		return {
-			'adam': Adam,
-			'rmsprop': RMSprop,
-			'sgd': SGD,
-			'asgd': ASGD,
-			'adamw': AdamW,
-			'adamax': Adamax,
-			'rprop': Rprop,
-			'adagrad': Adagrad,
-			'adadelta': Adadelta,
-			**super().product_registry()
-		}
-	
-
-	@agnosticmethod
-	def _build(self, ident='adam', parameters=None, **kwargs):
-		optim = super()._build(ident=ident, **kwargs)
-		if parameters is not None:
-			optim.prepare(parameters=parameters)
-		return optim
-
-
-	class UnknownOptimizer(NotImplementedError):
-		pass
+# @register_builder('optimizer')
+# class BasicOptimizer(ClassBuilder):
+# 	ident = hparam('adam', space=['adam'])
+#
+#
+# 	@agnosticmethod
+# 	def product_registry(self):
+# 		return {
+# 			'adam': Adam,
+# 			'rmsprop': RMSprop,
+# 			'sgd': SGD,
+# 			'asgd': ASGD,
+# 			'adamw': AdamW,
+# 			'adamax': Adamax,
+# 			'rprop': Rprop,
+# 			'adagrad': Adagrad,
+# 			'adadelta': Adadelta,
+# 			**super().product_registry()
+# 		}
+#
+#
+# 	@agnosticmethod
+# 	def _build(self, ident='adam', parameters=None, **kwargs):
+# 		optim = super()._build(ident=ident, **kwargs)
+# 		if parameters is not None:
+# 			optim.prepare(parameters=parameters)
+# 		return optim
+#
+#
+# 	class UnknownOptimizer(NotImplementedError):
+# 		pass
 
 
 
