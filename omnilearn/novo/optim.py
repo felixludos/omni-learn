@@ -1,13 +1,15 @@
 import torch
 from torch import optim as O
+from omnibelt import agnosticmethod, unspecified_argument
 from omnidata.framework import hparam, inherit_hparams, Parametrized, Builder, register_builder, spaces
+from omnidata.framework.building import ClassBuilder
 from omnidata.framework.features import Prepared
 
 
 class Optimizer(Parametrized, Prepared):
 	def __init__(self, **kwargs):
 		kwargs = self._extract_hparams(kwargs)
-		hparams = {k: getattr(self, k) for k, v in self.iterate_hparams(items=True) if v.in_init}
+		hparams = {k: getattr(self, k) for k, v in self.hyperparameters(items=True) if v.in_init}
 		kwargs.update(hparams)
 		super().__init__(**kwargs)
 
@@ -185,55 +187,33 @@ class Rprop(PytorchOptimizer, O.Rprop):
 
 
 @register_builder('optimizer')
-class BasicOptimizer(Builder):
+class BasicOptimizer(ClassBuilder):
+	ident = hparam('adam', space=['adam'])
+	
+	
+	@agnosticmethod
+	def product_registry(self):
+		return {
+			'adam': Adam,
+			'rmsprop': RMSprop,
+			'sgd': SGD,
+			'asgd': ASGD,
+			'adamw': AdamW,
+			'adamax': Adamax,
+			'rprop': Rprop,
+			'adagrad': Adagrad,
+			'adadelta': Adadelta,
+			**super().product_registry()
+		}
+	
 
-	known_optim_types = {
-		'adam': Adam,
-		'rmsprop': RMSprop,
-		'sgd': SGD,
-		'asgd': ASGD,
-		'adamw': AdamW,
-		'adamax': Adamax,
-		'rprop': Rprop,
-		'adagrad': Adagrad,
-		'adadelta': Adadelta,
-	}
-
-	optim_type = hparam('adam', space=list(known_optim_types.keys()))
-
-	@classmethod
-	def _build(cls, *args, parameters=None, optim_type='adam', **kwargs):
-		if optim_type not in cls.known_optim_types:
-			raise cls.UnknownOptimizer(optim_type)
-
-		optim_cls = cls.known_optim_types[optim_type]
-		optim = optim_cls(*args, **kwargs)
-
+	@agnosticmethod
+	def _build(self, ident='adam', parameters=None, **kwargs):
+		optim = super()._build(ident=ident, **kwargs)
 		if parameters is not None:
 			optim.prepare(parameters=parameters)
 		return optim
 
-
-	# @classmethod
-	# def _build(cls, parameters, optim_type='adam', lr=0.001, weight_decay=0.0001,
-	#            momentum=0., beta1=0.9, beta2=0.999, **optim_args):
-	#
-	# 	if optim_type == 'adam':
-	# 		return O.Adam(parameters, lr=lr, weight_decay=weight_decay, betas=(beta1, beta2), **optim_args)
-	# 	elif optim_type == 'sgd':
-	# 		return O.SGD(parameters, lr=lr, weight_decay=weight_decay, momentum=momentum, **optim_args)
-	# 	elif optim_type == 'rmsprop':
-	# 		return O.RMSprop(parameters, lr=lr, weight_decay=weight_decay, momentum=momentum, **optim_args)
-	# 	elif optim_type == 'adamw':
-	# 		return O.AdamW(parameters, lr=lr, weight_decay=weight_decay, betas=(beta1, beta2), **optim_args)
-	# 	elif optim_type == 'rprop':
-	# 		return O.Rprop(parameters, lr=lr, **optim_args)
-	# 	elif optim_type == 'adagrad':
-	# 		return O.Adagrad(parameters, lr=lr, weight_decay=weight_decay, **optim_args)
-	# 	elif optim_type == 'adadelta':
-	# 		return O.Adadelta(parameters, lr=lr, weight_decay=weight_decay, **optim_args)
-	#
-	# 	raise cls.UnknownOptimizer(optim_type)
 
 	class UnknownOptimizer(NotImplementedError):
 		pass

@@ -7,49 +7,60 @@ from omnidata.framework import spaces
 from omnidata.framework.base import Function
 from omnidata.framework.hyperparameters import hparam, Parametrized
 # from omnidata.framework.models import Model
-from omnidata.framework.building import Builder, get_builder, register_builder
+from omnidata.framework.building import Builder, get_builder, register_builder, ClassBuilder
 
 
 @register_builder('nonlinearity')
-class BasicNonlinearlity(Builder):
-	known_nonlinearities = ('relu', 'prelu', 'lrelu', 'tanh', 'softplus', 'sigmoid', 'elu', 'selu')
-
-	ident = hparam('elu', space=known_nonlinearities)
+class BasicNonlinearlity(ClassBuilder):
+	ident = hparam('elu', space=['elu'])
 	inplace = hparam(True, space=spaces.Binary())
+	
 
-	@classmethod
-	def _build(cls, ident, inplace=True, **kwargs):
-		if ident is None:
-			return None
-
-		if ident == 'prelu':
-			return nn.PReLU(**kwargs)
-		elif ident == 'elu':
-			return nn.ELU(inplace=inplace, **kwargs)
-		elif ident == 'lrelu':
-			return nn.LeakyReLU(**kwargs)
-		elif ident == 'relu':
-			return nn.ReLU(inplace=inplace)
-		elif ident == 'tanh':
-			return nn.Tanh()
-		elif ident == 'softplus':
-			return nn.Softplus(**kwargs)
-		elif ident == 'sigmoid':
-			return nn.Sigmoid()
-		elif ident == 'selu':
-			return nn.SELU(inplace=inplace)
-		raise cls.UnknownNonlin(ident)
-
-	class UnknownNonlin(NotImplementedError):
-		pass
-
-
+	@agnosticmethod
+	def product_registry(self):
+		return {
+			'relu': nn.ReLU,
+			'prelu': nn.PReLU,
+			'lrelu': nn.LeakyReLU,
+			'tanh': nn.Tanh,
+			'softplus': nn.Softplus,
+			'sigmoid': nn.Sigmoid,
+			'elu': nn.ELU,
+			'selu': nn.SELU,
+			**super().product_registry()
+		}
+	
+	
+	@agnosticmethod
+	def _build(self, ident, inplace=True, **kwargs):
+		product = self.product(ident=ident, inplace=inplace, **kwargs)
+		if product in {nn.ELU, nn.ReLU, nn.SELU}:
+			return product(inplace=inplace, **kwargs)
+		return product(**kwargs)
+	
+	
+	
 @register_builder('normalization')
 class BasicNormalization(Builder):
 	# known_nonlinearities = ('batch', 'instance', 'layer', 'group')
 	known_nonlinearities = ('batch', 'instance', 'group')
 
-	ident = hparam('batch', space=known_nonlinearities)
+
+	@agnosticmethod
+	def product_registry(self):
+		return {
+			'batch1d': nn.BatchNorm1d,
+			'batch2d': nn.BatchNorm2d,
+			'batch3d': nn.BatchNorm3d,
+			'instance1d': nn.InstanceNorm1d,
+			'instance2d': nn.InstanceNorm2d,
+			'instance3d': nn.InstanceNorm3d,
+			'group': nn.GroupNorm,
+			**super().product_registry()
+		}
+
+
+	ident = hparam('batch1d', space=['batch1d'])
 	# lazy = hparam(True, space=spaces.Binary())
 
 	width = hparam(None)
@@ -61,46 +72,41 @@ class BasicNormalization(Builder):
 	eps = hparam(1e-5)
 	affine = hparam(True, space=spaces.Binary())
 
-	@classmethod
-	def _build(cls, ident, width, spatial_dims=1, num_groups=None, lazy=True, momentum=0.1,
-	           eps=1e-5, affine=True):
-		if ident is None:
-			return None
 
-		norms = {
-			'batch': {1: nn.BatchNorm1d, 2: nn.BatchNorm2d, 3: nn.BatchNorm3d},
-			'instance': {1: nn.InstanceNorm1d, 2: nn.InstanceNorm2d, 3: nn.InstanceNorm3d},
-		}
-		norm_fn = norms.get(ident, {}).get(spatial_dims, None)
+	@agnosticmethod
+	def _product(self, ident, spatial_dims=1, **kwargs):
+		if ident in {'batch', 'instance'}:
+			ident = f'{ident}{spatial_dims}d'
+		return super()._product(ident, **kwargs)
 
-		if ident == 'group':
+
+	@agnosticmethod
+	def _build(self, ident, width, spatial_dims=1, num_groups=None, momentum=0.1,
+	           eps=1e-5, affine=True, **kwargs):
+		
+		product = self.product(ident=ident, spatial_dims=spatial_dims, **kwargs)
+
+		if product is nn.GroupNorm:
 			if num_groups is None:
 				num_groups = 8 if width >= 16 else 4
-			return nn.GroupNorm(num_groups, width, eps=eps, affine=affine)
-		elif norm_fn is not None:
-			return norm_fn(width, momentum=momentum, eps=eps, affine=affine)
-		else:
-			raise cls.UnknownNorm(ident)
+			return product(num_groups, width, eps=eps, affine=affine)
+		return product(width, momentum=momentum, eps=eps, affine=affine, **kwargs)
 
-	class UnknownNorm(NotImplementedError):
-		pass
 
 
 @register_builder('loss')
 class BasicLoss(Builder):
 	target_space = hparam(required=True)
-
-	@classmethod
-	def _build(cls, target_space):
+	
+	@agnosticmethod
+	def _product(self, target_space):
 		if isinstance(target_space, spaces.Categorical):
-			return nn.CrossEntropyLoss()
+			return nn.CrossEntropyLoss
 		elif isinstance(target_space, spaces.Continuous):
-			return nn.MSELoss()
+			return nn.MSELoss
 		else:
-			raise cls.UnknownTarget(target_space)
-
-	class UnknownTarget(NotImplementedError):
-		pass
+			raise self.NoProductFound(target_space)
+		
 
 
 class Reshaper(nn.Module):  # by default flattens
@@ -116,17 +122,16 @@ class Reshaper(nn.Module):  # by default flattens
 		return x.view(B, *self.dout)
 
 
+
 @register_builder('mlp')
 class MLP(Builder, Function, nn.Sequential):
 	def __init__(self, layers=None, **kwargs):
-		# self.get_hparam('nonlin').space = get_builder('nonlinearity').get_hparam('ident').space
-		# self.get_hparam('norm').space = get_builder('normalization').get_hparam('ident').space
+		self._nonlin_builder = get_builder('nonlinearity')
+		self._norm_builder = get_builder('normalization')
 		if layers is None:
 			kwargs = self._extract_hparams(kwargs)
 			layers = self._build_layers()
 		super().__init__(layers, **kwargs)
-		self._nonlin_builder = get_builder('nonlinearity')()
-		self._norm_builder = get_builder('normalization')()
 
 	din = hparam(required=True)
 	dout = hparam(required=True)
@@ -142,6 +147,9 @@ class MLP(Builder, Function, nn.Sequential):
 	out_nonlin = hparam(None)
 	out_norm = hparam(None)
 	out_bias = hparam(True)
+	
+	_nonlin_builder = get_builder('nonlinearity')
+	_norm_builder = get_builder('normalization')
 
 	@agnosticmethod
 	def _expand_dim(self, dim):
@@ -153,14 +161,29 @@ class MLP(Builder, Function, nn.Sequential):
 			return dim.expanded_shape
 		raise NotImplementedError(dim)
 
+	@agnosticmethod
 	def _create_nonlin(self, ident=None, inplace=unspecified_argument, **kwargs):
 		return self._nonlin_builder.build(ident, inplace=inplace, **kwargs)
 
+	@agnosticmethod
 	def _create_norm(self, norm, width, **kwargs):
 		return self._norm_builder.build(norm, width, spatial_dim=1, **kwargs)
 
+	@agnosticmethod
 	def _create_linear_layer(self, din, dout, bias=True):
 		return nn.Linear(din, dout, bias=bias)
+
+	@agnosticmethod
+	def _plan(self, nonlin=None, norm=None, out_nonlin=None, out_norm=None, **kwargs):
+		yield from super()._plan(**kwargs)
+		if nonlin is not None:
+			yield from self._nonlin_builder.plan(nonlin, **kwargs)
+		if out_nonlin is not None:
+			yield from self._nonlin_builder.plan(out_nonlin, **kwargs)
+		if norm is not None:
+			yield from self._norm_builder.plan(norm, **kwargs)
+		if out_norm is not None:
+			yield from self._norm_builder.plan(out_norm, **kwargs)
 
 	@agnosticmethod
 	def _build_layer(self, din, dout, nonlin=unspecified_argument, norm=unspecified_argument,
@@ -224,10 +247,10 @@ class MLP(Builder, Function, nn.Sequential):
 		layers.extend(self._build_outlayer(end_dim, dout))
 		return layers
 
-	@classmethod
-	def _build(cls, din, dout, hidden, nonlin, norm, bias=True, **kwargs):
-		return cls(din=din, dout=dout, hidden=hidden, nonlin=nonlin, norm=norm, bias=bias, **kwargs)
-
+	@agnosticmethod
+	def _build(self, din, dout, hidden, nonlin, norm, bias=True, **kwargs):
+		return super()._build(din=din, dout=dout, hidden=hidden, nonlin=nonlin, norm=norm, bias=bias, **kwargs)
+		
 
 
 
