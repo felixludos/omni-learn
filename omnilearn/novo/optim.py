@@ -1,12 +1,12 @@
 import torch
 from torch import optim as O
 from omnibelt import agnosticmethod, unspecified_argument
-from omnidata.framework import hparam, inherit_hparams, Parametrized, Builder, register_builder, spaces
+from omnidata.framework import hparam, inherit_hparams, Parameterized, Builder, register_builder, spaces
 from omnidata.framework.building import ClassBuilder, AutoClassBuilder
 from omnidata.framework.features import Prepared
 
 
-class Optimizer(Parametrized, Prepared):
+class Optimizer(Parameterized, Prepared):
 	def __init__(self, **kwargs):
 		kwargs = self._extract_hparams(kwargs)
 		hparams = {k: getattr(self, k) for k, v in self.hyperparameters(items=True) if v.in_init}
@@ -14,7 +14,7 @@ class Optimizer(Parametrized, Prepared):
 		super().__init__(**kwargs)
 
 
-	class Hyperparameter(Parametrized.Hyperparameter):
+	class Hyperparameter(Parameterized.Hyperparameter):
 		def __init__(self, name=None, in_init=True, **kwargs):
 			super().__init__(name=name, **kwargs)
 			self.in_init = in_init

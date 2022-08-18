@@ -5,7 +5,7 @@ from omnibelt import unspecified_argument, agnosticmethod
 
 from omnidata.framework import spaces
 from omnidata.framework.base import Function
-from omnidata.framework.hyperparameters import hparam, Parametrized
+from omnidata.framework.hyperparameters import hparam, Parameterized
 # from omnidata.framework.models import Model
 from omnidata.framework.building import Builder, get_builder, register_builder, ClassBuilder
 
@@ -40,7 +40,7 @@ class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
 	
 	
 @register_builder('normalization')
-class BasicNormalization(Builder, default_ident='batch'):
+class BasicNormalization(ClassBuilder, default_ident='batch'):
 
 	@agnosticmethod
 	def product_registry(self):
@@ -157,11 +157,11 @@ class MLP(Builder, Function, nn.Sequential):
 		raise NotImplementedError(dim)
 
 	@agnosticmethod
-	def _create_nonlin(self, ident=None, inplace=unspecified_argument, **kwargs):
-		return self._nonlin_builder.build(ident, inplace=inplace, **kwargs)
+	def _create_nonlin(self, ident=None, **kwargs):
+		return self._nonlin_builder.build(ident, **kwargs)
 
 	@agnosticmethod
-	def _create_norm(self, norm, width, **kwargs):
+	def _create_norm(self, norm, width, spatial_dim=1, **kwargs):
 		return self._norm_builder.build(norm, width, spatial_dim=1, **kwargs)
 
 	@agnosticmethod
