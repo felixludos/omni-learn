@@ -9,6 +9,8 @@ from . import models
 from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
 	Evaluatable, Visualizable, Function, Optimizable, TensorflowPort
 
+from . import novo
+
 from omnibelt import get_printer
 
 prt = get_printer(__name__)
