@@ -26,6 +26,7 @@ class Optimizer(Parameterized, Prepared):
 
 
 @register_builder('optimizer')
+@register_builder('optim')
 class PytorchOptimizer(AutoClassBuilder, Optimizer, O.Optimizer, create_registry=True):
 	def __init__(self, params=None, **kwargs):
 		if params is None:
@@ -132,7 +133,7 @@ class AdamLike(PytorchOptimizer):
 
 
 @inherit_hparams('lr', 'beta1', 'beta2', 'eps', 'weight_decay')
-class Adam(AdamLike, O.Adam, ident='adam'):
+class Adam(AdamLike, O.Adam, ident='adam', default=True):
 	amsgrad = hparam(False)
 
 	# def __init__(self, lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8, weight_decay=0, amsgrad=False):

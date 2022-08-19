@@ -11,6 +11,7 @@ from omnidata.framework.building import Builder, get_builder, register_builder, 
 
 
 @register_builder('nonlinearity')
+@register_builder('nonlin')
 class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
 	inplace = hparam(True, space=spaces.Binary())
 	
@@ -40,6 +41,7 @@ class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
 	
 	
 @register_builder('normalization')
+@register_builder('norm')
 class BasicNormalization(ClassBuilder, default_ident='batch'):
 
 	@agnosticmethod
