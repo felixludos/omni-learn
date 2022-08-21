@@ -9,13 +9,14 @@ import omnifig as fig
 import omnilearn as learn
 from omnilearn import util
 from omnilearn import models
-from omnidata.framework import hparam, inherit_hparams, spaces, get_builder
+from omnidata.framework import machine, hparam, inherit_hparams, spaces, get_builder
 from omnidata import framework as fm
 # from omnidata.nn import MLP
+from omnilearn.novo import trainers
 from omnilearn.novo import MLP
 
 
-class Supervised_Model(fm.SimplePytorchModel):
+class Supervised_Model(trainers.SimplePytorchModel):
 	def __init__(self, *args, target_space=None, criterion=None, **kwargs):
 		if target_space is None:
 			target_space = self.dout
@@ -26,12 +27,9 @@ class Supervised_Model(fm.SimplePytorchModel):
 	
 	
 	optim_type = hparam('adam', ref=get_builder('optimizer').get_hparam('optim_type'))
-	lr = hparam(1e-3, ref=get_builder('optimizer').get_hparam('lr'))
-	weight_decay = hparam(1e-4, ref=get_builder('optimizer').get_hparam('weight_decay'))
-	@hparam
+	@machine
 	def optimizer(self):
-		return get_builder('optimizer').build(self.parameters(), optim_type=self.optim_type,
-		                                      lr=self.lr, weight_decay=self.weight_decay)
+		return get_builder('optimizer').build(ident=self.optim_type, parameters=self.parameters())
 	
 	
 	# class Statistics(fm.SimplePytorchModel.Statistics):
@@ -75,7 +73,8 @@ class Supervised_Model(fm.SimplePytorchModel):
 
 
 
-@inherit_hparams('lr', 'weight_decay', 'nonlin', 'norm', 'dropout', 'bias', 'out_nonlin', 'out_norm', 'out_bias')
+@inherit_hparams(#'lr', 'weight_decay',
+                 'nonlin', 'norm', 'dropout', 'bias', 'out_nonlin', 'out_norm', 'out_bias')
 class Supervised_Model(Supervised_Model, MLP):
 	width = hparam(64, space=[64, 128, 256, 512, 1024])
 	depth = hparam(1, space=[0, 1, 2, 3, 4, 6, 8])
@@ -88,18 +87,17 @@ class Supervised_Model(Supervised_Model, MLP):
 	
 	# class Statistics(Supervised_Model.Statistics):
 	
-	
-	def _extract_stats(self, info):
-		stats = super()._extract_stats(info)
-		
-		if isinstance(self.dout, spaces.Categorical):
-			confs, picks = info['pred'].max(-1)
-			stats['accuracy'] = (picks == info['target']).float().mean()
-			stats['confidence'] = confs#.mean()
-		else:
-			raise NotImplementedError
-		
-		return stats
+	# def _extract_stats(self, info):
+	# 	stats = super()._extract_stats(info)
+	#
+	# 	if isinstance(self.dout, spaces.Categorical):
+	# 		confs, picks = info['pred'].max(-1)
+	# 		stats['accuracy'] = (picks == info['target']).float().mean()
+	# 		stats['confidence'] = confs#.mean()
+	# 	else:
+	# 		raise NotImplementedError
+	#
+	# 	return stats
 
 
 

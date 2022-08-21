@@ -9,7 +9,7 @@ from omnidata.framework.features import Prepared
 class Optimizer(Parameterized, Prepared):
 	def __init__(self, **kwargs):
 		kwargs = self._extract_hparams(kwargs)
-		hparams = {k: getattr(self, k) for k, v in self.hyperparameters(items=True) if v.in_init}
+		hparams = {k: getattr(self, k) for k, v in self.named_hyperparameters() if v.in_init}
 		kwargs.update(hparams)
 		super().__init__(**kwargs)
 
