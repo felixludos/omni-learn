@@ -25,12 +25,9 @@ class Supervised_Model(trainers.SimplePytorchModel):
 		super().__init__(*args, **kwargs)
 		self.criterion = criterion
 	
-	
-	optim_type = hparam('adam', ref=get_builder('optimizer').get_hparam('optim_type'))
-	@machine
-	def optimizer(self):
-		return get_builder('optimizer').build(ident=self.optim_type, parameters=self.parameters())
-	
+
+	optimizer = machine(builder='optimizer')
+
 	
 	# class Statistics(fm.SimplePytorchModel.Statistics):
 	#
@@ -73,14 +70,15 @@ class Supervised_Model(trainers.SimplePytorchModel):
 
 
 
-@inherit_hparams(#'lr', 'weight_decay',
-                 'nonlin', 'norm', 'dropout', 'bias', 'out_nonlin', 'out_norm', 'out_bias')
+# @inherit_hparams(#'lr', 'weight_decay',
+#                  'nonlin', 'norm', 'dropout', 'bias', 'out_nonlin', 'out_norm', 'out_bias')
+@inherit_hparams('optimizer', 'nonlin', 'norm', 'dropout', 'bias', 'out_nonlin', 'out_norm', 'out_bias')
 class Supervised_Model(Supervised_Model, MLP):
 	width = hparam(64, space=[64, 128, 256, 512, 1024])
 	depth = hparam(1, space=[0, 1, 2, 3, 4, 6, 8])
 
 	
-	@hparam
+	@property
 	def hidden(self):
 		return [self.width] * self.depth
 	
