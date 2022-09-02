@@ -5,13 +5,14 @@ from omnibelt import unspecified_argument, agnosticmethod
 
 from omnidata.framework import spaces
 from omnidata.framework.base import Function
-from omnidata.framework.hyperparameters import hparam, Parameterized
 # from omnidata.framework.models import Model
+from omnidata.framework.hyperparameters import hparam, Parameterized
 from omnidata.framework.building import Builder, get_builder, register_builder, ClassBuilder
+from omnidata.framework.machines import machine, MachineParametrized
 
 
-@register_builder('nonlinearity')
 @register_builder('nonlin')
+@register_builder('nonlinearity')
 class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
 	inplace = hparam(True, space=spaces.Binary())
 	
@@ -37,11 +38,11 @@ class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
 		if product in {nn.ELU, nn.ReLU, nn.SELU}:
 			return product(inplace=inplace, **kwargs)
 		return product(**kwargs)
-	
-	
-	
-@register_builder('normalization')
+
+
+
 @register_builder('norm')
+@register_builder('normalization')
 class BasicNormalization(ClassBuilder, default_ident='batch'):
 
 	@agnosticmethod
@@ -122,8 +123,6 @@ class Reshaper(nn.Module):  # by default flattens
 @register_builder('mlp')
 class MLP(Builder, Function, nn.Sequential):
 	def __init__(self, layers=None, **kwargs):
-		self._nonlin_builder = get_builder('nonlinearity')
-		self._norm_builder = get_builder('normalization')
 		if layers is None:
 			kwargs = self._extract_hparams(kwargs)
 			layers = self._build_layers()
@@ -134,19 +133,16 @@ class MLP(Builder, Function, nn.Sequential):
 
 	hidden = hparam(())
 
-	_nonlin_builder = get_builder('nonlinearity')
-	_norm_builder = get_builder('normalization')
-
-	nonlin = hparam('elu', ref=_nonlin_builder.get_hparam('ident'))
-	norm = hparam(None, ref=_norm_builder.get_hparam('ident'))
 	dropout = hparam(0., space=spaces.Bound(0., 0.5))
 
+	nonlin = machine('elu', builder='nonlinearity')
+	out_nonlin = machine(None, builder='nonlinearity')
+
+	norm = machine(None, builder='normalization')
+	out_norm = machine(None, builder='normalization')
+
 	bias = hparam(True)
-
-	out_nonlin = hparam(None)
-	out_norm = hparam(None)
 	out_bias = hparam(True)
-
 
 	@agnosticmethod
 	def _expand_dim(self, dim):
@@ -160,27 +156,19 @@ class MLP(Builder, Function, nn.Sequential):
 
 	@agnosticmethod
 	def _create_nonlin(self, ident=None, **kwargs):
-		return self._nonlin_builder.build(ident, **kwargs)
+		if ident is None:
+			return None
+		return self.get_hparam('nonlin').get_builder().build(ident=ident, **kwargs)
 
 	@agnosticmethod
 	def _create_norm(self, norm, width, spatial_dim=1, **kwargs):
-		return self._norm_builder.build(norm, width, spatial_dim=1, **kwargs)
+		if norm is None:
+			return None
+		return self.get_hparam('norm').get_builder().build(norm, width=width, spatial_dim=spatial_dim, **kwargs)
 
 	@agnosticmethod
 	def _create_linear_layer(self, din, dout, bias=True):
 		return nn.Linear(din, dout, bias=bias)
-
-	@agnosticmethod
-	def _plan(self, nonlin=None, norm=None, out_nonlin=None, out_norm=None, **kwargs):
-		yield from super()._plan(**kwargs)
-		if nonlin is not None:
-			yield from self._nonlin_builder.plan(nonlin, **kwargs)
-		if out_nonlin is not None:
-			yield from self._nonlin_builder.plan(out_nonlin, **kwargs)
-		if norm is not None:
-			yield from self._norm_builder.plan(norm, **kwargs)
-		if out_norm is not None:
-			yield from self._norm_builder.plan(out_norm, **kwargs)
 
 	@agnosticmethod
 	def _build_layer(self, din, dout, nonlin=unspecified_argument, norm=unspecified_argument,

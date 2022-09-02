@@ -25,8 +25,8 @@ class Optimizer(Parameterized, Prepared):
 
 
 
-@register_builder('optimizer')
 @register_builder('optim')
+@register_builder('optimizer')
 class PytorchOptimizer(AutoClassBuilder, Optimizer, O.Optimizer, create_registry=True):
 	def __init__(self, params=None, **kwargs):
 		if params is None:
