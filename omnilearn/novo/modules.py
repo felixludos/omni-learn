@@ -7,13 +7,14 @@ from omnidata.framework import spaces
 from omnidata.framework.base import Function
 # from omnidata.framework.models import Model
 from omnidata.framework.hyperparameters import hparam, Parameterized
-from omnidata.framework.building import Builder, get_builder, register_builder, ClassBuilder
+from omnidata.framework.building import get_builder, register_builder
 from omnidata.framework.machines import machine, MachineParametrized
+from omnidata.framework.architects import Architect, ClassArchitect, AutoClassArchitect
 
 
 @register_builder('nonlin')
 @register_builder('nonlinearity')
-class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
+class BasicNonlinearlity(ClassArchitect, default_ident='elu'):
 	inplace = hparam(True, space=spaces.Binary())
 	
 
@@ -43,7 +44,7 @@ class BasicNonlinearlity(ClassBuilder, default_ident='elu'):
 
 @register_builder('norm')
 @register_builder('normalization')
-class BasicNormalization(ClassBuilder, default_ident='batch'):
+class BasicNormalization(ClassArchitect, default_ident='batch'):
 
 	@agnosticmethod
 	def product_registry(self):
@@ -92,7 +93,7 @@ class BasicNormalization(ClassBuilder, default_ident='batch'):
 
 
 @register_builder('loss')
-class BasicLoss(Builder):
+class BasicLoss(Architect):
 	target_space = hparam(required=True)
 	
 	@agnosticmethod
@@ -121,7 +122,7 @@ class Reshaper(nn.Module):  # by default flattens
 
 
 @register_builder('mlp')
-class MLP(Builder, Function, nn.Sequential):
+class MLP(Architect, Function, nn.Sequential):
 	def __init__(self, layers=None, **kwargs):
 		if layers is None:
 			kwargs = self._extract_hparams(kwargs)

@@ -26,7 +26,7 @@ class PytorchModel(TrainableModel, nn.Module):
 class SimplePytorchModel(PytorchModel):
 	_loss_key = 'loss'
 
-	optimizer = machine(None)
+	optimizer = machine(required=True)
 
 
 	def _prepare(self, source=None, **kwargs):
