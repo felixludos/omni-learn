@@ -78,7 +78,7 @@ class Supervised_Model(Supervised_Model, MLP):
 	depth = hparam(1, space=[0, 1, 2, 3, 4, 6, 8])
 
 	
-	@property
+	@hparam(hidden=True)
 	def hidden(self):
 		return [self.width] * self.depth
 	
