@@ -5,3 +5,5 @@ name: mnist_example
 #
 #src: 'main.py'
 package: src
+
+project_type: novo
