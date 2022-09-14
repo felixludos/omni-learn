@@ -16,6 +16,17 @@ from omnilearn.novo import trainers
 from omnilearn.novo import MLP
 
 
+@fig.Script('test')
+def _test_script(A):
+
+	print(A.pull('a'))
+	print(A.pull('x', 10))
+	print(A.pulls('y', 'y1', 'y2', default=100))
+	print(A.pulls('b2', 'b'))
+
+	print('done')
+
+
 class Supervised_Model(trainers.SimplePytorchModel):
 	def __init__(self, *args, target_space=None, criterion=None, **kwargs):
 		if target_space is None:
