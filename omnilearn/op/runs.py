@@ -11,7 +11,7 @@ from omnibelt import load_yaml, save_yaml, get_now, create_dir, get_printer, uns
 
 import omnifig as fig
 from omnifig import Configurable
-from omnifig.errors import MissingParameterError, MissingComponentError
+from omnifig.old.errors import MissingParameterError, MissingComponentError
 
 prt = get_printer(__name__)
 
