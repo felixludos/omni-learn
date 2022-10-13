@@ -2,7 +2,7 @@ import torch
 from torch import optim as O
 from omnibelt import agnosticmethod, unspecified_argument
 from omnidata.framework import hparam, inherit_hparams, Parameterized, Builder, register_builder, spaces
-from omnidata.framework.building import ClassBuilder
+from omnidata.framework.building import MultiBuilder
 from omnidata.framework.features import Prepared
 from omnidata.framework import AutoClassArchitect
 
