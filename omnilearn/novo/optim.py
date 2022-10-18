@@ -1,7 +1,7 @@
 import torch
 from torch import optim as O
 from omnibelt import agnosticmethod, unspecified_argument
-from omnidata.framework import hparam, inherit_hparams, Parameterized, Builder, register_builder, spaces
+from omnidata.framework import hparam, inherit_hparams, Parameterized, register_builder, spaces, ClassBuilder
 from omnidata.framework.building import MultiBuilder
 from omnidata.framework.features import Prepared
 # from omnidata.framework import AutoClassArchitect
@@ -28,7 +28,7 @@ class Optimizer(Parameterized, Prepared):
 
 @register_builder('optim')
 @register_builder('optimizer')
-class PytorchOptimizer(AutoClassArchitect, Optimizer, O.Optimizer, create_registry=True):
+class PytorchOptimizer(ClassBuilder, Optimizer, O.Optimizer, create_registry=True):
 	def __init__(self, params=None, **kwargs):
 		if params is None:
 			params = [torch.zeros(0)]

@@ -1,40 +1,31 @@
 import numpy as np
 from torch import nn
 import torch.optim as O
-from omnibelt import unspecified_argument, agnosticmethod
+from omnibelt import unspecified_argument, agnostic
 
 from omnidata.framework import spaces
 from omnidata.framework.base import Function
 # from omnidata.framework.models import Model
-from omnidata.framework.hyperparameters import hparam, Parameterized
-from omnidata.framework.building import get_builder, register_builder
-from omnidata.framework.machines import machine, MachineParametrized
-from omnidata.framework.architects import Architect, ClassArchitect, AutoClassArchitect
+from omnidata.framework import hparam, Parameterized, \
+	get_builder, register_builder, machine, Machine, RegistryBuilder, BasicBuilder, Builder, Buildable
 
 
 @register_builder('nonlin')
 @register_builder('nonlinearity')
-class BasicNonlinearlity(ClassArchitect, default_ident='elu'):
+class BasicNonlinearlity(RegistryBuilder, default_ident='elu', products={
+							'relu': nn.ReLU,
+							'prelu': nn.PReLU,
+							'lrelu': nn.LeakyReLU,
+							'tanh': nn.Tanh,
+							'softplus': nn.Softplus,
+							'sigmoid': nn.Sigmoid,
+							'elu': nn.ELU,
+							'selu': nn.SELU,
+                         }):
 	inplace = hparam(True, space=spaces.Binary())
-	
 
-	@agnosticmethod
-	def product_registry(self):
-		return {
-			'relu': nn.ReLU,
-			'prelu': nn.PReLU,
-			'lrelu': nn.LeakyReLU,
-			'tanh': nn.Tanh,
-			'softplus': nn.Softplus,
-			'sigmoid': nn.Sigmoid,
-			'elu': nn.ELU,
-			'selu': nn.SELU,
-			**super().product_registry()
-		}
-	
-	
-	@agnosticmethod
-	def _build(self, ident, inplace=True, **kwargs):
+	@agnostic
+	def build(self, ident, inplace=True, **kwargs):
 		product = self.product(ident=ident, inplace=inplace, **kwargs)
 		if product in {nn.ELU, nn.ReLU, nn.SELU}:
 			return product(inplace=inplace, **kwargs)
@@ -44,22 +35,15 @@ class BasicNonlinearlity(ClassArchitect, default_ident='elu'):
 
 @register_builder('norm')
 @register_builder('normalization')
-class BasicNormalization(ClassArchitect, default_ident='batch'):
-
-	@agnosticmethod
-	def product_registry(self):
-		return {
-			'batch1d': nn.BatchNorm1d,
-			'batch2d': nn.BatchNorm2d,
-			'batch3d': nn.BatchNorm3d,
-			'instance1d': nn.InstanceNorm1d,
-			'instance2d': nn.InstanceNorm2d,
-			'instance3d': nn.InstanceNorm3d,
-			'group': nn.GroupNorm,
-			**super().product_registry()
-		}
-
-	# lazy = hparam(True, space=spaces.Binary())
+class BasicNormalization(RegistryBuilder, default_ident='batch', products={
+							'batch1d': nn.BatchNorm1d,
+							'batch2d': nn.BatchNorm2d,
+							'batch3d': nn.BatchNorm3d,
+							'instance1d': nn.InstanceNorm1d,
+							'instance2d': nn.InstanceNorm2d,
+							'instance3d': nn.InstanceNorm3d,
+							'group': nn.GroupNorm,
+                         }):
 
 	width = hparam(None)
 	spatial_dims = hparam(1, space=[1, 2, 3])
@@ -70,21 +54,19 @@ class BasicNormalization(ClassArchitect, default_ident='batch'):
 	eps = hparam(1e-5)
 	affine = hparam(True, space=spaces.Binary())
 
-
-	@agnosticmethod
-	def _product(self, ident, spatial_dims=1, **kwargs):
+	@agnostic
+	def product(self, ident, spatial_dims=1, **kwargs):
 		if ident in {'batch', 'instance'}:
 			ident = f'{ident}{spatial_dims}d'
-		return super()._product(ident, **kwargs)
+		return super().product(ident, **kwargs)
 
-
-	@agnosticmethod
-	def _build(self, ident, width, spatial_dims=1, num_groups=None, momentum=0.1,
+	@agnostic
+	def build(self, ident, width, spatial_dims=1, num_groups=None, momentum=0.1,
 	           eps=1e-5, affine=True, **kwargs):
 		
 		product = self.product(ident=ident, spatial_dims=spatial_dims, **kwargs)
 
-		if product is nn.GroupNorm:
+		if issubclass(product, nn.GroupNorm):
 			if num_groups is None:
 				num_groups = 8 if width >= 16 else 4
 			return product(num_groups, width, eps=eps, affine=affine)
@@ -93,11 +75,11 @@ class BasicNormalization(ClassArchitect, default_ident='batch'):
 
 
 @register_builder('loss')
-class BasicLoss(Architect):
+class BasicLoss(Builder):
 	target_space = hparam(required=True)
 	
-	@agnosticmethod
-	def _product(self, target_space):
+	@agnostic
+	def product_base(self, target_space):
 		if isinstance(target_space, spaces.Categorical):
 			return nn.CrossEntropyLoss
 		elif isinstance(target_space, spaces.Continuous):
@@ -120,9 +102,42 @@ class Reshaper(nn.Module):  # by default flattens
 		return x.view(B, *self.dout)
 
 
+@register_builder('linear')
+class BasicLinear(Builder):
+	din = hparam(None)
+	dout = hparam(None)
+
+	width = hparam(None)
+
+	bias = hparam(True, space=spaces.Binary())
+
+	@agnostic
+	def product_base(self, *args, **kwargs):
+		return nn.Linear
+
+	@agnostic
+	def build(self, width: int = None, *, din=None, dout=None, bias=True, **kwargs):
+		if din is None and dout is None:
+			raise ValueError('Must specify either din or dout')
+		if width is not None and din is not None and dout is not None:
+			raise ValueError('Cannot specify width and both din and dout')
+
+		if isinstance(din, spaces.Dim):
+			din = din.width
+		if isinstance(dout, spaces.Dim):
+			dout = dout.width
+
+		if width is not None:
+			if din is None:
+				din = width
+			elif dout is None:
+				dout = width
+
+		return self.product()(din, dout, bias=bias, **kwargs)
+
 
 @register_builder('mlp')
-class MLP(Architect, Function, nn.Sequential):
+class MLP(Buildable, Function, nn.Sequential):
 	def __init__(self, layers=None, **kwargs):
 		if layers is None:
 			kwargs = self._extract_hparams(kwargs)
@@ -145,7 +160,7 @@ class MLP(Architect, Function, nn.Sequential):
 	bias = hparam(True)
 	out_bias = hparam(True)
 
-	@agnosticmethod
+	@agnostic
 	def _expand_dim(self, dim):
 		if isinstance(dim, int):
 			dim = [dim]
@@ -155,23 +170,23 @@ class MLP(Architect, Function, nn.Sequential):
 			return dim.expanded_shape
 		raise NotImplementedError(dim)
 
-	@agnosticmethod
+	@agnostic
 	def _create_nonlin(self, ident=None, **kwargs):
 		if ident is None:
 			return None
 		return self.get_hparam('nonlin').get_builder().build(ident=ident, **kwargs)
 
-	@agnosticmethod
+	@agnostic
 	def _create_norm(self, norm, width, spatial_dim=1, **kwargs):
 		if norm is None:
 			return None
 		return self.get_hparam('norm').get_builder().build(norm, width=width, spatial_dim=spatial_dim, **kwargs)
 
-	@agnosticmethod
+	@agnostic
 	def _create_linear_layer(self, din, dout, bias=True):
 		return nn.Linear(din, dout, bias=bias)
 
-	@agnosticmethod
+	@agnostic
 	def _build_layer(self, din, dout, nonlin=unspecified_argument, norm=unspecified_argument,
 	                 dropout=None, bias=unspecified_argument):
 
@@ -212,7 +227,7 @@ class MLP(Architect, Function, nn.Sequential):
 			layers.append(Reshaper(out_shape))
 		return dout, layers
 
-	@agnosticmethod
+	@agnostic
 	def _build_outlayer(self, din, dout, nonlin=unspecified_argument, norm=unspecified_argument,
 	                    dropout=None, bias=unspecified_argument, **kwargs):
 		if nonlin is unspecified_argument:
@@ -223,7 +238,7 @@ class MLP(Architect, Function, nn.Sequential):
 			bias = self.out_bias
 		return self._build_layer(din, dout, nonlin=nonlin, norm=norm, dropout=dropout, bias=bias, **kwargs)[1]
 
-	@agnosticmethod
+	@agnostic
 	def _build_layers(self, din, dout, hidden=()):
 		layers = []
 		start_dim, end_dim = din, din
@@ -233,7 +248,7 @@ class MLP(Architect, Function, nn.Sequential):
 		layers.extend(self._build_outlayer(end_dim, dout))
 		return layers
 
-	@agnosticmethod
+	@agnostic
 	def _build(self, din, dout, hidden, nonlin, norm, bias=True, **kwargs):
 		return super()._build(din=din, dout=dout, hidden=hidden, nonlin=nonlin, norm=norm, bias=bias, **kwargs)
 		

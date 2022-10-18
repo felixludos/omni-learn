@@ -2,7 +2,7 @@ from omnibelt import agnosticmethod
 import torch
 from torch import nn
 from omnidata.framework import Trainer, TrainableModel, \
-	machine, hparam, inherit_hparams, Parameterized, Builder, register_builder, get_builder, spaces
+	machine, hparam, inherit_hparams, Parameterized, AbstractBuilder, register_builder, get_builder, spaces
 
 
 
