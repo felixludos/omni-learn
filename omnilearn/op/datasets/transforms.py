@@ -10,7 +10,7 @@ from bisect import bisect_right
 
 from ... import util
 
-from omnifig import AutoModifier, Modification
+# from omnifig import AutoModifier, Modification
 
 from ...data import register_dataset, Deviced, ImageDataset, Dataset, Batchable, wrap_dataset, DatasetWrapper
 
@@ -32,7 +32,7 @@ class Concat(Dataset):
 		return self.datasets[idx][item - int(self.cumlens[int(idx-1)]) if idx > 0 else item]
 
 
-@DatasetWrapper('cropped')
+#@DatasetWrapper('cropped')
 class Cropped(ImageDataset):
 	'''
 	Parent dataset must have a din that is an image
@@ -90,7 +90,7 @@ class Cropped(ImageDataset):
 
 
 
-@AutoModifier('interpolated')
+# @AutoModifier('interpolated')
 class Interpolated(ImageDataset):
 	def __init__(self, A, interpolate_size=unspecified_argument, interpolate_mode=None, din=None, **kwargs):
 

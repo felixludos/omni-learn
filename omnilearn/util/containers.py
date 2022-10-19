@@ -149,7 +149,7 @@ class TensorList(Movable, list):
 				self[i] = x
 
 
-@fig.AutoModifier('smart-results')
+#@fig.AutoModifier('smart-results')
 class SmartResults(HierarchyPersistent):
 	def _save_datafile(self, data, path, ext=unspecified_argument, overwrite=False,
 	                   separate_dict=True, recursive=False, _save_fn=None):

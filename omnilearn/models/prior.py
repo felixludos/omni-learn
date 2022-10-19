@@ -40,7 +40,7 @@
 # 	def sample_prior(self, N=1):
 # 		return torch.randn(N, self.prior_dim, device=self.device)
 #
-# @fig.Component('adain')
+# #@fig.Component('adain')
 # class AdaIN(StorablePrior, fm.FunctionBase):
 #
 # 	def __init__(self, A):
@@ -101,7 +101,7 @@
 # 		return s*c + m
 #
 #
-# @fig.Component('style')
+# #@fig.Component('style')
 # class StyleModel(MultiLayer, StorablePrior):
 #
 # 	def _create_layers(self, A):

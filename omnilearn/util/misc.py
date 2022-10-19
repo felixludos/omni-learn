@@ -25,7 +25,8 @@ import random
 FD_PATH = os.path.dirname(os.path.dirname(__file__))
 
 # fig.register_config_dir(os.path.join(os.path.dirname(FD_PATH), 'config'))
-fig.register_config('origin', os.path.join(os.path.dirname(FD_PATH), 'config', 'origin.yaml'))
+print('WARNING: not registering config dir')
+# fig.register_config('origin', os.path.join(os.path.dirname(FD_PATH), 'config', 'origin.yaml'))
 
 DEFAULT_DATA_PATH = os.path.join(os.path.dirname(FD_PATH),'local_data')
 DEFAULT_SAVE_PATH = os.path.join(os.path.dirname(FD_PATH),'trained_nets')
@@ -67,16 +68,14 @@ def create_param(*sizes, requires_grad=True):
 
 
 
-@fig.Component('progress-bar')
-class Progress_Bar(Singleton):
-	def __init__(self, A):
-		ptype = A.pull('display-on', 'cmd')
-		
-		self._pbar_cls = tqdm_notebook if ptype in {'notebook', 'jupyter'} else tqdm
+# @fig.component('progress-bar')
+class Progress_Bar(Singleton, fig.Configurable):
+	def __init__(self, display_on='cmd', limit=None):
+		self._pbar_cls = tqdm_notebook if display_on in {'notebook', 'jupyter'} else tqdm
 		self.pbar = None
 		self.pbariter = None
 		
-		self.default_limit = A.pull('limit', None)
+		self.default_limit = limit
 		
 		self.pause_state = None
 		self._val = None

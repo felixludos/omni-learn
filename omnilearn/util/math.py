@@ -145,8 +145,8 @@ def logify(x, eps=1e-15):
 	v = x.abs().add(eps).log().add(1)
 	return ok * x + high * v - low * v
 
-@fig.Component('logifier')
-class Logifier(nn.Module):
+# @fig.component('logifier')
+class Logifier(nn.Module, fig.Configurable):
 	def __init__(self, eps=1e-15):
 		super().__init__()
 		self.eps = eps
@@ -161,12 +161,12 @@ def unlogify(x):
 	v = x.abs().sub(1).exp()
 	return ok * x + high * v - low * v
 
-@fig.Component('unlogifier')
-class Unlogifier(nn.Module):
+# @fig.component('unlogifier')
+class Unlogifier(nn.Module, fig.Configurable):
 	def forward(self, x):
 		return unlogify(x)
 
-@fig.AutoComponent('regularization')
+# @fig.autocomponent('regularization')
 def get_regularization(ident, p=2, dim=1, reduction='mean'):
 
 	if not isinstance(ident, str):
@@ -194,7 +194,7 @@ class Swish(nn.Module):
 		return x * torch.sigmoid(x)
 
 # Choose non-linearities
-@fig.AutoComponent('nonlin')
+# @fig.autocomponent('nonlin')
 def get_nonlinearity(ident, dim=1, inplace=True, **kwargs):
 
 	if ident is None:
@@ -233,7 +233,7 @@ def get_nonlinearity(ident, dim=1, inplace=True, **kwargs):
 	else:
 		assert False, "Unknown nonlin type: " + ident
 
-@fig.AutoComponent('lp-norm')
+# #@fig.AutoComponent('lp-norm')
 class Lp_Normalization(nn.Module):
 	def __init__(self, p=2, dim=1, eps=1e-8):
 		super().__init__()
@@ -247,7 +247,7 @@ class Lp_Normalization(nn.Module):
 	def forward(self, x):
 		return F.normalize(x, p=self.p, dim=self.dim, eps=self.eps)
 
-@fig.AutoComponent('normalization1d')
+# #@fig.AutoComponent('normalization1d')
 def get_normalization1d(ident, width, groups=8, p=2, **kwargs):
 	if not isinstance(ident, str):
 		return ident
@@ -267,7 +267,7 @@ def get_normalization1d(ident, width, groups=8, p=2, **kwargs):
 	raise Exception(f'unknown norm type: {ident}')
 
 
-@fig.AutoComponent('normalization')
+# #@fig.AutoComponent('normalization')
 def get_normalization(ident, channels, groups=8, p=2, **kwargs):
 
 	if not isinstance(ident, str):
@@ -287,7 +287,7 @@ def get_normalization(ident, channels, groups=8, p=2, **kwargs):
 		return nn.GroupNorm(groups, channels, **kwargs)
 	raise Exception(f'unknown norm type: {ident}')
 
-@fig.AutoComponent('down-pooling')
+# #@fig.AutoComponent('down-pooling')
 def get_pooling(ident, down, chn=None):
 	if not isinstance(ident, str):
 		return ident
@@ -305,7 +305,7 @@ def get_pooling(ident, down, chn=None):
 
 	raise Exception(f'unknown pool type: {ident}')
 
-@fig.AutoComponent('up-pooling')
+# #@fig.AutoComponent('up-pooling')
 def get_upsample(ident, up=2, size=None, channels=None):
 	if not isinstance(ident, str):
 		return ident

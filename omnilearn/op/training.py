@@ -25,7 +25,7 @@ class RunEvent(Freq):
 	def purge(self):
 		pass
 
-@fig.Component('run/epoch')
+#@fig.Component('run/epoch')
 class Epoch(RunEvent):
 	def __init__(self, A, **kwargs):
 		step_limit = A.pull('step-limit', None)
@@ -220,7 +220,7 @@ class Epoch(RunEvent):
 		if records is not None:
 			records.switch_to(prev_mode)
 	
-@fig.Component('run/checkpoint')
+#@fig.Component('run/checkpoint')
 class Checkpointer(RunEvent):
 	def __init__(self, A, **kwargs):
 		
@@ -339,7 +339,7 @@ class Checkpointer(RunEvent):
 		info.update_ckpt_path(path)
 		
 		
-@fig.Component('run/viz')
+#@fig.Component('run/viz')
 class VizStep(RunEvent):
 	def __init__(self, A, **kwargs):
 		
@@ -366,7 +366,7 @@ class VizStep(RunEvent):
 			model.visualize(out, records)
 
 
-@fig.Component('run/print')
+#@fig.Component('run/print')
 class PrintStep(RunEvent):
 	def activate(self, tick, info=None):
 		if info is not None:
@@ -375,7 +375,7 @@ class PrintStep(RunEvent):
 			sys.stdout.flush()
 
 
-@fig.Script('legacy-train', description='Train new/existing models')
+#@fig.Script('legacy-train', description='Train new/existing models')
 def old_iterative_training(A=None, run=None):
 	'''
 	This is the entry for the training script for new or existing runs.
@@ -403,7 +403,7 @@ def old_iterative_training(A=None, run=None):
 	return run
 
 
-@fig.Script('train', description='Train new/existing models')
+#@fig.Script('train', description='Train new/existing models')
 def trainer_fit(A):
 	
 	trainer = A.pull('trainer', None)

@@ -67,7 +67,7 @@ class Prior(Generative):
 # 	def _simple_prior_sampling(self, *shape, **kwargs):
 # 		raise NotImplementedError
 
-@fig.AutoModifier('gaussian-prior')
+#@fig.AutoModifier('gaussian-prior')
 class Gaussian(Prior):
 	def get_prior(self, N=1, *shape):
 		if len(shape) == 0:
@@ -77,13 +77,13 @@ class Gaussian(Prior):
 	# def _simple_prior_sampling(self, *shape, **kwargs):
 	# 	return torch.randn(*shape, **kwargs)
 
-# @fig.AutoModifier('uniform-prior')
+# #@fig.AutoModifier('uniform-prior')
 # class Uniform(SimplePrior):
 # 	def _simple_prior_sampling(self, *shape, **kwargs):
 # 		return torch.rand(*shape, **kwargs)
 
 
-@fig.AutoModifier('prior-tfm') # for the generator
+#@fig.AutoModifier('prior-tfm') # for the generator
 class Transformed(Prior):
 	def __init__(self, A, **kwargs):
 
@@ -116,7 +116,7 @@ class Transformed(Prior):
 
 # TODO: setup mixture model initalization
 
-@fig.AutoModifier('distrib')
+#@fig.AutoModifier('distrib')
 class Distribution(Stochastic):
 	'''Automodifier that turns a function output into a distribution'''
 	def __init__(self, A, autosample=None, distrib_cls=None, joint_params=None, modify_out_layer=None,
@@ -260,18 +260,18 @@ class Distribution(Stochastic):
 
 
 
-@fig.AutoModifier('normal')
+#@fig.AutoModifier('normal')
 class Normal(Distribution):
 	def __init__(self, A, distrib_cls=None, **kwargs):
 		super().__init__(A, distrib_cls=util.get_distribution_base('normal'), **kwargs)
 
-@fig.AutoModifier('beta')
+#@fig.AutoModifier('beta')
 class Beta(Distribution):
 	def __init__(self, A, distrib_cls=None, **kwargs):
 		super().__init__(A, distrib_cls=util.get_distribution_base('beta'), **kwargs)
 #
 #
-# @fig.AutoModifier('kumaraswamy')
+# #@fig.AutoModifier('kumaraswamy')
 # class Kumaraswamy(Distribution):
 # 	def __init__(self, A, distrib_cls=None, **kwargs):
 # 		super().__init__(A, distrib_cls=util.get_distribution_base('kumaraswamy'), **kwargs)

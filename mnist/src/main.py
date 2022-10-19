@@ -16,7 +16,7 @@ from omnilearn.novo import trainers
 from omnilearn.novo import MLP
 
 
-@fig.Script('test')
+#@fig.Script('test')
 def _test_script(A):
 
 	print(A.pull('a'))
@@ -110,8 +110,8 @@ class Supervised_Model(Supervised_Model, MLP):
 
 
 
-# @fig.Component('simple')
-class Old_Simple_Model(learn.Model):
+# #@fig.Component('simple')
+class Old_Simple_Model:#(learn.Model):
 	def __init__(self, info):
 
 		net = info.pull('net')

@@ -286,7 +286,7 @@ class Buildable(Configurable):
 
 
 
-@fig.Component('builder')
+# #@fig.Component('builder')
 class Builder(Buildable):
 	def __init__(self, A, source=unspecified_argument, **kwargs):
 		if source is unspecified_argument:

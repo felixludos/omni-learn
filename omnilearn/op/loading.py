@@ -20,8 +20,8 @@ class CompatibilityUnpickler(pickle.Unpickler):
 
 CompatibilityUnpickler.Unpickler = CompatibilityUnpickler
 
-# @fig.AutoModifier('torch')
-@fig.Component('run')
+# #@fig.AutoModifier('torch')
+#@fig.Component('run')
 class Torch_Run(Run):
 
 	def _save_datafile(self, data, path, _save_fn=None, **kwargs):
@@ -55,7 +55,7 @@ def respect_config(A):
 	A.push('seed', util.gen_random_seed(), overwrite=False, silent=False)
 	
 #
-# @fig.Script('load_config')
+# #@fig.Script('load_config')
 # def load_config(A):
 #
 #
@@ -87,7 +87,7 @@ def respect_config(A):
 # 	return A
 
 #
-# @fig.Script('load_records')
+# #@fig.Script('load_records')
 # def load_records(A):
 #
 # 	last = A.pull('last', False)
@@ -113,5 +113,5 @@ def respect_config(A):
 #
 
 # fig.register_config_dir(str(_config_root)) # WARNING: overrides debug
-fig.register_config('origin', str(_config_root/'origin.yaml'))
+# fig.register_config('origin', str(_config_root/'origin.yaml'))
 

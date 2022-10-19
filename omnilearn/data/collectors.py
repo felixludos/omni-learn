@@ -18,7 +18,7 @@ from .loaders import Featured_DataLoader
 
 from .. import util
 
-class DataLike(util.Preparable, fig.Cerifiable):
+class DataLike(util.Preparable):
 	pass
 
 # region DatasetBases

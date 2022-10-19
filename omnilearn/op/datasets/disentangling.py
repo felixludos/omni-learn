@@ -48,7 +48,7 @@ def _rec_decode(obj):
 
 
 
-@fig.AutoModifier('selected')
+#@fig.AutoModifier('selected')
 class Selected(Splitable):
 	def __init__(self, A, ordered=unspecified_argument, unordered=unspecified_argument,
 	             reject=unspecified_argument, invert=None, eval_name=None, **kwargs):

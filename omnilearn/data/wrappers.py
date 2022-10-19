@@ -30,9 +30,10 @@ class Wrapper_Registry(Class_Registry, components=['activate_fn', 'rewrappable']
 			if rewrappable:
 				def _chain_wrapper(base):
 					return wrap_class(val, base, chain=False)
-				fig.Modifier(name)(_chain_wrapper)
+				# fig.Modifier(name)(_chain_wrapper)
 			else:
-				fig.AutoModifier(name)(val)
+				# fig.AutoModifier(name)(val)
+				pass
 
 			entry = super()._register(val, name=name, activate_fn=activate_fn, rewrappable=rewrappable, **params)
 
@@ -95,14 +96,14 @@ def wrap_dataset(wrapper, dataset, *args, **kwargs):
 
 
 
-@DatasetWrapper('indexed')
+#@DatasetWrapper('indexed')
 class Indexed(DatasetBase):
 	def __getitem__(self, idx):
 		return idx, super().__getitem__(idx)
 
 
 
-@DatasetWrapper('shuffled')
+#@DatasetWrapper('shuffled')
 class Shuffled(DatasetBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -129,7 +130,7 @@ class Shuffled(DatasetBase):
 
 
 
-@DatasetWrapper('subset', rewrappable=True)
+#@DatasetWrapper('subset', rewrappable=True)
 class Subset(Dataset):
 	def __init__(self, A, indices=unspecified_argument, num=unspecified_argument, shuffle=unspecified_argument,
 	             update_data=unspecified_argument, **kwargs):
@@ -167,7 +168,7 @@ class Subset(Dataset):
 		self._subset_indices = indices
 
 
-	# @DatasetWrapper.condition(Observation)
+	# #@DatasetWrapper.condition(Observation)
 	# def get_observations(self, idx=None):
 	# 	if self._subset_indices is None:
 	# 		return super().get_observations(idx=idx)
@@ -176,7 +177,7 @@ class Subset(Dataset):
 	# 	return util.pytorch_collate([self[i][0] for i in range(len(self))])
 	#
 	#
-	# @DatasetWrapper.condition(Supervised)
+	# #@DatasetWrapper.condition(Supervised)
 	# def get_targets(self, idx=None):
 	# 	if self._subset_indices is None:
 	# 		return super().get_targets(idx=idx)
@@ -194,7 +195,7 @@ class Subset(Dataset):
 
 
 
-@DatasetWrapper('single-label')
+#@DatasetWrapper('single-label')
 class SingleLabel(Dataset):
 	def __init__(self, A, idx=None, **kwargs):
 		if idx is None:
@@ -236,7 +237,7 @@ class SingleLabel(Dataset):
 
 
 
-	# @DatasetWrapper.condition(Supervised)
+	# #@DatasetWrapper.condition(Supervised)
 	# def get_targets(self, idx=None):
 	# 	return super().get_targets(idx=idx).narrow(-1, self._label_idx, 1)
 
@@ -250,7 +251,7 @@ class SingleLabel(Dataset):
 
 
 
-# @DatasetWrapper('repeated')
+# #@DatasetWrapper('repeated')
 class Repeated(Dataset):
 	def __init__(self, A, factor=unspecified_argument, **kwargs):
 
@@ -288,7 +289,7 @@ class Repeated(Dataset):
 
 
 
-# @DatasetWrapper('format')
+# #@DatasetWrapper('format')
 class Formatted(Dataset):
 	def __init__(self, A, format_fn=unspecified_argument, format_args=None, include_original=None, **kwargs):
 

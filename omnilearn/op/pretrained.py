@@ -15,13 +15,13 @@ from .. import util
 from .framework import Function, FunctionWrapper, Encodable
 
 
-@fig.AutoModifier('extractor')
+#@fig.AutoModifier('extractor')
 class Extractor(Named, Encodable, Function):
 	pass
 
 
 
-@fig.Component('_pretrained')
+#@fig.Component('_pretrained')
 def build_pretrained(A, ID=None, pretrained=None, model_kwargs=None, include_config_args=None):
 
 	if ID is None:
@@ -52,7 +52,7 @@ def build_pretrained(A, ID=None, pretrained=None, model_kwargs=None, include_con
 
 
 
-@fig.Component('pretrained')
+#@fig.Component('pretrained')
 class Pretrained(FunctionWrapper):
 	def __init__(self, A, function=None, ID=None, pretrained=None, model_kwargs={}, include_config_args=None,
 	             fine_tune=None,
@@ -84,7 +84,7 @@ class Pretrained(FunctionWrapper):
 
 
 
-@fig.Component('feature-extractor')
+#@fig.Component('feature-extractor')
 class FeatureExtractor(Pretrained, Extractor):
 	def __init__(self, A, feature_sel=unspecified_argument, model_kwargs=None,
 	             features_only=unspecified_argument, reshape=None,

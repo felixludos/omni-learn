@@ -509,13 +509,13 @@ class SingleLabelEstimator(ScikitEstimator): # dout must be 1 (dof)
 
 
 
-# @fig.AutoModifier('discretized')
+# #@fig.AutoModifier('discretized')
 class Discretized(ScikitEstimator): # must be a boundd space
 	pass
 
 
 
-# @fig.AutoModifier('continuized')
+# #@fig.AutoModifier('continuized')
 class Continuized(ScikitEstimator): # must be a categorical space
 	pass
 
@@ -586,7 +586,7 @@ class ParallelEstimator(ScikitEstimatorBase):
 
 
 
-@fig.Component('joint-estimator')
+#@fig.Component('joint-estimator')
 class JointEstimator(ScikitEstimator, ParallelEstimator): # collection of single dim estimators (can be different spaces)
 	def __init__(self, A, estimators=unspecified_argument, **kwargs):
 		if estimators is unspecified_argument:
@@ -683,7 +683,7 @@ class Periodized(MultiEstimator, Regressor): # create a copy of the estimator fo
 
 
 
-@fig.Modifier('periodized', expects_config=False)
+#@fig.Modifier('periodized', expects_config=False)
 def _make_periodized(component):
 	def _periodized(config):
 		return Periodized(config, estimators=[component(config), component(config)])

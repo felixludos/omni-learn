@@ -15,7 +15,7 @@ from ... import util
 # from ...data import standard_split, Device_Dataset, Info_Dataset, Splitable_Dataset, Testable_Dataset, Batchable_Dataset, Image_Dataset
 
 
-@fig.Script('format-iam', description='Format IAM handwriting dataset')
+#@fig.Script('format-iam', description='Format IAM handwriting dataset')
 def format_iam(A):
 	
 	root = A.pull('root', '<>path', None)

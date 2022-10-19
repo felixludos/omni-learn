@@ -577,7 +577,7 @@ class DimSpecC(Configurable, DimSpec):
 
 
 
-@fig.Component('space/half-bound')
+#@fig.Component('space/half-bound')
 class HalfBoundDimC(DimSpecC, HalfBoundDim):
 	def __init__(self, A, bound=unspecified_argument, side=unspecified_argument,
 	             bound_type=unspecified_argument, epsilon=unspecified_argument, **kwargs):
@@ -596,7 +596,7 @@ class HalfBoundDimC(DimSpecC, HalfBoundDim):
 
 
 
-@fig.Component('space/bound')
+#@fig.Component('space/bound')
 class BoundDimC(DimSpecC, BoundDim):
 	def __init__(self, A, epsilon=unspecified_argument, **kwargs):
 		if epsilon is unspecified_argument:
@@ -605,13 +605,13 @@ class BoundDimC(DimSpecC, BoundDim):
 
 
 
-@fig.Component('space/unbound')
+#@fig.Component('space/unbound')
 class UnboundDimC(DimSpecC, UnboundDim):
 	pass
 
 
 
-@fig.Component('space/periodic')
+#@fig.Component('space/periodic')
 class PeriodicDimC(DimSpecC, PeriodicDim):
 	def __init__(self, A, period=unspecified_argument, **kwargs):
 		if period is unspecified_argument:
@@ -621,7 +621,7 @@ class PeriodicDimC(DimSpecC, PeriodicDim):
 
 
 
-@fig.Component('space/categorical')
+#@fig.Component('space/categorical')
 class CategoricalDimC(DimSpecC, CategoricalDim):
 	def __init__(self, A, n=unspecified_argument, **kwargs):
 		if n is unspecified_argument:
@@ -631,7 +631,7 @@ class CategoricalDimC(DimSpecC, CategoricalDim):
 
 
 
-@fig.Component('space/joint')
+#@fig.Component('space/joint')
 class JointSpaceC(DimSpecC, JointSpace):
 	def __init__(self, A, dims=unspecified_argument, **kwargs):
 		if dims is unspecified_argument:

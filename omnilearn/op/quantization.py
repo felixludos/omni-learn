@@ -60,7 +60,7 @@ class LZMACompression(Compressor):
 
 
 
-@fig.Component('lzma-compression')
+#@fig.Component('lzma-compression')
 class LZMACompressionC(fig.Configurable, LZMACompression):
 	pass
 
@@ -77,7 +77,7 @@ class Quantizer:
 
 
 
-@fig.Component('sigfig-quantizer')
+#@fig.Component('sigfig-quantizer')
 class SigfigQuantizer(Quantizer):
 	def __init__(self, sigfigs=3, **kwargs):
 		super().__init__(**kwargs)
@@ -111,7 +111,7 @@ class QuantizedCompressor(Quantizer, Compressor):
 
 
 
-@fig.Component('sigfig-lzma')
+#@fig.Component('sigfig-lzma')
 class SigfigLZMA(LZMACompressionC, QuantizedCompressor, SigfigQuantizer):
 	def __init__(self, A, sigfigs=None, **kwargs):
 		if sigfigs is None:

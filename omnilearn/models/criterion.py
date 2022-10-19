@@ -37,7 +37,7 @@ from .. import util
 
 
 
-@fig.AutoComponent('multigroup-cls')
+#@fig.AutoComponent('multigroup-cls')
 class MultiGroupClassification(fm.FunctionBase):
 	def __init__(self, group_sizes, group_weights=None):
 		super().__init__(sum(group_sizes), 1)

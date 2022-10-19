@@ -38,7 +38,7 @@ from .features import Configurable, Switchable, SwitchableBase
 
 
 
-# @fig.AutoModifier('reg-stats')
+# #@fig.AutoModifier('reg-stats')
 # class RegStats(StatsContainer):
 # 	def __init__(self, A, **kwargs):
 #
@@ -174,7 +174,7 @@ class StatsMeterBase(OrderedDict):
 
 
 
-@fig.Component('stats')
+# #@fig.Component('stats')
 class StatsMeter(Configurable, StatsMeterBase):
 	def __init__(self, A, meter_info=None, **kwargs):
 		if meter_info is None:
@@ -291,7 +291,7 @@ class StatsManagerBase(SwitchableBase, StatsMeterBase):
 
 
 
-@fig.Component('stats-manager')
+#@fig.Component('stats-manager')
 class StatsManager(Switchable, StatsManagerBase):
 
 	def __init__(self, A, collections=None, collection_fmts=None, **kwargs):
@@ -362,7 +362,7 @@ def set_default_tau(tau):
 	_tau = tau
 
 ### Computes sum/avg stats
-@fig.Component('meter')
+#@fig.Component('meter')
 class AverageMeter(Configurable):
 	"""Computes and stores the average and current value"""
 	def __init__(self, A=None, tau=None, **kwargs):

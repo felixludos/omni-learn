@@ -118,7 +118,7 @@ class InterventionSamplerBase(SamplerBase):
 		return self.inds_to_samples(inds)
 
 
-@fig.Component('intervention-sampler')
+#@fig.Component('intervention-sampler')
 class InterventionSampler(util.Configurable, InterventionSamplerBase):
 	def __init__(self, A, dataset=None, sizes=unspecified_argument, include_labels=None, **kwargs):
 		
@@ -135,7 +135,7 @@ class InterventionSampler(util.Configurable, InterventionSamplerBase):
 		                 _req_kwargs={'dataset':dataset, 'include_labels':include_labels}, **kwargs)
 
 
-@fig.AutoModifier('joint-sampler')
+#@fig.AutoModifier('joint-sampler')
 class JointFactorSampler(Dataset, util.Configurable, SamplerBase):
 	'''
 	for datasets of the type: (observation, factors)

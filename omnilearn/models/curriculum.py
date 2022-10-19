@@ -56,7 +56,7 @@ class Scheduler(util.Value, Savable, Reg, Freq):
 		raise NotImplementedError
 
 
-@fig.Component('scheduler/step')
+#@fig.Component('scheduler/step')
 class StepScheduler(Scheduler):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
@@ -72,7 +72,7 @@ class StepScheduler(Scheduler):
 		return self.factor * x
 
 
-@fig.Component('scheduler/multi-step')
+#@fig.Component('scheduler/multi-step')
 class MultiStepScheduler(StepScheduler):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
@@ -129,7 +129,7 @@ class FunctionScheduler(Scheduler):
 		raise NotImplementedError
 
 
-@fig.Component('scheduler/cos')
+#@fig.Component('scheduler/cos')
 class CosScheduler(FunctionScheduler):
 	def __init__(self, A, **kwargs):
 		trig = A.pull('trig', 'cos')
@@ -147,13 +147,13 @@ class CosScheduler(FunctionScheduler):
 		return (x0 - self.end) * (self.trig(self.nodes * math.pi * progress) + 1) / 2 + self.end
 
 
-@fig.Component('scheduler/exp')
+#@fig.Component('scheduler/exp')
 class ExpScheduler(FunctionScheduler):
 	def _func(self, progress, x0):
 		return x0 * (self.end / x0) ** progress
 
 
-@fig.Component('scheduler/lin')
+#@fig.Component('scheduler/lin')
 class LinScheduler(FunctionScheduler):
 	def _func(self, progress, x0):
 		return x0 - (x0 - self.end) * progress
@@ -215,7 +215,7 @@ class LinScheduler(FunctionScheduler):
 # 		raise NotImplementedError
 #
 #
-# @fig.Component('scheduler/step')
+# #@fig.Component('scheduler/step')
 # class StepScheduler(Scheduler):
 # 	def __init__(self, A, **kwargs):
 # 		super().__init__(A, **kwargs)
@@ -231,7 +231,7 @@ class LinScheduler(FunctionScheduler):
 # 		return self.factor * lr
 #
 #
-# @fig.Component('scheduler/multi-step')
+# #@fig.Component('scheduler/multi-step')
 # class MultiStepScheduler(StepScheduler):
 # 	def __init__(self, A, **kwargs):
 #
@@ -284,19 +284,19 @@ class LinScheduler(FunctionScheduler):
 # 		raise NotImplementedError
 #
 #
-# @fig.Component('scheduler/cos')
+# #@fig.Component('scheduler/cos')
 # class CosScheduler(FunctionScheduler):
 # 	def _func(self, progress, lr0):
 # 		return (lr0-self.min_lr) * (math.cos(math.pi * progress) + 1) / 2 + self.min_lr
 #
 #
-# @fig.Component('scheduler/exp')
+# #@fig.Component('scheduler/exp')
 # class ExpScheduler(FunctionScheduler):
 # 	def _func(self, progress, lr0):
 # 		return lr0 * (self.min_lr/lr0) ** progress
 #
 #
-# @fig.Component('scheduler/lin')
+# #@fig.Component('scheduler/lin')
 # class LinScheduler(FunctionScheduler):
 # 	def _func(self, progress, lr0):
 # 		return lr0 - (lr0-self.min_lr) * progress

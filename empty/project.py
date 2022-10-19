@@ -13,7 +13,7 @@ MY_PATH = os.path.dirname(os.path.abspath(__file__))
 
 trn.register_config_dir(os.path.join(MY_PATH, 'config'), recursive=True)
 
-@fd.Component('model')
+# @fd.Component('model')
 class Model(fd.Visualizable, fd.Model):
 	def __init__(self, info):
 

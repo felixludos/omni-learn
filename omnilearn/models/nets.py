@@ -27,7 +27,7 @@ class MLPBase(fm.FunctionBase, InitWall, nn.Sequential):
 		               bias=bias, output_bias=output_bias, **make_kwargs)
 		super().__init__(din=net.din, dout=net.dout, _req_args=tuple(net), **kwargs)
 
-@fig.Component('mlp')
+#@fig.Component('mlp')
 class MLP(fm.Function, MLPBase):
 	def __init__(self, A, din=unspecified_argument, dout=unspecified_argument,
 	             hidden=unspecified_argument, initializer=unspecified_argument,
@@ -70,7 +70,7 @@ class MLP(fm.Function, MLPBase):
 		                 bias=bias, output_bias=output_bias,
 		                 make_kwargs=make_kwargs, **kwargs)
 
-@fig.Component('multihead')
+#@fig.Component('multihead')
 class Multihead(fm.FunctionBase): # currently, the input dim for each head must be the same (but output can be different) TODO: generalize
 	def __init__(self, A):
 		
@@ -132,7 +132,7 @@ class Multihead(fm.FunctionBase): # currently, the input dim for each head must 
 		
 		return torch.cat(ys, dim=1)
 
-@fig.Component('multilayer') # used for CNNs
+#@fig.Component('multilayer') # used for CNNs
 class MultiLayer(fm.Function):
 
 	def __init__(self, A, layers=None, din=None, dout=None, in_order=None, **kwargs):

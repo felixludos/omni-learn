@@ -7,7 +7,7 @@ from .. import util
 
 from .loading import respect_config
 
-@fig.Script('eval', description='Evaluate an existing model')
+#@fig.Script('eval', description='Evaluate an existing model')
 def evaluate(A=None, run=None):
 	'''
 	Load and evaluate a model (by defaulting using the validation set)

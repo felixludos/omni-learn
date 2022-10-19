@@ -1,10 +1,10 @@
 import math
 import omnifig as fig
 
-from omnifig.config import ConfigList, ConfigIter
+# from omnifig.config import ConfigList, ConfigIter
 
 
-@fig.Component('pull')
+#@fig.Component('pull')
 def _config_pull(A):
 	terms = A.pull('_terms', '<>_term', silent=True)
 	args = A.pull('_args', {}, silent=True)
@@ -31,7 +31,7 @@ def _process_single(term, A):
 		return -val
 	raise Exception(f'unknown op: {op}')
 
-@fig.Component('expr')
+#@fig.Component('expr')
 def _config_expression(A):  # TODO: boolean ops
 
 	red = A.pull('_reduce', '<>_op', '+', silent=True)
@@ -71,8 +71,8 @@ def _config_expression(A):  # TODO: boolean ops
 	raise Exception(f'unkonwn caste: {caste}')
 
 
-@fig.Component('iter/repeat')
-class Repeat_Iter(ConfigIter):
+#@fig.Component('iter/repeat')
+class Repeat_Iter:
 	def __init__(self, A):
 		num = A.pull('_num', '<>_len')
 		unpack = A.pull('_unpack', False)
@@ -86,7 +86,7 @@ class Repeat_Iter(ConfigIter):
 		                 auto_pull=auto, include_key=include_key)
 
 
-@fig.Component('copy')
+#@fig.Component('copy')
 def copy_config(A):
 
 	src = A.pull('_src', None)

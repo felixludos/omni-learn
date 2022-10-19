@@ -71,11 +71,11 @@ class PriorStyleFusionLayer(Prior, StyleFusionLayer):
 		return super().forward(content, style=style, **kwargs)
 
 
-@fig.AutoModifier('gaussian-style')
+#@fig.AutoModifier('gaussian-style')
 class Gaussian(Gaussian, PriorStyleFusionLayer):
 	pass
 
-# @fig.AutoModifier('uniform-style')
+# #@fig.AutoModifier('uniform-style')
 # class Uniform(Uniform, PriorStyleFusionLayer):
 # 	pass
 
@@ -158,7 +158,7 @@ class StyleMultiLayer(MultiLayer):
 			layer.clear_style()
 
 
-@fig.Component('style-fusion')
+#@fig.Component('style-fusion')
 class StyleFusion(StyleFusionLayer, StyleMultiLayer):
 	def __init__(self, A, **kwargs):
 
@@ -197,7 +197,7 @@ class StyleFusion(StyleFusionLayer, StyleMultiLayer):
 
 
 
-@fig.Component('style-extractor')
+#@fig.Component('style-extractor')
 class StyleExtractor(StyleExtractorLayer, StyleMultiLayer):
 	def __init__(self, A, **kwargs):
 

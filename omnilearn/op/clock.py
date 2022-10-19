@@ -17,7 +17,7 @@ class AlertNotFoundError(Exception):
 		super().__init__(f'Could not find an alert named {name}')
 		self.name = name
 
-@fig.Component('clock/simple')
+#@fig.Component('clock/simple')
 class SimpleClock(Checkpointable, Configurable):
 	def __init__(self, A, skip_load=None, **kwargs):
 		
@@ -138,7 +138,7 @@ class SimpleClock(Checkpointable, Configurable):
 			self.tick(info=info)
 
 
-@fig.AutoModifier('clock/limit')
+#@fig.AutoModifier('clock/limit')
 class Limited(SimpleClock):
 	def __init__(self, A, **kwargs):
 		limit = A.pull('limit', None)
@@ -169,7 +169,7 @@ class Limited(SimpleClock):
 		return super().step(info=info, n=n)
 
 
-@fig.AutoModifier('clock/stats')
+#@fig.AutoModifier('clock/stats')
 class Stats(StatsClient, SimpleClock):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
@@ -187,7 +187,7 @@ class Stats(StatsClient, SimpleClock):
 		return val
 
 
-@fig.AutoModifier('clock/timed')
+#@fig.AutoModifier('clock/timed')
 class Timed(Stats):
 	def __init__(self, A):
 		super().__init__(A)
@@ -211,7 +211,7 @@ class Timed(Stats):
 		
 		return out
 
-@fig.Component('clock')
+#@fig.Component('clock')
 class Clock(Timed, Limited):
 	pass
 
@@ -263,7 +263,7 @@ class Alert(Configurable, AlertBase):
 
 
 
-@fig.AutoModifier('alert/reg')
+#@fig.AutoModifier('alert/reg')
 class Reg(Named, Alert):
 	def __init__(self, A, **kwargs):
 		super().__init__(A, **kwargs)
@@ -272,7 +272,7 @@ class Reg(Named, Alert):
 			clock.register_alert(self.get_name(), self)
 
 
-@fig.AutoModifier('alert/freq')
+#@fig.AutoModifier('alert/freq')
 class Freq(Alert):
 	def __init__(self, A, **kwargs):
 		zero = A.pull('include_zero', False)

@@ -15,7 +15,7 @@ import omnilearn as learn
 from omnilearn import util
 
 
-@fig.Component('point-enc')
+#@fig.Component('point-enc')
 class PointEncoder(learn.Encodable, learn.Visualizable, learn.FunctionBase):
 
 	def __init__(self, A):
@@ -57,7 +57,7 @@ class PointEncoder(learn.Encodable, learn.Visualizable, learn.FunctionBase):
 		return q
 
 
-@fig.AutoComponent('patch-points')
+#@fig.AutoComponent('patch-points')
 class Patch_Points(learn.FunctionBase):
 	'''
 	Converts an image into a set of unordered points where each point is a concat of the pixels of
@@ -118,7 +118,7 @@ class Patch_Points(learn.FunctionBase):
 		return p
 
 
-@fig.AutoComponent('1dconv-net')
+#@fig.AutoComponent('1dconv-net')
 def make_pointnet(pin, pout, hidden=None,
                   nonlin='prelu', output_nonlin=None):
 	if hidden is None:
@@ -138,7 +138,7 @@ def make_pointnet(pin, pout, hidden=None,
 	return net
 
 
-@fig.Component('point-net')
+#@fig.Component('point-net')
 class PointNet(learn.Model):
 	def __init__(self, A):
 
@@ -267,7 +267,7 @@ class PointJoin(PointNetModule):
 # Point-net operations
 
 
-@fig.AutoComponent('point-split')
+#@fig.AutoComponent('point-split')
 class PointSplitter(PointSplit):
 	def __init__(self, pin, split):
 		super().__init__(pin=pin, pout1=split, pout2=pin - split)
@@ -282,7 +282,7 @@ class PointSplitter(PointSplit):
 		return p[:, :self.split], p[:, self.split:]
 
 
-@fig.AutoComponent('point-buffer')
+#@fig.AutoComponent('point-buffer')
 class PointBuffer(PointSplit):
 	def __init__(self, pin, channels, N):
 		super().__init__(pin=pin, pout1=channels, pout2=pin)
@@ -301,7 +301,7 @@ class PointBuffer(PointSplit):
 		return p1, p2
 
 
-@fig.AutoComponent('point-transform-net')
+#@fig.AutoComponent('point-transform-net')
 class PointTransformNet(PointTransform):
 	def __init__(self, net):
 		super().__init__(net.pin, net.pout)
@@ -312,14 +312,14 @@ class PointTransformNet(PointTransform):
 		return self.net(p)
 
 
-@fig.AutoComponent('point-self')
+#@fig.AutoComponent('point-self')
 class PointSelfTransform(PointTransformNet):
 	def __init__(self, pin, pout, hidden=None, nonlin='prelu', output_nonlin=None):
 		super().__init__(make_pointnet(pin, pout, hidden=hidden, nonlin=nonlin,
 		                               output_nonlin=output_nonlin))
 
 
-@fig.AutoComponent('point-dual')
+#@fig.AutoComponent('point-dual')
 class PointDualTransform(PointParallel):
 	def __init__(self, left=None, right=None, pin1=None, pin2=None):
 
@@ -351,7 +351,7 @@ class PointDualTransform(PointParallel):
 		return p1, p2
 
 
-@fig.AutoComponent('point-swap')
+#@fig.AutoComponent('point-swap')
 class PointSwap(PointParallel):
 	def __init__(self, pin1, pin2):
 		super().__init__(pin1=pin1, pin2=pin2, pout1=pin2, pout2=pin1)
@@ -360,7 +360,7 @@ class PointSwap(PointParallel):
 		return p2, p1
 
 
-@fig.AutoComponent('point-cat')
+#@fig.AutoComponent('point-cat')
 class PointJoiner(PointJoin):
 	def __init__(self, pin1, pin2):
 		super().__init__(pin1=pin1, pin2=pin2, pout=pin1 + pin2)
@@ -369,7 +369,7 @@ class PointJoiner(PointJoin):
 		return torch.cat([p1, p2], dim=1)
 
 
-@fig.AutoComponent('point-wsum')
+#@fig.AutoComponent('point-wsum')
 class PointWeightedSum(learn.Cacheable, learn.Visualizable, PointJoin):
 
 	def __init__(self, pin1, pin2, heads=1, keys=1, norm_heads=False, sum_heads=True,
@@ -472,7 +472,7 @@ class PointWeightedSum(learn.Cacheable, learn.Visualizable, PointJoin):
 # 	pass
 
 
-@fig.AutoComponent('pool-points')
+#@fig.AutoComponent('pool-points')
 class Pool_Points(PointTransform):
 	def __init__(self, pin, fn='max', p=2):
 		super().__init__(pin, pin)
@@ -499,7 +499,7 @@ class Pool_Points(PointTransform):
 			return p.norm(p=self.p, dim=-1, keepdim=True)
 
 
-@fig.AutoComponent('concat-points')
+#@fig.AutoComponent('concat-points')
 class Concat_Points(PointTransform):
 	def __init__(self, pin, N=None, groups=1):
 		if N is None:

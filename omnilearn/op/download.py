@@ -10,7 +10,7 @@ from ..data import dataset_registry, Downloadable
 class DownloadError(Exception):
 	pass
 
-@fig.Script('download-dataset', description='Download and format a dataset')
+#@fig.Script('download-dataset', description='Download and format a dataset')
 def download_dataset(A, **kwargs):
 	'''
 	Download and format any registered dataset that subclasses `Downloadable` given the registered name.

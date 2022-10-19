@@ -200,7 +200,7 @@ class NSegReg_Base(fm.FunctionBase):
 
 
 
-@fig.Component('n-seg-reg')
+#@fig.Component('n-seg-reg')
 class NSegReg(fm.Function, fig.Configurable, NSegReg_Base):
 	'''Linear regression using N line segments in D dims'''
 	def __init__(self, A, n_seg=None, dim=unspecified_argument,

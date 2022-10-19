@@ -13,7 +13,7 @@ import omnifig as fig
 from .. import util
 
 
-@fig.AutoComponent('flip')
+#@fig.AutoComponent('flip')
 class RandomFlip(nn.Module):
 
 	def __init__(self, horizontal=None, vertical=None):
@@ -37,7 +37,7 @@ class RandomFlip(nn.Module):
 		return imgs
 
 
-@fig.AutoComponent('random-orientation')
+#@fig.AutoComponent('random-orientation')
 class RandomOrientation(nn.Module):
 
 	def forward(self, imgs, x=None):
@@ -74,7 +74,7 @@ class RandomOrientation(nn.Module):
 
 		return imgs
 
-@fig.AutoComponent('image-transform')
+#@fig.AutoComponent('image-transform')
 class Image_Transform(nn.Module):
 	def __init__(self, prob=None,
 	             flip_h=False, flip_w=False, rot_90=False,

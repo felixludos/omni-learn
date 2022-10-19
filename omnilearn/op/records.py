@@ -12,7 +12,7 @@ from .clock import Freq
 from .. import util
 from ..util.features import Configurable, Switchable, Checkpointable, Seed
 
-@fig.Component('records')
+#@fig.Component('records')
 class Records(Freq, Switchable, Seed, Configurable, dict):
 	def __init__(self, A, **kwargs):
 
@@ -202,7 +202,7 @@ class Records(Freq, Switchable, Seed, Configurable, dict):
 # 		self.import_(path)
 #
 #
-# @fig.Component('records')
+# #@fig.Component('records')
 # class Records(Checkpointed, SimpleRecords):
 # 	pass
 

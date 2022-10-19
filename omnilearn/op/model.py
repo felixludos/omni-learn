@@ -18,8 +18,8 @@ def load_checkpoint(path):  # model parameters - TODO: maybe add more options
 		return torch.load(path, map_location = "cpu")
 
 
-@fig.Script('load-model', description='Creates/loads a model')
-@fig.Component('model')
+#@fig.Script('load-model', description='Creates/loads a model')
+#@fig.Component('model')
 def load_model(A, silent=None):
 	'''
 	Creates the model and possibly loads existing model parameters

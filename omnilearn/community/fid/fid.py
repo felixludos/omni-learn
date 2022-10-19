@@ -17,7 +17,7 @@ from . import utils
 prt = get_printer(__name__)
 
 
-@fig.Component('inception-fid')
+#@fig.Component('inception-fid')
 class InceptionV3(FeatureExtractor):
 	def __init__(self, A, dim=None, function=unspecified_argument, **kwargs):
 		if dim is None:

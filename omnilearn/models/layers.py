@@ -111,9 +111,9 @@ def batched_grouped_linear(points, weights, masks, biases=None): # equivalent to
 
 	return out
 
-fig.AutoComponent('flatten')(nn.Flatten)
+#fig.AutoComponent('flatten')(nn.Flatten)
 
-@fig.AutoComponent('reshaper')
+#@fig.AutoComponent('reshaper')
 class Reshaper(nn.Module): # by default flattens
 
 	def __init__(self, dout=(-1,)):
@@ -128,7 +128,7 @@ class Reshaper(nn.Module): # by default flattens
 		B = x.size(0)
 		return x.view(B, *self.dout)
 
-@fig.Modification('spec-norm')
+#@fig.Modification('spec-norm')
 def spec_norm_layer(layer, config):
 	
 	kwargs = dict(
@@ -145,7 +145,7 @@ def spec_norm_layer(layer, config):
 # region Layers
 #################
 
-@fig.AutoComponent('recurrence')
+#@fig.AutoComponent('recurrence')
 class Recurrence(fm.FunctionBase):
 	def __init__(self, din, dout, hidden_dim=None, num_layers=1, output_nonlin=None,
 				 rec_type='gru', dropout=0., batch_first=False, bidirectional=False, auto_reset=True):
@@ -195,7 +195,7 @@ class Recurrence(fm.FunctionBase):
 
 		return out
 
-@fig.AutoComponent('fourier-layer')
+#@fig.AutoComponent('fourier-layer')
 class FourierLayer(fm.FunctionBase): # TODO: generalize period to multiple din
 	def __init__(self, din=1, dout=1, order=100, periods=None):
 		super().__init__(din, dout)
@@ -279,7 +279,7 @@ class Invertible(fm.FunctionBase):
 	def extra_repr(self):
 		return f'features={self.features}, bias={self.bias is not None}'
 
-@fig.AutoComponent('inv-layer')
+#@fig.AutoComponent('inv-layer')
 class InvertibleLayer(Invertible):
 	def __init__(self, A):
 		dim = A.pull('dim', '<>features', None)
@@ -327,7 +327,7 @@ class DenseLayerBase(fm.FunctionBase):
 		return self.layer(x)
 
 
-@fig.Component('dense-layer')
+#@fig.Component('dense-layer')
 class DenseLayer(fm.Function, DenseLayerBase):
 	def __init__(self, A, din=None, dout=None, bias=None, nonlin=None, **kwargs):
 		
@@ -414,7 +414,7 @@ class ConvLayerBase(fm.FunctionBase):
 
 
 
-@fig.Component('conv-layer')
+#@fig.Component('conv-layer')
 class ConvLayer(fm.Function, ConvLayerBase):
 
 	def __init__(self, A, din=None, dout=None, channels=None,
@@ -638,7 +638,7 @@ class ExpandedConvLayer(ConvLayer):
 		return super().forward(x)
 	
 	
-@fig.Component('coord-conv-layer')
+#@fig.Component('coord-conv-layer')
 class CoordConvLayer(ExpandedConvLayer):
 	def __init__(self, A, din=None, dout=None, channels=None, extra_channels=0, **kwargs):
 		super().__init__(A, din=din, dout=dout, channels=channels,
@@ -656,7 +656,7 @@ class CoordConvLayer(ExpandedConvLayer):
 		return torch.cat([x, coords], 1)
 
 
-@fig.AutoComponent('layer-norm')
+#@fig.AutoComponent('layer-norm')
 class LayerNorm(fm.FunctionBase):
 	def __init__(self, din, eps=1e-5, elementwise_affine=True):
 		super().__init__(din, din)
@@ -667,7 +667,7 @@ class LayerNorm(fm.FunctionBase):
 		return self.norm(x)
 
 
-@fig.AutoComponent('interpolate')
+#@fig.AutoComponent('interpolate')
 class Interpolate(fm.FunctionBase):
 	def __init__(self, din=None, size=None, scale_factor=None, mode='nearest',
 				 align_corners=None, recompute_scale_factor=None):
@@ -694,7 +694,7 @@ class Interpolate(fm.FunctionBase):
 							 recompute_scale_factor=self.recompute_scale_factor)
 
 
-@fig.AutoComponent('conv-lstm')
+#@fig.AutoComponent('conv-lstm')
 class ConvLSTM(fm.FunctionBase):
 	def __init__(self, input_dim, hidden_dim, kernel_size,
 				 batch_first=False, auto_reset=True,

@@ -86,7 +86,7 @@ def get_distrib_param_size(distrib_cls, key, dim):
 	return dim
 
 
-@fig.AutoComponent('distribution-base')
+#@fig.AutoComponent('distribution-base')
 def get_distribution_base(ident):
 	if not isinstance(ident, str):
 		return ident
@@ -132,11 +132,11 @@ _available_distributions = {k: type(f'{t.__name__}Function', (TorchDistribution,
                                  for k,t in _available_base_distributions.items()}
 locals().update({t.__name__:t for t in _available_distributions.values()})
 
-fig.Component('distribution/normal')(_available_distributions['normal'])
-fig.Component('distribution/categorical')(_available_distributions['categorical'])
-fig.Component('distribution/vonmises')(_available_distributions['vonmises'])
+# fig.Component('distribution/normal')(_available_distributions['normal'])
+# fig.Component('distribution/categorical')(_available_distributions['categorical'])
+# fig.Component('distribution/vonmises')(_available_distributions['vonmises'])
 
-@fig.AutoComponent('torch-distribution')
+#@fig.AutoComponent('torch-distribution')
 def get_torch_distribution(ident):
 	if not isinstance(ident, str):
 		return ident
@@ -144,11 +144,11 @@ def get_torch_distribution(ident):
 
 # class Normal(Distribution, _available_base_distributions['normal']):
 # 	pass
-# @fig.Component('distribution/categorical')
+# #@fig.Component('distribution/categorical')
 # class Categorical(Distribution, _available_base_distributions['categorical']):
 # 	pass
 #
-# @fig.Component('distribution/vonmises')
+# #@fig.Component('distribution/vonmises')
 # class VonMises(Distribution, _available_base_distributions['vonmises']):
 # 	pass
 

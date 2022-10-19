@@ -14,7 +14,7 @@ from .. import losses
 from ..features import Prior, Gaussian
 from ... import community
 
-@fig.Component('ae')
+#@fig.Component('ae')
 class Autoencoder(fm.Regularizable, fm.Encodable, fm.Decodable, fm.Model):
 	def __init__(self, A, encoder=None, decoder=None, din=None, dout=None, **other):
 
@@ -210,7 +210,7 @@ class Generative_AE(Prior, Autoencoder):
 		return self.decode(prior)
 
 
-@fig.Component('vae')
+#@fig.Component('vae')
 class Variational_Autoencoder(Generative_AE, Gaussian):
 	def __init__(self, A, include_bpd=None, include_elbo=None, **kwargs):
 
@@ -265,7 +265,7 @@ class Variational_Autoencoder(Generative_AE, Gaussian):
 		return util.standard_kl(q).sum() / q.loc.size(0)
 
 
-@fig.Component('wae')
+#@fig.Component('wae')
 class Wasserstein_Autoencoder(Generative_AE):  # MMD
 	def __init__(self, A, **kwargs):
 		A.push('reg', None)  # already taken care of

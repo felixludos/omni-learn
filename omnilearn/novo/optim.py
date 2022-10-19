@@ -2,9 +2,7 @@ import torch
 from torch import optim as O
 from omnibelt import agnosticmethod, unspecified_argument
 from omnidata.framework import hparam, inherit_hparams, Parameterized, register_builder, spaces, ClassBuilder
-from omnidata.framework.building import MultiBuilder
 from omnidata.framework.features import Prepared
-# from omnidata.framework import AutoClassArchitect
 
 
 class Optimizer(Parameterized, Prepared):
@@ -37,8 +35,8 @@ class PytorchOptimizer(ClassBuilder, Optimizer, O.Optimizer, create_registry=Tru
 
 
 	@agnosticmethod
-	def _build(self, ident='adam', parameters=None, **kwargs):
-		optim = super()._build(ident=ident, **kwargs)
+	def build(self, ident, parameters=None, **kwargs):
+		optim = super().build(ident=ident, **kwargs)
 		if parameters is not None:
 			optim.prepare(parameters=parameters)
 		return optim
@@ -73,7 +71,6 @@ class PytorchOptimizer(ClassBuilder, Optimizer, O.Optimizer, create_registry=Tru
 
 
 
-# @fig.AutoComponent('sgd', auto_name=False)
 class SGD(PytorchOptimizer, O.SGD, ident='sgd'):
 	lr = hparam(required=True)
 	momentum = hparam(0.)
@@ -134,7 +131,7 @@ class AdamLike(PytorchOptimizer):
 
 
 @inherit_hparams('lr', 'beta1', 'beta2', 'eps', 'weight_decay')
-class Adam(AdamLike, O.Adam, ident='adam', default=True):
+class Adam(AdamLike, O.Adam, ident='adam', is_default=True):
 	amsgrad = hparam(False)
 
 	# def __init__(self, lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8, weight_decay=0, amsgrad=False):

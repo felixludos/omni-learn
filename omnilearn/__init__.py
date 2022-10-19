@@ -1,24 +1,23 @@
-from . import util
-from . import op
-from . import data
-from . import community
-# from . import sim
-
-from . import models
-# from .framework import * # TODO: cleanup
-from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
-	Evaluatable, Visualizable, Function, Optimizable, TensorflowPort
+# from . import util
+# from . import op
+# from . import data
+# from . import community
+# # from . import sim
+#
+# from . import models
+# # from .framework import * # TODO: cleanup
+# from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
+# 	Evaluatable, Visualizable, Function, Optimizable, TensorflowPort
 
 from . import novo
 
-from omnibelt import get_printer
+# from omnibelt import get_printer
+# prt = get_printer(__name__)
 
-prt = get_printer(__name__)
-
-try:
-	from . import legacy
-except:
-	prt.info('Failed to important legacy models')
+# try:
+# 	from . import legacy
+# except:
+# 	prt.info('Failed to important legacy models')
 
 import os
 __info__ = {'__file__':os.path.join(os.path.abspath(os.path.dirname(__file__)), '_info.py')}

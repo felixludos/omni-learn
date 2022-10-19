@@ -9,7 +9,7 @@ from .wrappers import SingleLabelEstimator, Regressor, Classifier, FlatRegressor
 # A.push('default-regressor', 'gbt-regressor', overwrite=False)
 # A.push('default-classifier', 'gbt-classifier', overwrite=False)
 
-@fig.Component('gbt-regressor')
+#@fig.Component('gbt-regressor')
 class GBTRegressor(FlatRegressor, SingleLabelEstimator, GradientBoostingRegressor):
 	def __init__(self, A, loss=None, learning_rate=None, n_estimators=None,
 	             subsample=None, criterion=None, min_samples_split=None,
@@ -95,7 +95,7 @@ class GBTRegressor(FlatRegressor, SingleLabelEstimator, GradientBoostingRegresso
 
 
 
-@fig.Component('gbt-classifier')
+#@fig.Component('gbt-classifier')
 class GBTClassifier(Classifier, SingleLabelEstimator, GradientBoostingClassifier):
 	def __init__(self, A , loss=None, learning_rate=None, n_estimators=None, subsample=None, criterion=None,
 	             min_samples_split=None, min_samples_leaf=None, min_weight_fraction_leaf=None, max_depth=None,

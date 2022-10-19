@@ -9,7 +9,7 @@ from PIL import Image
 
 import omnifig as fig
 
-@fig.AutoComponent('logger')
+#@fig.AutoComponent('logger')
 class Logger(object):
 
 	def __init__(self, log_dir=None, tensorboard=False, txt=False, logfile=None, **kwargs):

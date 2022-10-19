@@ -11,7 +11,7 @@ from omnibelt import load_yaml, save_yaml, get_now, create_dir, get_printer, uns
 
 import omnifig as fig
 from omnifig import Configurable
-from omnifig.old.errors import MissingParameterError, MissingComponentError
+# from omnifig.old.errors import MissingParameterError, MissingComponentError
 
 prt = get_printer(__name__)
 
@@ -114,7 +114,7 @@ class RunNotFoundError(Exception):
 # 	pass
 
 
-@fig.Script('load-run', description='Load a new or existing run') # the script just loads a run
+#@fig.Script('load-run', description='Load a new or existing run') # the script just loads a run
 def load_run(A):
 	
 	silent = A.pull('silent', False, silent=True)
@@ -147,7 +147,7 @@ def load_run(A):
 	return A.pull_self()
 	
 	
-@fig.Component('run')
+#@fig.Component('run')
 class Run(Configurable, Persistent):
 	'''
 	Holds all the data and functions to load, save, train, and evaluate runs.
@@ -787,7 +787,7 @@ class Run(Configurable, Persistent):
 	# endregion
 
 
-@fig.AutoModifier('testable')
+#@fig.AutoModifier('testable')
 class Testable(Run):
 
 	def purge(self):
@@ -835,7 +835,7 @@ class Testable(Run):
 		return self.get_trainset().get_loader(mode, **kwargs)
 
 
-@fig.AutoModifier('inline')
+#@fig.AutoModifier('inline')
 class Inline(Run):
 	def _prep(self, A):
 
@@ -880,7 +880,7 @@ class Inline(Run):
 		return f'{mode}:{epochs} {ticks}/{limit} {progress}'
 
 		
-@fig.AutoModifier('timed-run')
+#@fig.AutoModifier('timed-run')
 class Timed(Run):
 	
 	def startup(self):
@@ -911,7 +911,7 @@ class Timed(Run):
 
 
 
-# @fig.AutoModifier('loadable') # TODO: works, but problem is model is created not through the config,
+# #@fig.AutoModifier('loadable') # TODO: works, but problem is model is created not through the config,
 ##                                    so ref pulls don't work
 # class Loadable(Run):
 # 	def __init__(self, A, load_path=unspecified_argument,

@@ -15,7 +15,7 @@ from ... import util
 # from ... import Generative
 from .fid import compute_inception_stat, load_inception_model
 
-@fig.Script('compute-fid', description='Compute an FID stat for a dataset or model')
+#@fig.Script('compute-fid', description='Compute an FID stat for a dataset or model')
 def compute_fid(A):
 
 	device = A.push('device', 'cuda' if torch.cuda.is_available() else 'cpu', overwrite=False)

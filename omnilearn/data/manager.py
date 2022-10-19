@@ -21,7 +21,7 @@ from .collectors import DataLike
 
 from ..op.clock import AlertBase
 
-@fig.Component('datamanager/simple-dataset')
+#@fig.Component('datamanager/simple-dataset')
 class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 	def __init__(self, A, mode='train', dataset_config=unspecified_argument,
 	             aliases=None, default_mode=None, **kwargs):
@@ -151,7 +151,7 @@ class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):
 
 
 
-@fig.AutoModifier('datamanager/loadable')
+#@fig.AutoModifier('datamanager/loadable')
 class Loadable(SimpleDataManager):
 	def __init__(self, A, **kwargs): # TODO arg defaults
 		num_workers = A.pull('num_workers', 0)
@@ -230,7 +230,7 @@ class Loadable(SimpleDataManager):
 
 
 
-@fig.AutoModifier('datamanager/splitable')
+#@fig.AutoModifier('datamanager/splitable')
 class Splitable(SimpleDataManager):
 	def __init__(self, A, skip_load=None, **kwargs):
 		
@@ -318,7 +318,7 @@ class Splitable(SimpleDataManager):
 
 
 
-@fig.AutoModifier('datamanager/sharable')
+#@fig.AutoModifier('datamanager/sharable')
 class Sharable(SimpleDataManager):
 	def __init__(self, A, _modes=None, _current_mode=None, **kwargs):
 		super().__init__(A, **kwargs)
@@ -343,7 +343,7 @@ class Sharable(SimpleDataManager):
 
 
 
-@fig.AutoModifier('datamanager/wrapable')
+#@fig.AutoModifier('datamanager/wrapable')
 class Wrapable(Sharable):
 	def __init__(self, A, wrappers=unspecified_argument, mode_wrappers=unspecified_argument, **kwargs):
 		if wrappers is unspecified_argument:
@@ -652,7 +652,7 @@ class InfoManager(Checkpointable, Active):
 
 
 
-@fig.Script('load-data', description='Load datasets')
+#@fig.Script('load-data', description='Load datasets')
 def load_data(A):
 
 	info = A.pull('dataset', None, raw=True)
@@ -667,7 +667,7 @@ def load_data(A):
 
 
 
-@fig.Component('dataset')
+#@fig.Component('dataset')
 class DataManager(InfoManager, Wrapable, Splitable, Statistics, SimpleDataManager):
 	def __init__(self, A, skip_load=None, **kwargs):
 		super().__init__(A, **kwargs)

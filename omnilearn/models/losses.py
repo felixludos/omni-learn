@@ -105,21 +105,21 @@ class Loss(fm.FunctionBase):
 
 
 
-@fig.AutoModifier('loss/invert')
+#@fig.AutoModifier('loss/invert')
 class Inverted(Loss):
 	def forward(self, *args, **kwargs):
 		return 1 / super().forward(*args, **kwargs)
 
 
 
-@fig.AutoModifier('loss/negative')
+#@fig.AutoModifier('loss/negative')
 class Negative(Loss):
 	def forward(self, *args, **kwargs):
 		return - super().forward(*args, **kwargs)
 
 
 
-@fig.Component('ms-ssim')
+#@fig.Component('ms-ssim')
 class MSSSIM(Loss, pytorch_msssim.MS_SSIM):
 	def __init__(self, size_average=False, _req_kwargs={}, **kwargs):
 		super().__init__(_req_kwargs={'size_average':size_average, **_req_kwargs}, **kwargs)
@@ -130,7 +130,7 @@ class MSSSIM(Loss, pytorch_msssim.MS_SSIM):
 
 
 
-@fig.Component('psnr')
+#@fig.Component('psnr')
 class PSNR(Loss):
 	@staticmethod
 	def _forward(img1, img2):
@@ -139,21 +139,21 @@ class PSNR(Loss):
 
 
 
-@fig.Component('frechet-distance')
+#@fig.Component('frechet-distance')
 class FrechetDistance(Loss):
 	def _forward(self, p, q):
 		return util.frechet_distance(p, q)
 
 
 
-@fig.Component('bits-per-dim')
+#@fig.Component('bits-per-dim')
 class BitsPerDim(Loss):
 	def _forward(self, reconstruction, original, **kwargs):
 		return bits_per_dim(reconstruction, original, reduction='none')
 
 
 
-@fig.Component('elbo')
+#@fig.Component('elbo')
 class ELBO(Loss):
 	def _forward(self, reconstruction, original, **kwargs):
 		return elbo(reconstruction, original, reduction='none')
@@ -196,7 +196,7 @@ class PytorchLoss(Loss, _Loss):
 
 
 
-@fig.AutoComponent('distrib-nll')
+#@fig.AutoComponent('distrib-nll')
 class DistributionNLLLoss(Loss):
 	def __init__(self, mn_lim=None, mx_lim=None, **kwargs):
 		super().__init__(**kwargs)
@@ -293,8 +293,8 @@ class CosineSimilarity(PytorchLoss, nn.CosineSimilarity):
 
 
 
-@fig.AutoComponent('criterion') # TODO: legacy
-@fig.AutoComponent('loss')
+#@fig.AutoComponent('criterion') # TODO: legacy
+#@fig.AutoComponent('loss')
 def get_loss_type(ident, **kwargs):
 
 	if not isinstance(ident, str):
@@ -337,7 +337,7 @@ def get_loss_type(ident, **kwargs):
 
 
 
-@fig.AutoComponent('viz-criterion')
+#@fig.AutoComponent('viz-criterion')
 class Viz_Criterion(nn.Module):
 	def __init__(self, criterion, arg_names=[], kwarg_names=[],
 				 allow_grads=False):

@@ -6,7 +6,7 @@ import omnifig as fig
 from ... import util
 
 
-@fig.Component('fid')
+#@fig.Component('fid')
 class ComputeFID(util.Deviced):  # TODO: turn into an alert and stats client
 	def __init__(self, A, dim=None, ret_stats=None,
 	             batch_size=None, n_samples=None, **kwargs):

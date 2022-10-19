@@ -9,7 +9,7 @@ from sklearn.cluster import KMeans as SK_KMeans
 from .wrappers import SingleLabelEstimator, Regressor, Classifier, Clustering, Outlier
 
 
-@fig.Component('kmeans')
+#@fig.Component('kmeans')
 class KMeans(Clustering, SK_KMeans):
 	def __init__(self, A, n_clusters=None, init=None, n_init=None, max_iter=None, tol=None, verbose=None,
 	             random_state=unspecified_argument, copy_x=None, algorithm=None, **kwargs):
@@ -46,7 +46,7 @@ class KMeans(Clustering, SK_KMeans):
 
 
 
-@fig.Component('isolation-forest')
+#@fig.Component('isolation-forest')
 class IsolationForest(Outlier, SK_IsolationForest):
 	def __init__(self, A, n_estimators=None, max_samples=None, contamination=None, max_features=None,
 	             bootstrap=None, n_jobs=unspecified_argument, random_state=unspecified_argument,

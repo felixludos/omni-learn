@@ -10,7 +10,7 @@ dataset_registry = util.Registry()
 
 def dataset_registration(name, dataset):
 	cmpn_name = f'dataset/{name}'
-	fig.Component(cmpn_name)(dataset)
+	# fig.Component(cmpn_name)(dataset)
 	
 	dataset_registry.new(name, cmpn_name)
 

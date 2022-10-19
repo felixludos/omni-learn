@@ -248,7 +248,7 @@ class Visualizable(Recordable):
 
 
 
-@fig.AutoModifier('optim')
+#@fig.AutoModifier('optim')
 class Optimizable(Function):
 
 	def __init__(self, A, **kwargs):
@@ -369,7 +369,7 @@ class Model(Seed, Savable, Trainable, Evaluatable, Visualizable, Function): # to
 
 
 
-@fig.AutoModifier('presentable')
+#@fig.AutoModifier('presentable')
 class Presentable(Function):
 	def __init__(self, A, batch_size=None, loader_args=None, **kwargs):
 		if batch_size is None:
@@ -405,35 +405,35 @@ class Stochastic(FunctionBase):
 
 
 
-@fig.AutoModifier('generative')
+#@fig.AutoModifier('generative')
 class Generative(Stochastic):
 	def generate(self, N=1):
 		return self._sample(N)
 
 
 
-@fig.AutoModifier('encodable')
+#@fig.AutoModifier('encodable')
 class Encodable(FunctionBase):
 	def encode(self, x): # by default this is just forward pass
 		return self(x)
 
 
 
-@fig.AutoModifier('decodable')
+#@fig.AutoModifier('decodable')
 class Decodable(FunctionBase): # by default this is just the forward pass
 	def decode(self, q):
 		return self(q)
 
 
 
-@fig.AutoModifier('invertible')
+#@fig.AutoModifier('invertible')
 class Invertible(object):
 	def inverse(self, *args, **kwargs):
 		raise NotImplementedError
 
 
 
-@fig.AutoModifier('tensorflow')
+#@fig.AutoModifier('tensorflow')
 class TensorflowPort(Function):
 	def __init__(self, A, skip_tf_load=None,
 	             allow_torch_load=None, save_torch_ckpt=unspecified_argument,
