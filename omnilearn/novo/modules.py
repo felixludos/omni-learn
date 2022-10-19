@@ -3,6 +3,8 @@ from torch import nn
 import torch.optim as O
 from omnibelt import unspecified_argument, agnostic
 
+import omnifig as fig
+
 from omnidata.framework import spaces
 from omnidata.framework.base import Function
 # from omnidata.framework.models import Model
@@ -104,10 +106,10 @@ class Reshaper(nn.Module):  # by default flattens
 
 @register_builder('linear')
 class BasicLinear(Builder):
+	width = hparam(None)
+	
 	din = hparam(None)
 	dout = hparam(None)
-
-	width = hparam(None)
 
 	bias = hparam(True, space=spaces.Binary())
 
@@ -134,6 +136,37 @@ class BasicLinear(Builder):
 				dout = width
 
 		return self.product()(din, dout, bias=bias, **kwargs)
+
+
+@register_builder('dropout')
+class BasicDropout(Builder): # TODO: enable multiple dims
+	p = hparam(0.1, space=spaces.Bound(0, 1))
+
+	@agnostic
+	def product_base(self, *args, **kwargs):
+		return nn.Dropout
+
+	@agnostic
+	@fig.config_aliases(p='prob')
+	def build(self, p=0.1, **kwargs):
+		return self.product()(p=p, **kwargs)
+
+
+@register_builder('fc')
+class DenseLayer(Buildable, nn.Module):
+	
+	linear = machine(builder='linear')
+	
+	norm = machine(None, builder='normalization')
+	nonlin = machine('elu', builder='nonlinearity')
+	dropout = machine(None, builder='dropout')
+	
+	def __init__(self, ):
+		pass
+	
+	# TODO: make this prepared to realize machines
+	
+	pass
 
 
 @register_builder('mlp')
