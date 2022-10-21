@@ -1,8 +1,10 @@
 import torch
 from torch import optim as O
-from omnibelt import agnosticmethod, unspecified_argument
-from omnidata.framework import hparam, inherit_hparams, Parameterized, register_builder, spaces, ClassBuilder
+from omnibelt import agnostic, unspecified_argument
 from omnidata.framework.features import Prepared
+from omnidata.framework import hparam, Parameterized, inherit_hparams, get_builder, machine, Machine, with_hparams
+
+from . import base as reg
 
 
 class Optimizer(Parameterized, Prepared):
@@ -23,10 +25,7 @@ class Optimizer(Parameterized, Prepared):
 		raise NotImplementedError
 
 
-
-@register_builder('optim')
-@register_builder('optimizer')
-class PytorchOptimizer(ClassBuilder, Optimizer, O.Optimizer, create_registry=True):
+class PytorchOptimizer(reg.ClassBuilder, Optimizer, O.Optimizer):
 	def __init__(self, params=None, **kwargs):
 		if params is None:
 			params = [torch.zeros(0)]
@@ -34,7 +33,7 @@ class PytorchOptimizer(ClassBuilder, Optimizer, O.Optimizer, create_registry=Tru
 		self.param_groups.clear()
 
 
-	@agnosticmethod
+	@agnostic
 	def build(self, ident, parameters=None, **kwargs):
 		optim = super().build(ident=ident, **kwargs)
 		if parameters is not None:
@@ -48,6 +47,7 @@ class PytorchOptimizer(ClassBuilder, Optimizer, O.Optimizer, create_registry=Tru
 	def _prepare(self, parameters=None, **kwargs):
 		if parameters is not None:
 			self.add_parameters(*parameters)
+		return super()._prepare(**kwargs)
 
 
 	def add_parameters(self, *parameters):

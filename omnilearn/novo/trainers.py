@@ -4,7 +4,7 @@ from torch import nn
 from omnidata.framework import Trainer, TrainableModel, \
 	machine, hparam, inherit_hparams, Parameterized, register_builder, get_builder, spaces
 
-
+from .optim import PytorchOptimizer
 
 class PytorchModel(TrainableModel, nn.Module):
 	@agnosticmethod
@@ -26,7 +26,7 @@ class PytorchModel(TrainableModel, nn.Module):
 class SimplePytorchModel(PytorchModel):
 	_loss_key = 'loss'
 
-	optimizer = machine(required=True)
+	optimizer = machine(type=PytorchOptimizer, builder='optimizer')
 
 
 	def _prepare(self, source=None, **kwargs):

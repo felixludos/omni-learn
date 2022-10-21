@@ -1,7 +1,9 @@
 
 
 from omnifig import script, component, creator, modifier
-from omnidata.framework import BuilderCreator as _BuilderCreator, register_builder as _register_builder
+from omnidata.framework import BuilderCreator as _BuilderCreator, register_builder as _register_builder, \
+	ClassBuilder as _ClassBuilder
+
 
 creator('build')(_BuilderCreator)
 
@@ -20,6 +22,11 @@ class builder(_register_builder):
 
 
 
+class ClassBuilder(_ClassBuilder):
+	def __init_subclass__(cls, ident=None, skip_component_registration=False, **kwargs):
+		super().__init_subclass__(ident=ident, **kwargs)
+		if ident is not None and not skip_component_registration:
+			builder(ident)(cls)
 
 
 

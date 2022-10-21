@@ -91,7 +91,8 @@ class BasicLoss(Builder):
 		
 
 
-class Reshaper(nn.Module):  # by default flattens
+@reg.component('reshaper')
+class Reshaper(Buildable, nn.Module):  # by default flattens
 	def __init__(self, dout=(-1,)):
 		super().__init__()
 		self.dout = dout
@@ -102,6 +103,7 @@ class Reshaper(nn.Module):  # by default flattens
 	def forward(self, x):
 		B = x.size(0)
 		return x.view(B, *self.dout)
+
 
 
 @reg.builder('linear')
@@ -138,6 +140,7 @@ class BasicLinear(Builder):
 		return self.product()(din, dout, bias=bias, **kwargs)
 
 
+
 @reg.builder('dropout')
 class BasicDropout(Builder): # TODO: enable multiple dims
 	p = hparam(0.1, space=spaces.Bound(0, 1))
@@ -150,6 +153,7 @@ class BasicDropout(Builder): # TODO: enable multiple dims
 	@fig.config_aliases(p='prob')
 	def build(self, p=0.1, **kwargs):
 		return self.product()(p=p, **kwargs)
+
 
 
 @reg.builder('dense-layer')
@@ -177,6 +181,7 @@ class DenseLayer(Buildable, nn.Module):
 		if self.dropout is not None:
 			x = self.dropout(x)
 		return x
+
 
 
 @reg.builder('mlp')
