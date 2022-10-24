@@ -51,7 +51,7 @@ class SimplePytorchModel(PytorchModel):
 
 		return info
 
-
+ 
 
 
 class SimpleTrainer(Trainer):

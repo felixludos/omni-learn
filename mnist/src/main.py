@@ -28,17 +28,9 @@ def _test_script(A):
 
 
 class Supervised_Model(trainers.SimplePytorchModel):
-	def __init__(self, *args, target_space=None, criterion=None, **kwargs):
-		if target_space is None:
-			target_space = self.dout
-		if criterion is None:
-			criterion = get_builder('loss').build(target_space)
-		super().__init__(*args, **kwargs)
-		self.criterion = criterion
 	
-
-	optimizer = machine(builder='optimizer')
-
+	criterion = machine(builder='loss')
+	
 	
 	# class Statistics(fm.SimplePytorchModel.Statistics):
 	#
