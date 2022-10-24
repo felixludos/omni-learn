@@ -1,14 +1,11 @@
-import sys, os
-from pathlib import Path
+import os
 import subprocess
-import pickle
 from typing import Any
 import zipfile
 import h5py as hf
 import numpy as np
 import torch
 from omnibelt import unspecified_argument, get_printer
-import omnifig as fig
 from torch.nn import functional as F
 
 prt = get_printer(__name__)
@@ -25,8 +22,8 @@ except ImportError:
 	
 
 from ... import util
-from ...data import register_dataset, Deviced, Batchable, Splitable, ImageDataset, \
-	Downloadable, Dataset, MissingDatasetError, Supervised, Disentanglement, Mechanistic, wrap_dataset
+from omnilearn.old.data import register_dataset, Batchable, Splitable, ImageDataset, \
+	Downloadable, MissingDatasetError, Disentanglement, Mechanistic, wrap_dataset
 
 from .transforms import Cropped
 

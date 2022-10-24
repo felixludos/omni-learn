@@ -8,7 +8,7 @@ from omnidata.framework import BuilderCreator as _BuilderCreator, register_build
 creator('build')(_BuilderCreator)
 
 
-class builder(_register_builder):
+class builder(_register_builder): # automatically register builders as components (with the creator `build`)
 	def __init__(self, *args, description=None, creator='build', **kwargs):
 		super().__init__(*args, **kwargs)
 		self.description = description
@@ -22,7 +22,7 @@ class builder(_register_builder):
 
 
 
-class ClassBuilder(_ClassBuilder):
+class ClassBuilder(_ClassBuilder): # auto register classes in the class registry as components (and builders)
 	def __init_subclass__(cls, ident=None, skip_component_registration=False, **kwargs):
 		super().__init_subclass__(ident=ident, **kwargs)
 		if ident is not None and not skip_component_registration:

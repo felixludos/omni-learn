@@ -11,7 +11,7 @@ from omnibelt import unspecified_argument, InitWall
 
 from .collectors import Supervised, Batchable
 
-from .. import util
+from omnilearn import util
 
 
 

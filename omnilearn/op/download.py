@@ -5,7 +5,7 @@ import omnifig as fig
 prt = get_printer(__name__)
 
 
-from ..data import dataset_registry, Downloadable
+from omnilearn.old.data import dataset_registry, Downloadable
 
 class DownloadError(Exception):
 	pass

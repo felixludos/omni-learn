@@ -1,5 +1,5 @@
 
-import sys, os
+import os
 from pathlib import Path
 
 import random
@@ -25,7 +25,7 @@ import omnifig as fig
 
 from ... import util
 
-from ...data import register_dataset, Deviced, Batchable, ImageDataset
+from omnilearn.old.data import register_dataset, Batchable
 
 DATASET_URL = 'ftp://guest:GU.205dldo@ftp.softronics.ch/mvtec_anomaly_detection/mvtec_anomaly_detection.tar.xz'
 

@@ -1,13 +1,12 @@
 import numpy as np
 import omnibelt as belt
 from omnibelt import unspecified_argument
-import omnifig as fig
 import torch
 from torch import nn
-from sklearn import base, metrics, cluster
+from sklearn import base, metrics
 
-from ..framework import Learnable, FunctionBase, Evaluatable, Recordable, Function, Computable
-from ...data import MissingDataError
+from ..framework import Learnable, Recordable, Computable
+from omnilearn.old.data import MissingDataError
 
 from ... import util
 

@@ -16,7 +16,7 @@ import omnifig as fig
 # from .collate import SampleFormat
 from .loaders import Featured_DataLoader
 
-from .. import util
+from omnilearn import util
 
 class DataLike(util.Preparable):
 	pass

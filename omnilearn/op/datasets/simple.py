@@ -1,18 +1,10 @@
-import sys, os
-from pathlib import Path
-import subprocess
-import pickle
-import zipfile
-import h5py as hf
 import numpy as np
 import torch
 from omnibelt import unspecified_argument, get_printer, InitWall
 import omnifig as fig
-from torch.nn import functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
-from ... import util
-from ...data import register_dataset, Deviced, Batchable, DevicedBase
+from omnilearn.old.data import register_dataset, Deviced, Batchable, DevicedBase
 
 prt = get_printer(__name__)
 

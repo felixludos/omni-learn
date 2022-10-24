@@ -5,7 +5,7 @@ from torch._six import container_abcs, string_classes, int_classes
 from omnibelt import unspecified_argument
 import omnifig as fig
 
-from ..util import TensorDict, TensorList
+from omnilearn.util import TensorDict, TensorList
 
 np_str_obj_array_pattern = re.compile(r'[SaUO]')
 

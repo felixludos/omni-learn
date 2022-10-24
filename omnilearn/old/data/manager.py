@@ -11,15 +11,15 @@ from omnibelt import save_yaml, load_yaml, unspecified_argument
 
 import omnifig as fig
 
-from .. import util
-from ..util.features import Checkpointable
+from omnilearn import util
+from omnilearn.util.features import Checkpointable
 
 from .register import dataset_registry, DatasetNotFoundError
 from .wrappers import wrap_dataset, wrapper_registry
 from .loaders import Featured_DataLoader, BatchedDataLoader
 from .collectors import DataLike
 
-from ..op.clock import AlertBase
+from omnilearn.op.clock import AlertBase
 
 #@fig.Component('datamanager/simple-dataset')
 class SimpleDataManager(util.Seed, util.Switchable, util.Deviced, DataLike):

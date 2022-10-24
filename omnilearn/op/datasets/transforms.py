@@ -8,11 +8,10 @@ from omnibelt import unspecified_argument
 
 from bisect import bisect_right
 
-from ... import util
-
 # from omnifig import AutoModifier, Modification
 
-from ...data import register_dataset, Deviced, ImageDataset, Dataset, Batchable, wrap_dataset, DatasetWrapper
+from omnilearn.old.data import register_dataset, Deviced, ImageDataset, Dataset
+
 
 @register_dataset('concat')
 class Concat(Dataset):

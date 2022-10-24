@@ -14,7 +14,7 @@ import omnifig as fig
 from .collectors import Observation, Supervised, Batchable, Lockable, DatasetBase, Dataset, Disentanglement, \
 	MechanisticBase, ListDataset
 
-from .. import util
+from omnilearn import util
 
 
 
