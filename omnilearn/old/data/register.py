@@ -1,7 +1,7 @@
 
 import omnifig as fig
 
-from .. import util
+from omnilearn import util
 
 class DatasetNotFoundError(Exception):
 	pass

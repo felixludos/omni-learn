@@ -9,7 +9,7 @@ from torch.utils.data.dataloader import _SingleProcessDataLoaderIter, _MultiProc
 
 # from .collectors import Batchable
 
-from .. import util
+from omnilearn import util
 
 
 class FeaturedDataFetcher(_MapDatasetFetcher):

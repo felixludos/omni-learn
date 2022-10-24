@@ -2,7 +2,7 @@ import sys, os, time
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-from .. import util
+from omnilearn import util
 
 stack_collate = util.make_collate(stack=True)
 cat_collate = util.make_collate(stack=False)

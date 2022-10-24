@@ -1,8 +1,6 @@
 
 import os
 
-import h5py as hf
-
 from omnibelt import unspecified_argument
 
 import numpy as np
@@ -11,7 +9,7 @@ from torch.nn import functional as F
 import torchvision
 
 from ... import util
-from ...data import register_dataset, Batchable, Deviced, Downloadable, ImageDataset, Supervised
+from omnilearn.old.data import register_dataset, Batchable, Downloadable, ImageDataset, Supervised
 
 
 # from .transforms import Interpolated

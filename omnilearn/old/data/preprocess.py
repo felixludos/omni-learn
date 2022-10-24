@@ -10,7 +10,7 @@ from torch.nn import functional as F
 
 import omnifig as fig
 
-from .. import util
+from omnilearn import util
 
 
 #@fig.AutoComponent('flip')

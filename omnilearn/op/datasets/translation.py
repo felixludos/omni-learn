@@ -1,6 +1,6 @@
 
 import numpy as np
-from ...data import register_dataset, Deviced, Batchable, ImageDataset
+from omnilearn.old.data import register_dataset, Batchable, ImageDataset
 
 
 @register_dataset('unpaired-translation')

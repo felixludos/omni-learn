@@ -1,11 +1,9 @@
 # from IPython.core.interactiveshell import InteractiveShell
 # InteractiveShell.ast_node_interactivity = "all"
 import torch
-from torch.utils.data import TensorDataset
 # %matplotlib tk
 #plt.switch_backend('Qt5Agg') #('Qt5Agg')
 from .. import util
-from .. import data as datautils
 
 import pandas as pd
 import numpy as np

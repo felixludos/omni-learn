@@ -9,7 +9,7 @@ import omnifig as fig
 
 from .collectors import Dataset
 
-from .. import util
+from omnilearn import util
 
 
 class SamplerBase:
