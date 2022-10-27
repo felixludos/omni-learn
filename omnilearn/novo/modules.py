@@ -5,12 +5,12 @@ from omnibelt import unspecified_argument, agnostic
 
 import omnifig as fig
 
-from omnidata.framework import spaces
-from omnidata.framework.base import Function
+from omnidata import Function, spaces
 # from omnidata.framework.models import Model
-from omnidata.framework import hparam, Parameterized, \
+from omnidata import hparam, Parameterized, \
 	get_builder, machine, Machine, RegistryBuilder, BasicBuilder, Builder, Buildable, with_hparams
 from . import base as reg
+
 
 @reg.builder('nonlin')
 @reg.builder('nonlinearity')

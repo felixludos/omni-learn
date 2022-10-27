@@ -1,7 +1,7 @@
 
 
 from omnifig import script, component, creator, modifier
-from omnidata.framework import BuilderCreator as _BuilderCreator, register_builder as _register_builder, \
+from omnidata import Named, BuilderCreator as _BuilderCreator, register_builder as _register_builder, \
 	ClassBuilder as _ClassBuilder
 
 
@@ -30,7 +30,16 @@ class ClassBuilder(_ClassBuilder): # auto register classes in the class registry
 
 
 
-
+class DatasetBuilder(ClassBuilder, Named): # auto register datasets as components (and builders)
+	def __init_subclass__(cls, ident=None, **kwargs):
+		if ident is None and cls.name is not None:
+			ident = cls.name
+		if ident is not None:
+			cls.name = ident
+			ident = f'dataset/{ident}'
+		super().__init_subclass__(ident=ident, **kwargs)
+	
+	
 
 
 
