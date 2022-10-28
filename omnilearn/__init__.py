@@ -9,7 +9,7 @@
 # from .op.framework import FunctionBase, Model, Encodable, Decodable, Generative, Recordable, \
 # 	Evaluatable, Visualizable, Function, Optimizable, TensorflowPort
 
-from . import novo
+# from . import novo
 
 # from omnibelt import get_printer
 # prt = get_printer(__name__)
@@ -18,6 +18,11 @@ from . import novo
 # 	from . import legacy
 # except:
 # 	prt.info('Failed to important legacy models')
+
+from .datasets import *
+from .novo import *
+from . import util
+
 
 import os
 __info__ = {'__file__':os.path.join(os.path.abspath(os.path.dirname(__file__)), '_info.py')}
