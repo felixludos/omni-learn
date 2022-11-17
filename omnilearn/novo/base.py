@@ -36,9 +36,8 @@ class DatasetBuilder(ClassBuilder, Named): # auto register datasets as component
 			ident = cls.name
 		if ident is not None:
 			cls.name = ident
-			ident = f'dataset/{ident}'
+			ident = f'data/{ident}'
 		super().__init_subclass__(ident=ident, **kwargs)
-	
 	
 
 
