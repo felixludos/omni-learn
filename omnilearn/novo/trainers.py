@@ -1,10 +1,12 @@
 from omnibelt import agnosticmethod
 import torch
 from torch import nn
-from omnidata.framework import Trainer, TrainableModel, \
-	machine, hparam, inherit_hparams, Parameterized, register_builder, get_builder, spaces
+
+from omnidata import hparam, Parameterized, inherit_hparams, get_builder, machine, Machine, with_hparams, Prepared
+
 
 from .optim import PytorchOptimizer
+
 
 class PytorchModel(TrainableModel, nn.Module):
 	@agnosticmethod

@@ -1,8 +1,8 @@
 import torch
 from torch import optim as O
 from omnibelt import agnostic, unspecified_argument
-from omnidata.framework.features import Prepared
-from omnidata.framework import hparam, Parameterized, inherit_hparams, get_builder, machine, Machine, with_hparams
+
+from omnidata import hparam, Parameterized, inherit_hparams, get_builder, machine, Machine, with_hparams, Prepared
 
 from . import base as reg
 
