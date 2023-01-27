@@ -1,3 +1,4 @@
+from typing import Iterable, Any, Optional, Union, Callable, Tuple, Dict, List
 import numpy as np
 from torch import nn
 import torch.optim as O
@@ -6,14 +7,13 @@ from omnibelt import unspecified_argument, agnostic
 import omnifig as fig
 
 from omnidata import Function, spaces
-from omnidata import hparam, Parameterized, \
-	get_builder, machine, Machine, RegistryBuilder, BasicBuilder, Builder, Buildable, with_hparams
+from omnidata import hparam, inherit_hparams, Parameterized, \
+	get_builder, submodule, Submodule, RegistryBuilder, BasicBuilder, Builder, Buildable, with_hparams
 from . import base as reg
 
 
-@reg.builder('nonlin')
-@reg.builder('nonlinearity')
-class BasicNonlinearlity(RegistryBuilder, default_ident='elu', products={
+class ActivationBuilder(reg.BranchBuilder, branch='nonlin', default_ident='elu',
+                        products={
 							'relu': nn.ReLU,
 							'prelu': nn.PReLU,
 							'lrelu': nn.LeakyReLU,
@@ -34,9 +34,7 @@ class BasicNonlinearlity(RegistryBuilder, default_ident='elu', products={
 
 
 
-@reg.builder('norm')
-@reg.builder('normalization')
-class BasicNormalization(RegistryBuilder, default_ident='batch', products={
+class NormalizationBuilder(reg.BranchBuilder, branch='norm', default_ident='batch', products={
 							'batch1d': nn.BatchNorm1d,
 							'batch2d': nn.BatchNorm2d,
 							'batch3d': nn.BatchNorm3d,
@@ -74,9 +72,8 @@ class BasicNormalization(RegistryBuilder, default_ident='batch', products={
 		return product(width, momentum=momentum, eps=eps, affine=affine, **kwargs)
 
 
-
 @reg.builder('loss')
-class BasicLoss(Builder):
+class LossBuilder(Builder):
 	target_space = hparam(required=True)
 	
 	@agnostic
@@ -113,6 +110,16 @@ class BasicLinear(Builder):
 	dout = hparam(None)
 
 	bias = hparam(True, space=spaces.Binary())
+
+	@agnostic
+	def _expand_dim(self, dim):
+		if isinstance(dim, int):
+			dim = [dim]
+		if isinstance(dim, (list, tuple)):
+			return dim
+		if isinstance(dim, spaces.Dim):
+			return dim.expanded_shape
+		raise NotImplementedError(dim)
 
 	@agnostic
 	def product_base(self, *args, **kwargs):
@@ -158,18 +165,24 @@ class BasicDropout(Builder): # TODO: enable multiple dims
 @reg.builder('dense-layer')
 class DenseLayer(Buildable, nn.Module):
 	
-	linear = machine(builder='linear')
+	linear = submodule(builder='linear')
 
-	norm = machine(None, builder='normalization')
-	nonlin = machine('elu', builder='nonlinearity')
-	dropout = machine(None, builder='dropout')
+	norm = submodule(None, builder='norm')
+	nonlin = submodule('elu', builder='nonlin')
+	dropout = submodule(None, builder='dropout')
 
-	@hparam
+	@hparam(hidden=True)
 	def din(self):
 		return self.linear.din
-	@hparam
+	@hparam(hidden=True)
 	def dout(self):
 		return self.linear.dout
+
+	def build(self, din, dout, **kwargs):
+		self.linear = self.linear(din=din, dout=dout, **kwargs)
+		self.norm = self.norm(width=dout, **kwargs)
+		self.nonlin = self.nonlin(**kwargs)
+		self.dropout = self.dropout(**kwargs)
 
 	def forward(self, x):
 		x = self.linear(x)
@@ -182,118 +195,125 @@ class DenseLayer(Buildable, nn.Module):
 		return x
 
 
+class Sequential(Parameterized, nn.Sequential):
+
+	din = hparam(None)
+	dout = hparam(None)
+
+	def __init__(self, layers=(), din=None, dout=None, **kwargs):
+		if len(layers):
+			if din is None:
+				din = getattr(layers[0], 'din', None)
+			if dout is None:
+				dout = getattr(layers[-1], 'dout', None)
+		super().__init__(*layers, din=din, dout=dout, **kwargs)
+
+
+
+@reg.builder('feedforward')
+class Feedforward(Builder):
+	din = hparam(None)
+	dout = hparam(None)
+
+	_product_base = Sequential
+
+	@agnostic
+	def product_base(self, *args, **kwargs):
+		return self._product_base
+
+	@agnostic
+	def _build_block(self, builder, *args, **kwargs):
+		builder = get_builder(builder)
+		layer = builder.build(*args, **kwargs)
+		return [layer], layer.din, layer.dout
+
+	@agnostic
+	def build(self, layer_builders=None, din=None, dout=None, **kwargs):
+		if layer_builders is None:
+			layer_builders = []
+		assert din is not None or dout is not None, 'Must specify either din or dout'
+
+		reverse = din is None
+		start, end = (None, dout) if reverse else (din, None)
+
+		layers = []
+		for builder in reversed(layer_builders) if reverse else layer_builders:
+			block, block_din, block_dout = self._build_block(builder, din=start, dout=end)
+			layers.extend(reversed(block) if reverse else block)
+			if reverse:
+				end = block_din
+			else:
+				start = block_dout
+
+		if reverse:
+			layers = list(reversed(layers))
+
+		ff = super().build(layers, **kwargs)
+		if din is not None and dout is not None:
+			assert (ff.din, ff.dout) == (din, dout), f'Feedforward has wrong shape: ' \
+			                                         f'{ff.din} -> {ff.dout} != {din} -> {dout}'
+		return ff
+
+
+
+class MLP(Sequential): # just for the name
+	pass
+
+
 
 @reg.builder('mlp')
-class MLP(Buildable, Function, nn.Sequential):
-	def __init__(self, layers=None, **kwargs):
-		if layers is None:
-			kwargs = self._extract_hparams(kwargs)
-			layers = self._default_build_layers()
-		super().__init__(*layers, **kwargs)
+@inherit_hparams('din', 'dout')
+class MLPBuilder(Feedforward):
 
-	din = hparam(required=True)
-	dout = hparam(required=True)
+	_product_base = MLP
+	_linear_builder = 'linear'
+	_nonlin_builder = 'nonlin'
+	_norm_builder = 'norm'
+	_dropout_builder = 'dropout'
+
+	nonlin = hparam('elu', space=get_builder(_nonlin_builder).get_hparam('ident').space)
+	out_nonlin = hparam(None, space=get_builder(_nonlin_builder).get_hparam('ident').space)
+
+	norm = hparam(None, space=get_builder(_norm_builder).get_hparam('ident').space)
+	out_norm = hparam(None, space=get_builder(_norm_builder).get_hparam('ident').space)
 
 	hidden = hparam(())
-
-	dropout = hparam(0., space=spaces.Bound(0., 1.))
-
-	nonlin = hparam('elu', space=get_builder('nonlinearity').get_hparam('ident').space)
-	out_nonlin = hparam(None, space=get_builder('nonlinearity').get_hparam('ident').space)
-
-	norm = hparam(None, space=get_builder('normalization').get_hparam('ident').space)
-	out_norm = hparam(None, space=get_builder('normalization').get_hparam('ident').space)
 
 	bias = hparam(True, space=spaces.Binary())
 	out_bias = hparam(True, space=spaces.Binary())
 
-	@agnostic
-	def _expand_dim(self, dim):
-		if isinstance(dim, int):
-			dim = [dim]
-		if isinstance(dim, (list, tuple)):
-			return dim
-		if isinstance(dim, spaces.Dim):
-			return dim.expanded_shape
-		raise NotImplementedError(dim)
+	dropout = hparam(0., space=spaces.Bound(0., 1.))
+
 
 	@agnostic
-	def _create_nonlin(self, ident=None, **kwargs):
-		if ident is None:
-			return None
-		return get_builder('nonlinearity').build(ident, **kwargs)
+	def _build_block(self, builder, *, din=None, dout=None, **kwargs):
+		layers = super()._build_block(self._linear_builder, width=builder, din=din, dout=dout,
+		                              bias=self.out_bias if builder is None else self.bias, **kwargs)
+		din, dout = layers[0].din, layers[0].dout
+
+		if builder is None:
+			if self.out_norm is not None:
+				layers.extend(super()._build_block(self._norm_builder, ident=self.out_norm, width=dout.width))
+			if self.out_nonlin is not None:
+				layers.extend(super()._build_block(self._nonlin_builder, ident=self.out_nonlin))
+
+		else:
+			if self.norm is not None:
+				layers.extend(super()._build_block(self._norm_builder, ident=self.norm, width=dout.width))
+			if self.nonlin is not None:
+				layers.extend(super()._build_block(self._nonlin_builder, ident=self.nonlin))
+			if self.dropout > 0:
+				layers.extend(super()._build_block(self._dropout_builder, p=self.dropout))
+
+		return layers, din, dout
+
 
 	@agnostic
-	def _create_norm(self, norm, width, spatial_dim=1, **kwargs):
-		if norm is None:
-			return None
-		return get_builder('normalization').build(norm, width, spatial_dim=spatial_dim, **kwargs)
+	def build(self, layer_builders=None, din=None, dout=None, **kwargs):
+		if layer_builders is None:
+			layer_builders = [*self.hidden, None]
+		return super().build(layer_builders, din=din, dout=dout, **kwargs)
 
-	@agnostic
-	def _create_linear_layer(self, din, dout, bias=True):
-		return get_builder('linear').build(din=din, dout=dout, bias=bias)
-
-	@agnostic
-	def _build_layer(self, din, dout, nonlin=unspecified_argument, norm=unspecified_argument,
-	                 dropout=None, bias=unspecified_argument):
-
-		if nonlin is unspecified_argument:
-			nonlin = self.nonlin
-
-		if norm is unspecified_argument:
-			norm = self.norm
-
-		if bias is unspecified_argument:
-			bias = self.bias
-
-		in_shape = self._expand_dim(din)
-		in_width = int(np.product(in_shape))
-
-		layers = []
-
-		if len(in_shape) > 1:
-			layers.append(nn.Flatten())
-
-		out_shape = self._expand_dim(dout)
-		out_width = int(np.product(out_shape))
-
-		layers.append(self._create_linear_layer(in_width, out_width, bias=bias))
-
-		norm = self._create_norm(norm, width=out_width)
-		if norm is not None:
-			layers.append(norm)
-
-		nonlin = self._create_nonlin(nonlin)
-		if nonlin is not None:
-			layers.append(nonlin)
-
-		if dropout is not None and dropout > 0:
-			layers.append(nn.Dropout(dropout))
-
-		if len(out_shape) > 1:
-			layers.append(Reshaper(out_shape))
-		return dout, layers
-
-	@agnostic
-	def _build_outlayer(self, din, dout, nonlin=unspecified_argument, norm=unspecified_argument,
-	                    dropout=None, bias=unspecified_argument, **kwargs):
-		if nonlin is unspecified_argument:
-			nonlin = self.out_nonlin
-		if norm is unspecified_argument:
-			norm = self.out_norm
-		if bias is unspecified_argument:
-			bias = self.out_bias
-		return self._build_layer(din, dout, nonlin=nonlin, norm=norm, dropout=dropout, bias=bias, **kwargs)[1]
-
-	@agnostic
-	def _default_build_layers(self):
-		layers = []
-		start_dim, end_dim = self.din, self.din
-		for end_dim in self.hidden:
-			start_dim, new_layers = self._build_layer(start_dim, end_dim)
-			layers.extend(new_layers)
-		layers.extend(self._build_outlayer(end_dim, self.dout))
-		return layers
 
 
 

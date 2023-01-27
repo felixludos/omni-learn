@@ -1,37 +1,38 @@
 from collections import OrderedDict
 import numpy as np
 
-from omnidata import data, toy, Buildable, hparam, inherit_hparams, spaces
-from omnidata.data import flavors
-# from omnidata.data import Noisy as _Noisy
-# from omnidata import ces
+from omnidata import toy, Buildable, hparam, inherit_hparams, spaces
 
-from ..novo.base import DatasetBuilder
+from ..novo.base import DataProduct, DataBuilder
 
 
 
-class DataStreams(DatasetBuilder, ident='stream', as_branch=True):
+class DataStreams(DataBuilder, ident='stream', as_branch=True):
 	pass
 
 
-class SwissRoll(DataStreams, toy.SwissRoll):
+@inherit_hparams('Ax', 'Ay', 'Az', 'freq', 'tmin', 'tmax')
+class SwissRoll(DataProduct, toy.SwissRoll, registry=DataStreams, ident='swissroll'):
 	pass
 
 
-class Helix(DataStreams, toy.Helix):
+@inherit_hparams('n_helix', 'periodic_strand', 'Rx', 'Ry', 'Rz', 'w')
+class Helix(DataProduct, toy.Helix, registry=DataStreams, ident='helix'):
 	pass
 
 
 
-class ToyManifolds(DatasetBuilder, ident='manifold', as_branch=True):
+class ToyManifolds(DataBuilder, ident='manifold', as_branch=True):
 	pass
 
 
-class SwissRollDataset(ToyManifolds, toy.SwissRollDataset, ident='swiss-roll'):
+@inherit_hparams('n_samples', 'Ax', 'Ay', 'Az', 'freq', 'tmin', 'tmax')
+class SwissRollDataset(DataProduct, toy.SwissRollDataset, registry=ToyManifolds, ident='swissroll'):
 	pass
 
 
-class HelixDataset(ToyManifolds, toy.HelixDataset, ident='helix'):
+@inherit_hparams('n_samples', 'n_helix', 'periodic_strand', 'Rx', 'Ry', 'Rz', 'w')
+class HelixDataset(DataProduct, toy.HelixDataset, registry=ToyManifolds, ident='helix'):
 	pass
 
 

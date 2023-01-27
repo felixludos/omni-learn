@@ -22,7 +22,7 @@ def download_dataset(A, **kwargs):
 	if cmpn_name is None:
 		raise DownloadError(f'Can\'t find dataset {name} (has it been registered?)')
 	
-	cmpn = fig.find_component(cmpn_name).fn
+	cmpn = fig.find_component(cmpn_name)._fn
 	if not issubclass(cmpn, Downloadable):
 		raise DownloadError(f'{name} is not downloadable (it does not subclass `Downloadable`)')
 

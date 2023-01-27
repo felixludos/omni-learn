@@ -2,8 +2,8 @@ from omnibelt import agnosticmethod
 import torch
 from torch import nn
 
-from omnidata import hparam, Parameterized, inherit_hparams, get_builder, machine, Machine, with_hparams, Prepared
-
+from omnidata import hparam, module, inherit_hparams, with_hparams, Parameterized, \
+	get_builder, Prepared, TrainableModel
 
 from .optim import PytorchOptimizer
 
@@ -28,7 +28,7 @@ class PytorchModel(TrainableModel, nn.Module):
 class SimplePytorchModel(PytorchModel):
 	_loss_key = 'loss'
 
-	optimizer = machine(type=PytorchOptimizer, builder='optimizer')
+	optimizer = module(type=PytorchOptimizer, builder='optimizer')
 
 
 	def _prepare(self, source=None, **kwargs):

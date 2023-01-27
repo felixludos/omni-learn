@@ -1,8 +1,8 @@
 
-
+from omnibelt import agnostic, Class_Registry
 from omnifig import script, component, creator, modifier
 from omnidata import Named, BuildCreator as _BuilderCreator, register_builder as _register_builder, \
-	ClassBuilder as _ClassBuilder
+	HierarchyBuilder as _HierarchyBuilder, RegisteredProduct as _RegisteredProduct
 
 
 creator('build')(_BuilderCreator)
@@ -22,26 +22,55 @@ class builder(_register_builder): # automatically register builders as component
 
 
 
-class ClassBuilder(_ClassBuilder, create_registry=False): # auto register classes in the class registry as components (and builders)
-	def __init_subclass__(cls, ident=None, skip_component_registration=False, **kwargs):
-		super().__init_subclass__(ident=ident, **kwargs)
-		if ident is not None and not skip_component_registration:
-			builder(ident)(cls)
+# dataset_registry = Class_Registry()
+# get_dataset = dataset_registry.get_class
+# class register_dataset(component):
+# 	@classmethod
+# 	def register(cls, name, item, **kwargs) -> None:
+# 		dataset_registry.new(name, item, **kwargs)
+# 		return super().register(name, item, **kwargs)
 
 
 
-class DatasetBuilder(ClassBuilder, Named): # auto register datasets as components (and builders)
-	def __init_subclass__(cls, ident=None, **kwargs):
-		if ident is None and cls.name is not None:
-			ident = cls.name
-		if ident is not None:
-			cls.name = ident
-			ident = f'data/{ident}'
-		super().__init_subclass__(ident=ident, **kwargs)
-	
+class BranchBuilder(_HierarchyBuilder, create_registry=False):
+	# automatically register builders as components (with the creator `build`)
+	def __init_subclass__(cls, branch=None, create_registry=None, description=None,
+	                      skip_component_registration=False, **kwargs):
+		super().__init_subclass__(branch=branch, **kwargs)
+		if not skip_component_registration and (create_registry or branch is not None):
+			builder(cls._hierarchy_address, description=description)(cls)
+
+	@agnostic
+	def register_product(self, name, product, is_default=False, *, creator='build', description=None, **kwargs):
+		if self._hierarchy_address is not None:
+			if description is None:
+				description = getattr(product, 'description', None)
+			component(f'{self._hierarchy_address}{self._hierarchy_address_delimiter}{name}',
+			          creator=creator, description=description)(product)
+		return super().register_product(name, product, **kwargs)
 
 
 
+class DataBuilder(BranchBuilder, branch='data'):
+	pass
+
+
+class ModelBuilder(BranchBuilder, branch='model'):
+	pass
+
+
+
+
+class Product(_RegisteredProduct):
+	pass
+
+
+class DataProduct(Product, registry=DataBuilder):
+	pass
+
+
+class ModelProduct(Product, registry=ModelBuilder):
+	pass
 
 
 
