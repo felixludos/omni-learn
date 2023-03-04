@@ -86,22 +86,22 @@ class dSprites(_Synthetic_Disentanglement, ident='dsprites'):
 		# 	default_len = 737280
 		super().__init__(default_len=default_len, **kwargs)
 
-		self.register_material('observation', self.ImageBuffer(space=spaces.Pixels(1, 64, 64, as_bytes=as_bytes)))
+		self.register_buffer('observation', self.ImageBuffer(space=spaces.Pixels(1, 64, 64, as_bytes=as_bytes)))
 
 		_shape_names = ['square', 'ellipse', 'heart']
 		_dim_names = ['shape', 'scale', 'orientation', 'posX', 'posY']
-		self.register_material('label', space=spaces.Joint(spaces.Categorical(_shape_names),
-		                                                   spaces.Categorical(6),
-		                                                   spaces.Categorical(40),
-		                                                   spaces.Categorical(32),
-		                                                   spaces.Categorical(32),
-		                                                   names=_dim_names))
-		self.get_material('mechanism').space = spaces.Joint(spaces.Categorical(_shape_names),
-		                                                    spaces.Bound(0.5, 1.),
-		                                                    spaces.Periodic(period=2 * np.pi),
-		                                                    spaces.Bound(0., 1.),
-		                                                    spaces.Bound(0., 1.),
-		                                                    names=_dim_names)
+		self.register_buffer('label', space=spaces.Joint(spaces.Categorical(_shape_names),
+		                                                 spaces.Categorical(6),
+		                                                 spaces.Categorical(40),
+		                                                 spaces.Categorical(32),
+		                                                 spaces.Categorical(32),
+		                                                 names=_dim_names))
+		self.get_buffer('mechanism').space = spaces.Joint(spaces.Categorical(_shape_names),
+		                                                  spaces.Bound(0.5, 1.),
+		                                                  spaces.Periodic(period=2 * np.pi),
+		                                                  spaces.Bound(0., 1.),
+		                                                  spaces.Bound(0., 1.),
+		                                                  names=_dim_names)
 
 
 	_source_url = 'https://github.com/deepmind/dsprites-dataset/raw/master/' \
@@ -141,9 +141,9 @@ class dSprites(_Synthetic_Disentanglement, ident='dsprites'):
 		# self.meta = self._decode_meta_info(data['metadata'][()])
 
 		with hf.File(str(dest), 'r') as f:
-			self.get_material('observation').data = torch.from_numpy(f[self._image_key_name][()]).unsqueeze(1)
+			self.get_buffer('observation').data = torch.from_numpy(f[self._image_key_name][()]).unsqueeze(1)
 			# self.get_buffer('label').data = torch.from_numpy(data['latents_values'][:, 1:]).float()
-			self.get_material('label').data = torch.from_numpy(f['latents_classes'][:, 1:]).float()
+			self.get_buffer('label').data = torch.from_numpy(f['latents_classes'][:, 1:]).float()
 
 
 
@@ -164,21 +164,21 @@ class Shapes3D(_Synthetic_Disentanglement, ident='shapes3d'):
 		_hue_names = ['red', 'orange', 'yellow', 'green', 'seagreen', 'cyan', 'blue', 'dark-blue', 'purple', 'pink']
 		_shape_names = ['cube', 'cylinder', 'ball', 'capsule']
 
-		self.register_material('observation', self.ImageBuffer(space=spaces.Pixels(3, 64, 64, as_bytes=as_bytes)))
-		self.register_material('label', space=spaces.Joint(spaces.Categorical(_hue_names),
-		                                                   spaces.Categorical(_hue_names),
-		                                                   spaces.Categorical(_hue_names),
-		                                                   spaces.Categorical(8),
-		                                                   spaces.Categorical(_shape_names),
-		                                                   spaces.Categorical(15),
-		                                                   names=_all_label_names))
-		self.get_material('mechanism').space = spaces.Joint(spaces.Periodic(),
-		                                                    spaces.Periodic(),
-		                                                    spaces.Periodic(),
-		                                                    spaces.Bound(0.75, 1.25),
-		                                                    spaces.Categorical(_shape_names),
-		                                                    spaces.Bound(-30., 30.),
-		                                                    names=_all_label_names)
+		self.register_buffer('observation', self.ImageBuffer(space=spaces.Pixels(3, 64, 64, as_bytes=as_bytes)))
+		self.register_buffer('label', space=spaces.Joint(spaces.Categorical(_hue_names),
+		                                                 spaces.Categorical(_hue_names),
+		                                                 spaces.Categorical(_hue_names),
+		                                                 spaces.Categorical(8),
+		                                                 spaces.Categorical(_shape_names),
+		                                                 spaces.Categorical(15),
+		                                                 names=_all_label_names))
+		self.get_buffer('mechanism').space = spaces.Joint(spaces.Periodic(),
+		                                                  spaces.Periodic(),
+		                                                  spaces.Periodic(),
+		                                                  spaces.Bound(0.75, 1.25),
+		                                                  spaces.Categorical(_shape_names),
+		                                                  spaces.Bound(-30., 30.),
+		                                                  names=_all_label_names)
 
 	_source_url = 'gs://3d-shapes/3dshapes.h5'
 	_image_key_name = 'images'
@@ -228,8 +228,8 @@ class Shapes3D(_Synthetic_Disentanglement, ident='shapes3d'):
 			# images = f[self._image_key_name][indices] # TODO: why is h5py so slow with indexed reads
 			images = images.transpose(0, 3, 1, 2)
 
-			self.get_material('observation').data = torch.from_numpy(images)
-			self.get_material('mechanism').data = torch.from_numpy(mechanism).float()
+			self.get_buffer('observation').data = torch.from_numpy(images)
+			self.get_buffer('mechanism').data = torch.from_numpy(mechanism).float()
 
 
 
@@ -255,23 +255,23 @@ class _MPI3D_Base(_Synthetic_Disentanglement, registry=MPI3D): # TODO
 			_shapes = ['mug', 'ball', 'banana', 'cup']
 			_colors = ['yellow', 'green', 'olive', 'red']
 
-		self.register_material('observation', self.ImageBuffer(space=spaces.Pixels(3, 64, 64, as_bytes=as_bytes)))
-		self.register_material('label', space=spaces.Joint(spaces.Categorical(_colors),
-		                                                   spaces.Categorical(_shapes),
-		                                                   spaces.Categorical(['small', 'large']),
-		                                                   spaces.Categorical(['top', 'center', 'bottom']),
-		                                                   spaces.Categorical(_bg_color),
-		                                                   spaces.Categorical(40),
-		                                                   spaces.Categorical(40),
-		                                                   names=_all_label_names))
-		self.get_material('mechanism').space = spaces.Joint(spaces.Categorical(_colors),
-		                                                    spaces.Categorical(_shapes),
-		                                                    spaces.Bound(0., 1.),
-		                                                    spaces.Bound(0., 1.),
-		                                                    spaces.Categorical(_bg_color),
-		                                                    spaces.Bound(0., 1.),
-		                                                    spaces.Bound(0., 1.),
-		                                                    names=_all_label_names)
+		self.register_buffer('observation', self.ImageBuffer(space=spaces.Pixels(3, 64, 64, as_bytes=as_bytes)))
+		self.register_buffer('label', space=spaces.Joint(spaces.Categorical(_colors),
+		                                                 spaces.Categorical(_shapes),
+		                                                 spaces.Categorical(['small', 'large']),
+		                                                 spaces.Categorical(['top', 'center', 'bottom']),
+		                                                 spaces.Categorical(_bg_color),
+		                                                 spaces.Categorical(40),
+		                                                 spaces.Categorical(40),
+		                                                 names=_all_label_names))
+		self.get_buffer('mechanism').space = spaces.Joint(spaces.Categorical(_colors),
+		                                                  spaces.Categorical(_shapes),
+		                                                  spaces.Bound(0., 1.),
+		                                                  spaces.Bound(0., 1.),
+		                                                  spaces.Categorical(_bg_color),
+		                                                  spaces.Bound(0., 1.),
+		                                                  spaces.Bound(0., 1.),
+		                                                  names=_all_label_names)
 
 	_source_url = {
 		'toy': 'https://storage.googleapis.com/disentanglement_dataset/Final_Dataset/mpi3d_toy.npz',

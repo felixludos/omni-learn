@@ -65,9 +65,9 @@ class _Torchvision_Toy_Dataset(flavors.DownloadableRouter, flavors.SupervisedDat
 		super().__init__(default_len=default_len, **kwargs)
 
 		if observation_buffer is not None:
-			self.register_material('observation', observation_buffer)
+			self.register_buffer('observation', observation_buffer)
 		if target_buffer is not None:
-			self.register_material('target', target_buffer)
+			self.register_buffer('target', target_buffer)
 
 		self._resize = resize
 		self.mode = mode
@@ -113,12 +113,12 @@ class _Torchvision_Toy_Dataset(flavors.DownloadableRouter, flavors.SupervisedDat
 			images = images.permute(0,3,1,2)
 		if self._resize:
 			images = F.interpolate(images.float(), (32, 32), mode='bilinear').round().byte()
-		self.get_material('observation').data = images
+		self.get_buffer('observation').data = images
 
 		targets = getattr(src, self._target_attr)
 		if not isinstance(targets, torch.Tensor):
 			targets = torch.as_tensor(targets)
-		self.get_material('target').data = targets
+		self.get_buffer('target').data = targets
 
 
 
@@ -167,7 +167,7 @@ class EMNIST(_Torchvision_Toy_Dataset, ident='emnist'):
 		super().__init__(default_len=default_len, target_buffer=target_buffer, **kwargs)
 
 		if target_buffer is not None:
-			self.register_material('target', target_buffer)
+			self.register_buffer('target', target_buffer)
 
 		self._split = split
 
