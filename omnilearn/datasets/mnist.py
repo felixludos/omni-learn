@@ -26,14 +26,17 @@ class _Torchvision_Toy_Dataset(flavors.DownloadableRouter, flavors.SupervisedDat
 	mode = hparam(None)
 	_as_bytes = hparam(False)
 
+
 	@hparam(hidden=True)
 	def default_len(self):
 		return 10000 if self.mode == 'test' else 60000
+
 
 	@hparam(hidden=True)
 	def observation_space(self):
 		size = (32, 32) if self.resize else (28, 28)
 		return spaces.Pixels(1, *size, as_bytes=self._as_bytes)
+
 
 	@hparam(hidden=True)
 	def target_space(self):

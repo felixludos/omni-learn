@@ -2,7 +2,7 @@ from omnibelt import agnosticmethod
 import torch
 from torch import nn
 
-from omnidata import hparam, module, inherit_hparams, with_hparams, Parameterized, \
+from omnidata import hparam, module, inherit_hparams, with_hparams, Structured, \
 	get_builder, Prepared, TrainableModel
 
 from .optim import PytorchOptimizer

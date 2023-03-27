@@ -7,7 +7,7 @@ from omnibelt import unspecified_argument, agnostic
 import omnifig as fig
 
 from omnidata import Function, spaces
-from omnidata import hparam, inherit_hparams, Parameterized, \
+from omnidata import hparam, inherit_hparams, Structured, \
 	get_builder, submodule, Submodule, RegistryBuilder, BasicBuilder, Builder, Buildable, with_hparams
 from . import base as reg
 
@@ -195,7 +195,7 @@ class DenseLayer(Buildable, nn.Module):
 		return x
 
 
-class Sequential(Parameterized, nn.Sequential):
+class Sequential(Structured, nn.Sequential):
 
 	din = hparam(None)
 	dout = hparam(None)

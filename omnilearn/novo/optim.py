@@ -3,7 +3,7 @@ from torch import optim as O
 from omnibelt import agnostic, unspecified_argument
 
 from omnidata import hparam, inherit_hparams, get_builder, module, Submodule, with_hparams
-from omnidata import Prepared, RegistryBuilder, RegisteredProduct, Parameterized
+from omnidata import Prepared, RegistryBuilder, RegisteredProduct, Structured
 
 from . import base as reg
 
@@ -28,7 +28,7 @@ class OptimizerBuilder(reg.BranchBuilder, branch='optim'):
 
 
 
-class PytorchOptimizer(reg.Product, Parameterized, AbstractOptimizer, O.Optimizer, registry=OptimizerBuilder):
+class PytorchOptimizer(reg.Product, Structured, AbstractOptimizer, O.Optimizer, registry=OptimizerBuilder):
 	def __init__(self, params=None, **kwargs):
 		kwargs = self._extract_hparams(kwargs)
 		hparams = {k: getattr(self, k) for k, v in self.named_hyperparameters() if v.in_init}
@@ -39,7 +39,7 @@ class PytorchOptimizer(reg.Product, Parameterized, AbstractOptimizer, O.Optimize
 		self.param_groups.clear()
 
 
-	class Hyperparameter(Parameterized.Hyperparameter):
+	class Hyperparameter(Structured.Hyperparameter):
 		def __init__(self, name=None, in_init=True, **kwargs):
 			super().__init__(name=name, **kwargs)
 			self.in_init = in_init
