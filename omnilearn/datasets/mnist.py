@@ -10,8 +10,10 @@ from omnidata import spaces, flavors
 from ..novo.base import DataProduct, DataBuilder
 
 
+
 class ToyData(DataBuilder, ident='toy', as_branch=True):
 	pass
+
 
 
 class CIFAR(ToyData, ident='cifar', as_branch=True):

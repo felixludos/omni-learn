@@ -38,22 +38,23 @@ class BranchBuilder(_HierarchyBuilder, create_registry=False):
 	                      skip_component_registration=False, **kwargs):
 		super().__init_subclass__(branch=branch, **kwargs)
 		if not skip_component_registration and (create_registry or branch is not None):
-			builder(cls._branch_address, description=description)(cls)
+			builder(cls.hierarchy_registry_address(), description=description)(cls)
 
 
 	@classmethod
 	def register_product(cls, name, product, is_default=False, *, creator='build', description=None, **kwargs):
-		if cls._branch_address is not None:
+		addr = cls.hierarchy_registry_address()
+		if addr is not None:
 			if description is None:
 				description = getattr(product, 'description', None)
-			component(f'{cls._branch_address}{cls._branch_address_delimiter}{name}',
-			          creator=creator, description=description)(product)
+			component(f'{addr}{cls._branch_address_delimiter}{name}', creator=creator, description=description)(product)
 		return super().register_product(name, product, **kwargs)
 
 
 
 class DataBuilder(BranchBuilder, branch='data'):
 	pass
+
 
 
 class ModelBuilder(BranchBuilder, branch='model'):
