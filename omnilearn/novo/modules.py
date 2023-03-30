@@ -7,13 +7,15 @@ from omnibelt import unspecified_argument, agnostic
 import omnifig as fig
 
 from omnidata import Function, spaces
-from omnidata import hparam, inherit_hparams, Structured, \
-	get_builder, submodule, Submodule, RegistryBuilder, BasicBuilder, Builder, Buildable, with_hparams
+
+from .base import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
+	Structured, Builder
 from . import base as reg
 
 
-class ActivationBuilder(reg.BranchBuilder, branch='nonlin', default_ident='elu',
-                        products={
+
+@reg.builder('nonlin')
+class Activation(reg.BranchBuilder, branch='nonlin', default_ident='relu', products={
 							'relu': nn.ReLU,
 							'prelu': nn.PReLU,
 							'lrelu': nn.LeakyReLU,
@@ -23,82 +25,86 @@ class ActivationBuilder(reg.BranchBuilder, branch='nonlin', default_ident='elu',
 							'elu': nn.ELU,
 							'selu': nn.SELU,
                          }):
-	inplace = hparam(True, space=spaces.Binary())
-
-	@agnostic
-	def build(self, ident, inplace, **kwargs):
-		product = self.product(ident=ident, inplace=inplace, **kwargs)
-		if product in {nn.ELU, nn.ReLU, nn.SELU}:
-			return product(inplace=inplace, **kwargs)
-		return product(**kwargs)
+	inplace = hparam(True, space=spaces.Binary(), hidden=True)
 
 
-
-class NormalizationBuilder(reg.BranchBuilder, branch='norm', default_ident='batch', products={
-							'batch1d': nn.BatchNorm1d,
-							'batch2d': nn.BatchNorm2d,
-							'batch3d': nn.BatchNorm3d,
-							'instance1d': nn.InstanceNorm1d,
-							'instance2d': nn.InstanceNorm2d,
-							'instance3d': nn.InstanceNorm3d,
-							'group': nn.GroupNorm,
-                         }):
-
-	width = hparam(None)
-	spatial_dims = hparam(1, space=[1, 2, 3])
-
-	num_groups = hparam(None)
-
-	momentum = hparam(0.1, space=spaces.Bound(0.01, 0.99))
-	eps = hparam(1e-5)
-	affine = hparam(True, space=spaces.Binary())
-
-	@agnostic
-	def product(self, ident, spatial_dims=1, **kwargs):
-		if ident in {'batch', 'instance'}:
-			ident = f'{ident}{spatial_dims}d'
-		return super().product(ident, **kwargs)
-
-	@agnostic
-	def build(self, ident, width, spatial_dims=1, num_groups=None, momentum=0.1,
-	           eps=1e-5, affine=True, **kwargs):
-		
-		product = self.product(ident=ident, spatial_dims=spatial_dims, **kwargs)
-
-		if issubclass(product, nn.GroupNorm):
-			if num_groups is None:
-				num_groups = 8 if width >= 16 else 4
-			return product(num_groups, width, eps=eps, affine=affine)
-		return product(width, momentum=momentum, eps=eps, affine=affine, **kwargs)
+	def _build_kwargs(self, product, ident, **kwargs):
+		kwargs = super()._build_kwargs(product, ident, **kwargs)
+		if issubclass(product, (nn.ELU, nn.ReLU, nn.SELU)) and 'inplace' not in kwargs:
+			kwargs['inplace'] = self.inplace
+		return kwargs
 
 
-@reg.builder('loss')
-class LossBuilder(Builder):
-	target_space = hparam(required=True)
-	
-	@agnostic
-	def product_base(self, target_space):
+
+class CrossEntropyLoss(nn.CrossEntropyLoss):
+	def forward(self, input, target):
+		if target.ndim > 1:
+			target = target.view(-1)
+		return super().forward(input, target)
+
+
+
+@reg.builder('criterion')
+class CriterionBuilder(Builder):
+	target_space = space('target')
+	@space('input')
+	def input_space(self):
+		return self.target_space
+
+
+	def product_signatures(self, *args, **kwargs):
+		yield self._Signature('output', inputs=('input', 'target'))
+
+
+	def product_base(self, target_space=None):
+		if target_space is None:
+			target_space = self.target_space
 		if isinstance(target_space, spaces.Categorical):
 			return nn.CrossEntropyLoss
 		elif isinstance(target_space, spaces.Continuous):
 			return nn.MSELoss
 		else:
 			raise self.NoProductFound(target_space)
-		
+
 
 
 @reg.component('reshaper')
-class Reshaper(Buildable, nn.Module):  # by default flattens
-	def __init__(self, dout=(-1,)):
-		super().__init__()
-		self.dout = dout
+class Reshaper(Structured, nn.Module):  # by default flattens
+	dout_shape = hparam((-1,))
+
 
 	def extra_repr(self):
-		return f'out={self.dout}'
+		return f'out={self.dout_shape}'
+
 
 	def forward(self, x):
 		B = x.size(0)
-		return x.view(B, *self.dout)
+		return x.view(B, *self.dout_shape)
+
+
+
+@reg.builder('linear')
+class LinearBuilder(Builder):
+	din = space('input')
+	dout = space('output')
+
+
+	def product_base(self, *args, **kwargs):
+		return nn.Linear
+
+
+	def _build_kwargs(self, product, *, in_features=None, out_features=None, bias=None, **kwargs):
+		kwargs = super()._build_kwargs(product, **kwargs)
+
+		if in_features is None:
+			in_features = self.din.width
+		kwargs['in_features'] = in_features
+
+		if out_features is None:
+			out_features = self.dout.width
+		kwargs['out_features'] = out_features
+
+		return kwargs
 
 
 
@@ -111,6 +117,7 @@ class BasicLinear(Builder):
 
 	bias = hparam(True, space=spaces.Binary())
 
+
 	@agnostic
 	def _expand_dim(self, dim):
 		if isinstance(dim, int):
@@ -121,9 +128,11 @@ class BasicLinear(Builder):
 			return dim.expanded_shape
 		raise NotImplementedError(dim)
 
+
 	@agnostic
 	def product_base(self, *args, **kwargs):
 		return nn.Linear
+
 
 	@agnostic
 	def build(self, width: int = None, *, din=None, dout=None, bias=True, **kwargs):
@@ -316,6 +325,53 @@ class MLPBuilder(Feedforward):
 
 
 
+
+
+
+
+# class NormalizationBuilder(reg.BranchBuilder, branch='norm', default_ident='batch', products={
+# 							'batch1d': nn.BatchNorm1d,
+# 							'batch2d': nn.BatchNorm2d,
+# 							'batch3d': nn.BatchNorm3d,
+# 							'instance1d': nn.InstanceNorm1d,
+# 							'instance2d': nn.InstanceNorm2d,
+# 							'instance3d': nn.InstanceNorm3d,
+# 							'group': nn.GroupNorm,
+#                          }):
+#
+# 	width = hparam(None)
+# 	spatial_dims = hparam(1, space=[1, 2, 3])
+#
+# 	num_groups = hparam(None)
+#
+# 	momentum = hparam(0.1, space=spaces.Bound(0.01, 0.99))
+# 	eps = hparam(1e-5)
+# 	affine = hparam(True, space=spaces.Binary())
+#
+# 	@agnostic
+# 	def product(self, ident, spatial_dims=1, **kwargs):
+# 		if ident in {'batch', 'instance'}:
+# 			ident = f'{ident}{spatial_dims}d'
+# 		return super().product(ident, **kwargs)
+#
+# 	@agnostic
+# 	def build(self, ident, width, spatial_dims=1, num_groups=None, momentum=0.1,
+# 	           eps=1e-5, affine=True, **kwargs):
+#
+# 		product = self.product(ident=ident, spatial_dims=spatial_dims, **kwargs)
+#
+# 		if issubclass(product, nn.GroupNorm):
+# 			if num_groups is None:
+# 				num_groups = 8 if width >= 16 else 4
+# 			return product(num_groups, width, eps=eps, affine=affine)
+# 		return product(width, momentum=momentum, eps=eps, affine=affine, **kwargs)
+
+
+
+
+
+
+#####
 
 # # @reg.builder('qik-mlp')
 # class QikMLP(Buildable, nn.Module):

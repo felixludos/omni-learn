@@ -2,7 +2,8 @@
 from omnibelt import agnostic, Class_Registry
 from omnifig import script, component, creator, modifier
 
-from omnidata import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, Structured
+from omnidata import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
+	Structured, Builder
 
 from omnidata import Named, BuildCreator as _BuilderCreator, register_builder as _register_builder, \
 	HierarchyBuilder as _HierarchyBuilder, RegisteredProduct as _RegisteredProduct
