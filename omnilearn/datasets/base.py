@@ -3,9 +3,12 @@ from pathlib import Path
 
 from omnifig import script, component, creator, modifier
 
-from omnidata import hparam, inherit_hparams, submodule, submachine, spaces, material, space, indicator, machine, \
-	Structured
-from omnidata import Dataset, Datastream, HierarchyBuilder
+from omnidata import toy, Dataset, Datastream, HierarchyBuilder
+
+
+from ..novo.base import DataProduct, DataBuilder
+from ..novo.base import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, Structured
+
 
 
 
@@ -21,25 +24,19 @@ class RootedDataset(Dataset):
 
 
 
-class Data(HierarchyBuilder):
+class ToyData(DataBuilder, branch='toy'):
 	pass
 
+ToyData.register_product('swiss-roll', toy.SwissRollDataset)
+ToyData.register_product('helix', toy.HelixDataset, is_default=True)
 
 
-class Toy(Data, branch='toy', default_ident='swiss-roll', products={
-	'swiss-roll': toy.SwissRollDataset,
-	'helix': toy.HelixDataset,
-	}):
+
+class Manifolds(DataBuilder, branch='manifold'):
 	pass
 
-
-
-class Manifolds(Data, branch='manifold', default_ident='swiss-roll', products={
-	'swiss-roll': toy.SwissRoll,
-	'helix': toy.Helix,
-	}):
-	pass
-
+Manifolds.register_product('swiss-roll', toy.SwissRoll)
+Manifolds.register_product('helix', toy.Helix, is_default=True)
 
 
 

@@ -1,6 +1,9 @@
 
 from omnibelt import agnostic, Class_Registry
 from omnifig import script, component, creator, modifier
+
+from omnidata import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, Structured
+
 from omnidata import Named, BuildCreator as _BuilderCreator, register_builder as _register_builder, \
 	HierarchyBuilder as _HierarchyBuilder, RegisteredProduct as _RegisteredProduct
 
@@ -52,12 +55,17 @@ class BranchBuilder(_HierarchyBuilder, create_registry=False):
 
 
 
-class DataBuilder(BranchBuilder, branch='data'):
+class WorldBuilder(BranchBuilder, branch='world'):
 	pass
 
 
 
-class ModelBuilder(BranchBuilder, branch='model'):
+class DataBuilder(WorldBuilder, branch='data'):
+	pass
+
+
+
+class ModelBuilder(WorldBuilder, branch='model'):
 	pass
 
 
