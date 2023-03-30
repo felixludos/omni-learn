@@ -9,24 +9,20 @@ from omnidata import spaces, Dataset, Datastream
 from ..novo.base import DataProduct, DataBuilder
 from ..novo.base import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, Structured
 
-from .base import ToyData, RootedDataset
-
-
-class ToyData(DataBuilder, ident='toy', as_branch=True):
-	pass
+from .base import DownloadableDataset, ImageClassificationData
 
 
 
-class CIFAR(ToyData, ident='cifar', as_branch=True):
-	pass
-
-
-
-class _Torchvision_Toy_Dataset(RootedDataset):
-	resize = hparam(True)
-	mode = hparam(None)
-	download = hparam(False)
+class _Torchvision_Toy_Dataset(DownloadableDataset, registry=ImageClassificationData):
+	mode = hparam(None, inherit=True)
+	download = hparam(False, inherit=True)
 	_as_bytes = hparam(False)
+
+
+	def __init_subclass__(cls, ident=None, **kwargs):
+		if ident is None and cls._dirname is not None:
+			ident = cls._dirname
+		super().__init_subclass__(ident=ident, **kwargs)
 
 
 	def _expected_size(self):
@@ -39,10 +35,6 @@ class _Torchvision_Toy_Dataset(RootedDataset):
 		if self._as_bytes:
 			return images
 		return images.float().div(255)
-	@space('image')
-	def observation_space(self):
-		size = (32, 32) if self.resize else (28, 28)
-		return spaces.Pixels(1, *size, as_bytes=self._as_bytes)
 
 
 	@material.from_indices('target')
@@ -69,12 +61,8 @@ class _Torchvision_Toy_Dataset(RootedDataset):
 	_target_names = None
 
 
-	# @agnostic
-	# def is_downloaded(self):
-	# 	return True
-
-	# def download(self):
-	# 	self._create_source(download=True)
+	def download_data(self):
+		self._create_source(download=True)
 
 
 	def _create_source(self, **kwargs):
@@ -95,8 +83,6 @@ class _Torchvision_Toy_Dataset(RootedDataset):
 			images = images.unsqueeze(1)
 		if images.size(1) not in {1,3}:
 			images = images.permute(0,3,1,2)
-		if self.resize:
-			images = F.interpolate(images.float(), (32, 32), mode='bilinear').round().byte()
 		self.images = images
 
 		targets = getattr(src, self._target_attr)
@@ -106,153 +92,45 @@ class _Torchvision_Toy_Dataset(RootedDataset):
 
 
 
-@inherit_hparams('resize', 'mode', 'download')
-class MNIST(_Torchvision_Toy_Dataset):
-	_dirname = 'mnist'
-	_source_type = torchvision.datasets.MNIST
+class _ResizableToyDataset(_Torchvision_Toy_Dataset):
+	resize = hparam(True, inherit=True)
 
 
-
-@inherit_hparams('resize', 'mode', 'download')
-class KMNIST(_Torchvision_Toy_Dataset):
-	_dirname = 'kmnist'
-	_source_type = torchvision.datasets.KMNIST
-	_target_names = ['お', 'き', 'す', 'つ', 'な', 'は', 'ま', 'や', 'れ', 'を']
-
-
-
-
-
-########################################################################################################################
-
-
-class _Torchvision_Toy_Dataset(flavors.DownloadableRouter, flavors.SupervisedDataset, DataProduct, registry=ToyData):
-	ImageBuffer = flavors.ImageBuffer
-
-	resize = hparam(True)
-	mode = hparam(None)
-	_as_bytes = hparam(False)
-
-
-	@hparam(hidden=True)
-	def default_len(self):
-		return 10000 if self.mode == 'test' else 60000
-
-
-	@hparam(hidden=True)
+	@space('image')
 	def observation_space(self):
 		size = (32, 32) if self.resize else (28, 28)
 		return spaces.Pixels(1, *size, as_bytes=self._as_bytes)
 
 
-	@hparam(hidden=True)
-	def target_space(self):
-		return spaces.Categorical(10 if self._target_names is None else self._target_names)
-
-
-	@material
-	def observation(self):
-		size = (32, 32) if self.resize else (28, 28)
-		return self.ImageBuffer(space=spaces.Pixels(1, *size, as_bytes=self._as_bytes))
-
-
-	def __init__(self, *, resize=True, as_bytes=False, mode=None, default_len=None,
-	             observation_buffer=unspecified_argument, target_buffer=unspecified_argument, **kwargs):
-		if default_len is None:
-			default_len = 10000 if mode == 'test' else 60000
-
-		if observation_buffer is unspecified_argument:
-			observation_buffer = self.ImageBuffer(space=spaces.Pixels(1, 28, 28, as_bytes=as_bytes))
-			if resize:
-				observation_buffer.space.width = 32
-				observation_buffer.space.height = 32
-		elif resize:
-			raise ValueError('Cannot resize a custom observation buffer')
-		if target_buffer is unspecified_argument:
-			target_buffer = self.Buffer(space=spaces.Categorical(10 if self._target_names is None
-			                                                     else self._target_names))
-
-		super().__init__(default_len=default_len, **kwargs)
-
-		if observation_buffer is not None:
-			self.register_buffer('observation', observation_buffer)
-		if target_buffer is not None:
-			self.register_buffer('target', target_buffer)
-
-		self._resize = resize
-		self.mode = mode
-
-
-	def _get_source_kwargs(self, root=unspecified_argument, train=unspecified_argument,
-	                       download=unspecified_argument, **kwargs):
-		if root is unspecified_argument:
-			kwargs['root'] = self.root
-		if train is unspecified_argument:
-			kwargs['train'] = self.mode != 'test'
-		if download is unspecified_argument:
-			kwargs['download'] = self._auto_download
-		return kwargs
-
-	_source_type = None
-	_target_attr = 'targets'
-	_target_names = None
-
-	@agnostic
-	def is_downloaded(self):
-		return True
-
-	def download(self):
-		self._create_source(download=True)
-
-	def _create_source(self, **kwargs):
-		src_kwargs = self._get_source_kwargs(**kwargs)
-		src = self._source_type(**src_kwargs)
-		return src
-
 	def _prepare(self, *args, **kwargs):
 		super()._prepare(*args, **kwargs)
 
-		src = self._create_source()
-
-		images = src.data
-		if isinstance(images, np.ndarray):
-			images = torch.as_tensor(images)
-		if images.ndimension() == 3:
-			images = images.unsqueeze(1)
-		if images.size(1) not in {1,3}:
-			images = images.permute(0,3,1,2)
-		if self._resize:
-			images = F.interpolate(images.float(), (32, 32), mode='bilinear').round().byte()
-		self.get_buffer('observation').data = images
-
-		targets = getattr(src, self._target_attr)
-		if not isinstance(targets, torch.Tensor):
-			targets = torch.as_tensor(targets)
-		self.get_buffer('target').data = targets
+		if self.resize:
+			self.images = F.interpolate(self.images.float(), (32, 32), mode='bilinear').round().byte()
 
 
 
-class MNIST(_Torchvision_Toy_Dataset, ident='mnist'):
+class MNIST(_ResizableToyDataset):
 	_dirname = 'mnist'
 	_source_type = torchvision.datasets.MNIST
 
 
 
-class KMNIST(_Torchvision_Toy_Dataset, ident='kmnist'):
+class KMNIST(_ResizableToyDataset):
 	_dirname = 'kmnist'
 	_source_type = torchvision.datasets.KMNIST
 	_target_names = ['お', 'き', 'す', 'つ', 'な', 'は', 'ま', 'や', 'れ', 'を']
 
 
 
-class FashionMNIST(_Torchvision_Toy_Dataset, ident='fmnist'):
+class FashionMNIST(_ResizableToyDataset):
 	_dirname = 'fmnist'
 	_source_type = torchvision.datasets.FashionMNIST
 	_target_names = ['top', 'trouser', 'pullover', 'dress', 'coat', 'sandal', 'shirt', 'sneaker', 'bag', 'boot']
 
 
 
-class EMNIST(_Torchvision_Toy_Dataset, ident='emnist'):
+class EMNIST(_ResizableToyDataset):
 	_dirname = 'emnist'
 	_source_type = torchvision.datasets.EMNIST
 	_source_split_default_lens = {
@@ -260,52 +138,45 @@ class EMNIST(_Torchvision_Toy_Dataset, ident='emnist'):
 		'byclass': {'train': 697932, 'test': 116323},
 		'bymerge': {'train': 697932, 'test': 116323},
 		'digits': {'train': 240000, 'test': 40000},
-		'letters': {'train': 124800, 'test': 20800}
+		'letters': {'train': 124800, 'test': 20800},
 		'mnist': {'train': 60000, 'test': 10000},
 	}
 
-	split = hparam('split', default='mnist', choices=sorted(_source_split_default_lens.keys()))
-	
-	def __init__(self, split='letters', default_len=None, mode=None, target_buffer=unspecified_argument, **kwargs):
-		if default_len is None and split in self._source_split_default_lens:
-			default_len = self._source_split_default_lens['test' if mode == 'test' else 'train']
 
-		if target_buffer is unspecified_argument:
-			assert split in self._source_type.classes_split_dict, \
-				f'{split} vs {list(self._source_type.classes_split_dict)}'
-			target_buffer = self.Buffer(space=spaces.Categorical(self._source_type.classes_split_dict[split]))
-		super().__init__(default_len=default_len, target_buffer=target_buffer, **kwargs)
+	split = hparam('balanced', space=sorted(_source_split_default_lens.keys()))
 
-		if target_buffer is not None:
-			self.register_buffer('target', target_buffer)
 
-		self._split = split
+	@space('target')
+	def target_space(self):
+		return spaces.Categorical(self._source_type.classes_split_dict[self.split])
+
+
+	def _expected_size(self):
+		return self._source_split_default_lens[self.split]['test' if self.mode == 'test' else 'train']
 
 
 	def _get_source_kwargs(self, **kwargs):
 		kwargs = super()._get_source_kwargs(**kwargs)
-		kwargs['split'] = self._split
+		kwargs['split'] = self.split
 		return kwargs
 
 
 
 class _Toy_RGB_Dataset(_Torchvision_Toy_Dataset):
-	def __init__(self, *, as_bytes=False, observation_buffer=unspecified_argument, **kwargs):
-		if observation_buffer is unspecified_argument:
-			observation_buffer = self.ImageBuffer(space=spaces.Pixels(3, 32, 32, as_bytes=as_bytes))
-		super().__init__(observation_buffer=observation_buffer, resize=False, **kwargs)
+	@space('image')
+	def observation_space(self):
+		return spaces.Pixels(3, 32, 32, as_bytes=self._as_bytes)
 
 
 
-class SVHN(_Toy_RGB_Dataset, ident='svhn'):
+class SVHN(_Toy_RGB_Dataset):
 	_dirname = 'svhn'
 	_source_type = torchvision.datasets.SVHN
 	_target_attr = 'labels'
 
-	def __init__(self, *, default_len=None, mode=None, **kwargs):
-		if default_len is None:
-			default_len = 26032 if mode == 'test' else 73257
-		super().__init__(mode=mode, default_len=default_len, **kwargs)
+
+	def _expected_size(self):
+		return 26032 if self.mode == 'test' else 73257
 
 
 	def _get_source_kwargs(self, **kwargs):
@@ -316,12 +187,17 @@ class SVHN(_Toy_RGB_Dataset, ident='svhn'):
 
 
 
-class _CIFAR_Base(_Toy_RGB_Dataset, registry=CIFAR):
+class CIFAR_Data(ImageClassificationData, branch='cifar'):
+	pass
+
+
+
+class _CIFAR_Base(_Toy_RGB_Dataset, registry=CIFAR_Data):
 	_dirname = 'cifar'
 
 
 
-class CIFAR10(_CIFAR_Base, ident='10'):
+class CIFAR10(_CIFAR_Base, ident='10', is_default=True):
 	name = 'cifar10'
 	_source_type = torchvision.datasets.CIFAR10
 	_target_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
@@ -332,21 +208,16 @@ class CIFAR100(_CIFAR_Base, ident='100'):
 	name = 'cifar100'
 	_source_type = torchvision.datasets.CIFAR100
 	_target_names = ['apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle',
-	                    'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle',
-	                    'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch',
-	                    'cra', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest',
-	                    'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower',
-	                    'leopard', 'lion', 'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain',
-	                    'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear',
-	                    'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit',
-	                    'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk',
-	                    'skyscraper', 'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower',
-	                    'sweet_pepper', 'table', 'tank', 'telephone', 'television', 'tiger', 'tractor', 'train',
+	                 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle',
+	                 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch',
+	                 'cra', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest',
+	                 'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower',
+	                 'leopard', 'lion', 'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain',
+	                 'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear',
+	                 'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit',
+	                 'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk',
+	                 'skyscraper', 'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower',
+	                 'sweet_pepper', 'table', 'tank', 'telephone', 'television', 'tiger', 'tractor', 'train',
 	                 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman', 'worm']
-
-
-
-
-
 
 

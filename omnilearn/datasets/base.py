@@ -11,9 +11,9 @@ from ..novo.base import hparam, inherit_hparams, submodule, submachine, material
 
 
 
-
-class RootedDataset(Dataset):
+class RootedDataset(Dataset, DataProduct):
 	_dirname = None
+
 
 	@hparam(inherit=True)
 	def root(self):
@@ -24,17 +24,27 @@ class RootedDataset(Dataset):
 
 
 
-class ToyData(DataBuilder, branch='toy'):
-	pass
+class DownloadableDataset(RootedDataset):
+	def is_downloaded(self):
+		return self.root.exists()
 
+
+	def download_data(self):
+		raise NotImplementedError
+
+
+
+class ImageClassificationData(DataBuilder, branch='image-classification'): pass
+
+
+
+class ToyData(DataBuilder, branch='toy'): pass
 ToyData.register_product('swiss-roll', toy.SwissRollDataset)
 ToyData.register_product('helix', toy.HelixDataset, is_default=True)
 
 
 
-class Manifolds(DataBuilder, branch='manifold'):
-	pass
-
+class Manifolds(DataBuilder, branch='manifold'): pass
 Manifolds.register_product('swiss-roll', toy.SwissRoll)
 Manifolds.register_product('helix', toy.Helix, is_default=True)
 
