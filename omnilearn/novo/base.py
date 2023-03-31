@@ -1,4 +1,6 @@
 
+from torch import nn
+
 from omnibelt import agnostic, Class_Registry
 from omnifig import script, component, creator, modifier
 
@@ -7,6 +9,8 @@ from omnidata import hparam, inherit_hparams, submodule, submachine, material, s
 
 from omnidata import Named, BuildCreator as _BuilderCreator, register_builder as _register_builder, \
 	HierarchyBuilder as _HierarchyBuilder, RegisteredProduct as _RegisteredProduct
+
+from omnidata.tools import Signature
 
 
 creator('build')(_BuilderCreator)
@@ -83,8 +87,6 @@ class DataProduct(Product, registry='data'):
 
 class ModelProduct(Product, registry='model'):
 	pass
-
-
 
 
 

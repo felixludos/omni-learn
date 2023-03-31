@@ -6,7 +6,7 @@ from omnibelt import unspecified_argument, agnostic
 
 import omnifig as fig
 
-from omnidata import Function, spaces
+from omnidata import Function, spaces, SimpleFunction
 
 from .base import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
 	Structured, Builder
@@ -28,6 +28,14 @@ class Activation(reg.BranchBuilder, branch='nonlin', default_ident='relu', produ
 	inplace = hparam(True, space=spaces.Binary(), hidden=True)
 
 
+	# @space('input')
+	# def input_space(self, output):
+	# 	return output
+	# @space('output')
+	# def output_space(self, input):
+	# 	return input
+
+
 	def _build_kwargs(self, product, ident, **kwargs):
 		kwargs = super()._build_kwargs(product, ident, **kwargs)
 		if issubclass(product, (nn.ELU, nn.ReLU, nn.SELU)) and 'inplace' not in kwargs:
@@ -36,7 +44,83 @@ class Activation(reg.BranchBuilder, branch='nonlin', default_ident='relu', produ
 
 
 
-class CrossEntropyLoss(nn.CrossEntropyLoss):
+class NormalizationBuilder(reg.BranchBuilder, branch='norm', default_ident='batch', products={
+							'batch1d': nn.BatchNorm1d,
+							'batch2d': nn.BatchNorm2d,
+							'batch3d': nn.BatchNorm3d,
+							'instance1d': nn.InstanceNorm1d,
+							'instance2d': nn.InstanceNorm2d,
+							'instance3d': nn.InstanceNorm3d,
+							'group': nn.GroupNorm,
+                         }):
+	@hparam(cache=False)
+	def width(self):
+		# try:
+		# 	width = self.dout.width
+		# except AttributeError:
+		# 	try:
+		# 		width = self.din.width
+		# 	except AttributeError:
+		# 		raise ValueError('Could not determine width without input or output space')
+		# return width
+		if self.din is not None:
+			return self.din.width
+		if self.dout is not None:
+			return self.dout.width
+		raise ValueError('Could not determine width without input or output space')
+
+	@hparam(cache=False, space=[1,2,3])
+	def spatial_dims(self):
+		# try:
+		# 	return len(self.din.shape)
+		# except AttributeError:
+		# 	try:
+		# 		return len(self.dout.shape)
+		# 	except AttributeError:
+		# 		return 1
+		if self.din is not None:
+			return len(self.din.shape)
+		if self.dout is not None:
+			return len(self.dout.shape)
+		return 1
+
+	@hparam(cache=False)
+	def num_groups(self):
+		width = self.width
+		if width > 16:
+			return 8
+		if width > 4:
+			return 4
+		if width > 2:
+			return 2
+		return 1
+
+	momentum = hparam(0.1, space=spaces.Bound(0.01, 0.99))
+	eps = hparam(1e-5)
+	affine = hparam(True, space=spaces.Binary())
+
+
+	din = space('input')
+	dout = space('output')
+
+
+	def product_base(self, ident, spatial_dims=None, **kwargs):
+		if spatial_dims is None:
+			spatial_dims = self.spatial_dims
+		if ident in {'batch', 'instance'}:
+			ident = f'{ident}{spatial_dims}d'
+		return super().product_base(ident, **kwargs)
+
+
+	def _build_kwargs(self, product, ident, **kwargs):
+		kwargs = super()._build_kwargs(product, ident, **kwargs)
+		if issubclass(product, nn.GroupNorm):
+			kwargs['num_groups'] = self.num_groups
+		return kwargs
+
+
+
+class CrossEntropyLoss(SimpleFunction, nn.CrossEntropyLoss, output='loss', input=('input', 'target')):
 	def forward(self, input, target):
 		if target.ndim > 1:
 			target = target.view(-1)
@@ -64,7 +148,7 @@ class CriterionBuilder(Builder):
 		elif isinstance(target_space, spaces.Continuous):
 			return nn.MSELoss
 		else:
-			raise self.NoProductFound(target_space)
+			raise NotImplementedError(target_space)
 
 
 
@@ -85,6 +169,10 @@ class Reshaper(Structured, nn.Module):  # by default flattens
 
 @reg.builder('linear')
 class LinearBuilder(Builder):
+	width = hparam(None)
+
+	bias = hparam(True, space=spaces.Binary())
+
 	din = space('input')
 	dout = space('output')
 
@@ -96,63 +184,31 @@ class LinearBuilder(Builder):
 	def _build_kwargs(self, product, *, in_features=None, out_features=None, bias=None, **kwargs):
 		kwargs = super()._build_kwargs(product, **kwargs)
 
+		if bias is None:
+			bias = self.bias
+		kwargs['bias'] = bias
+
 		if in_features is None:
-			in_features = self.din.width
+			# try:
+			# 	in_features = self.din.width
+			# except AttributeError:
+			# 	if self.width is None:
+			# 		raise
+			# 	in_features = self.width
+			in_features = self.width if self.din is None else self.din.width
 		kwargs['in_features'] = in_features
 
 		if out_features is None:
-			out_features = self.dout.width
+			# try:
+			# 	out_features = self.dout.width
+			# except AttributeError:
+			# 	if self.width is None:
+			# 		raise
+			# 	out_features = self.width
+			out_features = self.width if self.dout is None else self.dout.width
 		kwargs['out_features'] = out_features
 
 		return kwargs
-
-
-
-@reg.builder('linear')
-class BasicLinear(Builder):
-	width = hparam(None)
-	
-	din = hparam(None)
-	dout = hparam(None)
-
-	bias = hparam(True, space=spaces.Binary())
-
-
-	@agnostic
-	def _expand_dim(self, dim):
-		if isinstance(dim, int):
-			dim = [dim]
-		if isinstance(dim, (list, tuple)):
-			return dim
-		if isinstance(dim, spaces.Dim):
-			return dim.expanded_shape
-		raise NotImplementedError(dim)
-
-
-	@agnostic
-	def product_base(self, *args, **kwargs):
-		return nn.Linear
-
-
-	@agnostic
-	def build(self, width: int = None, *, din=None, dout=None, bias=True, **kwargs):
-		if din is None and dout is None:
-			raise ValueError('Must specify either din or dout')
-		if width is not None and din is not None and dout is not None:
-			raise ValueError('Cannot specify width and both din and dout')
-
-		if isinstance(din, spaces.Dim):
-			din = din.width
-		if isinstance(dout, spaces.Dim):
-			dout = dout.width
-
-		if width is not None:
-			if din is None:
-				din = width
-			elif dout is None:
-				dout = width
-
-		return self.product()(din, dout, bias=bias, **kwargs)
 
 
 
@@ -160,38 +216,48 @@ class BasicLinear(Builder):
 class BasicDropout(Builder): # TODO: enable multiple dims
 	p = hparam(0.1, space=spaces.Bound(0, 1))
 
-	@agnostic
+
 	def product_base(self, *args, **kwargs):
 		return nn.Dropout
 
-	@agnostic
-	@fig.config_aliases(p='prob')
-	def build(self, p=0.1, **kwargs):
-		return self.product()(p=p, **kwargs)
+
+	def _build_kwargs(self, product, *, p=None, **kwargs):
+		kwargs = super()._build_kwargs(product, **kwargs)
+		if p is None:
+			p = self.p
+		kwargs['p'] = p
+		return kwargs
 
 
 
-@reg.builder('dense-layer')
-class DenseLayer(Buildable, nn.Module):
-	
+class AbstractBlock:
+	def block_layers(self):
+		yield from ()
+
+
+
+class DenseLayer(SimpleFunction, nn.Module, AbstractBlock, output='output', inputs=('input',)):
 	linear = submodule(builder='linear')
 
 	norm = submodule(None, builder='norm')
 	nonlin = submodule('elu', builder='nonlin')
 	dropout = submodule(None, builder='dropout')
 
-	@hparam(hidden=True)
-	def din(self):
-		return self.linear.din
-	@hparam(hidden=True)
-	def dout(self):
-		return self.linear.dout
 
-	def build(self, din, dout, **kwargs):
-		self.linear = self.linear(din=din, dout=dout, **kwargs)
-		self.norm = self.norm(width=dout, **kwargs)
-		self.nonlin = self.nonlin(**kwargs)
-		self.dropout = self.dropout(**kwargs)
+	din = space('input')
+	dout = space('output')
+
+
+	def block_layers(self):
+		if self.linear is not None:
+			yield self.linear
+		if self.norm is not None:
+			yield self.norm
+		if self.nonlin is not None:
+			yield self.nonlin
+		if self.dropout is not None:
+			yield self.dropout
+
 
 	def forward(self, x):
 		x = self.linear(x)
@@ -204,64 +270,113 @@ class DenseLayer(Buildable, nn.Module):
 		return x
 
 
-class Sequential(Structured, nn.Sequential):
 
-	din = hparam(None)
-	dout = hparam(None)
+class Sequential(SimpleFunction, nn.Sequential, AbstractBlock, output='output', inputs='input'):
+	din = space('input')
+	dout = space('output')
 
-	def __init__(self, layers=(), din=None, dout=None, **kwargs):
-		if len(layers):
-			if din is None:
-				din = getattr(layers[0], 'din', None)
-			if dout is None:
-				dout = getattr(layers[-1], 'dout', None)
-		super().__init__(*layers, din=din, dout=dout, **kwargs)
+
+	def block_layers(self):
+		yield from self
+
+
+
+@reg.builder('sequential')
+class SequentialBuilder(Builder):
+	layers = hparam(None)
+
+	din = space('input')
+	dout = space('output')
+
+
+	def product_base(self, *args, **kwargs):
+		return nn.Sequential
+
+
+	def product_signatures(self, *args, **kwargs):
+		yield self._Signature('output', inputs='input')
+
+
+	def _build_kwargs(self, product, layers=None, **kwargs):
+		kwargs = super()._build_kwargs(product, **kwargs)
+		if layers is None:
+			layers = self.layers
+		if layers is None:
+			layers = ()
+		if None not in kwargs:
+			kwargs[None] = layers
+		return kwargs
 
 
 
 @reg.builder('feedforward')
-class Feedforward(Builder):
-	din = hparam(None)
-	dout = hparam(None)
+@inherit_hparams('layers')
+class Feedforward(SequentialBuilder):
+	def _block_spec(self, input=None, output=None, **kwargs):
+		overrides = {}
+		if input is not None:
+			overrides['input'] = input
+		if output is not None:
+			overrides['output'] = output
+		overrides.update(kwargs)
+		if self.my_blueprint is not None:
+			return self.my_blueprint.adapt(overrides) # TODO: implement adapt in spec
+		spec = self._Spec()
+		for k, v in overrides.items():
+			spec.change_space_of(k, v)
+		return spec
 
-	_product_base = Sequential
 
-	@agnostic
-	def product_base(self, *args, **kwargs):
-		return self._product_base
+	def _as_block_builder(self, builder):
+		return get_builder(builder)
 
-	@agnostic
-	def _build_block(self, builder, *args, **kwargs):
-		builder = get_builder(builder)
-		layer = builder.build(*args, **kwargs)
-		return [layer], layer.din, layer.dout
 
-	@agnostic
-	def build(self, layer_builders=None, din=None, dout=None, **kwargs):
-		if layer_builders is None:
-			layer_builders = []
-		assert din is not None or dout is not None, 'Must specify either din or dout'
+	def _build_block(self, builder, value=unspecified_argument, spec=None):
+		if spec is None:
+			return builder.build() if value is unspecified_argument else builder.validate(value)
+		return builder.build_from_spec(spec) if value is unspecified_argument \
+			else builder.validate_from_spec(value, spec=spec)
 
-		reverse = din is None
-		start, end = (None, dout) if reverse else (din, None)
 
-		layers = []
-		for builder in reversed(layer_builders) if reverse else layer_builders:
-			block, block_din, block_dout = self._build_block(builder, din=start, dout=end)
-			layers.extend(reversed(block) if reverse else block)
-			if reverse:
-				end = block_din
-			else:
-				start = block_dout
+	@staticmethod
+	def _layers_from_block(block):
+		if isinstance(block, AbstractBlock):
+			yield from block.block_layers()
+		elif isinstance(block, (nn.Sequential, nn.ModuleList)):
+			yield from block
+		else:
+			yield block
 
-		if reverse:
-			layers = list(reversed(layers))
 
-		ff = super().build(layers, **kwargs)
-		if din is not None and dout is not None:
-			assert (ff.din, ff.dout) == (din, dout), f'Feedforward has wrong shape: ' \
-			                                         f'{ff.din} -> {ff.dout} != {din} -> {dout}'
-		return ff
+	def _build_blocks(self, block_builders, layers=None):
+		reverse = self.din is None
+		in_gizmo = 'output' if reverse else 'input'
+		out_gizmo = 'input' if reverse else 'output'
+
+		start = self.dout if reverse else self.din
+		ends = [None] * len(block_builders)
+		ends[-1] = self.din if reverse else self.dout
+
+		if layers is None:
+			layers = [unspecified_argument] * len(block_builders)
+		elif len(layers) != len(block_builders):
+			raise ValueError(f'Expected {len(block_builders)} layers, got {len(layers)}')
+
+		for builder, value, end in zip(reversed(block_builders) if reverse else block_builders, layers, ends):
+			spec = self._block_spec(**{in_gizmo: start, out_gizmo: end})
+
+			block = self._build_block(self._as_block_builder(builder), value=value, spec=spec)
+
+			start = spec.space_of(out_gizmo)
+
+			yield block
+
+
+	def _build_kwargs(self, product, *, layers=None, block_builders=None, **kwargs):
+		if layers is None:
+			layers = [layer for block in self._build_blocks(block_builders, layers=layers)
+			          for layer in self._layers_from_block(block)]
+		return super()._build_kwargs(product, layers=layers, **kwargs)
 
 
 
