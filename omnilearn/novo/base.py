@@ -1,14 +1,15 @@
-
+from typing import Sequence, Union, Any, Optional, Tuple, Dict, List, Iterable, Iterator, Callable, Type, Set
 from torch import nn
 
 from omnibelt import agnostic, Class_Registry
 from omnifig import script, component, creator, modifier
 
 from omnidata import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
-	Structured, Builder
+	Structured, Builder, spaces, Spec
 
 from omnidata import Named, BuildCreator as _BuilderCreator, register_builder as _register_builder, \
 	HierarchyBuilder as _HierarchyBuilder, RegisteredProduct as _RegisteredProduct
+from omnidata import get_builder
 
 from omnidata.tools import Signature
 
@@ -88,6 +89,30 @@ class DataProduct(Product, registry='data'):
 class ModelProduct(Product, registry='model'):
 	pass
 
+
+
+class Blueprint(Spec):
+	def _fix_space(self, space):
+		builder = get_builder('space')()
+		return builder.validate(space)
+
+
+	def change_space_of(self, gizmo: str, space: spaces.Dim):
+		space = self._fix_space(space)
+		return super().change_space_of(gizmo, space)
+
+
+
+class SpaceBuilder(WorldBuilder, branch='space', products={
+	'unbound': spaces.Unbound,
+	'categorical': spaces.Categorical
+}):
+	def validate(self, product):
+		if isinstance(product, (int, tuple)):
+			return self.build('unbound', shape=product)
+		if isinstance(product, Sequence):
+			return self.build('categorical', n=product)
+		return super().validate(product)
 
 
 

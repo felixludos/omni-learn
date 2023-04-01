@@ -9,7 +9,7 @@ import omnifig as fig
 from omnidata import Function, spaces, SimpleFunction
 
 from .base import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
-	Structured, Builder
+	Structured, Builder, get_builder
 from . import base as reg
 
 
@@ -120,7 +120,7 @@ class NormalizationBuilder(reg.BranchBuilder, branch='norm', default_ident='batc
 
 
 
-class CrossEntropyLoss(SimpleFunction, nn.CrossEntropyLoss, output='loss', input=('input', 'target')):
+class CrossEntropyLoss(SimpleFunction, nn.CrossEntropyLoss, output='loss', inputs=('input', 'target')):
 	def forward(self, input, target):
 		if target.ndim > 1:
 			target = target.view(-1)
@@ -283,8 +283,10 @@ class Sequential(SimpleFunction, nn.Sequential, AbstractBlock, output='output', 
 
 @reg.builder('sequential')
 class SequentialBuilder(Builder):
-	layers = hparam(None)
-
+	'''
+	This is effectively an abstract builder - it does not build anything by itself, but rather you can inherit
+	from it and make sure all the layers are passed in with the keyword `layers`.
+	'''
 	din = space('input')
 	dout = space('output')
 
@@ -297,21 +299,34 @@ class SequentialBuilder(Builder):
 		yield self._Signature('output', inputs='input')
 
 
-	def _build_kwargs(self, product, layers=None, **kwargs):
+	def _build_kwargs(self, product, layers=(), **kwargs):
 		kwargs = super()._build_kwargs(product, **kwargs)
-		if layers is None:
-			layers = self.layers
-		if layers is None:
-			layers = ()
 		if None not in kwargs:
 			kwargs[None] = layers
 		return kwargs
 
 
 
+class UnwrappedBlocks(SequentialBuilder):
+	@staticmethod
+	def _layers_from_block(block):
+		if isinstance(block, AbstractBlock):
+			yield from block.block_layers()
+		elif type(block) in {nn.Sequential, nn.ModuleList}:
+			yield from block
+		else:
+			yield block
+
+
+	def _build_kwargs(self, product, layers=(), **kwargs):
+		layers = [layer for block in layers for layer in self._layers_from_block(block)]
+		return super()._build_kwargs(product, layers=tuple(layers), **kwargs)
+
+
+
 @reg.builder('feedforward')
 @inherit_hparams('layers')
-class Feedforward(SequentialBuilder):
+class FeedforwardBuilder(SequentialBuilder):
 	def _block_spec(self, input=None, output=None, **kwargs):
 		overrides = {}
 		if input is not None:
@@ -338,17 +353,7 @@ class Feedforward(SequentialBuilder):
 			else builder.validate_from_spec(value, spec=spec)
 
 
-	@staticmethod
-	def _layers_from_block(block):
-		if isinstance(block, AbstractBlock):
-			yield from block.block_layers()
-		elif isinstance(block, (nn.Sequential, nn.ModuleList)):
-			yield from block
-		else:
-			yield block
-
-
-	def _build_blocks(self, block_builders, layers=None):
+	def _build_blocks(self, block_builders):
 		reverse = self.din is None
 		in_gizmo = 'output' if reverse else 'input'
 		out_gizmo = 'input' if reverse else 'output'
@@ -357,15 +362,10 @@ class Feedforward(SequentialBuilder):
 		ends = [None] * len(block_builders)
 		ends[-1] = self.din if reverse else self.dout
 
-		if layers is None:
-			layers = [unspecified_argument] * len(block_builders)
-		elif len(layers) != len(block_builders):
-			raise ValueError(f'Expected {len(block_builders)} layers, got {len(layers)}')
-
-		for builder, value, end in zip(reversed(block_builders) if reverse else block_builders, layers, ends):
+		for builder, end in zip(reversed(block_builders) if reverse else block_builders, ends):
 			spec = self._block_spec(**{in_gizmo: start, out_gizmo: end})
 
-			block = self._build_block(self._as_block_builder(builder), value=value, spec=spec)
+			block = self._build_block(self._as_block_builder(builder), spec=spec)
 
 			start = spec.space_of(out_gizmo)
 
@@ -373,21 +373,50 @@ class Feedforward(SequentialBuilder):
 
 
 	def _build_kwargs(self, product, *, layers=None, block_builders=None, **kwargs):
-		if layers is None:
-			layers = [layer for block in self._build_blocks(block_builders, layers=layers)
-			          for layer in self._layers_from_block(block)]
+		if layers is None and block_builders is not None and len(block_builders):
+			layers = [block for block in self._build_blocks(block_builders)]
 		return super()._build_kwargs(product, layers=layers, **kwargs)
 
 
 
-class MLP(Sequential): # just for the name
+class MLP(Structured, nn.Sequential):
 	pass
 
 
 
 @reg.builder('mlp')
+class MLPBuilder(FeedforwardBuilder):
+
+	hidden = hparam(())
+
+	nonlin = hparam('elu', space=get_builder('nonlin').get_hparam('ident').space)
+	out_nonlin = hparam(None, space=get_builder('nonlin').get_hparam('ident').space)
+
+	norm = hparam(None, space=get_builder('norm').get_hparam('ident').space)
+	out_norm = hparam(None, space=get_builder('norm').get_hparam('ident').space)
+
+	bias = hparam(True, space=spaces.Binary())
+	out_bias = hparam(True, space=spaces.Binary())
+
+	dropout = hparam(0., space=spaces.Bound(0., 1.))
+
+
+	def product_base(self, *args, **kwargs):
+		return MLP
+
+
+	pass
+
+
+
+# class MLP(Sequential): # just for the name
+# 	pass
+
+
+
+@reg.builder('mlp')
 @inherit_hparams('din', 'dout')
-class MLPBuilder(Feedforward):
+class MLPBuilder(FeedforwardBuilder):
 
 	_product_base = MLP
 	_linear_builder = 'linear'
