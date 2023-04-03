@@ -177,16 +177,30 @@ class LinearBuilder(Builder):
 	dout = space('output')
 
 
+	def __init__(self, width: int = None, *args, **kwargs):
+		super().__init__(*args, width=width, **kwargs)
+
+
 	def product_base(self, *args, **kwargs):
 		return nn.Linear
 
 
-	def _build_kwargs(self, product, *, in_features=None, out_features=None, bias=None, **kwargs):
+	def validate(self, product):
+		if isinstance(product, int):
+			return self.build(product)
+		return super().validate(product)
+
+
+	def _build_kwargs(self, product, width=unspecified_argument, *,
+	                  in_features=None, out_features=None, bias=None, **kwargs):
 		kwargs = super()._build_kwargs(product, **kwargs)
 
 		if bias is None:
 			bias = self.bias
 		kwargs['bias'] = bias
+
+		if width is unspecified_argument:
+			width = self.width
 
 		if in_features is None:
 			# try:
@@ -195,7 +209,7 @@ class LinearBuilder(Builder):
 			# 	if self.width is None:
 			# 		raise
 			# 	in_features = self.width
-			in_features = self.width if self.din is None else self.din.width
+			in_features = width if self.din is None else self.din.width
 		kwargs['in_features'] = in_features
 
 		if out_features is None:
@@ -205,7 +219,7 @@ class LinearBuilder(Builder):
 			# 	if self.width is None:
 			# 		raise
 			# 	out_features = self.width
-			out_features = self.width if self.dout is None else self.dout.width
+			out_features = width if self.dout is None else self.dout.width
 		kwargs['out_features'] = out_features
 
 		return kwargs
@@ -246,6 +260,10 @@ class DenseLayer(SimpleFunction, nn.Module, AbstractBlock, output='output', inpu
 
 	din = space('input')
 	dout = space('output')
+
+
+	def __init__(self, linear: int = None, **kwargs):
+		super().__init__(linear=linear, **kwargs)
 
 
 	def block_layers(self):
@@ -325,15 +343,9 @@ class UnwrappedBlocks(SequentialBuilder):
 
 
 @reg.builder('feedforward')
-@inherit_hparams('layers')
 class FeedforwardBuilder(SequentialBuilder):
-	def _block_spec(self, input=None, output=None, **kwargs):
-		overrides = {}
-		if input is not None:
-			overrides['input'] = input
-		if output is not None:
-			overrides['output'] = output
-		overrides.update(kwargs)
+	def _block_spec(self, overrides):
+		overrides = {k: v for k, v in overrides.items() if v is not None}
 		if self.my_blueprint is not None:
 			return self.my_blueprint.adapt(overrides) # TODO: implement adapt in spec
 		spec = self._Spec()
@@ -342,33 +354,31 @@ class FeedforwardBuilder(SequentialBuilder):
 		return spec
 
 
-	def _as_block_builder(self, builder):
-		return get_builder(builder)
-
-
-	def _build_block(self, builder, value=unspecified_argument, spec=None):
-		if spec is None:
-			return builder.build() if value is unspecified_argument else builder.validate(value)
-		return builder.build_from_spec(spec) if value is unspecified_argument \
-			else builder.validate_from_spec(value, spec=spec)
+	def _build_block(self, builder, spec=None):
+		# if spec is None:
+		# 	return builder.build() #if value is unspecified_argument else builder.validate(value)
+		# return builder.build_from_spec(spec) #\
+		# 	# if value is unspecified_argument else builder.validate_from_spec(value, spec=spec)
+		builder = get_builder(builder)
+		if isinstance(builder, type):
+			builder = builder(blueprint=spec)
+		if isinstance(builder, Builder):
+			return builder.build() if spec is None else builder.build_from_spec(spec)
+		return builder
 
 
 	def _build_blocks(self, block_builders):
 		reverse = self.din is None
-		in_gizmo = 'output' if reverse else 'input'
-		out_gizmo = 'input' if reverse else 'output'
 
-		start = self.dout if reverse else self.din
+		in_gizmo, out_gizmo = ('output', 'input') if reverse else ('input', 'output')
+
 		ends = [None] * len(block_builders)
-		ends[-1] = self.din if reverse else self.dout
+		start, ends[-1] = (self.dout, self.din) if reverse else (self.din, self.dout)
 
 		for builder, end in zip(reversed(block_builders) if reverse else block_builders, ends):
-			spec = self._block_spec(**{in_gizmo: start, out_gizmo: end})
-
-			block = self._build_block(self._as_block_builder(builder), spec=spec)
-
+			spec = self._block_spec({in_gizmo: start, out_gizmo: end})
+			block = self._build_block(builder, spec=spec)
 			start = spec.space_of(out_gizmo)
-
 			yield block
 
 
@@ -385,7 +395,7 @@ class MLP(Structured, nn.Sequential):
 
 
 @reg.builder('mlp')
-class MLPBuilder(FeedforwardBuilder):
+class MLPBuilder(FeedforwardBuilder, UnwrappedBlocks):
 
 	hidden = hparam(())
 
@@ -401,11 +411,16 @@ class MLPBuilder(FeedforwardBuilder):
 	dropout = hparam(0., space=spaces.Bound(0., 1.))
 
 
+	def _build_kwargs(self, product, *, block_builders=None, **kwargs):
+		if block_builders is None:
+
+			pass
+
+		return super()._build_kwargs(product, layers=layers, **kwargs)
+
+
 	def product_base(self, *args, **kwargs):
 		return MLP
-
-
-	pass
 
 
 
@@ -414,58 +429,57 @@ class MLPBuilder(FeedforwardBuilder):
 
 
 
-@reg.builder('mlp')
-@inherit_hparams('din', 'dout')
-class MLPBuilder(FeedforwardBuilder):
-
-	_product_base = MLP
-	_linear_builder = 'linear'
-	_nonlin_builder = 'nonlin'
-	_norm_builder = 'norm'
-	_dropout_builder = 'dropout'
-
-	nonlin = hparam('elu', space=get_builder(_nonlin_builder).get_hparam('ident').space)
-	out_nonlin = hparam(None, space=get_builder(_nonlin_builder).get_hparam('ident').space)
-
-	norm = hparam(None, space=get_builder(_norm_builder).get_hparam('ident').space)
-	out_norm = hparam(None, space=get_builder(_norm_builder).get_hparam('ident').space)
-
-	hidden = hparam(())
-
-	bias = hparam(True, space=spaces.Binary())
-	out_bias = hparam(True, space=spaces.Binary())
-
-	dropout = hparam(0., space=spaces.Bound(0., 1.))
-
-
-	@agnostic
-	def _build_block(self, builder, *, din=None, dout=None, **kwargs):
-		layers = super()._build_block(self._linear_builder, width=builder, din=din, dout=dout,
-		                              bias=self.out_bias if builder is None else self.bias, **kwargs)
-		din, dout = layers[0].din, layers[0].dout
-
-		if builder is None:
-			if self.out_norm is not None:
-				layers.extend(super()._build_block(self._norm_builder, ident=self.out_norm, width=dout.width))
-			if self.out_nonlin is not None:
-				layers.extend(super()._build_block(self._nonlin_builder, ident=self.out_nonlin))
-
-		else:
-			if self.norm is not None:
-				layers.extend(super()._build_block(self._norm_builder, ident=self.norm, width=dout.width))
-			if self.nonlin is not None:
-				layers.extend(super()._build_block(self._nonlin_builder, ident=self.nonlin))
-			if self.dropout > 0:
-				layers.extend(super()._build_block(self._dropout_builder, p=self.dropout))
-
-		return layers, din, dout
-
-
-	@agnostic
-	def build(self, layer_builders=None, din=None, dout=None, **kwargs):
-		if layer_builders is None:
-			layer_builders = [*self.hidden, None]
-		return super().build(layer_builders, din=din, dout=dout, **kwargs)
+# @reg.builder('mlp')
+# class MLPBuilder(FeedforwardBuilder):
+#
+# 	_product_base = MLP
+# 	_linear_builder = 'linear'
+# 	_nonlin_builder = 'nonlin'
+# 	_norm_builder = 'norm'
+# 	_dropout_builder = 'dropout'
+#
+# 	nonlin = hparam('elu', space=get_builder(_nonlin_builder).get_hparam('ident').space)
+# 	out_nonlin = hparam(None, space=get_builder(_nonlin_builder).get_hparam('ident').space)
+#
+# 	norm = hparam(None, space=get_builder(_norm_builder).get_hparam('ident').space)
+# 	out_norm = hparam(None, space=get_builder(_norm_builder).get_hparam('ident').space)
+#
+# 	hidden = hparam(())
+#
+# 	bias = hparam(True, space=spaces.Binary())
+# 	out_bias = hparam(True, space=spaces.Binary())
+#
+# 	dropout = hparam(0., space=spaces.Bound(0., 1.))
+#
+#
+# 	@agnostic
+# 	def _build_block(self, builder, *, din=None, dout=None, **kwargs):
+# 		layers = super()._build_block(self._linear_builder, width=builder, din=din, dout=dout,
+# 		                              bias=self.out_bias if builder is None else self.bias, **kwargs)
+# 		din, dout = layers[0].din, layers[0].dout
+#
+# 		if builder is None:
+# 			if self.out_norm is not None:
+# 				layers.extend(super()._build_block(self._norm_builder, ident=self.out_norm, width=dout.width))
+# 			if self.out_nonlin is not None:
+# 				layers.extend(super()._build_block(self._nonlin_builder, ident=self.out_nonlin))
+#
+# 		else:
+# 			if self.norm is not None:
+# 				layers.extend(super()._build_block(self._norm_builder, ident=self.norm, width=dout.width))
+# 			if self.nonlin is not None:
+# 				layers.extend(super()._build_block(self._nonlin_builder, ident=self.nonlin))
+# 			if self.dropout > 0:
+# 				layers.extend(super()._build_block(self._dropout_builder, p=self.dropout))
+#
+# 		return layers, din, dout
+#
+#
+# 	@agnostic
+# 	def build(self, layer_builders=None, din=None, dout=None, **kwargs):
+# 		if layer_builders is None:
+# 			layer_builders = [*self.hidden, None]
+# 		return super().build(layer_builders, din=din, dout=dout, **kwargs)
 
 
 

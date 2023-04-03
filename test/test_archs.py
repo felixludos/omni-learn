@@ -11,10 +11,10 @@ def test_feedforward():
 	spec = Blueprint()
 	spec.change_space_of('input', 10)
 
-	builder_type = get_builder('feedforward')
+	builder_type = get_builder('mlp')
 
 	builder = builder_type(
-		layers=[20, 30],
+		hidden=[20, 30],
 
 		blueprint=spec
 	)
