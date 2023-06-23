@@ -4,7 +4,7 @@ import torch
 from torch.nn import functional as F
 import torchvision
 from omnibelt import unspecified_argument, agnosticproperty, agnostic
-from omnidata import spaces, Dataset, Datastream
+from omniplex import spaces, Dataset, Datastream
 
 from ..novo.base import DataProduct, DataBuilder
 from ..novo.base import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, Structured

@@ -2,8 +2,8 @@ import torch
 from torch import optim as O
 from omnibelt import agnostic, unspecified_argument
 
-from omnidata import hparam, inherit_hparams, get_builder#, module, Submodule, with_hparams
-from omnidata import Prepared, RegistryBuilder, RegisteredProduct, Structured
+from omniplex import hparam, inherit_hparams, get_builder#, module, Submodule, with_hparams
+from omniplex import Prepared, RegistryBuilder, RegisteredProduct, Structured
 
 from . import base as reg
 

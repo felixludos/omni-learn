@@ -1,5 +1,5 @@
 
-from omnidata import spaces, Spec
+from omniplex import spaces, Spec
 from omnilearn import get_builder, Blueprint
 
 

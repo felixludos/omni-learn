@@ -3,7 +3,7 @@ from pathlib import Path
 
 from omnifig import script, component, creator, modifier
 
-from omnidata import toy, Dataset, Datastream, HierarchyBuilder
+from omniplex import toy, Dataset, Datastream, HierarchyBuilder
 
 
 from ..novo.base import DataProduct, DataBuilder
