@@ -1,0 +1,9 @@
+name: mnist_example
+#author: Workerbee
+#
+#related: ['foundation']
+#
+#src: 'main.py'
+package: src
+
+#project_type: novo

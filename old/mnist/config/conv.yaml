@@ -1,0 +1,26 @@
+
+parents: [basics]
+
+model.net:
+  _type: multilayer
+
+  norm: None
+#  pool: max
+
+  nonlin: elu
+
+  layer_type: conv-layer
+  channels: 32
+  down: 2
+
+  layers:
+    - _type: <>layer_type
+    - _type: <>layer_type
+    - _type: <>layer_type
+    - _type: <>layer_type
+
+  last:
+    _type: mlp
+    hidden: [64, 32]
+
+

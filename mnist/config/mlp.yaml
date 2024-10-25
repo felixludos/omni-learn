@@ -1,8 +1,0 @@
-
-parents: [basics]
-
-model.net:
-  _type: mlp
-
-  hidden: [256, 128]
-

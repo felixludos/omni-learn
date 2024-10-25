@@ -1,0 +1,39 @@
+parents: [origin]
+
+name: test-mnist
+
+#epochs: 5
+budget: 2000
+
+validation.freq: 1000
+checkpoint.freq: 1000
+print.freq: 100
+viz.freq: 500
+
+
+records.freq: 100
+
+
+dataset:
+  name: mnist
+
+  download: False
+  labeled: True
+
+  batch_size: 128
+
+  split.val: 0.1666666
+
+  device: cpu
+
+
+model:
+  _model_type: simple
+
+  nonlin: elu
+
+  optim:
+    _type: adam
+    lr: 0.01
+    weight_decay: 0.001
+

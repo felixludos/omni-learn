@@ -1,0 +1,42 @@
+parents: ['base']
+
+name: 'test-cmd'
+
+output:
+#    save_freq: 500
+
+    print_freq: 50
+
+dataset:
+    name: 'mnist'
+
+    download: False
+
+    batch_size: 512
+
+    val_split: 0.166666
+
+training:
+    step_limit: 1000
+
+#    val_freq: 500
+
+model:
+    _type: 'model'
+
+    nonlin: 'elu'
+
+    net:
+        _type: 'mlp'
+        hidden_dims: [300]
+
+
+    optim_type: 'adam'
+    lr: 1.e-3
+    weight_decay: 0
+    momentum: 0
+    beta1: 0.9
+    beta2: 0.999
+
+
+
