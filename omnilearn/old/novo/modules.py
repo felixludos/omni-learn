@@ -6,7 +6,7 @@ from omnibelt import unspecified_argument, agnostic
 
 import omnifig as fig
 
-from omnidata import Function, spaces, SimpleFunction
+from omniplex import Function, spaces, SimpleFunction
 
 from .base import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
 	Structured, Builder, get_builder

@@ -13,8 +13,8 @@ except:
 	pass
 
 from torch.utils.data.dataloader import default_collate as pytorch_collate
-from torch.utils.data._utils.collate import np_str_obj_array_pattern, string_classes, \
-	default_collate_err_msg_format
+# from torch.utils.data._utils.collate import np_str_obj_array_pattern, string_classes, \
+# 	default_collate_err_msg_format
 
 from .misc import TreeSpace
 import random

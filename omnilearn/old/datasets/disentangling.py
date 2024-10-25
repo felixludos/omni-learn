@@ -8,8 +8,8 @@ import subprocess
 import wget
 import h5py as hf
 
-from omnidata import hparam, material, inherit_hparams
-from omnidata import util, spaces, flavors
+from omniplex import hparam, material, inherit_hparams
+from omniplex import util, spaces, flavors
 
 from ..novo.base import DataProduct, DataBuilder
 

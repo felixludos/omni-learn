@@ -4,14 +4,14 @@ from torch import nn
 from omnibelt import agnostic, Class_Registry
 from omnifig import script, component, creator, modifier
 
-from omnidata import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
+from omniplex import hparam, inherit_hparams, submodule, submachine, material, space, indicator, machine, \
 	Structured, Builder, spaces, Spec
 
-from omnidata import Named, BuildCreator as _BuilderCreator, register_builder as _register_builder, \
+from omniplex import Named, BuildCreator as _BuilderCreator, register_builder as _register_builder, \
 	HierarchyBuilder as _HierarchyBuilder, RegisteredProduct as _RegisteredProduct
-from omnidata import get_builder
+from omniplex import get_builder
 
-from omnidata.tools import Signature
+from omniplex.tools import Signature
 
 
 creator('build')(_BuilderCreator)

@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import numpy as np
 
-from omnidata import toy, hparam, inherit_hparams, spaces
+from omniplex import toy, hparam, inherit_hparams, spaces
 
 # from ..novo.base import DataProduct, DataBuilder
 

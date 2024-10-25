@@ -7,7 +7,7 @@ import numpy as np
 from sklearn import metrics
 # from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
 
-from omnidata.structure import spaces, Function
+from omniplex.structure import spaces, Function
 from .models import Model
 
 
