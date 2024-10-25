@@ -3,10 +3,48 @@ from .abstract import AbstractDataset, AbstractGadget
 from .planning import DefaultPlanner
 from omniply.apps.training import Dataset as _DatasetBase
 
+from omnibelt import closest_factors, prime_factors
+
+
+
+def suggest_batch_sizes(dataset_size: int, *, 
+                        prefer_power_of_two: bool = True,
+                        target_iterations: Optional[int] = 100, 
+                        target_batch_size: Optional[int] = None) -> Iterator[int]:
+    '''
+    yields perfectly divisible batch sizes in order of closeness to target_batch_size 
+    (or s.t. there are target_iterations if not provided)
+
+    if prefer_power_of_two is True, it will first yield the best power of two
+    '''
+    if dataset_size is None:
+        yield 32
+        return
+
+    assert target_batch_size is not None or target_iterations is not None, 'either target_batch_size or target_iterations must be provided'
+    if target_batch_size is None:
+        target_batch_size = max(int(math.sqrt(dataset_size)), dataset_size // target_iterations)
+    assert 0 < target_batch_size <= dataset_size, 'target_batch_size must be in (0, dataset_size]' 
+
+    factors = Counter(prime_factors(dataset_size))
+    if prefer_power_of_two and 2 in factors:
+        yield min((2 ** i for i in range(1,factors[2] + 1)), key=lambda x: abs(x - target_batch_size))
+
+    yield from closest_factors(factors, Counter(prime_factors(target_batch_size)))
+
+
+
 class DatasetBase(_DatasetBase, ToolKit, AbstractDataset):
     _Planner = DefaultPlanner
     def __init__(self, gap: dict[str, str] = None, **kwargs):
         super().__init__(gap=gap, **kwargs)
+
+
+    def suggest_batch_size(self, *, prefer_power_of_two: bool = True, 
+                            target_iterations: Optional[int] = 100, 
+                            target_batch_size: Optional[int] = None) -> int:
+        return next(suggest_batch_sizes(self.size, prefer_power_of_two=prefer_power_of_two, 
+                                       target_iterations=target_iterations, target_batch_size=target_batch_size))
 
 
     def batch(self, batch_size: Optional[int] = None, *gadgets: AbstractGadget, 
