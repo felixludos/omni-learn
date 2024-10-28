@@ -3,6 +3,16 @@ from .imports import *
 from omniply.apps.training.abstract import AbstractDataset as AbstractDatasetBase, AbstractPlanner, AbstractBatch, AbstractTrainer as AbstractTrainerBase
 
 
+class AbstractElement(AbstractGadget):
+
+    def settings(self) -> Dict[str, Any]:
+        raise NotImplementedError
+    
+    def checkpoint(path: Path = None):
+        pass
+
+
+
 class AbstractDataset(AbstractDatasetBase):
     @property
     def name(self) -> str:
@@ -27,7 +37,7 @@ class AbstractDataset(AbstractDatasetBase):
 
 
 
-class AbstractModel(AbstractGadget):
+class AbstractModel(AbstractElement):
     @property
     def name(self) -> str:
         raise NotImplementedError
@@ -38,7 +48,7 @@ class AbstractModel(AbstractGadget):
 
 
 
-class AbstractOptimizer(AbstractGadget):    
+class AbstractOptimizer(AbstractElement):    
     def setup(self, model: AbstractModel, *, device: Optional[str] = None) -> Self:
         raise NotImplementedError
 
@@ -67,6 +77,11 @@ class AbstractTrainer(AbstractTrainerBase):
     
 
     @property
+    def settings(self) -> Dict[str, Any]:
+        raise NotImplementedError
+    
+
+    @property
     def model(self) -> AbstractModel:
         raise NotImplementedError
     
@@ -84,7 +99,7 @@ class AbstractTrainer(AbstractTrainerBase):
 
 class AbstractReporter(AbstractGadget):
     def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
-        raise NotImplementedError
+        return self
 
 
     def step(self, batch: AbstractBatch) -> None:
@@ -92,6 +107,10 @@ class AbstractReporter(AbstractGadget):
     
 
     def end(self, last_batch: AbstractBatch = None) -> None:
+        raise NotImplementedError
+    
+
+    def checkpointed(self, path: str) -> None:
         raise NotImplementedError
 
 

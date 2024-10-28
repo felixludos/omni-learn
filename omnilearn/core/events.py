@@ -2,7 +2,13 @@ from .imports import *
 from .abstract import AbstractTrainer, AbstractEvent, AbstractReporter, AbstractPlanner, AbstractBatch
 
 
-class PbarReporter(ToolKit, AbstractReporter):
+
+class ReporterBase(ToolKit, AbstractReporter):
+    pass
+
+
+
+class PbarReporter(ReporterBase):
     def __init__(self, *, show_pbar: bool = True, count_samples: bool = True, 
                  target_ema_scale=1000, **kwargs):
         super().__init__(**kwargs)
@@ -12,7 +18,6 @@ class PbarReporter(ToolKit, AbstractReporter):
         self._objective_key = None
         self._target_ema_scale = target_ema_scale
         self._ema_beta = None
-
 
 
     def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
@@ -28,7 +33,7 @@ class PbarReporter(ToolKit, AbstractReporter):
             pbar_type = tqdm.notebook.tqdm if where_am_i() == 'jupyter' else tqdm.tqdm
             self._pbar = pbar_type(total=total, unit='x' if self._count_samples else 'it')
 
-        return self
+        return super().setup(trainer, planner, batch_size)
 
 
     def step(self, batch: AbstractBatch) -> None:
@@ -53,6 +58,43 @@ class PbarReporter(ToolKit, AbstractReporter):
     def end(self, last_batch: AbstractBatch = None) -> None:
         if self._pbar is not None:
             self._pbar.close()
+
+
+
+class WandB_Reporter(ReporterBase):
+    def __init__(self, *, indicators: Dict[str, int] = None, project_name: Optional[str] = None, 
+                 project_settings: Optional[Dict[str, Any]] = None, **kwargs):
+        if indicators is None:
+            indicators = {}
+        super().__init__(**kwargs)
+        self._project_name = project_name
+        self._project_settings = project_settings
+        self._indicators = indicators
+
+
+    def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
+        project_name = self._project_name or trainer.name
+        project_settings = self._project_settings or trainer.settings
+
+        self._indicators.update(trainer.all_indicators())
+
+        import wandb
+        wandb.init(project=project_name, config=project_settings)
+        return super().setup(trainer, planner, batch_size)
+
+
+    def step(self, batch: AbstractBatch) -> None:
+        import wandb
+        itr = batch['iteration']
+        wandb.log({key: batch[key] 
+                   for key, freq in self._indicators.items() 
+                   if freq > 0 and itr % freq == 0})
+
+
+    def end(self, last_batch: AbstractBatch = None) -> None:
+        import wandb
+        wandb.finish()
+
 
 
 
