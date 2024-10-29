@@ -1,11 +1,11 @@
 from .imports import *
 from .abstract import AbstractElement, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractTrainer, AbstractEvent, AbstractPlanner, AbstractReporter
 from omniply.apps.training import DynamicTrainerBase as _DynamicTrainerBase
-
+from .events import ReporterBase
 
 
 class TrainerBase(_DynamicTrainerBase):
-	_Reporter = None # TODO
+	_Reporter = ReporterBase
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
 			  reporter: AbstractEvent = None, env: Dict[str, AbstractElement] = None, 
 			  device: str = None, **kwargs):
@@ -37,6 +37,16 @@ class TrainerBase(_DynamicTrainerBase):
 		  **{k: v.settings() for k, v in self._env.items()}}
 
 
+	@property
+	def model(self) -> AbstractModel:
+		return self._model
+	
+
+	@property
+	def optimizer(self) -> AbstractOptimizer:
+		return self._optimizer
+
+
 	def all_indicators(self) -> Dict[str, int]:
 		raise NotImplementedError
 	
@@ -44,13 +54,15 @@ class TrainerBase(_DynamicTrainerBase):
 	def gadgetry(self) -> Iterator[AbstractGadget]:
 		yield self._model
 		yield self._optimizer
-		yield super().gadgetry()
+		yield from super().gadgetry()
 
 
 	def _setup_fit(self, src: AbstractDataset, *, device: str = None, **settings: Any) -> AbstractPlanner:
 		if device is None:
 			device = self._device
 		
+		src = src.load(device=device)
+
 		planner = self._planner.setup(src, **settings)
 
 		self._dataset = src

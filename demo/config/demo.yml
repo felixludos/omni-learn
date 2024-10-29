@@ -1,0 +1,23 @@
+
+# _meta.script_name: train
+
+batch-size: 128
+
+budget: 1000
+
+dataset._type: mnist
+
+model:
+  _type: mlp
+  app:
+    input: observation
+    output: prediction
+
+hidden: [300]
+nonlin: relu
+
+env.task._type: classification
+
+optimizer._type: adam
+
+

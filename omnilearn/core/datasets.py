@@ -2,7 +2,7 @@ from omnibelt import closest_factors, prime_factors
 from omniply.apps.training import Dataset as _DatasetBase
 
 from .imports import *
-from .abstract import AbstractDataset, AbstractGadget
+from .abstract import AbstractDataset, AbstractGadget, AbstractFileDataset
 from .planning import DefaultPlanner
 
 
@@ -12,6 +12,8 @@ class DatasetBase(_DatasetBase, ToolKit, AbstractDataset):
 	def __init__(self, gap: dict[str, str] = None, **kwargs):
 		super().__init__(gap=gap, **kwargs)
 
+	def load(self, *, device: Optional[str] = None) -> Self:
+		return self
 
 	def suggest_batch_size(self, *, prefer_power_of_two: bool = True, 
 							target_iterations: Optional[int] = 100, 
@@ -56,6 +58,10 @@ class DatasetBase(_DatasetBase, ToolKit, AbstractDataset):
 
 
 
+class FileDatasetBase(DatasetBase, AbstractFileDataset):
+	@property
+	def dataroot(self) -> Optional[Path]:
+		return None
 
 
 

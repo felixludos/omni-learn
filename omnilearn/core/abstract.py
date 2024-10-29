@@ -3,13 +3,18 @@ from .imports import *
 from omniply.apps.training.abstract import AbstractDataset as AbstractDatasetBase, AbstractPlanner, AbstractBatch, AbstractTrainer as AbstractTrainerBase
 
 
-class AbstractElement(AbstractGadget):
 
+class AbstractElement(AbstractGadget):
     def settings(self) -> Dict[str, Any]:
         raise NotImplementedError
     
+
     def checkpoint(path: Path = None):
-        pass
+        raise NotImplementedError
+    
+
+    def load_checkpoint(*, path: Path = None, data: Any = None):
+        raise NotImplementedError
 
 
 
@@ -23,17 +28,15 @@ class AbstractDataset(AbstractDatasetBase):
         raise NotImplementedError
 
 
-    @property
-    def dataroot(self) -> Path:
-        raise NotImplementedError
-
-
     def suggest_batch_size(self) -> int:
         pass
 
 
-    def __iter__(self) -> Iterator[AbstractBatch]:
-        return self.iterate()
+
+class AbstractFileDataset(AbstractDataset):
+    @property
+    def dataroot(self) -> Path:
+        raise NotImplementedError
 
 
 

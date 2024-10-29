@@ -4,7 +4,14 @@ from .abstract import AbstractTrainer, AbstractEvent, AbstractReporter, Abstract
 
 
 class ReporterBase(ToolKit, AbstractReporter):
-    pass
+    def setup(self, trainer, planner, batch_size):
+        return self
+    
+    def step(self, batch):
+        pass
+
+    def end(self, last_batch=None):
+        pass
 
 
 
@@ -21,12 +28,14 @@ class PbarReporter(ReporterBase):
 
 
     def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
-        total = planner.expected_iterations(batch_size)
+        total_iterations = planner.expected_iterations(batch_size)
 
         # self.gauge_apply({'objective': trainer.optimizer.objective})
         self._objective_key = trainer.optimizer.objective
         self._objective_ema = None
-        self._ema_beta = min(self._target_ema_scale / total, 0.1)
+        self._ema_beta = min(self._target_ema_scale / total_iterations, 0.1)
+
+        total = planner.expected_samples(batch_size) if self._count_samples else total_iterations
 
         if self._show_pbar:
             import tqdm
@@ -46,7 +55,7 @@ class PbarReporter(ReporterBase):
                 self._objective_ema = val if self._objective_ema is None \
                     else self._ema_beta * val + (1 - self._ema_beta) * self._objective_ema
             if desc is None:
-                desc = self.default_pbar_desc(self._objective_ema)
+                desc = self._default_pbar_desc(self._objective_ema)
             self._pbar.set_description(desc, refresh=False)
             self._pbar.update(batch.size if self._count_samples else 1)
 

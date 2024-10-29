@@ -1,0 +1,13 @@
+python-dotenv
+tqdm
+tabulate
+h5py
+numpy
+matplotlib
+pandas
+scikit-learn
+torch
+torchvision
+omnibelt
+omnifig
+omniply

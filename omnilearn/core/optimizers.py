@@ -2,7 +2,7 @@ from .imports import *
 from .abstract import AbstractOptimizer, AbstractModel, AbstractBatch
 
 
-class OptimizerBase(ToolKit, AbstractOptimizer):
+class OptimizerBase(AbstractOptimizer):
 	def __init__(self, *, objective: str = 'loss', maximize: bool = False, **kwargs):
 		super().__init__(**kwargs)
 		self._objective = objective
@@ -15,6 +15,10 @@ class OptimizerBase(ToolKit, AbstractOptimizer):
 	@property
 	def objective_direction(self) -> int:
 		return 1 if self._maximize else -1
+	
+
+	def setup(self, model: AbstractModel, *, device: Optional[str] = None) -> Self:
+		return self
 
 
 
@@ -51,7 +55,7 @@ class PytorchOptimizer(OptimizerBase, O.Optimizer):
 		if self._maximize:
 			objective = -objective
 		objective.backward()
-		super().step()
+		super(AbstractOptimizer, self).step()
 		self.zero_grad()
 		return batch
 

@@ -3,7 +3,7 @@ from .abstract import AbstractModel, AbstractDataset
 
 
 
-class ModelBase(ToolKit, nn.Module, AbstractModel):
+class ModelBase(nn.Module, AbstractModel):
 	def prepare(self, dataset: AbstractDataset, *, device: Optional[str] = None) -> Self:
 		return self
 
@@ -20,13 +20,6 @@ class MLP(ModelBase, nn.Sequential):
 		self._output_dim = output_dim
 		self._nonlin = nonlin
 		self._output_nonlin = output_nonlin
-
-	
-	@tool('output')
-	def compute_output(self, input):
-		return self(input)
-	# def forward(self, input):
-	# 	return super().forward(input)
 
 
 	@staticmethod
@@ -56,6 +49,8 @@ class MLP(ModelBase, nn.Sequential):
 			 input_dim: Optional[int] = None, output_dim: Optional[int] = None):
 		if input_dim is None:
 			input_dim = self._input_dim or dataset.input_dim
+			if isinstance(input_dim, tuple):
+				input_dim = int(np.prod(input_dim))
 		if output_dim is None:
 			output_dim = self._output_dim or dataset.output_dim
 
