@@ -7,13 +7,13 @@ from .planning import DefaultPlanner
 
 
 
-class DatasetBase(_DatasetBase, ToolKit, AbstractDataset):
+class DatasetBase(AbstractDataset):
+	_Batch = Batch
 	_Planner = DefaultPlanner
-	def __init__(self, gap: dict[str, str] = None, **kwargs):
-		super().__init__(gap=gap, **kwargs)
 
 	def load(self, *, device: Optional[str] = None) -> Self:
 		return self
+
 
 	def suggest_batch_size(self, *, prefer_power_of_two: bool = True, 
 							target_iterations: Optional[int] = 100, 

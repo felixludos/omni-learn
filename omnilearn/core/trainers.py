@@ -1,13 +1,14 @@
 from .imports import *
-from .abstract import AbstractElement, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractTrainer, AbstractEvent, AbstractPlanner, AbstractReporter
+from .abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractTrainer, AbstractEvent, AbstractPlanner, AbstractReporter
 from omniply.apps.training import DynamicTrainerBase as _DynamicTrainerBase
 from .events import ReporterBase
+
 
 
 class TrainerBase(_DynamicTrainerBase):
 	_Reporter = ReporterBase
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
-			  reporter: AbstractEvent = None, env: Dict[str, AbstractElement] = None, 
+			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None, 
 			  device: str = None, **kwargs):
 		if reporter is None:
 			reporter = self._Reporter()
@@ -32,8 +33,7 @@ class TrainerBase(_DynamicTrainerBase):
 	@property
 	def settings(self) -> Dict[str, Any]:
 		assert 'model' not in self._env and 'optimizer' not in self._env, f'env cannot contain "model" or "optimizer": {self._env}'
-		return {'model': self._model.settings(), 
-		  'optimizer': self._optimizer.settings(), 
+		return {'model': self._model.settings(), 'optimizer': self._optimizer.settings(), 
 		  **{k: v.settings() for k, v in self._env.items()}}
 
 

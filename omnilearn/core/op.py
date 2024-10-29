@@ -1,32 +1,62 @@
 from .imports import *
 import omnifig as fig
 
-from .abstract import AbstractModel, AbstractOptimizer, AbstractEvent, AbstractElement
-from .planning import DefaultPlanner
+from .abstract import AbstractModel, AbstractOptimizer, AbstractEvent, AbstractMachine
+from .planning import DefaultPlanner as Planner
 from .datasets import FileDatasetBase, Batch
 from .models import MLP as MLPBase, ModelBase
 from .trainers import TrainerBase
 from .optimizers import Adam as AdamBase, SGD as SGDBase, OptimizerBase as Optimizer
-from .events import PbarReporter
+from .events import Pbar_Reporter as Reporter
 
 # configurable versions of the top level functions
 
-class Machine(fig.Configurable, ToolKit):
+
+
+class Machine(fig.Configurable, ToolKit, AbstractMachine):
 	@fig.config_aliases(gap='app')
 	def __init__(self, gap=None, **kwargs):
 		super().__init__(gap=gap, **kwargs)
 
 
+	def _checkpoint_data(self) -> Dict[str, Any]:
+		return self.settings()
+
+
+	def _load_checkpoint_data(self, data: Dict[str, Any]) -> None:
+		pass
+
+
+	def checkpoint(self, path: Path = None):
+		data = self._checkpoint_data()
+		if path is None:
+			return data
+		torch.save(data, path)
+	
+
+	def load_checkpoint(self, *, path = None, data = None):
+		assert path is None != data is None, 'must provide exactly one of path or data'
+		if data is None:
+			data = torch.load(path)
+		self._load_checkpoint_data(data)
+
+
+	def settings(self):
+		return {}
+
+
 
 class Trainer(fig.Configurable, TrainerBase):
-	_Planner = DefaultPlanner
-	_Reporter = PbarReporter
+	_Planner = Planner
+	_Reporter = Reporter
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
-			  reporter: AbstractEvent = None, env: Dict[str, AbstractElement] = None, 
-			  budget: int = None, device: str = None, **kwargs):
+			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None, 
+			  budget: Union[int, Dict[str, int]] = None, device: str = None, **kwargs):
+		if isinstance(budget, int):
+			budget = {'max_iterations': budget}
 		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, device=device, **kwargs)
 		if budget is not None:
-			self._planner._max_iterations = budget
+			self._planner.budget(**budget)
 
 
 
@@ -54,10 +84,26 @@ class MLP(Model, MLPBase):
 
 
 	@tool('output')
-	def compute_output(self, input):
+	def compute_output(self, input: torch.Tensor) -> torch.Tensor:
 		return self(input)
-	# def forward(self, input):
-	# 	return super().forward(input)
+	
+
+	def settings(self):
+		out = super()._checkpoint_data()
+		out['hidden'] = self._hidden
+		out['nonlin'] = self._nonlin
+		out['output_nonlin'] = self._output_nonlin
+		out['input_dim'] = self._input_dim
+		out['output_dim'] = self._output_dim
+		return out
+	
+	def _load_checkpoint_data(self, data: Dict[str, Any]) -> None:
+		super()._load_checkpoint_data(data)
+		self._hidden = data['hidden']
+		self._nonlin = data['nonlin']
+		self._output_nonlin = data['output_nonlin']
+		self._input_dim = data['input_dim']
+		self._output_dim = data['output_dim']
 
 
 

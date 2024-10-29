@@ -1,24 +1,34 @@
 from .imports import *
 
-from omniply.apps.training.abstract import AbstractDataset as AbstractDatasetBase, AbstractPlanner, AbstractBatch, AbstractTrainer as AbstractTrainerBase
+from omniply.apps.training.abstract import AbstractDataset as AbstractDatasetBase, AbstractPlanner as AbstractPlannerBase, AbstractBatch, AbstractTrainer as AbstractTrainerBase
 
 
 
-class AbstractElement(AbstractGadget):
+class AbstractPlanner(AbstractPlannerBase):
+    def budget(self, **settings):
+        raise NotImplementedError
+    
+
+    def expected_samples(self, step_size: int) -> Optional[int]:
+        raise NotImplementedError
+
+
+
+class AbstractMachine(AbstractGadget):
     def settings(self) -> Dict[str, Any]:
         raise NotImplementedError
     
 
-    def checkpoint(path: Path = None):
+    def checkpoint(self, path: Path = None):
         raise NotImplementedError
     
 
-    def load_checkpoint(*, path: Path = None, data: Any = None):
+    def load_checkpoint(self, *, path: Path = None, data: Any = None):
         raise NotImplementedError
 
 
 
-class AbstractDataset(AbstractDatasetBase):
+class AbstractDataset(AbstractDatasetBase, AbstractMachine):
     @property
     def name(self) -> str:
         raise NotImplementedError
@@ -40,7 +50,7 @@ class AbstractFileDataset(AbstractDataset):
 
 
 
-class AbstractModel(AbstractElement):
+class AbstractModel(AbstractMachine):
     @property
     def name(self) -> str:
         raise NotImplementedError
@@ -51,7 +61,7 @@ class AbstractModel(AbstractElement):
 
 
 
-class AbstractOptimizer(AbstractElement):    
+class AbstractOptimizer(AbstractMachine):    
     def setup(self, model: AbstractModel, *, device: Optional[str] = None) -> Self:
         raise NotImplementedError
 

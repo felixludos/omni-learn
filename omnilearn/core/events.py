@@ -15,7 +15,7 @@ class ReporterBase(ToolKit, AbstractReporter):
 
 
 
-class PbarReporter(ReporterBase):
+class Pbar_Reporter(ReporterBase):
     def __init__(self, *, show_pbar: bool = True, count_samples: bool = True, 
                  target_ema_scale=1000, **kwargs):
         super().__init__(**kwargs)
@@ -27,13 +27,14 @@ class PbarReporter(ReporterBase):
         self._ema_beta = None
 
 
+    _max_beta = 0.01
     def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
         total_iterations = planner.expected_iterations(batch_size)
 
         # self.gauge_apply({'objective': trainer.optimizer.objective})
         self._objective_key = trainer.optimizer.objective
         self._objective_ema = None
-        self._ema_beta = min(self._target_ema_scale / total_iterations, 0.1)
+        self._ema_beta = min(self._target_ema_scale / total_iterations, self._max_beta)
 
         total = planner.expected_samples(batch_size) if self._count_samples else total_iterations
 
@@ -61,7 +62,15 @@ class PbarReporter(ReporterBase):
 
 
     def _default_pbar_desc(self, objective: Union[float, torch.Tensor]) -> str:
-        return f'{self._objective_key} = {objective:.3g}'
+        if objective >= 1000 or objective <= 0.001:
+            val = f'{objective:.3g}'
+        elif objective >= 100:
+            val = f'{int(objective*10)/10:.1f}'
+        elif objective >= 10:
+            val = f'{int(objective*100)/100:.2f}'
+        else:
+            val = f'{int(objective*1000)/1000:.3f}'
+        return f'{self._objective_key} = {val}'
 
 
     def end(self, last_batch: AbstractBatch = None) -> None:

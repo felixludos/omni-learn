@@ -1,11 +1,12 @@
 from .imports import *
-from omnilearn import Dataset, Model, Adam, Optimizer, Trainer, Machine
+from omnilearn import Dataset, Model, Adam, Optimizer, Trainer, Machine, Planner
 from omnilearn import autoreg
 from torchvision.datasets import MNIST as Torchvision_MNIST
 
 
 
 fig.component('trainer')(Trainer)
+fig.component('planner')(Planner)
 
 
 @fig.component('mnist')
@@ -90,6 +91,7 @@ def train_mnist(cfg: fig.Configuration):
     dataset: Dataset = cfg.pull('dataset')
 
     cfg.push('trainer._type', 'trainer', overwrite=False, silent=True)
+    cfg.push('planner._type', 'planner', overwrite=False, silent=True)
     trainer: Trainer = cfg.pull('trainer')
 
     trainer.fit(dataset)

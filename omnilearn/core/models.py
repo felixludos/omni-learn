@@ -4,9 +4,22 @@ from .abstract import AbstractModel, AbstractDataset
 
 
 class ModelBase(nn.Module, AbstractModel):
-	def prepare(self, dataset: AbstractDataset, *, device: Optional[str] = None) -> Self:
-		return self
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self._is_prepared = False
 
+
+	def prepare(self, dataset: AbstractDataset, *, device: Optional[str] = None, **kwargs) -> Self:
+		if self._is_prepared:
+			return self
+		self._prepare(dataset, device=device, **kwargs)
+		self._is_prepared = True
+		return self
+	
+
+	def _prepare(self, dataset: AbstractDataset, *, device: Optional[str] = None):
+		pass
+	
 
 
 class MLP(ModelBase, nn.Sequential):
@@ -45,7 +58,7 @@ class MLP(ModelBase, nn.Sequential):
 		return layers
 
 
-	def prepare(self, dataset, *, device = None, 
+	def _prepare(self, dataset, *, device = None, 
 			 input_dim: Optional[int] = None, output_dim: Optional[int] = None):
 		if input_dim is None:
 			input_dim = self._input_dim or dataset.input_dim
@@ -61,7 +74,7 @@ class MLP(ModelBase, nn.Sequential):
 		
 		if device is not None:
 			self.to(device)
-		return super().prepare(dataset, device=device)
+		return super()._prepare(dataset, device=device)
 
 
 
