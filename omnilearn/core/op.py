@@ -51,10 +51,11 @@ class Trainer(fig.Configurable, TrainerBase):
 	_Reporter = Reporter
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
 			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None, 
-			  budget: Union[int, Dict[str, int]] = None, device: str = None, **kwargs):
+			  budget: Union[int, Dict[str, int]] = None, batch_size: int = None,
+			  device: str = None, **kwargs):
 		if isinstance(budget, int):
 			budget = {'max_iterations': budget}
-		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, device=device, **kwargs)
+		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, batch_size=batch_size, device=device, **kwargs)
 		if budget is not None:
 			self._planner.budget(**budget)
 

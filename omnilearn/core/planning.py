@@ -22,3 +22,6 @@ class DefaultPlanner(Indexed, AbstractPlanner):
             self._max_iterations = max_iterations
         if max_epochs is not None:
             self._max_epochs = max_epochs
+
+
+
