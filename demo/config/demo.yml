@@ -16,6 +16,18 @@ hidden: [300]
 nonlin: relu
 
 env.task._type: classification
+env.checkpointer:
+  _type: checkpointer
+  freq: <>ckpt-freq
+# env.eval._type: evaluator
+
+ckpt-freq: 100
+
+# metrics:
+#   loss: yes
+#   accuracy: yes
+
+log.accuracy: yes
 
 optimizer._type: adam
 

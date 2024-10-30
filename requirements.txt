@@ -14,6 +14,7 @@ ipdb
 h5py
 pyyaml
 tqdm
+humanize
 pandas
 scikit-learn
 seaborn

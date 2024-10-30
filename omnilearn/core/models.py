@@ -35,6 +35,15 @@ class MLP(ModelBase, nn.Sequential):
 		self._output_nonlin = output_nonlin
 
 
+	def count_parameters(self) -> int:
+		return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+	@property
+	def name(self) -> str:
+		return f'MLP-{self._nonlin}' if not self._is_prepared else f'MLP-{self._nonlin}-{naturalsize(self.count_parameters(), gnu=True, format='%.0f').replace('G', 'M').replace('T', 'B')}'
+
+
 	@staticmethod
 	def _build(din: int, dout: int, hidden: Optional[Iterable[int]] = None,
 			   nonlin: str = 'elu', output_nonlin: Optional[str] = None, 
@@ -67,6 +76,8 @@ class MLP(ModelBase, nn.Sequential):
 		if output_dim is None:
 			output_dim = self._output_dim or dataset.output_dim
 
+		self._input_dim = input_dim
+		self._output_dim = output_dim
 		layers = self._build(input_dim, output_dim, hidden=self._hidden, 
 					   nonlin=self._nonlin, output_nonlin=self._output_nonlin)
 		for i, layer in enumerate(layers):

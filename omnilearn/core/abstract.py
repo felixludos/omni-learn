@@ -50,6 +50,12 @@ class AbstractFileDataset(AbstractDataset):
 
 
 
+class AbstractEvaluatableDataset(AbstractDataset):
+    def as_eval(self) -> AbstractDataset:
+        raise NotImplementedError
+
+
+
 class AbstractModel(AbstractMachine):
     @property
     def name(self) -> str:
@@ -128,8 +134,8 @@ class AbstractReporter(AbstractGadget):
 
 
 
-class AbstractEvent(AbstractGadget):
-    def setup(self, trainer: AbstractTrainer, *, device: Optional[str] = None) -> Self:
+class AbstractEvent(AbstractMachine):
+    def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
         raise NotImplementedError
 
 

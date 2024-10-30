@@ -9,11 +9,14 @@ class TrainerBase(_DynamicTrainerBase):
 	_Reporter = ReporterBase
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
 			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None, 
+			  events: Iterable[AbstractEvent] = None,
 			  device: str = None, **kwargs):
 		if reporter is None:
 			reporter = self._Reporter()
 		if env is None:
 			env = {}
+		if events is None:
+			events = [e for e in env.values() if isinstance(e, AbstractEvent)]
 		super().__init__(**kwargs)
 		self._model = model
 		self._dataset = None
@@ -21,6 +24,7 @@ class TrainerBase(_DynamicTrainerBase):
 		self._reporter = reporter
 		self._device = device
 		self._env = env
+		self._events = events
 		self.extend(env.values())
 
 
@@ -47,7 +51,7 @@ class TrainerBase(_DynamicTrainerBase):
 		return self._optimizer
 
 
-	def all_indicators(self) -> Dict[str, int]:
+	def all_indicators(self) -> Iterator[str]:
 		raise NotImplementedError
 	
 
@@ -68,12 +72,15 @@ class TrainerBase(_DynamicTrainerBase):
 		self._dataset = src
 		self._model.prepare(src, device=device)
 		self._optimizer.setup(self._model, device=device)
+		for e in self._events:
+			e.setup(self, src, device=device)
 
 		return planner
 
 
 	def _end_fit(self, batch: Batch) -> None:
-		pass
+		for e in self._events:
+			e.end(batch)
 
 
 	def fit_loop(self, src: AbstractDataset, **settings):
@@ -89,6 +96,8 @@ class TrainerBase(_DynamicTrainerBase):
 
 			# Note: this runs the optimization step before yielding the batch
 			yield self.learn(batch)
+			for e in self._events:
+				e.step(batch)
 			reporter.step(batch)
 
 			if self._terminate_fit(batch):
@@ -104,38 +113,29 @@ class TrainerBase(_DynamicTrainerBase):
 
 
 
-class Checkpointable(TrainerBase):
+class CheckpointableTrainer(TrainerBase):
 	def __init__(self, checkpoint_freq: int = None, **kwargs):
 		super().__init__(**kwargs)
 		self._my_now = datetime.now().strftime('%Y%m%d_%H%M%S')
-		self._checkpoint_freq = checkpoint_freq
 
 
-	def checkpoint_step(self, batch: Batch) -> Batch:
-		itr = batch['iteration']
-		if self._checkpoint_freq is not None and itr % self._checkpoint_freq == 0 and itr > 0:
-			self.checkpoint(self._create_checkpoint_path(batch))
-	
-
-	_max_digits = 6
-	def _create_checkpoint_path(self, batch: Batch) -> Path:
-		cand = Path(f'{self.name}_{self._my_now}_{str(batch["iteration"]).zfill(self._max_digits)}.pt')
-		assert not cand.exists(), f'checkpoint already exists: {cand}'
-		return cand
+	@property
+	def name(self) -> str:
+		return f'{super().name}_{self._my_now}'
 
 
-	def checkpoint(self, path: Path = None) -> None:
-		outpath = path
-		path = None
-		ckpt = {
-			'model': self._model.checkpoint(path),
-			'optimizer': self._optimizer.checkpoint(path),
-			'dataset': self._dataset.checkpoint(path),
-			**{k: v.checkpoint(path) for k, v in self._env.items()}
-		}
-		if path is None:
-			return ckpt
-		torch.save(ckpt, outpath)
+	def checkpoint(self, path: Path) -> None:
+		path.mkdir()
+
+		self.model.checkpoint(path / 'model')
+		self.optimizer.checkpoint(path / 'optimizer')
+		if self._dataset is not None:
+			self._dataset.checkpoint(path / 'dataset')
+		for ident, machine in self._env.items():
+			machine.checkpoint(path / ident)
+
+		return path
+
 
 
 

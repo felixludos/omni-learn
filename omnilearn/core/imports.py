@@ -16,5 +16,6 @@ from torch import nn
 
 from tqdm import tqdm
 from tabulate import tabulate
+from humanize import naturalsize
 import time, random, hashlib, heapq, math
 from collections import Counter

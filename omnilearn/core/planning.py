@@ -4,6 +4,7 @@ from .abstract import AbstractPlanner
 from omniply.apps.training import Indexed
 
 
+
 class DefaultPlanner(Indexed, AbstractPlanner):
     def expected_samples(self, step_size: int) -> Optional[int]:
         total_itr = self.expected_iterations(step_size)

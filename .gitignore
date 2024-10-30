@@ -11,3 +11,4 @@ omnilearn.egg-info/
 extra/
 dist/
 data/
+checkpoints/

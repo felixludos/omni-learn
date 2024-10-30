@@ -23,8 +23,8 @@ class DatasetBase(AbstractDataset):
 
 
 	def batch(self, batch_size: Optional[int] = None, *gadgets: AbstractGadget, 
-			  show_pbar=False, shuffle=True, **settings: Any) -> Batch:
-		return next(self.iterate(batch_size, *gadgets, show_pbar=show_pbar, shuffle=shuffle, **settings))
+			  shuffle=True, **settings: Any) -> Batch:
+		return next(self.iterate(batch_size, *gadgets, show_pbar=False, shuffle=shuffle, **settings))
 
 
 	def iterate(self, batch_size: Optional[int] = None, *gadgets: AbstractGadget, 

@@ -61,10 +61,36 @@ class PytorchOptimizer(OptimizerBase, O.Optimizer):
 
 
 
-
 class SGD(PytorchOptimizer, O.SGD):
-	pass
+	@property
+	def name(self) -> str:
+		lr = f'{self.defaults["lr"]:.0e}'.replace('+', '')
+		return f'SGD{lr}'
+	
+	def settings(self):
+		return {
+			'lr': self.defaults['lr'],
+			'momentum': self.defaults['momentum'],
+			'nesterov': self.defaults['nesterov'],
+			'weight_decay': self.defaults['weight_decay'],
+		}
+
 
 
 class Adam(PytorchOptimizer, O.Adam):
-	pass
+	@property
+	def name(self) -> str:
+		lr = f'{self.defaults["lr"]:.0e}'.replace('+', '')
+		return f'Adam{lr}'
+
+
+	def settings(self):
+		return {
+			'lr': self.defaults['lr'],
+			'beta1': self.defaults['betas'][0],
+			'beta2': self.defaults['betas'][1],
+			'eps': self.defaults['eps'],
+			'weight_decay': self.defaults['weight_decay'],
+			'amsgrad': self.defaults['amsgrad'],
+		}
+

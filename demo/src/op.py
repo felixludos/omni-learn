@@ -1,5 +1,5 @@
 from .imports import *
-from omnilearn import Dataset, Model, Adam, Optimizer, Trainer, Machine, Planner
+from omnilearn import *
 from omnilearn import autoreg
 from torchvision.datasets import MNIST as Torchvision_MNIST
 
@@ -7,18 +7,34 @@ from torchvision.datasets import MNIST as Torchvision_MNIST
 
 fig.component('trainer')(Trainer)
 fig.component('planner')(Planner)
+fig.component('reporter')(Reporter)
+fig.component('checkpointer')(Checkpointer)
 
 
 @fig.component('mnist')
 class MNIST(Dataset):
-    def __init__(self, train: bool = True, download: bool = True, **kwargs):
+    _val_split = 10000
+    def __init__(self, split: str = 'train', download: bool = True, **kwargs):
         super().__init__(**kwargs)
-        self._train = train
+        if self._val_split is None:
+            assert split in ('train', 'test'), f'Invalid split: {split}'
+            size = 60000 if split == 'train' else 10000
+        else:
+            assert split in ('train', 'val', 'test'), f'Invalid split: {split}'
+            assert 0 < self._val_split < 60000, f'Invalid val_split: {self._val_split}'
+            size = {'train': 60000-self._val_split, 'val': self._val_split, 'test': 10000}[split]
+
+        self._split = split
         self._download = download
-        self._size = 60000 if train else 10000
+        self._size = size
         self._dataset = None
         self._image_data = None
         self._label_data = None
+
+
+    def as_eval(self, **kwargs) -> 'MNIST':
+        assert self._split == 'train', 'Only train split can be converted to eval'
+        return self.__class__(split='val', **kwargs)
 
 
     @property
@@ -38,7 +54,7 @@ class MNIST(Dataset):
 
     @property
     def name(self) -> str:
-        return f'MNIST-{"train" if self._train else "test"}'
+        return f'MNIST-{self._split}'
     
 
     @property
@@ -48,9 +64,16 @@ class MNIST(Dataset):
     
     def load(self, *, device: str = None) -> Self:
         if self._dataset is None:
-            self._dataset = Torchvision_MNIST(self.dataroot, train=self._train, download=self._download)
+            self._dataset = Torchvision_MNIST(self.dataroot, train=self._split != 'test', download=self._download)
             self._image_data = self._dataset.data
             self._label_data = self._dataset.targets
+            if self._split != 'test' and self._val_split is not None:
+                if self._split == 'train':
+                    self._image_data = self._image_data[self._val_split:]
+                    self._label_data = self._label_data[self._val_split:]
+                else:
+                    self._image_data = self._image_data[:self._val_split]
+                    self._label_data = self._label_data[:self._val_split]
             if device is not None:
                 self._image_data = self._image_data.to(device)
                 self._label_data = self._label_data.to(device)
@@ -82,6 +105,17 @@ class ImageClassification(Machine):
     @tool('loss')
     def get_loss(self, prediction: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         return F.cross_entropy(prediction, label)
+    
+
+    @tool('correct')
+    def get_correct(self, prediction: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
+        return (prediction.argmax(dim=1) == label)
+
+
+    @tool('accuracy')
+    def get_accuracy(self, correct: torch.Tensor) -> torch.Tensor:
+        return correct.float().mean()
+
 
 
 
@@ -92,6 +126,7 @@ def train_mnist(cfg: fig.Configuration):
 
     cfg.push('trainer._type', 'trainer', overwrite=False, silent=True)
     cfg.push('planner._type', 'planner', overwrite=False, silent=True)
+    cfg.push('reporter._type', 'reporter', overwrite=False, silent=True)
     trainer: Trainer = cfg.pull('trainer')
 
     trainer.fit(dataset)
