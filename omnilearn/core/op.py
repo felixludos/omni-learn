@@ -200,8 +200,7 @@ class SGD(Machine, SGDBase):
 
 	def _checkpoint_data(self):
 		data = {'settings': super().settings()}
-		if self._is_prepared:
-			data['state_dict'] = self.state_dict()
+		data['state_dict'] = self.state_dict()
 		return data
 
 
@@ -248,8 +247,7 @@ class Adam(Machine, AdamBase):
 
 	def _checkpoint_data(self):
 		data = {'settings': super().settings()}
-		if self._is_prepared:
-			data['state_dict'] = self.state_dict()
+		data['state_dict'] = self.state_dict()
 		return data
 	
 

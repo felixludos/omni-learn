@@ -54,7 +54,7 @@ class MNIST(Dataset):
 
     @property
     def name(self) -> str:
-        return f'MNIST-{self._split}'
+        return 'MNIST' if self._split == 'train' else f'MNIST-{self._split}'
     
 
     @property
