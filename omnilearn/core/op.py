@@ -167,12 +167,16 @@ class MLP(Model, MLPBase):
 				errors = ', '.join([f'{key}: {settings[key]} != {current[key]}' for key in error_keys])
 				raise ValueError(f'settings do not match: {errors}')
 			
-		self._hidden = settings['hidden']
-		self._nonlin = settings['nonlin']
-		self._output_nonlin = settings['output_nonlin']
-		self._input_dim = settings['input_dim']
-		self._output_dim = settings['output_dim']
-
+		if 'hidden' in settings:
+			self._hidden = settings['hidden']
+		if 'nonlin' in settings:
+			self._nonlin = settings['nonlin']
+		if 'output_nonlin' in settings:
+			self._output_nonlin = settings['output_nonlin']
+		if 'input_dim' in settings:
+			self._input_dim = settings['input_dim']
+		if 'output_dim' in settings:
+			self._output_dim = settings['output_dim']
 		if 'state_dict' in data:
 			if not self._is_prepared:
 				self.prepare(None)
