@@ -20,12 +20,14 @@ class Checkpointer(AbstractEvent):
 		self._saveroot.mkdir(exist_ok=True, parents=True)
 		self._savepath = self._saveroot / f'{trainer.name}'
 		assert not self._savepath.exists(), f'{self._savepath} already exists'
-		self._savepath.mkdir()
 		self._subject = trainer
 		return self
 	
 
 	def checkpoint_subject(self, name: str) -> None:
+		if not self._savepath.exists():
+			self._savepath.mkdir()
+		
 		path = self._savepath / name
 		exists = len(list(self._savepath.glob(f'{name}*'))) > 0
 		if not exists:
