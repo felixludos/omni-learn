@@ -40,7 +40,7 @@ class Machine(fig.Configurable, ToolKit, AbstractMachine):
 	
 
 	def load_checkpoint(self, *, path = None, data = None) -> None:
-		assert path is None != data is None, 'must provide exactly one of path or data'
+		assert (path is None) != (data is None), 'must provide exactly one of path or data'
 		if data is None:
 			if path.suffix == '': path = path.with_suffix('.pt')
 			assert path.exists(), f'checkpoint file does not exist: {path}'
