@@ -9,8 +9,10 @@ def fixed_width_format_value(val: float, width: int, force_positive: bool = Fals
     # https://chatgpt.com/c/6721c2ed-98ec-8005-b967-9b81f6b8d5f1
 
     if force_positive:
-        assert val >= 0, "Value must be positive."
-        return fixed_width_format_value(val, width+1, force_positive=False)[1:]
+        s = fixed_width_format_value(val, width+1, force_positive=False)
+        if s[0] == ' ':
+            return s[1:]
+        return s
 
     import math
 
