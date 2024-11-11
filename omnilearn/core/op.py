@@ -23,9 +23,14 @@ class Machine(fig.Configurable, ToolKit, AbstractMachine):
 		return self.settings()
 
 
-	def _load_checkpoint_data(self, data: Dict[str, Any]) -> None:
-		assert data == self.settings(), 'checkpoint data does not match settings'
-		raise NotImplementedError
+	def _load_checkpoint_data(self, data: Dict[str, Any], *, unsafe: bool = False) -> None:
+		if data != self.settings():
+			if unsafe:
+				print(f'WARNING: settings do not match: {data} != {self.settings()}')
+			else:
+				raise ValueError(f'settings do not match: {data} != {self.settings()}')
+		if len(data):
+			raise NotImplementedError
 
 
 	def checkpoint(self, path: Path = None) -> Any:
@@ -39,13 +44,13 @@ class Machine(fig.Configurable, ToolKit, AbstractMachine):
 		return path
 	
 
-	def load_checkpoint(self, *, path = None, data = None) -> None:
+	def load_checkpoint(self, *, path = None, data = None, unsafe: bool = False) -> None:
 		assert (path is None) != (data is None), 'must provide exactly one of path or data'
 		if data is None:
 			if path.suffix == '': path = path.with_suffix('.pt')
 			assert path.exists(), f'checkpoint file does not exist: {path}'
 			data = torch.load(path)
-		self._load_checkpoint_data(data)
+		self._load_checkpoint_data(data, unsafe=unsafe)
 		return path
 
 
@@ -152,20 +157,21 @@ class MLP(Model, MLPBase):
 	
 			
 	def _checkpoint_data(self):
-		data = {'settings': super().settings()}
+		data = {'settings': self.settings()}
 		if self._is_prepared:
 			data['state_dict'] = self.state_dict()
 		return data
 
 
-	def _load_checkpoint_data(self, data: Dict[str, Any]) -> None:
+	def _load_checkpoint_data(self, data: Dict[str, Any], *, unsafe: bool = False) -> None:
 		settings = data['settings']
 		if self._is_prepared:
 			current = self.settings()
 			if current != settings:
-				error_keys = [key for key in settings if settings.get(key) != current.get(key)]
-				errors = ', '.join([f'{key}: {settings[key]} != {current[key]}' for key in error_keys])
-				raise ValueError(f'settings do not match: {errors}')
+				if unsafe:
+					print(f'WARNING: settings do not match: {settings} != {current}')
+				else:
+					raise ValueError(f'settings do not match: {settings} != {current}')
 			
 		if 'hidden' in settings:
 			self._hidden = settings['hidden']
@@ -203,19 +209,20 @@ class SGD(Machine, SGDBase):
 
 
 	def _checkpoint_data(self):
-		data = {'settings': super().settings()}
+		data = {'settings': self.settings()}
 		data['state_dict'] = self.state_dict()
 		return data
 
 
-	def _load_checkpoint_data(self, data: Dict[str, Any]) -> None:
+	def _load_checkpoint_data(self, data: Dict[str, Any], *, unsafe: bool = False) -> None:
 		settings = data['settings']
 		if self._is_prepared:
 			current = self.settings()
 			if current != settings:
-				error_keys = [key for key in settings if settings.get(key) != current.get(key)]
-				errors = ', '.join([f'{key}: {settings[key]} != {current[key]}' for key in error_keys])
-				raise ValueError(f'settings do not match: {errors}')
+				if unsafe:
+					print(f'WARNING: settings do not match: {settings} != {current}')
+				else:
+					raise ValueError(f'settings do not match: {settings} != {current}')
 			
 		self.defaults['lr'] = settings['lr']
 		self.defaults['momentum'] = settings['momentum']
@@ -250,19 +257,20 @@ class Adam(Machine, AdamBase):
 	
 
 	def _checkpoint_data(self):
-		data = {'settings': super().settings()}
+		data = {'settings': self.settings()}
 		data['state_dict'] = self.state_dict()
 		return data
 	
 
-	def _load_checkpoint_data(self, data: Dict[str, Any]) -> None:
+	def _load_checkpoint_data(self, data: Dict[str, Any], *, unsafe: bool = False) -> None:
 		settings = data['settings']
 		if self._is_prepared:
 			current = self.settings()
 			if current != settings:
-				error_keys = [key for key in settings if settings.get(key) != current.get(key)]
-				errors = ', '.join([f'{key}: {settings[key]} != {current[key]}' for key in error_keys])
-				raise ValueError(f'settings do not match: {errors}')
+				if unsafe:
+					print(f'WARNING: settings do not match: {settings} != {current}')
+				else:
+					raise ValueError(f'settings do not match: {settings} != {current}')
 			
 		self.defaults['lr'] = settings['lr']
 		self.defaults['betas'] = (settings['beta1'], settings['beta2'])
