@@ -1,6 +1,8 @@
 from .imports import *
 import omnifig as fig
 
+from omniply.apps.mechanisms import Mechanism as MechanismBase
+
 from .abstract import AbstractModel, AbstractOptimizer, AbstractEvent, AbstractMachine
 from .planning import DefaultPlanner as Planner
 from .datasets import FileDatasetBase, Batch
@@ -60,6 +62,18 @@ class Machine(fig.Configurable, ToolKit, AbstractMachine):
 
 	def indicators(self) -> Iterator[str]:
 		yield from ()
+
+
+
+class Mechanism(Machine, MechanismBase):
+	def __init__(self, content: Union[AbstractGadget, list[AbstractGadget], tuple], *,
+				 apply: dict[str, str] | list[str] = None,
+				 select: dict[str, str] | list[str] = None, 
+				 insulate_out: bool = True, insulate_in: bool = True,
+				 **kwargs):
+		super().__init__(content=content, apply=apply, select=select, 
+				   insulate_in=insulate_in, insulate_out=insulate_out, **kwargs)
+
 
 
 class Reporter(Machine, Pbar_Reporter):

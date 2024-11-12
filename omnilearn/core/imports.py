@@ -8,7 +8,11 @@ from omnibelt import unspecified_argument, pformat, where_am_i
 from omniply import AbstractGadget, AbstractGaggle, AbstractGame
 from omniply import Scope, Selection#, ToolKit, Context, tool
 from omniply.apps.gaps import ToolKit, Context, tool
-from omniply.apps.training import Batch
+from omniply.apps.training import Batch as _Batch
+from omniply.apps.viz import Context as VizContext
+
+class Batch(_Batch, VizContext):
+	pass
 
 import numpy as np
 import torch
