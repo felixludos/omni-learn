@@ -2,10 +2,11 @@ from .imports import *
 import omnifig as fig
 
 from omniply.apps.mechanisms import Mechanism as MechanismBase
+from omniply.apps.viz import Mechanism as _VizMechanismBase
 
 from .abstract import AbstractModel, AbstractOptimizer, AbstractEvent, AbstractMachine
 from .planning import DefaultPlanner as Planner
-from .datasets import FileDatasetBase, Batch
+from .datasets import FileDatasetBase, Batch, VizBatch
 from .models import MLP as MLPBase, ModelBase
 from .trainers import CheckpointableTrainer
 from .optimizers import Adam as AdamBase, SGD as SGDBase, OptimizerBase as Optimizer
@@ -73,6 +74,10 @@ class Mechanism(Machine, MechanismBase):
 				 **kwargs):
 		super().__init__(content=content, apply=apply, select=select, 
 				   insulate_in=insulate_in, insulate_out=insulate_out, **kwargs)
+
+
+class VizMechanism(Mechanism, _VizMechanismBase):
+	pass
 
 
 

@@ -5,12 +5,6 @@ from torchvision.datasets import MNIST as Torchvision_MNIST
 
 
 
-fig.component('trainer')(Trainer)
-fig.component('planner')(Planner)
-fig.component('reporter')(Reporter)
-fig.component('checkpointer')(Checkpointer)
-
-
 @fig.component('mnist')
 class MNIST(Dataset):
     _val_split = 10000
@@ -122,6 +116,12 @@ class ImageClassification(Machine):
 @fig.script('train')
 def train_mnist(cfg: fig.Configuration):
 
+    record_step = cfg.pull('record-step', False)
+    if record_step:
+        Dataset._Batch = VizBatch
+        # Trainer._Batch = VizBatch
+        fig.component('mechanism')(VizMechanism)
+
     dataset: Dataset = cfg.pull('dataset')
 
     cfg.push('trainer._type', 'trainer', overwrite=False, silent=True)
@@ -129,7 +129,11 @@ def train_mnist(cfg: fig.Configuration):
     cfg.push('reporter._type', 'reporter', overwrite=False, silent=True)
     trainer: Trainer = cfg.pull('trainer')
 
-    trainer.fit(dataset)
+    if record_step:
+        for batch in trainer.fit_loop(dataset): break
+        print(batch.report(**cfg.pull('report-settings', {})))
+    else:
+        trainer.fit(dataset)
     
     return trainer
 

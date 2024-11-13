@@ -1,10 +1,18 @@
 from omnibelt import closest_factors, prime_factors
 from omniply.apps.training import Dataset as _DatasetBase
+from omniply.apps.viz import Context as VizContext
 
 from .imports import *
 from .abstract import AbstractDataset, AbstractGadget, AbstractFileDataset
 from .planning import DefaultPlanner
 
+
+
+class VizBatch(Batch, VizContext):
+	def __init__(self, *args, start_recording: bool = True, **kwargs):
+		super().__init__(*args, **kwargs)
+		if start_recording:
+			self.record()
 
 
 class DatasetBase(AbstractDataset):

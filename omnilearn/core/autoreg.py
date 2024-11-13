@@ -1,10 +1,16 @@
 import omnifig as fig
 
+from .op import Mechanism
+
+fig.component('mechanism')(Mechanism)
 
 
 # trainer
-from .op import Trainer
+from .op import Trainer, Planner, Reporter, Checkpointer
 fig.component('trainer')(Trainer)
+fig.component('planner')(Planner)
+fig.component('reporter')(Reporter)
+fig.component('checkpointer')(Checkpointer)
 
 
 

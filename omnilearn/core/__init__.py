@@ -1,1 +1,1 @@
-from .op import Machine, Dataset, Model, Optimizer, Adam, SGD, Trainer, Planner, Reporter, Checkpointer
+from .op import Machine, Dataset, Model, Optimizer, Adam, SGD, Trainer, Planner, Reporter, Checkpointer, VizBatch, VizMechanism

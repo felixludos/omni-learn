@@ -90,9 +90,11 @@ class TrainerBase(_DynamicTrainerBase):
 
 		reporter = self._reporter.setup(self, planner, batch_size)
 
+		batch_cls = self._Batch or getattr(src, '_Batch', None) or Batch
+		
 		batch = None
 		for info in planner.generate(batch_size):
-			batch = self._Batch(info, planner=planner).include(src, reporter).extend(tuple(self.gadgetry()))
+			batch = batch_cls(info, planner=planner).include(src, reporter).extend(tuple(self.gadgetry()))
 
 			# Note: this runs the optimization step before yielding the batch
 			yield self.learn(batch)
