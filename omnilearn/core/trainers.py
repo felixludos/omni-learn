@@ -49,6 +49,11 @@ class TrainerBase(_DynamicTrainerBase):
 	@property
 	def optimizer(self) -> AbstractOptimizer:
 		return self._optimizer
+	
+
+	@property
+	def reporter(self) -> AbstractReporter:
+		return self._reporter
 
 
 	def all_indicators(self) -> Iterator[str]:
@@ -83,6 +88,10 @@ class TrainerBase(_DynamicTrainerBase):
 			e.end(batch)
 
 
+	# def loop(self, src: AbstractDataset, **settings: Any) -> Iterator[Batch]:
+	# 	return self.fit_loop(src, **settings)
+
+
 	def fit_loop(self, src: AbstractDataset, **settings):
 		planner = self._setup_fit(src, **settings)
 
@@ -97,21 +106,24 @@ class TrainerBase(_DynamicTrainerBase):
 			batch = batch_cls(info, planner=planner).include(src, reporter).extend(tuple(self.gadgetry()))
 
 			# Note: this runs the optimization step before yielding the batch
-			yield self.learn(batch)
-			for e in self._events:
-				e.step(batch)
-			reporter.step(batch)
+			terminate = self.learn(batch)
+			
+			yield batch
 
-			if self._terminate_fit(batch):
+			if terminate:
 				break
 
 		self._end_fit(batch)
 		reporter.end(batch)
 
 
-	def learn(self, batch: Batch) -> Batch:
+	def learn(self, batch: Batch) -> bool:
 		self._optimizer.step(batch)
-		return batch
+		for e in self._events:
+			e.step(batch)
+		self.reporter.step(batch)
+
+		return self._terminate_fit(batch)
 
 
 

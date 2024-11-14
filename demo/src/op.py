@@ -131,6 +131,7 @@ def train_mnist(cfg: fig.Configuration):
 
     if record_step:
         for batch in trainer.fit_loop(dataset): break
+        print()
         print(batch.report(**cfg.pull('report-settings', {})))
     else:
         trainer.fit(dataset)
