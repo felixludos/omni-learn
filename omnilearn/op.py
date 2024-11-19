@@ -4,6 +4,7 @@ import omnifig as fig
 from omniply.apps.mechanisms import Mechanism as MechanismBase
 from omniply.apps.viz import Mechanism as _VizMechanismBase
 
+from .spaces import Context, ToolKit, space, gear, tool, indicator
 from .abstract import AbstractModel, AbstractOptimizer, AbstractEvent, AbstractMachine
 from .planning import DefaultPlanner as Planner
 from .datasets import FileDatasetBase, Batch, VizBatch

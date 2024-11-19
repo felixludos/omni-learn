@@ -32,16 +32,6 @@ class MNIST(Dataset):
 
 
     @property
-    def input_dim(self) -> int:
-        return (28, 28)
-    
-
-    @property
-    def output_dim(self) -> int:
-        return 10
-
-
-    @property
     def size(self) -> int:
         return self._size
     
@@ -78,11 +68,17 @@ class MNIST(Dataset):
     def get_images(self, index: np.ndarray) -> torch.Tensor:
         '''returns int8 tensor of shape (N, 28, 28)'''
         return self._image_data[torch.from_numpy(index)]
+    @get_images.space
+    def image_size(self) -> tuple:
+        return (28, 28)
     
 
     @tool('label')
     def get_labels(self, index: np.ndarray) -> torch.Tensor:
         return self._label_data[torch.from_numpy(index)]
+    @get_labels.space
+    def number_of_classes(self) -> int:
+        return 10
 
 
 
@@ -94,22 +90,24 @@ class ImageClassification(Machine):
         if image.dtype == torch.uint8:
             image = image.float().div(255)
         return image.view(N, -1)
+    @transform_image.space
+    def observation_space(self, image: tuple) -> int:
+        return spaces.Pixels(C=image.channels, H=image.height, W=image.width, as_bytes=False)
     
 
-    @tool('loss')
+    @indicator('loss')
     def get_loss(self, prediction: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         return F.cross_entropy(prediction, label)
     
 
-    @tool('correct')
+    @tool('correct', space=spaces.Boolean(1))
     def get_correct(self, prediction: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
         return (prediction.argmax(dim=1) == label)
 
 
-    @tool('accuracy')
+    @indicator('accuracy')
     def get_accuracy(self, correct: torch.Tensor) -> torch.Tensor:
         return correct.float().mean()
-
 
 
 
