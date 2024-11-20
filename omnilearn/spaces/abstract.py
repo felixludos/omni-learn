@@ -29,3 +29,6 @@ class AbstractSpace:
 
 	def shape(self, batch_size: Optional[int] = None) -> tuple[int]:
 		raise NotImplementedError
+
+	def json(self) -> dict:
+		raise NotImplementedError

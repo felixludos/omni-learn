@@ -100,6 +100,9 @@ class ImageClassification(Machine):
     @space('prediction')
     def prediction_space(self, label: spaces.Categorical) -> spaces.Logits:
         return spaces.Logits(label.classes)
+
+
+    label_space = space('label')
     
 
     @indicator('loss')
@@ -115,6 +118,10 @@ class ImageClassification(Machine):
     @indicator('accuracy')
     def get_accuracy(self, correct: torch.Tensor) -> torch.Tensor:
         return correct.float().mean()
+
+
+    def settings(self) -> Dict[str, Any]:
+        return {'observation': self.observation_space.json(), 'label': self.label_space.json()}
 
 
 

@@ -23,11 +23,15 @@ env.checkpointer:
 
 ckpt-freq: 1000
 
-# metrics:
-#   loss: yes
-#   accuracy: yes
-
 log.accuracy: yes
+
+events.monitor:
+  _type: wandb
+  freqs:
+    loss: 10
+    accuracy: 10
+
+project-name: demo-{dataset.name}
 
 optimizer._type: adam
 

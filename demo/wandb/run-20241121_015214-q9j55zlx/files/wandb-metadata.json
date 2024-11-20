@@ -1,0 +1,35 @@
+{
+  "os": "Windows-11-10.0.26100-SP0",
+  "python": "3.12.4",
+  "startedAt": "2024-11-20T16:52:14.724267Z",
+  "args": [
+    "-d"
+  ],
+  "program": "C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\main.py",
+  "codePath": "demo\\main.py",
+  "git": {
+    "remote": "https://github.com/felixludos/omni-learn.git",
+    "commit": "f45642b2dfae33ae3d9ff48cb24a37c55e0caefb"
+  },
+  "email": "felix.leeb@hotmail.com",
+  "root": "C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo",
+  "host": "GLOBE",
+  "username": "anwan",
+  "executable": "C:\\Users\\anwan\\miniconda3\\python.exe",
+  "codePathLocal": "main.py",
+  "cpu_count": 12,
+  "cpu_count_logical": 12,
+  "disk": {
+    "/": {
+      "total": "1021771247616",
+      "used": "715651178496"
+    }
+  },
+  "memory": {
+    "total": "33898176512"
+  },
+  "cpu": {
+    "count": 12,
+    "countLogical": 12
+  }
+}

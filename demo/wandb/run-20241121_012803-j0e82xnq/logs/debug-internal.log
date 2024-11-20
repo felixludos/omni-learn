@@ -1,0 +1,16 @@
+{"time":"2024-11-21T01:28:03.4935021+09:00","level":"INFO","msg":"using version","core version":"0.18.5"}
+{"time":"2024-11-21T01:28:03.4935021+09:00","level":"INFO","msg":"created symlink","path":"C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\wandb\\run-20241121_012803-j0e82xnq\\logs\\debug-core.log"}
+{"time":"2024-11-21T01:28:03.9276945+09:00","level":"INFO","msg":"created new stream","id":"j0e82xnq"}
+{"time":"2024-11-21T01:28:03.9282071+09:00","level":"INFO","msg":"stream: started","id":"j0e82xnq"}
+{"time":"2024-11-21T01:28:03.9282071+09:00","level":"INFO","msg":"sender: started","stream_id":"j0e82xnq"}
+{"time":"2024-11-21T01:28:03.9282071+09:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"j0e82xnq"}}
+{"time":"2024-11-21T01:28:03.9282071+09:00","level":"INFO","msg":"handler: started","stream_id":{"value":"j0e82xnq"}}
+{"time":"2024-11-21T01:28:04.9711525+09:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-21T01:29:11.581361+09:00","level":"INFO","msg":"stream: closing","id":"j0e82xnq"}
+{"time":"2024-11-21T01:29:11.5819784+09:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-21T01:29:11.5895555+09:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-21T01:29:14.3781695+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-21T01:29:14.7105493+09:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"j0e82xnq"}}
+{"time":"2024-11-21T01:29:14.7105493+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"j0e82xnq"}}
+{"time":"2024-11-21T01:29:14.7110676+09:00","level":"INFO","msg":"sender: closed","stream_id":"j0e82xnq"}
+{"time":"2024-11-21T01:29:14.7115929+09:00","level":"INFO","msg":"stream: closed","id":"j0e82xnq"}

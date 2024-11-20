@@ -1,8 +1,8 @@
 from .imports import *
 from ..abstract import AbstractOptimizer, AbstractModel, AbstractBatch
+from ..machines import Machine
 
-
-class OptimizerBase(AbstractOptimizer):
+class OptimizerBase(Machine, AbstractOptimizer):
 	def __init__(self, *, objective: str = 'loss', maximize: bool = False, **kwargs):
 		super().__init__(**kwargs)
 		self._objective = objective

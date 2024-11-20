@@ -1,0 +1,62 @@
+_wandb:
+    value:
+        cli_version: 0.18.5
+        m: []
+        python_version: 3.12.4
+        t:
+            "1":
+                - 1
+                - 41
+                - 55
+            "2":
+                - 1
+                - 41
+                - 55
+            "3":
+                - 2
+                - 16
+                - 23
+                - 55
+                - 61
+            "4": 3.12.4
+            "5": 0.18.5
+            "8":
+                - 3
+                - 5
+            "12": 0.18.5
+            "13": windows-arm64
+checkpointer:
+    value:
+        freq: 1000
+        saveroot: C:\Users\anwan\OneDrive\Khan\research\foundation\demo\checkpoints
+model:
+    value:
+        hidden:
+            - 300
+        input_dim: null
+        nonlin: relu
+        output_dim: null
+        output_nonlin: null
+monitor:
+    value:
+        freqs:
+            accuracy: 10
+            loss: 10
+optimizer:
+    value:
+        amsgrad: false
+        beta1: 0.9
+        beta2: 0.999
+        eps: 1e-08
+        lr: 0.001
+        weight_decay: 0
+task:
+    value:
+        label:
+            classes: 10
+            type: categorical
+        observation:
+            dims: 784
+            lower: 0
+            type: bounded
+            upper: 1

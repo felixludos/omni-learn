@@ -1,5 +1,5 @@
 from .imports import *
-from .abstract import AbstractMachine, AbstractEvent
+from .abstract import AbstractMachine, AbstractEvent, AbstractTrainer, AbstractDataset, AbstractBatch
 from .core import ToolKit
 
 
@@ -47,13 +47,16 @@ class Machine(ToolKit, AbstractMachine):
 		return {}
 
 
-	# def indicators(self) -> Iterator[str]:
-	# 	yield from ()
-
 
 class Event(Machine, AbstractEvent):
-	pass
+	def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
+		return self
 
+	def step(self, batch: AbstractBatch) -> None:
+		pass
+
+	def end(self, last_batch: AbstractBatch = None) -> None:
+		pass
 
 
 

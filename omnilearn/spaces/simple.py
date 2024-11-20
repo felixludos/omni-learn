@@ -34,6 +34,9 @@ class Scalar(SpaceBase):
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
 		return ()
 
+	def json(self) -> dict:
+		return {'type': 'scalar'}
+
 
 class Categorical(SpaceBase):
 	def __init__(self, n: int):
@@ -56,6 +59,9 @@ class Categorical(SpaceBase):
 	def __repr__(self) -> str:
 		return f'{self.__class__.__name__}({self._n})'
 
+	def json(self) -> dict:
+		return {'type': 'categorical', 'classes': self._n}
+
 
 class Vector(SpaceBase):
 	def __init__(self, dim: int):
@@ -64,9 +70,12 @@ class Vector(SpaceBase):
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
 		return (batch_size, self._dim)
 
+	def json(self) -> dict:
+		return {'type': 'vector', 'dims': self._dim}
 
 class Logits(Vector):
-	pass
+	def json(self) -> dict:
+		return {'type': 'logits', 'dims': self._dim}
 
 
 class Bounded(Vector):
@@ -83,11 +92,16 @@ class Bounded(Vector):
 	def upper_bound(self) -> Optional[float]:
 		return self._upper
 
+	def json(self) -> dict:
+		return {'type': 'bounded', 'dims': self._dim, 'lower': self._lower, 'upper': self._upper}
 
 class Boolean(Vector):
 	@property
 	def dtype(self) -> 'torch.dtype':
 		return torch.bool
+
+	def json(self) -> dict:
+		return {'type': 'boolean', 'dims': self._dim}
 
 
 class Spatial(SpaceBase):
@@ -103,6 +117,10 @@ class Spatial(SpaceBase):
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
 		return (batch_size, self._channels, *self._spatial) if self._channel_first \
 			else (batch_size, *self._spatial, self._channels)
+
+	def json(self) -> dict:
+		return {'type': 'spatial', 'channels': self._channels, 'spatial': list(self._spatial),
+				'channel_first': self._channel_first}
 
 
 class Sequence(Spatial):
@@ -143,6 +161,10 @@ class Pixels(Image):
 	@property
 	def upper_bound(self) -> Optional[Union[int, float]]:
 		return 255 if self._as_bytes else 1.
+
+	def json(self) -> dict:
+		data = super().json()
+		return {**data, 'as_bytes': self._as_bytes}
 
 
 class Volume(Spatial):

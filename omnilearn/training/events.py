@@ -1,6 +1,7 @@
 from .imports import *
 from ..core import ToolKit
-from ..abstract import AbstractTrainer, AbstractReporter, AbstractPlanner, AbstractBatch, AbstractDataset, AbstractEvaluatableDataset
+from ..abstract import (AbstractTrainer, AbstractReporter, AbstractPlanner, AbstractBatch, AbstractDataset,
+						AbstractEvaluatableDataset)
 
 from ..machines import Event
 from ..util import fixed_width_format_value, fixed_width_format_positive, DynamicMeter, IntervalMeter
@@ -16,6 +17,10 @@ class Checkpointer(Event):
 		self._subject = None
 		self._last_checkpoint = None
 		self._savepath = None
+
+
+	def settings(self) -> Dict[str, Any]:
+		return {'freq': self._freq, 'saveroot': str(self._saveroot.absolute().expanduser())}
 
 
 	def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
@@ -44,7 +49,9 @@ class Checkpointer(Event):
 
 
 	def end(self, last_batch: AbstractBatch = None) -> None:
-		self.checkpoint_subject(f'ckpt_{str(last_batch["num_iterations"]).zfill(6)}')
+		path = self.checkpoint_subject(f'ckpt_{str(last_batch["num_iterations"]+1).zfill(6)}')
+		print(f' checkpointed to {path}')
+
 
 
 class ReporterBase(ToolKit, AbstractReporter):
@@ -60,7 +67,8 @@ class ReporterBase(ToolKit, AbstractReporter):
 
 
 class Pbar_Reporter(ReporterBase):
-	def __init__(self, *, print_metrics: Iterable[str] = (), print_objective: bool = True, show_pbar: bool = True, unit: str = 'samples', ema_halflife: float = 5, ema_alpha: float = None, **kwargs):
+	def __init__(self, *, print_metrics: Iterable[str] = (), print_objective: bool = True, show_pbar: bool = True,
+				 unit: str = 'samples', ema_halflife: float = 5, ema_alpha: float = None, **kwargs):
 		assert unit.startswith('s') or unit.startswith('i'), f'unit should be "samples" or "iterations", not "{unit}"'
 		super().__init__(**kwargs)
 		self._show_pbar = show_pbar
@@ -132,44 +140,50 @@ class Pbar_Reporter(ReporterBase):
 
 
 
-class WandB_Reporter(ReporterBase):
-	def __init__(self, *, project_name: Optional[str] = None, 
-				 project_settings: Optional[Dict[str, Any]] = None, use_wandb: bool = None, **kwargs):
+class WandB_Monitor(Event):
+	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, **kwargs):
 		super().__init__(**kwargs)
 		self._project_name = project_name
-		self._project_settings = project_settings
-		self._use_wandb = use_wandb
-		self._indicators = {}
-		self._indicator_costs = {}
+		self._freqs = freqs
+		self._use_wandb = freqs is not None
 
 
-	def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
-		project_name = self._project_name or trainer.name
-		project_settings = self._project_settings or trainer.settings
+	def settings(self) -> Dict[str, Any]:
+		return {'freqs': self._freqs}
 
-		indicators = list(trainer.all_indicators()) # TODO: skip for now - use config instead
-		self._indicators.update({key: DynamicMeter() for key in indicators})
-		self._indicator_costs.update({key: IntervalMeter() for key in indicators})
 
-		try:
-			import wandb
-			wandb.init(project=project_name, config=project_settings)
-		except ImportError:
-			if self._use_wandb:
-				raise
-			print('WARNING: wandb could not be imported, skipping')
-			self._use_wandb = False
-		return super().setup(trainer, planner, batch_size)
+	def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
+		if self._use_wandb:
+			project_settings = trainer.settings
+			if self._project_name is None:
+				project_name = trainer.name
+			else:
+				project_name = pformat(self._project_name,
+									   {'model': trainer.model, 'optimizer': trainer.optimizer, 'dataset': src,
+									   'trainer': trainer, 'settings': project_settings,
+										**trainer.environment()})
+
+
+			try:
+				import wandb
+				wandb.init(project=project_name, config=project_settings)
+			except ImportError:
+				if self._use_wandb:
+					raise
+				print('WARNING: wandb could not be imported, skipping')
+				self._use_wandb = False
+		return super().setup(trainer, src, device=device)
 
 
 	def step(self, batch: AbstractBatch) -> None:
 		out = super().step(batch)
 		if self._use_wandb:
-			import wandb
-			itr = batch['iteration']
-			wandb.log({key: batch[key] 
-					for key, freq in self._indicators.items() 
-					if freq > 0 and itr % freq == 0})
+			itr = batch['num_iterations']
+			content = {key: batch[key]  for key, freq in self._freqs.items()
+					   if freq and itr > 0 and itr % freq == 0}
+			if len(content):
+				import wandb
+				wandb.log(content, step=itr)
 		return out
 
 

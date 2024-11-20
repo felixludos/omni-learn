@@ -1,0 +1,44 @@
+Traceback (most recent call last):
+  File "C:\Program Files\JetBrains\PyCharm 2024.1.6\plugins\python\helpers\pydev\pydevd.py", line 1551, in _exec
+    pydev_imports.execfile(file, globals, locals)  # execute the script
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\JetBrains\PyCharm 2024.1.6\plugins\python\helpers\pydev\_pydev_imps\_pydev_execfile.py", line 18, in execfile
+    exec(compile(contents+"\n", file, 'exec'), glob, loc)
+  File "C:\Users\anwan\OneDrive\Khan\research\foundation\demo\main.py", line 3, in <module>
+    omnifig.entry()
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\top.py", line 56, in entry
+    get_profile().entry(script_name=script_name)
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\organization\profiles.py", line 169, in entry
+    self.main(argv, script_name=script_name)
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\organization\profiles.py", line 204, in main
+    return self.get_current_project().main(argv, script_name=script_name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\organization\workspaces.py", line 426, in main
+    output = self.run_script(script_name, config)  # run based on the config
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\organization\workspaces.py", line 447, in run_script
+    return self.run(config, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\organization\workspaces.py", line 500, in run
+    raise exc
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\organization\workspaces.py", line 490, in run
+    output = self._run(entry, config, args=args, kwargs=kwargs) # run script
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\anwan\OneDrive\Khan\research\omni-fig\omnifig\organization\workspaces.py", line 545, in _run
+    return fn(config, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\anwan\OneDrive\Khan\research\foundation\demo\src\op.py", line 149, in train_mnist
+    trainer.fit(dataset)
+  File "C:\Users\anwan\OneDrive\Khan\research\data-foundation\omniply\apps\training\trainers.py", line 52, in fit
+    for batch in self.fit_loop(src): pass
+  File "C:\Users\anwan\OneDrive\Khan\research\foundation\omnilearn\training\trainers.py", line 92, in fit_loop
+    planner = self._setup_fit(src, **settings)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\anwan\OneDrive\Khan\research\foundation\omnilearn\training\trainers.py", line 81, in _setup_fit
+    e.setup(self, src, device=device)
+  File "C:\Users\anwan\OneDrive\Khan\research\foundation\omnilearn\training\events.py", line 167, in setup
+    return super().setup(trainer, src, device=device)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\anwan\OneDrive\Khan\research\foundation\omnilearn\abstract.py", line 121, in setup
+    raise NotImplementedError
+NotImplementedError

@@ -1,0 +1,32 @@
+2024-11-21 01:49:12,953 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Current SDK version is 0.18.5
+2024-11-21 01:49:12,953 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Configure stats pid to 27760
+2024-11-21 01:49:12,953 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Loading settings from C:\Users\anwan\.config\wandb\settings
+2024-11-21 01:49:12,953 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Loading settings from C:\Users\anwan\OneDrive\Khan\research\foundation\demo\wandb\settings
+2024-11-21 01:49:12,954 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Loading settings from environment variables: {}
+2024-11-21 01:49:12,954 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Applying setup settings: {'mode': None, '_disable_service': None}
+2024-11-21 01:49:12,954 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Inferring run settings from compute environment: {'program_relpath': 'demo\\main.py', 'program_abspath': 'C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\main.py', 'program': 'C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\main.py'}
+2024-11-21 01:49:12,954 INFO    MainThread:27760 [wandb_setup.py:_flush():79] Applying login settings: {}
+2024-11-21 01:49:12,955 INFO    MainThread:27760 [wandb_init.py:_log_setup():534] Logging user logs to C:\Users\anwan\OneDrive\Khan\research\foundation\demo\wandb\run-20241121_014912-yc44e5fc\logs\debug.log
+2024-11-21 01:49:12,955 INFO    MainThread:27760 [wandb_init.py:_log_setup():535] Logging internal logs to C:\Users\anwan\OneDrive\Khan\research\foundation\demo\wandb\run-20241121_014912-yc44e5fc\logs\debug-internal.log
+2024-11-21 01:49:12,955 INFO    MainThread:27760 [wandb_init.py:init():621] calling init triggers
+2024-11-21 01:49:12,955 INFO    MainThread:27760 [wandb_init.py:init():628] wandb.init called with sweep_config: {}
+config: {'model': {'hidden': [300], 'nonlin': 'relu', 'output_nonlin': None, 'input_dim': None, 'output_dim': None}, 'optimizer': {'lr': 0.001, 'beta1': 0.9, 'beta2': 0.999, 'eps': 1e-08, 'weight_decay': 0.0, 'amsgrad': False}, 'task': {'observation': {'type': 'bounded', 'dims': 784, 'lower': 0.0, 'upper': 1.0}, 'label': {'type': 'categorical', 'classes': 10}}, 'checkpointer': {'freq': 1000, 'saveroot': 'C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\checkpoints'}, 'monitor': {'freqs': {'loss': 10, 'accuracy': 10}}}
+2024-11-21 01:49:12,956 INFO    MainThread:27760 [wandb_init.py:init():671] starting backend
+2024-11-21 01:49:12,956 INFO    MainThread:27760 [wandb_init.py:init():675] sending inform_init request
+2024-11-21 01:49:12,960 INFO    MainThread:27760 [backend.py:_multiprocessing_setup():104] multiprocessing start_methods=spawn, using: spawn
+2024-11-21 01:49:12,962 INFO    MainThread:27760 [wandb_init.py:init():688] backend started and connected
+2024-11-21 01:49:12,972 INFO    MainThread:27760 [wandb_init.py:init():783] updated telemetry
+2024-11-21 01:49:13,039 INFO    MainThread:27760 [wandb_init.py:init():816] communicating run to backend with 90.0 second timeout
+2024-11-21 01:49:14,197 INFO    MainThread:27760 [wandb_init.py:init():867] starting run threads in backend
+2024-11-21 01:49:15,432 INFO    MainThread:27760 [wandb_run.py:_console_start():2463] atexit reg
+2024-11-21 01:49:15,433 INFO    MainThread:27760 [wandb_run.py:_redirect():2311] redirect: wrap_raw
+2024-11-21 01:49:15,433 INFO    MainThread:27760 [wandb_run.py:_redirect():2376] Wrapping output streams.
+2024-11-21 01:49:15,433 INFO    MainThread:27760 [wandb_run.py:_redirect():2401] Redirects installed.
+2024-11-21 01:49:15,438 INFO    MainThread:27760 [wandb_init.py:init():911] run started, returning control to user process
+2024-11-21 01:50:29,792 INFO    MainThread:27760 [wandb_run.py:_finish():2158] finishing run felixludos/demo-MNIST/yc44e5fc
+2024-11-21 01:50:29,792 INFO    MainThread:27760 [wandb_run.py:_atexit_cleanup():2426] got exitcode: 0
+2024-11-21 01:50:29,793 INFO    MainThread:27760 [wandb_run.py:_restore():2408] restore
+2024-11-21 01:50:29,794 INFO    MainThread:27760 [wandb_run.py:_restore():2414] restore done
+2024-11-21 01:50:34,946 INFO    MainThread:27760 [wandb_run.py:_footer_history_summary_info():3975] rendering history
+2024-11-21 01:50:34,947 INFO    MainThread:27760 [wandb_run.py:_footer_history_summary_info():4007] rendering summary
+2024-11-21 01:50:35,288 INFO    MainThread:27760 [wandb_run.py:_footer_sync_info():3934] logging synced files

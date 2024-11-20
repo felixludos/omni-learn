@@ -10,14 +10,14 @@ class TrainerBase(_DynamicTrainerBase):
 	_Reporter = ReporterBase
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
 			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None, 
-			  events: Iterable[AbstractEvent] = None,
+			  events: Dict[str, AbstractEvent] = None,
 			  device: str = None, **kwargs):
 		if reporter is None:
 			reporter = self._Reporter()
 		if env is None:
 			env = {}
 		if events is None:
-			events = [e for e in env.values() if isinstance(e, AbstractEvent)]
+			events = {}
 		super().__init__(**kwargs)
 		self._model = model
 		self._dataset = None
@@ -25,6 +25,7 @@ class TrainerBase(_DynamicTrainerBase):
 		self._reporter = reporter
 		self._device = device
 		self._env = env
+		env.update(events)
 		self._events = events
 		self.extend(env.values())
 
@@ -33,7 +34,12 @@ class TrainerBase(_DynamicTrainerBase):
 	def name(self) -> str:
 		src = 'unknown' if self._dataset is None else self._dataset.name
 		return f'{self._model.name}_{src}'
-	
+
+
+	def environment(self) -> Dict[str, Any]:
+		'''prepare the dataset for training'''
+		return self._env.copy()
+
 
 	@property
 	def settings(self) -> Dict[str, Any]:
@@ -57,10 +63,6 @@ class TrainerBase(_DynamicTrainerBase):
 		return self._reporter
 
 
-	def all_indicators(self) -> Iterator[str]:
-		raise NotImplementedError
-	
-
 	def gadgetry(self) -> Iterator[AbstractGadget]:
 		yield self._model
 		yield self._optimizer
@@ -80,19 +82,15 @@ class TrainerBase(_DynamicTrainerBase):
 		self._dataset = src
 		self._model.prepare(device=device)
 		self._optimizer.setup(self._model, device=device)
-		for e in self._events:
+		for e in self._events.values():
 			e.setup(self, src, device=device)
 
 		return planner
 
 
 	def _end_fit(self, batch: Batch) -> None:
-		for e in self._events:
+		for e in self._events.values():
 			e.end(batch)
-
-
-	# def loop(self, src: AbstractDataset, **settings: Any) -> Iterator[Batch]:
-	# 	return self.fit_loop(src, **settings)
 
 
 	def fit_loop(self, src: AbstractDataset, **settings):
@@ -122,7 +120,7 @@ class TrainerBase(_DynamicTrainerBase):
 
 	def learn(self, batch: Batch) -> bool:
 		self._optimizer.step(batch)
-		for e in self._events:
+		for e in self._events.values():
 			e.step(batch)
 		self.reporter.step(batch)
 

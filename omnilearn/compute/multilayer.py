@@ -21,7 +21,7 @@ class MLP(Model, nn.Sequential):
 		self._nonlin = nonlin
 		self._output_nonlin = output_nonlin
 
-	@space('input', parse=True)
+	@space('input')
 	def input_space(self) -> spaces.Vector:
 		if self._input_dim is None:
 			raise self._GearFailed('input_dim is not set')
@@ -82,7 +82,7 @@ class MLP(Model, nn.Sequential):
 
 	def settings(self):
 		out = super().settings()
-		out['hidden'] = self._hidden
+		out['hidden'] = list(self._hidden) if self._hidden is not None else None
 		out['nonlin'] = self._nonlin
 		out['output_nonlin'] = self._output_nonlin
 		out['input_dim'] = self._input_dim

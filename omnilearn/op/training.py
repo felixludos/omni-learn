@@ -1,12 +1,19 @@
 from .imports import *
-from .common import Machine
+from .common import Machine, Event
 
 from ..training import CheckpointableTrainer, Pbar_Reporter, Checkpointer as _Checkpointer, DefaultPlanner
+from ..training import WandB_Monitor as _WandB_Monitor
 
 
 
 class Planner(Machine, DefaultPlanner):
 	pass
+
+
+
+class WandB_Monitor(Event, _WandB_Monitor):
+	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, **kwargs):
+		super().__init__(freqs=freqs, project_name=project_name, **kwargs)
 
 
 
@@ -33,17 +40,19 @@ class Trainer(Configurable, CheckpointableTrainer):
 	_Reporter = Reporter
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *,
 			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None,
-			  indicators: Iterable[str] = None,
+				 events: Dict[str, AbstractEvent] = None,
+			  # indicators: Iterable[str] = None,
 			  budget: Union[int, Dict[str, int]] = None, batch_size: int = None,
 			  device: str = None, **kwargs):
-		if indicators is None:
-			indicators = []
+		# if indicators is None:
+		# 	indicators = []
 		if isinstance(budget, int):
 			budget = {'max_iterations': budget}
-		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, batch_size=batch_size, device=device, **kwargs)
+		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, events=events,
+						 batch_size=batch_size, device=device, **kwargs)
 		if budget is not None:
 			self._planner.budget(**budget)
-		self._indicators = indicators
+		# self._indicators = indicators
 
 
 	# def all_indicators(self) -> Iterator[str]:

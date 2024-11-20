@@ -1,0 +1,17 @@
+{"time":"2024-11-21T01:52:14.7284335+09:00","level":"INFO","msg":"using version","core version":"0.18.5"}
+{"time":"2024-11-21T01:52:14.7284335+09:00","level":"INFO","msg":"created symlink","path":"C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\wandb\\run-20241121_015214-q9j55zlx\\logs\\debug-core.log"}
+{"time":"2024-11-21T01:52:14.8467691+09:00","level":"INFO","msg":"created new stream","id":"q9j55zlx"}
+{"time":"2024-11-21T01:52:14.8467691+09:00","level":"INFO","msg":"stream: started","id":"q9j55zlx"}
+{"time":"2024-11-21T01:52:14.847271+09:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"q9j55zlx"}}
+{"time":"2024-11-21T01:52:14.8498138+09:00","level":"INFO","msg":"handler: started","stream_id":{"value":"q9j55zlx"}}
+{"time":"2024-11-21T01:52:14.8498138+09:00","level":"INFO","msg":"sender: started","stream_id":"q9j55zlx"}
+{"time":"2024-11-21T01:52:15.7967039+09:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-21T01:52:54.841074+09:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-21T01:52:54.8426662+09:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-21T01:52:55.8628402+09:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"uploading config.yaml","runtime_seconds":0.4697777,"progress":"1.2KB/1.2KB"}],"total_operations":1}}
+{"time":"2024-11-21T01:52:56.0842748+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-21T01:52:57.7881089+09:00","level":"INFO","msg":"stream: closing","id":"q9j55zlx"}
+{"time":"2024-11-21T01:52:57.7881089+09:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"q9j55zlx"}}
+{"time":"2024-11-21T01:52:57.7881089+09:00","level":"INFO","msg":"sender: closed","stream_id":"q9j55zlx"}
+{"time":"2024-11-21T01:52:57.7881089+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"q9j55zlx"}}
+{"time":"2024-11-21T01:52:57.7886109+09:00","level":"INFO","msg":"stream: closed","id":"q9j55zlx"}

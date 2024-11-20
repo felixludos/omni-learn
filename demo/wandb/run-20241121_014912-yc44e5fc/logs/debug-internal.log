@@ -1,0 +1,17 @@
+{"time":"2024-11-21T01:49:12.963512+09:00","level":"INFO","msg":"using version","core version":"0.18.5"}
+{"time":"2024-11-21T01:49:12.963512+09:00","level":"INFO","msg":"created symlink","path":"C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\wandb\\run-20241121_014912-yc44e5fc\\logs\\debug-core.log"}
+{"time":"2024-11-21T01:49:13.0829603+09:00","level":"INFO","msg":"created new stream","id":"yc44e5fc"}
+{"time":"2024-11-21T01:49:13.0829603+09:00","level":"INFO","msg":"handler: started","stream_id":{"value":"yc44e5fc"}}
+{"time":"2024-11-21T01:49:13.0834656+09:00","level":"INFO","msg":"stream: started","id":"yc44e5fc"}
+{"time":"2024-11-21T01:49:13.0834656+09:00","level":"INFO","msg":"sender: started","stream_id":"yc44e5fc"}
+{"time":"2024-11-21T01:49:13.0834656+09:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"yc44e5fc"}}
+{"time":"2024-11-21T01:49:14.3387729+09:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-21T01:50:29.7955399+09:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-21T01:50:29.7975677+09:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-21T01:50:30.8022211+09:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"saving job artifact","runtime_seconds":0.5199783},{"desc":"uploading config.yaml","runtime_seconds":0.2543556,"progress":"1.2KB/1.2KB"},{"desc":"uploading output.log","runtime_seconds":0.2543556,"progress":"106B/106B"}],"total_operations":3}}
+{"time":"2024-11-21T01:50:33.6506286+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-21T01:50:35.2952372+09:00","level":"INFO","msg":"stream: closing","id":"yc44e5fc"}
+{"time":"2024-11-21T01:50:35.2952372+09:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"yc44e5fc"}}
+{"time":"2024-11-21T01:50:35.2952372+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"yc44e5fc"}}
+{"time":"2024-11-21T01:50:35.2952372+09:00","level":"INFO","msg":"sender: closed","stream_id":"yc44e5fc"}
+{"time":"2024-11-21T01:50:35.2957401+09:00","level":"INFO","msg":"stream: closed","id":"yc44e5fc"}

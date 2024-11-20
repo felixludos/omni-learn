@@ -1,0 +1,17 @@
+{"time":"2024-11-21T01:29:44.8510291+09:00","level":"INFO","msg":"using version","core version":"0.18.5"}
+{"time":"2024-11-21T01:29:44.8510291+09:00","level":"INFO","msg":"created symlink","path":"C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\wandb\\run-20241121_012944-5gimehvx\\logs\\debug-core.log"}
+{"time":"2024-11-21T01:29:44.9710671+09:00","level":"INFO","msg":"created new stream","id":"5gimehvx"}
+{"time":"2024-11-21T01:29:44.9710671+09:00","level":"INFO","msg":"stream: started","id":"5gimehvx"}
+{"time":"2024-11-21T01:29:44.9717845+09:00","level":"INFO","msg":"sender: started","stream_id":"5gimehvx"}
+{"time":"2024-11-21T01:29:44.9710671+09:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"5gimehvx"}}
+{"time":"2024-11-21T01:29:44.9710671+09:00","level":"INFO","msg":"handler: started","stream_id":{"value":"5gimehvx"}}
+{"time":"2024-11-21T01:29:45.9802655+09:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-21T01:30:57.4272959+09:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-21T01:30:57.4296634+09:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-21T01:30:58.4304823+09:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"saving job artifact","runtime_seconds":0.6951846},{"desc":"uploading config.yaml","runtime_seconds":0.4680748,"progress":"1.2KB/1.2KB"}],"total_operations":2}}
+{"time":"2024-11-21T01:31:00.7917615+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-21T01:31:02.5316265+09:00","level":"INFO","msg":"stream: closing","id":"5gimehvx"}
+{"time":"2024-11-21T01:31:02.5316265+09:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"5gimehvx"}}
+{"time":"2024-11-21T01:31:02.5316265+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"5gimehvx"}}
+{"time":"2024-11-21T01:31:02.5316265+09:00","level":"INFO","msg":"sender: closed","stream_id":"5gimehvx"}
+{"time":"2024-11-21T01:31:02.5316265+09:00","level":"INFO","msg":"stream: closed","id":"5gimehvx"}
