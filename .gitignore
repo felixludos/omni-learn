@@ -10,5 +10,6 @@ old_trained_nets/
 omnilearn.egg-info/
 extra/
 dist/
-data/
+demo/data/
+local_data/
 checkpoints/
