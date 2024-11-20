@@ -24,7 +24,7 @@ class AbstractSpace:
 		return self.lower_bound, self.upper_bound
 
 	@property
-	def dtype(self) -> torch.dtype:
+	def dtype(self) -> 'torch.dtype':
 		raise NotImplementedError
 
 	def shape(self, batch_size: Optional[int] = None) -> tuple[int]:

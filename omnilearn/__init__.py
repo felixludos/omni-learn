@@ -1,5 +1,7 @@
-__version__ = '0.8.0'
+__version__ = '0.9.0'
 
-from .op import Context, ToolKit, space, gear, tool, indicator
-from .op import Machine, Dataset, Model, Optimizer, Adam, SGD, Trainer, Planner, Reporter, Checkpointer, VizBatch, VizMechanism
+from .core import *
 from . import spaces
+from . import op
+
+

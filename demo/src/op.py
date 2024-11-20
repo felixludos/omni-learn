@@ -1,5 +1,6 @@
 from .imports import *
 from omnilearn import *
+from omnilearn.op import *
 from omnilearn import autoreg
 from torchvision.datasets import MNIST as Torchvision_MNIST
 
@@ -69,16 +70,16 @@ class MNIST(Dataset):
         '''returns int8 tensor of shape (N, 28, 28)'''
         return self._image_data[torch.from_numpy(index)]
     @get_images.space
-    def image_size(self) -> tuple:
-        return (28, 28)
+    def image_space(self) -> spaces.Pixels:
+        return spaces.Pixels(1, 28, 28, as_bytes=True)
     
 
     @tool('label')
     def get_labels(self, index: np.ndarray) -> torch.Tensor:
         return self._label_data[torch.from_numpy(index)]
     @get_labels.space
-    def number_of_classes(self) -> int:
-        return 10
+    def label_space(self) -> spaces.Categorical:
+        return spaces.Categorical(10)
 
 
 
@@ -91,8 +92,8 @@ class ImageClassification(Machine):
             image = image.float().div(255)
         return image.view(N, -1)
     @transform_image.space
-    def observation_space(self, image: tuple) -> int:
-        return spaces.Pixels(C=image.channels, H=image.height, W=image.width, as_bytes=False)
+    def observation_space(self, image: spaces.Pixels) -> int:
+        return image.size
     
 
     @indicator('loss')

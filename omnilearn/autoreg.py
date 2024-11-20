@@ -1,7 +1,6 @@
 import omnifig as fig
 
 from .op import Mechanism
-
 fig.component('mechanism')(Mechanism)
 
 
