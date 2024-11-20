@@ -21,7 +21,7 @@ env.checkpointer:
   freq: <>ckpt-freq
 # env.eval._type: evaluator
 
-ckpt-freq: 100
+ckpt-freq: 1000
 
 # metrics:
 #   loss: yes

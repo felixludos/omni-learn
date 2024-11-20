@@ -23,6 +23,12 @@ class SpaceBase(AbstractSpace):
 	def dtype(self) -> 'torch.dtype':
 		return torch.float32
 
+	def __str__(self) -> str:
+		return f'{" x ".join("_" if d is None else str(d) for d in self.shape())}'
+
+	def __repr__(self) -> str:
+		return f'{self.__class__.__name__}({", ".join("_" if d is None else str(d) for d in self.shape())})'
+
 
 class Scalar(SpaceBase):
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
@@ -33,6 +39,11 @@ class Categorical(SpaceBase):
 	def __init__(self, n: int):
 		self._n = n
 
+	@property
+	def classes(self) -> int:
+		return self._n
+
+	@property
 	def size(self) -> int:
 		return self._n
 
@@ -42,6 +53,9 @@ class Categorical(SpaceBase):
 	def dtype(self) -> 'torch.dtype':
 		return torch.int64
 
+	def __repr__(self) -> str:
+		return f'{self.__class__.__name__}({self._n})'
+
 
 class Vector(SpaceBase):
 	def __init__(self, dim: int):
@@ -49,6 +63,25 @@ class Vector(SpaceBase):
 
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
 		return (batch_size, self._dim)
+
+
+class Logits(Vector):
+	pass
+
+
+class Bounded(Vector):
+	def __init__(self, dim: int, lower: float = None, upper: float = None):
+		super().__init__(dim)
+		self._lower = lower
+		self._upper = upper
+
+	@property
+	def lower_bound(self) -> Optional[float]:
+		return self._lower
+
+	@property
+	def upper_bound(self) -> Optional[float]:
+		return self._upper
 
 
 class Boolean(Vector):

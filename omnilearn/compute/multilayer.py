@@ -80,7 +80,6 @@ class MLP(Model, nn.Sequential):
 			self.to(device)
 		return super()._prepare(device=device)
 
-
 	def settings(self):
 		out = super().settings()
 		out['hidden'] = self._hidden
@@ -90,13 +89,11 @@ class MLP(Model, nn.Sequential):
 		out['output_dim'] = self._output_dim
 		return out
 
-
 	def _checkpoint_data(self):
 		data = {'settings': self.settings()}
 		if self._is_prepared:
 			data['state_dict'] = self.state_dict()
 		return data
-
 
 	def _load_checkpoint_data(self, data: Dict[str, Any], *, unsafe: bool = False) -> None:
 		settings = data['settings']

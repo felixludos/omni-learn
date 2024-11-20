@@ -92,8 +92,14 @@ class ImageClassification(Machine):
             image = image.float().div(255)
         return image.view(N, -1)
     @transform_image.space
-    def observation_space(self, image: spaces.Pixels) -> int:
-        return image.size
+    def observation_space(self, image: spaces.Pixels) -> spaces.Bounded:
+        """Flattens the image"""
+        return spaces.Bounded(image.size, lower=0., upper=1.)
+
+
+    @space('prediction')
+    def prediction_space(self, label: spaces.Categorical) -> spaces.Logits:
+        return spaces.Logits(label.classes)
     
 
     @indicator('loss')

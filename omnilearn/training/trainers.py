@@ -1,5 +1,5 @@
 from .imports import *
-from ..core import Batch
+from ..core import Batch, ToolKit
 from ..abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractEvent, AbstractPlanner, AbstractReporter
 from omniply.apps.training import DynamicTrainerBase as _DynamicTrainerBase
 from .events import ReporterBase
@@ -72,6 +72,8 @@ class TrainerBase(_DynamicTrainerBase):
 			device = self._device
 		
 		src = src.load(device=device)
+
+		env = ToolKit(src, *self.gadgetry())
 
 		planner = self._planner.setup(src, **settings)
 
