@@ -12,8 +12,8 @@ class Planner(Machine, DefaultPlanner):
 
 
 class WandB_Monitor(Event, _WandB_Monitor):
-	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, **kwargs):
-		super().__init__(freqs=freqs, project_name=project_name, **kwargs)
+	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = None, **kwargs):
+		super().__init__(freqs=freqs, project_name=project_name, use_wandb=use_wandb, **kwargs)
 
 
 

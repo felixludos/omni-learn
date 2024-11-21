@@ -38,6 +38,9 @@ class Scalar(SpaceBase):
 		return {'type': 'scalar'}
 
 
+# TODO: Tensor - fixed shape (batched or unbatched)
+
+
 class Categorical(SpaceBase):
 	def __init__(self, n: int):
 		self._n = n
