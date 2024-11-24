@@ -35,7 +35,8 @@ class SpaceBase(AbstractSpace):
 
 
 class Tensor(SpaceBase):
-	def __init__(self, *shape: int, batched: bool = True, dtype: 'torch.dtype' = torch.float32, **kwargs):
+	def __init__(self, *shape: int, batched: bool = True, dtype: 'torch.dtype' = None, **kwargs):
+		dtype = dtype or torch.float32
 		super().__init__(**kwargs)
 		self._shape = shape
 		self._dtype = dtype
@@ -68,7 +69,8 @@ class Scalar(Tensor):
 
 
 class Vector(Tensor):
-	def __init__(self, dim: int, *, dtype: 'torch.dtype' = torch.float32, batched: bool = True):
+	def __init__(self, dim: int, *, dtype: 'torch.dtype' = None, batched: bool = True):
+		dtype = dtype or torch.float32
 		super().__init__(dim, dtype=dtype, batched=batched)
 
 
@@ -98,7 +100,8 @@ class Bounded(Vector):
 
 
 class Boolean(Tensor):
-	def __init__(self, *args, dtype: 'torch.dtype' = torch.bool, **kwargs):
+	def __init__(self, *args, dtype: 'torch.dtype' = None, **kwargs):
+		dtype = dtype or torch.bool
 		super().__init__(*args, dtype=dtype, **kwargs)
 
 
