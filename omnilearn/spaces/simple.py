@@ -29,16 +29,78 @@ class SpaceBase(AbstractSpace):
 	def __repr__(self) -> str:
 		return f'{self.__class__.__name__}({", ".join("_" if d is None else str(d) for d in self.shape())})'
 
+	def json(self) -> dict:
+		return {'type': self.__class__.__name__}
 
-class Scalar(SpaceBase):
+
+
+class Tensor(SpaceBase):
+	def __init__(self, *shape: int, batched: bool = True, dtype: 'torch.dtype' = torch.float32, **kwargs):
+		super().__init__(**kwargs)
+		self._shape = shape
+		self._dtype = dtype
+		self._batched = batched
+
+
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
-		return ()
+		return (batch_size, *self._shape) if self.batched else self._shape
+
 
 	def json(self) -> dict:
-		return {'type': 'scalar'}
+		return {**super().json(), 'shape': list(self._shape), 'batched': self._batched, 'dtype': str(self._dtype)}
 
 
-# TODO: Tensor - fixed shape (batched or unbatched)
+	@property
+	def batched(self) -> bool:
+		return self._batched
+
+
+	@property
+	def dtype(self) -> 'torch.dtype':
+		return self._dtype
+
+
+
+class Scalar(Tensor):
+	def __init__(self, *, dtype: 'torch.dtype' = torch.float32, batched: bool = False):
+		super().__init__(dtype=dtype, batched=batched)
+
+
+
+class Vector(Tensor):
+	def __init__(self, dim: int, *, dtype: 'torch.dtype' = torch.float32, batched: bool = True):
+		super().__init__(dim, dtype=dtype, batched=batched)
+
+
+
+class Logits(Vector):
+	pass
+
+
+
+class Bounded(Vector):
+	def __init__(self, *args, lower: float = None, upper: float = None, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._lower = lower
+		self._upper = upper
+
+	@property
+	def lower_bound(self) -> Optional[float]:
+		return self._lower
+
+	@property
+	def upper_bound(self) -> Optional[float]:
+		return self._upper
+
+	def json(self) -> dict:
+		return {**super().json(), 'lower': self._lower, 'upper': self._upper}
+
+
+
+class Boolean(Tensor):
+	def __init__(self, *args, dtype: 'torch.dtype' = torch.bool, **kwargs):
+		super().__init__(*args, dtype=dtype, **kwargs)
+
 
 
 class Categorical(SpaceBase):
@@ -65,46 +127,6 @@ class Categorical(SpaceBase):
 	def json(self) -> dict:
 		return {'type': 'categorical', 'classes': self._n}
 
-
-class Vector(SpaceBase):
-	def __init__(self, dim: int):
-		self._dim = dim
-
-	def shape(self, batch_size: Optional[int] = None) -> tuple:
-		return (batch_size, self._dim)
-
-	def json(self) -> dict:
-		return {'type': 'vector', 'dims': self._dim}
-
-class Logits(Vector):
-	def json(self) -> dict:
-		return {'type': 'logits', 'dims': self._dim}
-
-
-class Bounded(Vector):
-	def __init__(self, dim: int, lower: float = None, upper: float = None):
-		super().__init__(dim)
-		self._lower = lower
-		self._upper = upper
-
-	@property
-	def lower_bound(self) -> Optional[float]:
-		return self._lower
-
-	@property
-	def upper_bound(self) -> Optional[float]:
-		return self._upper
-
-	def json(self) -> dict:
-		return {'type': 'bounded', 'dims': self._dim, 'lower': self._lower, 'upper': self._upper}
-
-class Boolean(Vector):
-	@property
-	def dtype(self) -> 'torch.dtype':
-		return torch.bool
-
-	def json(self) -> dict:
-		return {'type': 'boolean', 'dims': self._dim}
 
 
 class Spatial(SpaceBase):
