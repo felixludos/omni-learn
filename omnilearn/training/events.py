@@ -54,7 +54,7 @@ class Checkpointer(Event):
 
 
 
-class ReporterBase(ToolKit, AbstractReporter):
+class ReporterBase(AbstractReporter):
 	def setup(self, trainer, planner, batch_size):
 		return self
 	

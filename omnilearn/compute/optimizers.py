@@ -1,6 +1,9 @@
 from .imports import *
-from ..abstract import AbstractOptimizer, AbstractModel, AbstractBatch
+from ..abstract import AbstractMachine, AbstractOptimizer, AbstractModel, AbstractBatch
 from ..machines import Machine
+from .models import Model
+
+
 
 class OptimizerBase(Machine, AbstractOptimizer):
 	def __init__(self, *, objective: str = 'loss', maximize: bool = False, **kwargs):
@@ -17,7 +20,7 @@ class OptimizerBase(Machine, AbstractOptimizer):
 		return 1 if self._maximize else -1
 	
 
-	def setup(self, model: AbstractModel, *, device: Optional[str] = None) -> Self:
+	def setup(self, model: AbstractModel) -> Self:
 		return self
 
 
@@ -41,9 +44,9 @@ class PytorchOptimizer(OptimizerBase, O.Optimizer):
 			self.add_param_group(param_group)
 
 
-	def setup(self, model: AbstractModel, *, device: Optional[str] = None) -> Self:
+	def setup(self, model: Model) -> Self:
 		self.add_parameters(model.parameters())
-		return super().setup(model, device=device)
+		return super().setup(model)
 		
 
 	def step(self, batch: AbstractBatch) -> AbstractBatch:
@@ -56,20 +59,21 @@ class PytorchOptimizer(OptimizerBase, O.Optimizer):
 		return batch
 
 
+	def _checkpoint_data(self):
+		data = {'settings': self.settings()}
+		if self._is_prepared:
+			state = self.state_dict()
+			if state is not None and len(state):
+				data['state_dict'] = state
+		return data
+
+
 
 class SGD(PytorchOptimizer, O.SGD):
 	@property
 	def name(self) -> str:
 		lr = f'{self.defaults["lr"]:.0e}'.replace('+', '')
 		return f'SGD{lr}'
-	
-	def settings(self):
-		return {
-			'lr': self.defaults['lr'],
-			'momentum': self.defaults['momentum'],
-			'nesterov': self.defaults['nesterov'],
-			'weight_decay': self.defaults['weight_decay'],
-		}
 
 	def settings(self):
 		return {
@@ -79,11 +83,6 @@ class SGD(PytorchOptimizer, O.SGD):
 			'weight_decay': self.defaults['weight_decay'],
 			'nesterov': self.defaults['nesterov'],
 		}
-
-	def _checkpoint_data(self):
-		data = {'settings': self.settings()}
-		data['state_dict'] = self.state_dict()
-		return data
 
 	def _load_checkpoint_data(self, data: Dict[str, Any], *, unsafe: bool = False) -> None:
 		settings = data['settings']
@@ -103,8 +102,9 @@ class SGD(PytorchOptimizer, O.SGD):
 
 		if 'state_dict' in data:
 			if not self._is_prepared:
-				self.prepare(None)
+				raise ValueError(f'optimizer must be prepared before loading state_dict')
 			self.load_state_dict(data['state_dict'])
+
 
 
 class Adam(PytorchOptimizer, O.Adam):
@@ -112,7 +112,6 @@ class Adam(PytorchOptimizer, O.Adam):
 	def name(self) -> str:
 		lr = f'{self.defaults["lr"]:.0e}'.replace('+', '')
 		return f'Adam{lr}'
-
 
 	def settings(self):
 		return {
@@ -123,11 +122,6 @@ class Adam(PytorchOptimizer, O.Adam):
 			'weight_decay': self.defaults['weight_decay'],
 			'amsgrad': self.defaults['amsgrad'],
 		}
-
-	def _checkpoint_data(self):
-		data = {'settings': self.settings()}
-		data['state_dict'] = self.state_dict()
-		return data
 
 	def _load_checkpoint_data(self, data: Dict[str, Any], *, unsafe: bool = False) -> None:
 		settings = data['settings']
@@ -147,7 +141,7 @@ class Adam(PytorchOptimizer, O.Adam):
 
 		if 'state_dict' in data:
 			if not self._is_prepared:
-				self.prepare(None)
+				raise ValueError(f'optimizer must be prepared before loading state_dict')
 			self.load_state_dict(data['state_dict'])
 
 

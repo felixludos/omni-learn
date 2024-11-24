@@ -1,12 +1,13 @@
 from .imports import *
-from ..core import Batch, ToolKit
+from ..core import Batch, ToolKit, Structured
 from ..abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractEvent, AbstractPlanner, AbstractReporter
 from omniply.apps.training import DynamicTrainerBase as _DynamicTrainerBase
+from ..mixins import Prepared
 from .events import ReporterBase
 
 
 
-class TrainerBase(_DynamicTrainerBase):
+class TrainerBase(Prepared, _DynamicTrainerBase):
 	_Reporter = ReporterBase
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
 			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None, 
@@ -69,23 +70,36 @@ class TrainerBase(_DynamicTrainerBase):
 		yield from super().gadgetry()
 
 
-	def _setup_fit(self, src: AbstractDataset, *, device: str = None, **settings: Any) -> AbstractPlanner:
+	def _prepare(self, *, device: str = None):
+		"""
+		Only run once, only uses dataset implicitly - eg through gears. Generally this is not the top level
+
+		use setup() instead
+		"""
+		self._model.prepare(device=device)
+		self._optimizer.setup(self._model)
+		self._optimizer.prepare(device=device)
+		for e in self._env.values():
+			e.prepare(device=device)
+		return self
+
+
+	_System = Structured
+	def setup(self, src: AbstractDataset, *, device: str = None):
+		self._dataset = src
 		if device is None:
 			device = self._device
-		
 		src = src.load(device=device)
+		system = self._System(src, *self.gadgetry())
+		# system.mechanize() # sync for gears and spaces
+		self.prepare(device=device)
+		return system
 
-		env = ToolKit(src, *self.gadgetry())
 
-		planner = self._planner.setup(src, **settings)
-
-		self._dataset = src
-		self._model.prepare(device=device)
-		self._optimizer.setup(self._model, device=device)
+	def _setup_fit(self, src: AbstractDataset, *, device: str = None, **settings: Any) -> AbstractPlanner:
 		for e in self._events.values():
 			e.setup(self, src, device=device)
-
-		return planner
+		return self._planner.setup(src, **settings)
 
 
 	def _end_fit(self, batch: Batch) -> None:
@@ -93,36 +107,50 @@ class TrainerBase(_DynamicTrainerBase):
 			e.end(batch)
 
 
-	def fit_loop(self, src: AbstractDataset, **settings):
-		planner = self._setup_fit(src, **settings)
+	def loop(self, batch_size: int = None, *, system: Structured = None, planner: AbstractPlanner = None):
+		if batch_size is None:
+			assert self._batch_size is not None, 'batch_size must be provided if not set'
+			batch_size = self._batch_size
+		if planner is None:
+			assert self._dataset is not None, 'planner must be provided if dataset is not set'
+			planner = self._planner.setup(self._dataset)
 
-		batch_size = src.suggest_batch_size() if self._batch_size is None else self._batch_size
-
-		reporter = self._reporter.setup(self, planner, batch_size)
-
-		batch_cls = self._Batch or getattr(src, '_Batch', None) or Batch
-		
-		batch = None
+		batch_cls = self._Batch or getattr(self._dataset, '_Batch', None) or Batch
 		for info in planner.generate(batch_size):
-			batch = batch_cls(info, planner=planner).include(src, reporter).extend(tuple(self.gadgetry()))
-
-			# Note: this runs the optimization step before yielding the batch
-			terminate = self.learn(batch)
-			
+			batch = batch_cls(info, planner=planner)
+			if system is not None:
+				batch.include(system)
 			yield batch
 
-			if terminate:
-				break
+
+	def fit_loop(self, src: AbstractDataset, *, batch_size: int = None, **settings):
+		if batch_size is None:
+			batch_size = src.suggest_batch_size() if self._batch_size is None else self._batch_size
+
+		system = self.setup(src)
+		planner = self._setup_fit(src, **settings)
+		self.reporter.setup(self, planner, batch_size)
+
+		batch = None
+		for batch in self.loop(batch_size, system=system, planner=planner):
+			# Note: this runs the optimization step before yielding the batch
+			terminate = self.learn(batch)
+			yield batch
+			if terminate: break
 
 		self._end_fit(batch)
-		reporter.end(batch)
+		self.reporter.end(batch)
 
 
 	def learn(self, batch: Batch) -> bool:
 		self._optimizer.step(batch)
+
 		for e in self._events.values():
 			e.step(batch)
-		self.reporter.step(batch)
+
+		reporter = self.reporter
+		if reporter is not None:
+			reporter.step(batch)
 
 		return self._terminate_fit(batch)
 

@@ -17,7 +17,8 @@ class AbstractPlanner(AbstractPlannerBase):
 
 
 class AbstractMachine(AbstractPrepared, AbstractCheckpointable, AbstractSettings, AbstractGadget):
-	pass
+	def prepare(self, *, device: str = None) -> Self:
+		raise NotImplementedError
 
 
 
@@ -31,26 +32,19 @@ class AbstractDataset(AbstractNamed, AbstractDatasetBase, AbstractMachine):
 
 
 
-
 class AbstractEvaluatableDataset(AbstractDataset):
 	def as_eval(self) -> AbstractDataset:
 		raise NotImplementedError
 
 
 
-class AbstractModel(AbstractMachine):
-	@property
-	def name(self) -> str:
-		raise NotImplementedError
-
-
-	def prepare(self, *, device: str = None) -> Self:
-		raise NotImplementedError
+class AbstractModel(AbstractNamed, AbstractMachine):
+	pass
 
 
 
-class AbstractOptimizer(AbstractMachine):
-	def setup(self, model: AbstractModel, *, device: Optional[str] = None) -> Self:
+class AbstractOptimizer(AbstractNamed, AbstractMachine):
+	def setup(self, model: AbstractModel) -> Self:
 		raise NotImplementedError
 
 
@@ -71,12 +65,7 @@ class AbstractOptimizer(AbstractMachine):
 
 
 
-class AbstractTrainer(AbstractTrainerBase):
-	@property
-	def name(self) -> str:
-		raise NotImplementedError
-
-
+class AbstractTrainer(AbstractNamed, AbstractTrainerBase):
 	@property
 	def settings(self) -> Dict[str, Any]:
 		raise NotImplementedError

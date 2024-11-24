@@ -1,6 +1,5 @@
 from .imports import *
 from ..spaces.abstract import AbstractSpace
-from omniply.apps.mechanisms import Mechanism
 
 
 
@@ -18,6 +17,11 @@ class ToolKit(omniply_ToolKit):
 			if default is self._space_of_default:
 				raise
 			return default
+
+
+
+class Structured(omniply_Structured):
+	pass
 
 
 

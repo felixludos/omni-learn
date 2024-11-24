@@ -10,7 +10,7 @@ import json
 import h5py as hf
 from tabulate import tabulate
 from tqdm import tqdm 
-from omniply import Scope, Selection
+# from omniply import Scope, Selection
 from omniply import AbstractGadget
 # from omniply.apps.gaps import tool, ToolKit, Context#, Scope, Selection
 from omniply.apps.training import Dataset as DatabaseBase, Batch, DynamicTrainerBase
