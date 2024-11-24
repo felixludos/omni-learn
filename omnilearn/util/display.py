@@ -89,7 +89,7 @@ def fixed_width_format_value(val: float, width: int, force_positive: bool = Fals
                 return formatted
     raise ValueError(f"Cannot format value {val} in width {width}")
 
-import uuid
+import uuid, json
 from IPython.display import display_javascript, display_html, display
 
 class _RenderJSON(object):
