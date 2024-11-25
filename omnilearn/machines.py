@@ -1,11 +1,11 @@
 from .imports import *
 from .abstract import AbstractMachine, AbstractEvent, AbstractTrainer, AbstractDataset, AbstractBatch
-from .core import ToolKit
+from .core import Structured
 from .mixins import Prepared
 
 
 
-class Machine(Prepared, ToolKit, AbstractMachine):
+class Machine(Prepared, Structured, AbstractMachine):
 	def _checkpoint_data(self) -> Dict[str, Any]:
 		return self.settings()
 

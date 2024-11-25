@@ -133,22 +133,22 @@ class Categorical(SpaceBase):
 
 
 class Spatial(SpaceBase):
-	def __init__(self, C: int, *, spatial: tuple, channel_first: bool = True):
+	def __init__(self, C: int, *, spatial: tuple, channels_first: bool = True):
 		self._channels = C
 		self._spatial = spatial
-		self._channel_first = channel_first
+		self._channels_first = channels_first
 
 	@property
 	def channels(self) -> int:
 		return self._channels
 
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
-		return (batch_size, self._channels, *self._spatial) if self._channel_first \
+		return (batch_size, self._channels, *self._spatial) if self._channels_first \
 			else (batch_size, *self._spatial, self._channels)
 
 	def json(self) -> dict:
 		return {'type': 'spatial', 'channels': self._channels, 'spatial': list(self._spatial),
-				'channel_first': self._channel_first}
+				'channels_first': self._channels_first}
 
 
 class Sequence(Spatial):

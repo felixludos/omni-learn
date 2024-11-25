@@ -6,9 +6,16 @@ from ..machines import Machine as _Machine, Event as _Event
 
 class Machine(Configurable, _Machine):
 	@fig.config_aliases(gap='app')
-	def __init__(self, gap=None, **kwargs):
-		super().__init__(gap=gap, **kwargs)
+	def __init__(self, *args, gap=None, **kwargs):
+		super().__init__(*args, gap=gap, **kwargs)
 
+
+	def _prepare(self, *, device: str = None):
+		out = super()._prepare(device=device)
+		for gadget in self.vendors():
+			if isinstance(gadget, Machine):
+				gadget.prepare(device=device)
+		return out
 
 
 class Event(Machine, _Event):
@@ -16,14 +23,22 @@ class Event(Machine, _Event):
 
 
 
-class Mechanism(Machine, _Mechanism):
+class Mechanism(Configurable, Prepared, _Mechanism, AbstractMachine):
 	def __init__(self, content: Union[AbstractGadget, Iterable[AbstractGadget]], *,
-				 apply: Union[Dict[str, str], List[str]] = None,
-				 select: Union[Dict[str, str], List[str]] = None,
-				 insulate_out: bool = True, insulate_in: bool = True,
+				 internal: Union[Dict[str, str], List[str]] = None,
+				 external: Union[Dict[str, str], List[str]] = None,
+				 exclusive: bool = True, insulate: bool = True,
 				 **kwargs):
-		super().__init__(content=content, apply=apply, select=select,
-				   insulate_in=insulate_in, insulate_out=insulate_out, **kwargs)
+		super().__init__(content=content, internal=internal, external=external,
+				   insulate=insulate, exclusive=exclusive, **kwargs)
+
+
+	def _prepare(self, *, device: str = None):
+		out = super()._prepare(device=device)
+		for gadget in self.vendors():
+			if isinstance(gadget, Machine):
+				gadget.prepare(device=device)
+		return out
 
 
 

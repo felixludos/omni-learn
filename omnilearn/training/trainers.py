@@ -77,6 +77,7 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 		use setup() instead
 		"""
 		self._model.prepare(device=device)
+		print(self._model)
 		self._optimizer.setup(self._model)
 		self._optimizer.prepare(device=device)
 		for e in self._env.values():
@@ -91,7 +92,7 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 			device = self._device
 		src = src.load(device=device)
 		system = self._System(src, *self.gadgetry())
-		# system.mechanize() # sync for gears and spaces
+		system.mechanize() # sync for gears and spaces
 		self.prepare(device=device)
 		return system
 
