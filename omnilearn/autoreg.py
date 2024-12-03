@@ -15,8 +15,9 @@ fig.component('wandb')(WandB_Monitor)
 
 
 # models
-from .op import MLP
+from .op import MLP, Linear
 fig.component('mlp')(MLP)
+fig.component('linear')(Linear)
 
 
 

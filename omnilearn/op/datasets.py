@@ -6,6 +6,8 @@ from ..data import FileDatasetBase
 
 
 class Dataset(Machine, FileDatasetBase):
-	pass
+	def _prepare(self, **kwargs):
+		self.load(**kwargs)
+		return self
 
 

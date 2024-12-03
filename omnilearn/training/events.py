@@ -141,11 +141,11 @@ class Pbar_Reporter(ReporterBase):
 
 
 class WandB_Monitor(Event):
-	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = True, **kwargs):
+	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = None, **kwargs):
 		super().__init__(**kwargs)
 		self._project_name = project_name
 		self._freqs = freqs
-		self._use_wandb = use_wandb and freqs is not None and len(freqs) > 0
+		self._use_wandb = (use_wandb or use_wandb is None) and freqs is not None and len(freqs) > 0
 
 
 	def settings(self) -> Dict[str, Any]:

@@ -5,4 +5,4 @@ from .datasets import Dataset
 from .training import Trainer, Planner, Reporter, Checkpointer, WandB_Monitor
 
 # requires torch
-from .models import Model, MLP, SGD, Adam
+from .models import Model, MLP, SGD, Adam, Linear

@@ -1,7 +1,7 @@
 from .imports import *
 from .common import Machine
 
-from ..compute import Model as _Model, MLP as _MLP, SGD as _SGD, Adam as _Adam
+from ..compute import Model as _Model, MLP as _MLP, SGD as _SGD, Adam as _Adam, Linear as _Linear
 
 
 
@@ -19,6 +19,10 @@ class MLP(Model, _MLP):
 						 input_dim=input_dim, output_dim=output_dim,
 						 **kwargs)
 
+
+class Linear(Model, _Linear):
+	def __init__(self, in_features: int = None, out_features: int = None, *, bias: bool = True, **kwargs):
+		super().__init__(in_features=in_features, out_features=out_features, bias=bias, **kwargs)
 
 
 class SGD(Machine, _SGD):

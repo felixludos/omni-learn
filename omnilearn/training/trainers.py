@@ -93,6 +93,7 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 		src = src.load(device=device)
 		system = self._System(src, *self.gadgetry())
 		system.mechanize() # sync for gears and spaces
+		mech = system.mechanics()
 		self.prepare(device=device)
 		return system
 

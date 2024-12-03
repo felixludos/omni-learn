@@ -67,6 +67,10 @@ class Scalar(Tensor):
 		super().__init__(dtype=dtype, batched=batched)
 
 
+	def json(self):
+		return {'type': self.__class__.__name__}
+
+
 
 class Vector(Tensor):
 	def __init__(self, dim: int, *, dtype: 'torch.dtype' = None, batched: bool = True):
