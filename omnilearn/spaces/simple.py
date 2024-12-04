@@ -111,28 +111,43 @@ class Boolean(Tensor):
 
 
 class Categorical(SpaceBase):
-	def __init__(self, n: int):
-		self._n = n
+	def __init__(self, n: Union[Iterable[int], Iterable[str], int]):
+		if isinstance(n, int):
+			n = range(n)
+		self._classes = tuple(map(str, n))
 
 	@property
-	def classes(self) -> int:
-		return self._n
+	def n(self) -> int:
+		return len(self._classes)
+	
+	@property
+	def class_names(self) -> tuple:
+		return self._classes
 
 	@property
 	def size(self) -> int:
-		return self._n
+		return self.n
 
 	def shape(self, batch_size: Optional[int] = None) -> tuple:
 		return (batch_size, 1)
 
 	def dtype(self) -> 'torch.dtype':
-		return torch.int64
+		return torch.int
 
 	def __repr__(self) -> str:
-		return f'{self.__class__.__name__}({self._n})'
+		return f'{self.__class__.__name__}({self.n})'
 
 	def json(self) -> dict:
-		return {'type': 'categorical', 'classes': self._n}
+		return {'type': 'categorical', 'classes': self._classes}
+
+
+
+class BooleanCategorical(Categorical):
+	def shape(self, batch_size = None):
+		return (batch_size, self.n)
+	
+	def dtype(self):
+		return torch.bool
 
 
 

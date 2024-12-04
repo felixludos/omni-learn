@@ -65,18 +65,22 @@ class ReporterBase(AbstractReporter):
 		pass
 
 
-
 class Pbar_Reporter(ReporterBase):
 	def __init__(self, *, print_metrics: Iterable[str] = (), print_objective: bool = True, show_pbar: bool = True,
-				 unit: str = 'samples', ema_halflife: float = 5, ema_alpha: float = None, **kwargs):
-		assert unit.startswith('s') or unit.startswith('i'), f'unit should be "samples" or "iterations", not "{unit}"'
+				 unit: str = 'samples', include_epochs: bool = None, ema_halflife: float = 5, ema_alpha: float = None, **kwargs):
+		unit = unit.lower()
+		assert unit.startswith('s') or unit.startswith('i') or unit.startswith('e'), f'unit should be "samples" or "iterations" or "epochs", not "{unit}"'
+		if include_epochs is None and unit.startswith('e'):
+			include_epochs = False
 		super().__init__(**kwargs)
 		self._show_pbar = show_pbar
-		self._count_samples = unit.startswith('s')
+		self._bar_unit = unit
 		self._print_metrics = list(print_metrics)
 		self._pbar = None
 		self._meter_ema_alpha = ema_alpha
 		self._meter_ema_halflife = ema_halflife
+		self._include_epochs = include_epochs
+		self._itrs_per_epoch = None
 		self._objective_key = None
 		self._objective_meter = DynamicMeter(alpha=ema_alpha, target_halflife=ema_halflife) if print_objective else None
 		self._meters = None
@@ -92,12 +96,27 @@ class Pbar_Reporter(ReporterBase):
 		self._objective_key = trainer.optimizer.objective
 		self._objective_meter.reset()
 
-		total = planner.expected_samples(batch_size) if self._count_samples else total_iterations
+		dataset_size = getattr(planner, '_dataset_size', None) # TODO: clean up
+		if dataset_size is None and (self._bar_unit.startswith('e') or self._include_epochs):
+			raise ValueError('dataset size must be known to include epochs in progress bar')
+		if dataset_size is not None:
+			self._itrs_per_epoch = dataset_size / batch_size
+		
+		total = planner.expected_samples(batch_size) if self._bar_unit.startswith('s') else total_iterations
+		if self._bar_unit.startswith('e'):
+			assert dataset_size is not None, 'dataset size must be known to include epochs in progress bar'
+			total = dataset_size / batch_size
+
+		unit = 'x' if self._bar_unit.startswith('s') \
+			else 'ep' if self._bar_unit.startswith('e') else 'it'
+		
+		bar_format = "{l_bar}{bar}| {n:.2f}/{total:.2f} [{elapsed}<{remaining}, {rate_fmt}{postfix}]" if self._bar_unit.startswith('e') else "{l_bar}{bar}{r_bar}"
 
 		if self._show_pbar:
 			import tqdm
 			pbar_type = tqdm.notebook.tqdm if where_am_i() == 'jupyter' else tqdm.tqdm
-			self._pbar = pbar_type(total=total, unit='x' if self._count_samples else 'it')
+			self._pbar = pbar_type(total=total, unit=unit, bar_format=bar_format)
+			# self._pbar = pbar_type(total=total, unit=unit, unit_scale=1. / self._itrs_per_epoch if self._bar_unit.startswith('e') else None)
 
 		return super().setup(trainer, planner, batch_size)
 
@@ -118,7 +137,10 @@ class Pbar_Reporter(ReporterBase):
 			post = self._default_pbar_post(batch)
 			if post is not None:
 				self._pbar.set_postfix_str(post, refresh=False)
-			self._pbar.update(batch.size if self._count_samples else 1)
+			inc = batch.size if self._bar_unit.startswith('s') else 1
+			if self._bar_unit.startswith('e'):
+				inc = 1 / self._itrs_per_epoch
+			self._pbar.update(inc)
 		return super().step(batch)
 
 
@@ -131,13 +153,14 @@ class Pbar_Reporter(ReporterBase):
 	
 
 	def _default_pbar_post(self, batch: AbstractBatch) -> str:
-		return None
+		if self._itrs_per_epoch is not None and (self._include_epochs or self._include_epochs is None):
+			epoch = batch['num_iterations'] / self._itrs_per_epoch
+			return f'{epoch:.2f} epochs'
 
 
 	def end(self, last_batch: AbstractBatch = None) -> None:
 		if self._pbar is not None:
 			self._pbar.close()
-
 
 
 class WandB_Monitor(Event):

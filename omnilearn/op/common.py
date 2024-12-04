@@ -27,11 +27,15 @@ class Mechanism(Configurable, Prepared, _Mechanism, AbstractMachine):
 	def __init__(self, content: Union[AbstractGadget, Iterable[AbstractGadget]], *,
 				 internal: Union[Dict[str, str], List[str]] = None,
 				 external: Union[Dict[str, str], List[str]] = None,
-				 exclusive: bool = True, insulate: bool = True,
+				 exclusive: bool = True, insulated: bool = True,
 				 **kwargs):
-		super().__init__(content=content, internal=internal, external=external,
-				   insulate=insulate, exclusive=exclusive, **kwargs)
+		super().__init__(*content, internal=internal, external=external,
+				   insulated=insulated, exclusive=exclusive, **kwargs)
 
+	def settings(self):
+		return {'content': [g.settings() for g in self.vendors()],
+		  'internal': self.internal, 'external': self.external,
+		  'exclusive': self.exclusive, 'insulated': self.insulated}
 
 	def _prepare(self, *, device: str = None):
 		out = super()._prepare(device=device)

@@ -19,8 +19,8 @@ class WandB_Monitor(Event, _WandB_Monitor):
 
 class Reporter(Machine, Pbar_Reporter):
 	@fig.config_aliases(print_metrics='log')
-	def __init__(self, print_metrics: Iterable[str] = None, **kwargs):
-		super().__init__(print_metrics=print_metrics, **kwargs)
+	def __init__(self, print_metrics: Iterable[str] = None, show_pbar: bool = True, unit: str = 'iterations', **kwargs):
+		super().__init__(print_metrics=print_metrics, show_pbar=show_pbar, unit=unit, **kwargs)
 
 
 

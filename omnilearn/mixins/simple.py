@@ -4,9 +4,7 @@ from .abstract import AbstractPrepared
 
 
 class Prepared(AbstractPrepared):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self._is_prepared = False
+	_is_prepared: bool = False
 
 
 	def prepare(self, **kwargs) -> Self:

@@ -27,17 +27,21 @@ class Linear(Model, _Linear):
 
 class SGD(Machine, _SGD):
 	def __init__(self, lr: float, momentum: float = 0., dampening: float = 0.,
-				 weight_decay: float = 0., nesterov: bool = False, **kwargs):
+				 weight_decay: float = 0., nesterov: bool = False, 
+				 objective: str = 'loss', maximize: bool = False, **kwargs):
 		super().__init__(lr=lr, momentum=momentum, dampening=dampening,
-						 weight_decay=weight_decay, nesterov=nesterov, **kwargs)
+						 weight_decay=weight_decay, nesterov=nesterov,
+						  objective=objective, maximize=maximize, **kwargs)
 
 
 
 class Adam(Machine, _Adam):
 	def __init__(self, lr: float = 0.001, beta1: float = 0.9, beta2: float = 0.999,
-				 eps: float = 1e-8, weight_decay: float = 0., amsgrad: bool = False,
+				 eps: float = 1e-8, weight_decay: float = 0., amsgrad: bool = False, 
+				 objective: str = 'loss', maximize: bool = False, 
 				 **kwargs):
 		super().__init__(lr=lr, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay,
-						 amsgrad=amsgrad, **kwargs)
+						 amsgrad=amsgrad,
+						  objective=objective, maximize=maximize, **kwargs)
 
 
