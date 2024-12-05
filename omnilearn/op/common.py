@@ -10,8 +10,8 @@ class Machine(Configurable, _Machine):
 		super().__init__(*args, gap=gap, **kwargs)
 
 
-	def _prepare(self, *, device: str = None):
-		out = super()._prepare(device=device)
+	def _prepare(self, *, device: str = None, **kwargs):
+		out = super()._prepare(device=device, **kwargs)
 		for gadget in self.vendors():
 			if isinstance(gadget, Machine):
 				gadget.prepare(device=device)
@@ -34,8 +34,8 @@ class Mechanism(Configurable, Prepared, _Mechanism, AbstractMachine):
 
 	def settings(self):
 		return {'content': [g.settings() for g in self.vendors()],
-		  'internal': self.internal, 'external': self.external,
-		  'exclusive': self.exclusive, 'insulated': self.insulated}
+		  'internal': self._internal_map, 'external': self._external_map,
+		  'exclusive': self._exclusive, 'insulated': self._insulated}
 
 	def _prepare(self, *, device: str = None):
 		out = super()._prepare(device=device)

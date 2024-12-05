@@ -71,8 +71,12 @@ class MLP(Model, nn.Sequential):
 
 		return layers
 
-	def _prepare(self, *, device: Optional[str] = None):
-		layers = self._build(self.input_space, self.output_space, hidden=self._hidden,
+	def _prepare(self, *, device: Optional[str] = None, 
+			  input_space: Optional[spaces.AbstractSpace] = None,
+			  output_space: Optional[spaces.AbstractSpace] = None):
+		input_space = input_space or self.input_space
+		output_space = output_space or self.output_space
+		layers = self._build(input_space, output_space, hidden=self._hidden,
 							 nonlin=self._nonlin, output_nonlin=self._output_nonlin)
 		for i, layer in enumerate(layers):
 			self.add_module(f'{i}', layer)
