@@ -164,11 +164,16 @@ class Pbar_Reporter(ReporterBase):
 
 
 class WandB_Monitor(Event):
-	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = None, **kwargs):
+	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = None, wandb_dir: Union[str, Path] = None, max_imgs: int = 12, details: str = None, **kwargs):
 		super().__init__(**kwargs)
 		self._project_name = project_name
-		self._freqs = freqs
+		self._wandb_dir = Path(wandb_dir) if wandb_dir is not None else None
+		self._details = details
+		self._freqs = {key: freq for key, freq in freqs.items() if freq is not None and freq > 0}
 		self._use_wandb = (use_wandb or use_wandb is None) and freqs is not None and len(freqs) > 0
+		self._max_imgs = max_imgs
+		from torchvision.transforms import ToPILImage
+		self._to_pil = ToPILImage()
 
 
 	def settings(self) -> Dict[str, Any]:
@@ -185,11 +190,12 @@ class WandB_Monitor(Event):
 									   {'model': trainer.model, 'optimizer': trainer.optimizer, 'dataset': src,
 									   'trainer': trainer, 'settings': project_settings,
 										**trainer.environment()})
-
+			if self._details is not None:
+				project_name = f'{project_name}-{self._details}'
 
 			try:
 				import wandb
-				wandb.init(project=project_name, config=project_settings)
+				wandb.init(project=project_name, config=project_settings, dir=self._wandb_dir)
 			except ImportError:
 				if self._use_wandb:
 					raise
@@ -202,12 +208,21 @@ class WandB_Monitor(Event):
 		out = super().step(batch)
 		if self._use_wandb:
 			itr = batch['num_iterations']
-			content = {key: batch[key]  for key, freq in self._freqs.items()
-					   if freq and itr > 0 and itr % freq == 0}
+			content = {key: self._format_content(key, batch[key]) for key, freq in self._freqs.items()
+					   if freq and itr > 0 and itr % freq == 0 and batch.gives(key)}
 			if len(content):
 				import wandb
 				wandb.log(content, step=itr)
 		return out
+	
+	def _format_content(self, key, raw):
+		import wandb, torchvision
+		if isinstance(raw, torch.Tensor) and raw.dtype == torch.uint8 and len(raw.size()) == 4:
+			n = min(self._max_imgs, raw.size(0))
+			nrows = int(n ** 0.5)
+			grid = torchvision.utils.make_grid(raw[:n], nrow=nrows)
+			return wandb.Image(self._to_pil(grid))
+		return raw
 
 
 	def report_validation(self, metrics: Dict[str, float], iteration: int) -> None:

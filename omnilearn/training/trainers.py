@@ -77,7 +77,6 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 		use setup() instead
 		"""
 		self._model.prepare(device=device)
-		print(self._model)
 		self._optimizer.setup(self._model)
 		self._optimizer.prepare(device=device)
 		for e in self._env.values():
@@ -95,12 +94,15 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 		system.mechanize() # sync for gears and spaces
 		mech = system.mechanics()
 		self.prepare(device=device)
+		for e in self._events.values():
+			e.setup(self, src, device=device)
+		print(self._my_config.root)
+		print(src)
+		print(self._model)
 		return system
 
 
 	def _setup_fit(self, src: AbstractDataset, *, device: str = None, **settings: Any) -> AbstractPlanner:
-		for e in self._events.values():
-			e.setup(self, src, device=device)
 		return self._planner.setup(src, **settings)
 
 

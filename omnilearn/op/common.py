@@ -32,6 +32,9 @@ class Mechanism(Configurable, Prepared, _Mechanism, AbstractMachine):
 		super().__init__(*content, internal=internal, external=external,
 				   insulated=insulated, exclusive=exclusive, **kwargs)
 
+	def checkpoint(self, path = None):
+		pass
+
 	def settings(self):
 		return {'content': [g.settings() for g in self.vendors()],
 		  'internal': self._internal_map, 'external': self._external_map,

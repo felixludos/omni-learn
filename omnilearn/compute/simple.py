@@ -9,9 +9,13 @@ class Linear(Model, nn.Linear):
 		self.in_features = in_features
 		self.out_features = out_features
 
-	def _prepare(self, *, device = None):
-		din = self.input_space.size
-		dout = self.output_space.size
+	def _prepare(self, *, device = None,
+			  input_space: Optional[spaces.AbstractSpace] = None,
+			  output_space: Optional[spaces.AbstractSpace] = None):
+		input_space = input_space or self.input_space
+		output_space = output_space or self.output_space
+		din = input_space.size
+		dout = output_space.size
 		if (dout, din) != self.weight.shape:
 			if self.in_features is not None and self.in_features != din:
 				print(f'WARNING: in_features was set to {self.in_features}, but preparing input size {din}')
