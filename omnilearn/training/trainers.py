@@ -40,6 +40,12 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 	def environment(self) -> Dict[str, Any]:
 		'''prepare the dataset for training'''
 		return self._env.copy()
+	
+	def train(self):
+		self._model.train()
+
+	def eval(self):
+		self._model.eval()
 
 
 	@property
@@ -89,7 +95,7 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 		self._dataset = src
 		if device is None:
 			device = self._device
-		src = src.load(device=device)
+		src = src.prepare(device=device)
 		system = self._System(src, *self.gadgetry())
 		system.mechanize() # sync for gears and spaces
 		mech = system.mechanics()
@@ -173,6 +179,8 @@ class CheckpointableTrainer(TrainerBase):
 
 	def checkpoint(self, path: Path) -> None:
 		path.mkdir()
+
+		path.joinpath('config.yaml').write_text(str(self._my_config.root))
 
 		self.model.checkpoint(path / 'model')
 		self.optimizer.checkpoint(path / 'optimizer')

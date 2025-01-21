@@ -2,7 +2,7 @@ from .imports import *
 from .common import Machine, Event
 
 from ..training import CheckpointableTrainer, Pbar_Reporter, Checkpointer as _Checkpointer, DefaultPlanner
-from ..training import WandB_Monitor as _WandB_Monitor
+from ..training import WandB_Monitor as _WandB_Monitor, EvaluatorBase as _EvaluatorBase
 
 
 
@@ -12,8 +12,8 @@ class Planner(Machine, DefaultPlanner):
 
 
 class WandB_Monitor(Event, _WandB_Monitor):
-	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = None, wand_dir: Path = None, max_imgs: int = 12, **kwargs):
-		super().__init__(freqs=freqs, project_name=project_name, use_wandb=use_wandb, max_imgs=max_imgs, wand_dir=wand_dir, **kwargs)
+	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = None, wandb_dir: Path = None, max_imgs: int = 12, **kwargs):
+		super().__init__(freqs=freqs, project_name=project_name, use_wandb=use_wandb, max_imgs=max_imgs, wandb_dir=wandb_dir, **kwargs)
 
 
 
@@ -50,4 +50,7 @@ class Trainer(Configurable, CheckpointableTrainer):
 			self._planner.budget(**budget)
 
 
+class Evaluator(Configurable, _EvaluatorBase):
+	def __init__(self, metrics: Iterable[str] = None, *, freq: int = None, eval_reporter = None, skip_0 = True, eval_src = None, show_pbar: bool = True, single_batch: bool = True, batch_size: int = None, eval_batch_size: int = None, prefix: str = 'val', **kwargs):
+		super().__init__(metrics=metrics, freq=freq, eval_reporter=eval_reporter, skip_0=skip_0, eval_src=eval_src, show_pbar=show_pbar, single_batch=single_batch, batch_size=batch_size, eval_batch_size=eval_batch_size, prefix=prefix, **kwargs)
 

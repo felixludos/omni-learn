@@ -4,7 +4,7 @@ from ..abstract import (AbstractTrainer, AbstractReporter, AbstractPlanner, Abst
 						AbstractEvaluatableDataset)
 
 from ..machines import Event
-from ..util import fixed_width_format_value, fixed_width_format_positive, DynamicMeter, IntervalMeter
+from ..util import fixed_width_format_value, fixed_width_format_positive, DynamicMeter, IntervalMeter, Meter
 
 
 
@@ -43,7 +43,7 @@ class Checkpointer(Event):
 
 
 	def step(self, batch: AbstractBatch) -> None:
-		if self._freq is not None and batch['num_iterations'] % self._freq == 0 and (not self._skip_0 or batch['num_iterations'] > 0):
+		if self._freq and batch['num_iterations'] % self._freq == 0 and (not self._skip_0 or batch['num_iterations'] > 0):
 			path = self.checkpoint_subject(f'ckpt_{str(batch["num_iterations"]).zfill(6)}')
 			print(f' checkpointed to {path}')
 
@@ -207,12 +207,11 @@ class WandB_Monitor(Event):
 	def step(self, batch: AbstractBatch) -> None:
 		out = super().step(batch)
 		if self._use_wandb:
-			itr = batch['num_iterations']
+			itr = batch['num_iterations'] + 1
 			content = {key: self._format_content(key, batch[key]) for key, freq in self._freqs.items()
 					   if freq and itr > 0 and itr % freq == 0 and batch.gives(key)}
 			if len(content):
-				import wandb
-				wandb.log(content, step=itr)
+				self.report_metrics(content, itr)
 		return out
 	
 	def _format_content(self, key, raw):
@@ -224,12 +223,12 @@ class WandB_Monitor(Event):
 			return wandb.Image(self._to_pil(grid))
 		return raw
 
-
-	def report_validation(self, metrics: Dict[str, float], iteration: int) -> None:
-		if self._use_wandb:
+	def report_metrics(self, metrics: Dict[str, Any], iteration: int, *, key_fmt='train/{key}') -> None:
+		if self._use_wandb and len(metrics):
 			import wandb
-			wandb.log({f'val_{key}': val for key, val in metrics.items()}, step=iteration)
-
+			wandb.log({key if key_fmt is None else key_fmt.format(key=key): val 
+			  			for key, val in metrics.items()}, step=iteration)
+	
 
 	def end(self, last_batch: AbstractBatch = None) -> None:
 		out = super().end(last_batch)
@@ -241,63 +240,98 @@ class WandB_Monitor(Event):
 
 
 class EvaluatorBase(Event):
-	def __init__(self, metrics: Iterable[str] = None, *, freq: int = None, skip_0: bool = True, eval_src: AbstractDataset = None, show_pbar: bool = True, batch_size: int = None, eval_batch_size: int = None, prefix: str = 'val', **kwargs):
+	def __init__(self, metrics: Iterable[str] = None, *, freq: int = None, eval_reporter = None, skip_0: bool = True, eval_src: AbstractDataset = None, show_pbar: bool = True, single_batch: bool = True, batch_size: int = None, eval_batch_size: int = None, prefix: str = 'val', **kwargs):
 		if metrics is None:
 			metrics = []
 		super().__init__(**kwargs)
 		self._freq = freq
+		self._single_batch = single_batch
 		self._skip_0 = skip_0
+		if isinstance(metrics, dict):
+			metrics = [key for key, val in metrics.items() if val]
 		self._metrics = list(metrics) # TODO: make sure to gauge transform these
 		self._batch_size = batch_size
 		self._eval_batch_size = eval_batch_size
 		self._prefix = prefix
 		self._eval_src = eval_src
+		self._trainer = None
 		self._gadgtry = None
-		self._reporter = None
+		self._reporter = eval_reporter
 		self._show_pbar = show_pbar
 
 
 	def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
-		self._reporter = trainer.reporter
+		if self._reporter is None:
+			self._reporter = trainer.reporter
 		self._gadgtry = tuple(trainer.gadgetry())
+		self._trainer = trainer
 		if self._eval_src is None:
 			assert isinstance(src, AbstractEvaluatableDataset), f'{src} must be an instance of AbstractEvaluatableDataset'
 			self._eval_src = src.as_eval()
+		self._eval_src.prepare(device=device)
 		return super().setup(trainer, src, device=device)
 
 	
 	def step(self, batch: AbstractBatch) -> None:
-		if self._freq is not None and batch['num_iterations'] % self._freq == 0 and (not self._skip_0 or batch['num_iterations'] > 0):
-			metrics = self.run()
-			if self._reporter is not None:
-				self._reporter.report_validation(metrics, batch['num_iterations'])
+		itr = batch['num_iterations'] + 1
+		if self._freq and itr % self._freq == 0 and (not self._skip_0 or itr > 0):
+			metrics = self.run(self._single_batch)
+			if self._reporter is not None and metrics:
+				self._report_metrics(metrics, itr, key_fmt=f'{self._prefix}/{{key}}')
 
 
 	def end(self, last_batch: AbstractBatch = None) -> None:
-		out = self.run() if last_batch is not None else None
+		out = self.run(False) if last_batch is not None else None
 		self._eval_src = None
 		self._gadgtry = None
-		if self._reporter is not None:
-			self._reporter.report_validation(out, last_batch['num_iterations'])
+		if self._reporter is not None and out:
+			self._report_metrics(out, last_batch['num_iterations'] + 1, key_fmt=f'final/{{key}}')
+		if out:
+			nums = {key: (val.avg, val.std, val.max, val.min, val.count) for key, val in out.items() if isinstance(val, self._Meter)}
+			missing = set(out) - set(nums)
+			if missing:
+				print(f'Keys not included here: {missing}')
+			print(tabulate([(key, *nums[key]) for key in sorted(nums)], headers=['key', 'avg', 'std', 'max', 'min', 'count']))
 		self._reporter = None
 		return out
+	
+	def _report_metrics(self, metrics, iteration, key_fmt='val/{key}'):
+		if metrics:
+			reportable = {key: score.avg if isinstance(score, self._Meter) else score for key, score in metrics.items()}
+			if len(reportable):
+				self._reporter.report_metrics(reportable, iteration, key_fmt=key_fmt)
+		return metrics
 
 
-	_Meter = DynamicMeter
-	def run(self) -> Dict[str, float]:
+	_Meter = Meter
+	def run(self, single_batch: bool = True, **kwargs) -> Dict[str, float]:
 		if len(self._metrics) == 0 or self._eval_src is None:
 			return
-		metrics = {key: self._Meter() for key in self._metrics if not key.startswith(f'{self._prefix}_')}
+		self._trainer.eval()
+		metrics = {key: self._Meter() for key in self._metrics}
 		with torch.no_grad():
-			for batch in self._eval_src.iterate(self._batch_size, *self._gadgtry, show_pbar=self._show_pbar):
+			for batch in self._eval_src.iterate(self._batch_size, *self._gadgtry, show_pbar=self._show_pbar and not single_batch, shuffle=single_batch, **kwargs):
 				self._run_step(metrics, batch)
-		return {key: score.avg for key, score in metrics.items()}
+				if single_batch:
+					break
+		self._trainer.train()
+		return metrics
 	
+	def _as_number(self, val: Any) -> float:
+		if isinstance(val, torch.Tensor) and val.numel() == 1:
+			return val.item()
+		if isinstance(val, np.ndarray) and val.size == 1:
+			return val.item()
+		return val
 
 	def _run_step(self, metrics, batch):
 		for key in self._metrics:
-			metrics[key].mete(batch[key], n=batch.size)
-
-
+			if isinstance(metrics[key], self._Meter) and batch.gives(key):
+				val = self._as_number(batch[key])
+				if isinstance(val, (int, float)):
+					metrics[key].mete(val, n=batch.size)
+				else:
+					metrics[key] = val
+		return metrics
 
 

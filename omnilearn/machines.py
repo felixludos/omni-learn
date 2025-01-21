@@ -37,7 +37,7 @@ class Machine(Prepared, Structured, AbstractMachine):
 			assert path is not None, f'must provide path or data (not both)'
 			if not path.exists() and path.suffix == '': path = path.with_suffix('.pt')
 			assert path.exists(), f'checkpoint file does not exist: {path}'
-			data = torch.load(path)
+			data = torch.load(path, map_location='cpu')
 		else:
 			assert path is None, f'must provide path or data (not both)'
 		self._load_checkpoint_data(data, unsafe=unsafe)
