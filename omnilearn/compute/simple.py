@@ -91,6 +91,10 @@ def get_nonlinearity(ident, dim=1, inplace=True, **kwargs):
 		return nn.ELU(inplace=inplace, **kwargs)
 	elif ident == 'selu':
 		return nn.SELU(inplace=inplace, **kwargs)
+	elif ident == 'gelu':
+		return nn.GELU()
+	elif ident == 'silu':
+		return nn.SiLU()
 
 	elif ident == 'mish':
 		return Mish()
@@ -101,3 +105,17 @@ def get_nonlinearity(ident, dim=1, inplace=True, **kwargs):
 		assert False, f'Unknown nonlinearity: {ident}'
 
 
+def get_normalization_layer(ident, width: int, dim=1, **kwargs):
+	if ident is None:
+		return None
+	if not isinstance(ident, str):
+		return ident
+
+	if ident == 'bn':
+		return nn.BatchNorm1d(width) if dim == 1 else nn.BatchNorm2d(width)
+	elif ident == 'ln':
+		return nn.LayerNorm(width, **kwargs)
+	elif ident == 'in':
+		return nn.InstanceNorm1d(width) if dim == 1 else nn.InstanceNorm2d(width)
+	# elif ident == 'gn':
+	# 	return nn.GroupNorm(1, width)

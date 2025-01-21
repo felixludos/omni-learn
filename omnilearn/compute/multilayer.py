@@ -5,13 +5,15 @@ from ..util import human_size
 from .math import parameter_count
 
 from .models import Model
-from .simple import get_nonlinearity
+from .simple import get_nonlinearity, get_normalization_layer
 
 
 
 class MLP(Model, nn.Sequential):
 	def __init__(self, hidden: Optional[Iterable[int]] = None, *,
 				 nonlin: str = 'elu', output_nonlin: Optional[str] = None,
+				 norm: Optional[str] = None, dropout: Optional[float] = None,
+				 output_norm: Optional[str] = None, output_dropout: Optional[float] = None,
 				 input_dim: Optional[int] = None, output_dim: Optional[int] = None,
 				 **kwargs):
 		super().__init__(**kwargs)
@@ -20,6 +22,10 @@ class MLP(Model, nn.Sequential):
 		self._output_dim = output_dim
 		self._nonlin = nonlin
 		self._output_nonlin = output_nonlin
+		self._norm = norm
+		self._dropout = dropout
+		self._output_norm = output_norm
+		self._output_dropout = output_dropout
 
 	@space('input')
 	def input_space(self) -> spaces.Vector:
@@ -48,7 +54,9 @@ class MLP(Model, nn.Sequential):
 	@staticmethod
 	def _build(din: Union[int, spaces.AbstractSpace], dout: Union[int, spaces.AbstractSpace],
 			   hidden: Optional[Iterable[int]] = None, initializer=None,
-			   nonlin: str = 'elu', output_nonlin: Optional[str] = None):
+			   nonlin: str = 'elu', output_nonlin: Optional[str] = None,
+			   norm: Optional[str] = None, dropout: Optional[float] = None,
+			   output_norm: Optional[str] = None, output_dropout: Optional[float] = None):
 		if isinstance(din, spaces.AbstractSpace):
 			din = din.size
 		if isinstance(dout, spaces.AbstractSpace):
@@ -57,17 +65,23 @@ class MLP(Model, nn.Sequential):
 			hidden = []
 
 		nonlins = [nonlin] * len(hidden) + [output_nonlin]
+		norms = [norm] * len(hidden) + [output_norm]
+		dropouts = [dropout] * len(hidden) + [output_dropout]
 		hidden = din, *hidden, dout
 
 		layers = []
 
-		for in_dim, out_dim, nonlin in zip(hidden, hidden[1:], nonlins):
+		for in_dim, out_dim, nonlin, norm, dropout in zip(hidden, hidden[1:], nonlins, norms, dropouts):
 			layer = nn.Linear(in_dim, out_dim)
 			if initializer is not None:
 				layer = initializer(layer, nonlin)
 			layers.append(layer)
+			if norm is not None:
+				layers.append(get_normalization_layer(norm, out_dim))
 			if nonlin is not None:
 				layers.append(get_nonlinearity(nonlin))
+			if dropout is not None:
+				layers.append(nn.Dropout(dropout))
 
 		return layers
 
@@ -77,7 +91,9 @@ class MLP(Model, nn.Sequential):
 		input_space = input_space or self.input_space
 		output_space = output_space or self.output_space
 		layers = self._build(input_space, output_space, hidden=self._hidden,
-							 nonlin=self._nonlin, output_nonlin=self._output_nonlin)
+							 nonlin=self._nonlin, output_nonlin=self._output_nonlin,
+							 norm=self._norm, dropout=self._dropout,
+							 output_norm=self._output_norm, output_dropout=self._output_dropout)
 		for i, layer in enumerate(layers):
 			self.add_module(f'{i}', layer)
 
