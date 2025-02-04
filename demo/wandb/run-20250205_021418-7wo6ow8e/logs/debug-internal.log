@@ -1,0 +1,11 @@
+{"time":"2025-02-05T02:14:18.2482092+09:00","level":"INFO","msg":"using version","core version":"0.18.5"}
+{"time":"2025-02-05T02:14:18.2482092+09:00","level":"INFO","msg":"created symlink","path":"C:\\Users\\anwan\\OneDrive\\Khan\\research\\foundation\\demo\\wandb\\run-20250205_021418-7wo6ow8e\\logs\\debug-core.log"}
+{"time":"2025-02-05T02:14:18.8579213+09:00","level":"INFO","msg":"created new stream","id":"7wo6ow8e"}
+{"time":"2025-02-05T02:14:18.858578+09:00","level":"INFO","msg":"stream: started","id":"7wo6ow8e"}
+{"time":"2025-02-05T02:14:18.8610767+09:00","level":"INFO","msg":"sender: started","stream_id":"7wo6ow8e"}
+{"time":"2025-02-05T02:14:18.8605888+09:00","level":"INFO","msg":"handler: started","stream_id":{"value":"7wo6ow8e"}}
+{"time":"2025-02-05T02:14:18.8605888+09:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"7wo6ow8e"}}
+{"time":"2025-02-05T02:14:18.8933689+09:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": dial tcp: lookup api.wandb.ai: no such host"}
+{"time":"2025-02-05T02:14:21.1627279+09:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": dial tcp: lookup api.wandb.ai: no such host"}
+{"time":"2025-02-05T02:14:26.1091634+09:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": dial tcp: lookup api.wandb.ai: no such host"}
+{"time":"2025-02-05T02:14:31.5177087+09:00","level":"INFO","msg":"stream: closing","id":"7wo6ow8e"}

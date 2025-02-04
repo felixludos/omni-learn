@@ -99,7 +99,7 @@ class ImageClassification(Machine):
 
     @space('prediction')
     def prediction_space(self, label: spaces.Categorical) -> spaces.Logits:
-        return spaces.Logits(label.classes)
+        return spaces.Logits(label.n)
 
 
     label_space = space('label')

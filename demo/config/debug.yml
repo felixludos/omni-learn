@@ -9,4 +9,6 @@ _base: [demo]
 
 #budget: 5
 
+use-wandb: no
+
 hidden: [2]

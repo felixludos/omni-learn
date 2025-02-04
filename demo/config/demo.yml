@@ -2,7 +2,7 @@
 
 batch-size: 128
 
-budget: 5000
+budget: 10
 
 dataset._type: mnist
 
@@ -28,8 +28,8 @@ log.accuracy: yes
 events.monitor:
   _type: wandb
   freqs:
-    loss: 10
-    accuracy: 10
+    loss: 5
+    accuracy: 5
 
 project-name: demo-{dataset.name}
 
