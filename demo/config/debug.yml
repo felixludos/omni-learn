@@ -5,10 +5,27 @@ _base: [demo]
 
 # unit: i
 
-#record-step: yes
+# record-step: yes
 
 #budget: 5
 
 use-wandb: no
 
-hidden: [2]
+# hidden: [2]
+budget: 1000
+
+# env.meaner:
+#   _type: meaner
+
+dataset._type: bernies
+
+log.val_accuracy: yes
+
+events.evaluator:
+  _type: evaluator
+  metrics:
+    accuracy: 10
+
+# model:
+#   app:
+#     input: selection
