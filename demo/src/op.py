@@ -152,3 +152,6 @@ def train_mnist(cfg: fig.Configuration):
 
 
 
+
+
+

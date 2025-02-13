@@ -259,6 +259,17 @@ class EvaluatorBase(Event):
 		self._reporter = eval_reporter
 		self._show_pbar = show_pbar
 
+	def gizmos(self):
+		yield from (f'{self._prefix}_{key}' for key in self._metrics)
+		yield from super().gizmos()
+
+	def grab_from(self, ctx, gizmo):
+		if gizmo.startswith(f'{self._prefix}_'):
+			key = gizmo[len(f'{self._prefix}_'):]
+			metrics = self.run(True, metrics=[key])
+			return metrics[key].avg
+		return super().grab_from(ctx, gizmo)
+
 
 	def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
 		if self._reporter is None:
@@ -266,7 +277,7 @@ class EvaluatorBase(Event):
 		self._gadgtry = tuple(trainer.gadgetry())
 		self._trainer = trainer
 		if self._eval_src is None:
-			assert isinstance(src, AbstractEvaluatableDataset), f'{src} must be an instance of AbstractEvaluatableDataset'
+			# assert isinstance(src, AbstractEvaluatableDataset), f'{src} must be an instance of AbstractEvaluatableDataset'
 			self._eval_src = src.as_eval()
 		self._eval_src.prepare(device=device)
 		return super().setup(trainer, src, device=device)
@@ -304,11 +315,13 @@ class EvaluatorBase(Event):
 
 
 	_Meter = Meter
-	def run(self, single_batch: bool = True, **kwargs) -> Dict[str, float]:
-		if len(self._metrics) == 0 or self._eval_src is None:
+	def run(self, single_batch: bool = True, metrics: Iterable[str] = None, **kwargs) -> Dict[str, float]:
+		if metrics is None:
+			metrics = self._metrics
+		if len(metrics) == 0 or self._eval_src is None:
 			return
 		self._trainer.eval()
-		metrics = {key: self._Meter() for key in self._metrics}
+		metrics = {key: self._Meter() for key in metrics}
 		with torch.no_grad():
 			for batch in self._eval_src.iterate(self._batch_size, *self._gadgtry, show_pbar=self._show_pbar and not single_batch, shuffle=single_batch, **kwargs):
 				self._run_step(metrics, batch)

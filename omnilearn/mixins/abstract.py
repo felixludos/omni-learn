@@ -12,6 +12,12 @@ class AbstractPrepared:
 
 
 
+class AbstractStaged:
+	def stage(self, stage: dict[str, Any]):
+		raise NotImplementedError
+
+
+
 class AbstractCheckpointable:
 	def checkpoint(self, path: Path = None):
 		raise NotImplementedError

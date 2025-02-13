@@ -1,5 +1,5 @@
 from .imports import *
-from .abstract import AbstractPrepared
+from .abstract import AbstractPrepared, AbstractStaged
 
 
 
@@ -18,6 +18,10 @@ class Prepared(AbstractPrepared):
 		pass
 
 
+
+class Staged(AbstractStaged):
+	def stage(self, stage: dict[str, Any]):
+		raise NotImplementedError
 
 
 
