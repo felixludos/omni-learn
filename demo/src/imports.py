@@ -13,7 +13,7 @@ from tqdm import tqdm
 # from omniply import Scope, Selection
 from omniply import AbstractGadget
 # from omniply.apps.gaps import tool, ToolKit, Context#, Scope, Selection
-from omniply.apps.training import Dataset as DatabaseBase, Batch, DynamicTrainerBase
+from omniply.apps.training import Dataset as DatabaseBase, Batch
 from omnilearn import *
 
 import numpy as np

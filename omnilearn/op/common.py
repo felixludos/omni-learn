@@ -18,6 +18,7 @@ class Machine(Configurable, _Machine):
 		return out
 
 
+
 class Event(Machine, _Event):
 	pass
 

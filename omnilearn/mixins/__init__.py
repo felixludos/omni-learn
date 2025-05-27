@@ -1,2 +1,2 @@
-from .abstract import AbstractNamed, AbstractPrepared, AbstractCheckpointable, AbstractSettings
+from .abstract import AbstractNamed, AbstractCheckpointable, AbstractSettings
 from .simple import Prepared

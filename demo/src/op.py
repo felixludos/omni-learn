@@ -141,6 +141,29 @@ def train_mnist(cfg: fig.Configuration):
     cfg.push('reporter._type', 'reporter', overwrite=False, silent=True)
     trainer: Trainer = cfg.pull('trainer')
 
+    self = trainer
+
+    reporter = self.reporter
+
+    system = self.prepare(src)
+
+    plan = self.plan(system)
+    reporter.begin(self, plan)
+
+    batch_cls = self._Batch or getattr(src, '_Batch', None) or Batch
+    for info in plan.generate(batch_size):
+        batch = batch_cls(info, plan=plan)
+        if system is not None:
+            batch.include(system)
+
+        terminate = self.learn(batch)
+        if terminate: break
+
+    reporter.end(batch)
+
+
+
+
     if record_step:
         for batch in trainer.fit_loop(dataset): break
         print()

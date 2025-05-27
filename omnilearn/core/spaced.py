@@ -6,7 +6,7 @@ from ..spaces.abstract import AbstractSpace
 from omniply.apps.gaps import StaticGearCraft
 from omniply.core.gadgets import SingleGadgetBase
 from omniply.core.tools import AbstractCrafty, CraftBase, ToolCraftBase, ToolDecoratorBase
-from omniply.gears.gears import GearCraftBase, GearSkillBase
+from omniply.gears.gears import GearCraftBase, GearSkill
 
 
 
@@ -49,7 +49,7 @@ class SpaceCraft(GearCraftBase):
 		self._parse = parse
 
 
-	def as_skill(self, owner: AbstractCrafty, *, parse: bool = None, **kwargs) -> GearSkillBase:
+	def as_skill(self, owner: AbstractCrafty, *, parse: bool = None, **kwargs) -> GearSkill:
 		if parse is None:
 			parse = self._parse
 		return super().as_skill(owner, parse=parse, **kwargs)

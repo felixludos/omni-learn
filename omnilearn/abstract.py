@@ -2,39 +2,85 @@ from .imports import *
 from .mixins import *
 from .spaces import AbstractSpace
 
-from omniply.apps.training.abstract import AbstractDataset as AbstractDatasetBase, AbstractPlanner as AbstractPlannerBase, AbstractBatch, AbstractTrainer as AbstractTrainerBase
 
 
-
-class AbstractPlanner(AbstractPlannerBase):
-	def budget(self, **settings):
+class AbstractSource(AbstractNamed, AbstractSized):
+	def iterate(self, batch_size: int, **kwargs) -> Iterator['AbstractBatch']:
 		raise NotImplementedError
 
 
-	def expected_samples(self, step_size: int) -> Optional[int]:
+	def batch(self, batch_size: int, **kwargs) -> 'AbstractBatch':
 		raise NotImplementedError
 
 
-
-class AbstractMachine(AbstractPrepared, AbstractCheckpointable, AbstractSettings, AbstractGadget):
-	def prepare(self, *, device: str = None) -> Self:
+	def actualize(self, info: Dict[str, Any], planner: 'AbstractPlanner' = None) -> 'AbstractBatch':
 		raise NotImplementedError
 
 
 
-class AbstractDataset(AbstractNamed, AbstractDatasetBase, AbstractMachine):
-	def load(self, *, device: Optional[str] = None) -> Self:
+class AbstractSystem(AbstractPlanning, AbstractSource):
+	@property
+	def source(self) -> AbstractSource:
 		raise NotImplementedError
 
 
-	def suggest_batch_size(self) -> int:
+
+class AbstractPlanner(AbstractPlanning, AbstractSource):
+	def draw(self, size: int) -> Dict[str, Any]:
+		'''create the info for a new batch'''
+		raise NotImplementedError
+
+
+	def generate(self, step_size: int) -> Iterator[Dict[str, Any]]:
+		'''generate batch infos with given step size'''
+		raise NotImplementedError
+
+
+
+class AbstractMachine(AbstractCheckpointable, AbstractSettings, AbstractStaged, AbstractGadget):
+	pass
+
+
+
+class AbstractEvent(AbstractMachine):
+	def prepare(self):
+		pass
+
+
+	def step(self, batch: 'AbstractBatch') -> None:
+		pass
+
+
+	def end(self, last_batch: Optional['AbstractBatch'] = None) -> None:
 		pass
 
 
 
-class AbstractEvaluatableDataset(AbstractDataset):
-	def as_eval(self) -> AbstractDataset:
+class AbstractDataset(AbstractSource, AbstractMachine):
+	@property
+	def suggested_batch_size(self) -> int:
 		raise NotImplementedError
+
+
+
+class AbstractBatch(AbstractDataset, AbstractIndustry, AbstractGame):
+	def new(self, size: int = None) -> 'AbstractBatch':
+		raise NotImplementedError
+
+
+	@property
+	def plan(self) -> Optional[AbstractPlanner]:
+		raise NotImplementedError
+
+
+
+class AbstractEngine(AbstractSettings, AbstractIndustry):
+	def loop(self) -> Iterator[AbstractGame]:
+		raise NotImplementedError
+
+
+	def run(self) -> JSONABLE:
+		for _ in self.loop(): pass
 
 
 
@@ -43,11 +89,7 @@ class AbstractModel(AbstractNamed, AbstractMachine):
 
 
 
-class AbstractOptimizer(AbstractNamed, AbstractMachine):
-	def setup(self, model: AbstractModel) -> Self:
-		raise NotImplementedError
-
-
+class AbstractOptimizer(AbstractNamed, AbstractEvent):
 	def step(self, batch: AbstractBatch) -> None:
 		raise NotImplementedError
 
@@ -65,19 +107,9 @@ class AbstractOptimizer(AbstractNamed, AbstractMachine):
 
 
 
-class AbstractTrainer(AbstractNamed, AbstractTrainerBase):
-	@property
-	def settings(self) -> Dict[str, Any]:
-		raise NotImplementedError
-
-
+class AbstractTrainer(AbstractNamed, AbstractEngine):
 	@property
 	def model(self) -> AbstractModel:
-		raise NotImplementedError
-
-
-	@property
-	def optimizer(self) -> AbstractOptimizer:
 		raise NotImplementedError
 
 
@@ -87,34 +119,19 @@ class AbstractTrainer(AbstractNamed, AbstractTrainerBase):
 
 
 
-class AbstractReporter(AbstractGadget):
-	def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
-		return self
-
-
-	def step(self, batch: AbstractBatch) -> None:
-		raise NotImplementedError
-
-
-	def end(self, last_batch: AbstractBatch = None) -> None:
-		raise NotImplementedError
-
-
-	def checkpointed(self, path: str) -> None:
-		raise NotImplementedError
-
-
-
-class AbstractEvent(AbstractMachine):
-	def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
-		raise NotImplementedError
-
-
-	def step(self, batch: AbstractBatch) -> None:
-		raise NotImplementedError
-
-
-	def end(self, last_batch: AbstractBatch = None) -> None:
-		raise NotImplementedError
-
+# class AbstractReporter(AbstractGadget):
+# 	def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
+# 		return self
+#
+#
+# 	def step(self, batch: AbstractBatch) -> None:
+# 		raise NotImplementedError
+#
+#
+# 	def end(self, last_batch: AbstractBatch = None) -> None:
+# 		raise NotImplementedError
+#
+#
+# 	def checkpointed(self, path: str) -> None:
+# 		raise NotImplementedError
 

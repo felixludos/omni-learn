@@ -6,7 +6,9 @@ import sys, os, shutil
 from datetime import datetime
 
 from omnibelt import unspecified_argument, pformat, where_am_i
+from omnibelt.staging import AbstractStaged, AbstractSetup, AbstractScape, AutoStaged
 from omniply import AbstractGadget, AbstractGaggle, AbstractGame
+from omniply.gears import AbstractMechanics
 # from omniply import Scope, Selection#, ToolKit, Context, tool
 # from omniply.apps.gaps import ToolKit, Context, tool
 

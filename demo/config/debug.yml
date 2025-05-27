@@ -12,17 +12,18 @@ _base: [demo]
 use-wandb: no
 
 # hidden: [2]
-budget: 1000
+budget: 10
 
 # env.meaner:
 #   _type: meaner
 
 dataset._type: bernies
 
-log.val_accuracy: yes
+#log.val_accuracy: yes
 
 events.evaluator:
   _type: evaluator
+  eval_reporter: null
   metrics:
     accuracy: 10
 

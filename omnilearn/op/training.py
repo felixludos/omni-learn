@@ -40,14 +40,12 @@ class Trainer(Configurable, CheckpointableTrainer):
 	_Reporter = Reporter
 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, reporter: AbstractEvent = None,
 				 env: Dict[str, AbstractMachine] = None, events: Dict[str, AbstractEvent] = None,
-				 planner: AbstractPlanner = None, budget: Union[int, Dict[str, int]] = None, batch_size: int = None,
-				 device: str = None, **kwargs):
+				 budget: Union[int, Dict[str, int]] = None, batch_size: int = None, **kwargs):
 		if isinstance(budget, int):
 			budget = {'max_iterations': budget}
-		super().__init__(model=model, optimizer=optimizer, reporter=reporter, planner=planner, env=env, events=events,
-						 batch_size=batch_size, device=device, **kwargs)
-		if budget is not None:
-			self._planner.budget(**budget)
+		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, events=events,
+						 batch_size=batch_size, **kwargs)
+		self._budget = budget
 
 
 class Evaluator(Configurable, _EvaluatorBase):

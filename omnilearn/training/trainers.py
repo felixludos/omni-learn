@@ -1,57 +1,52 @@
 from .imports import *
 from ..core import Batch, ToolKit, Structured
 from ..abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractEvent, AbstractPlanner, AbstractReporter
-from omniply.apps.training import DynamicTrainerBase as _DynamicTrainerBase
-from ..mixins import Prepared
+from omniply.apps.training import TrainerBase as _TrainerBase
+# from ..mixins import Prepared
 from .events import ReporterBase
 
 
 
-class TrainerBase(Prepared, _DynamicTrainerBase):
+class TrainerBase(AutoStaged, _TrainerBase):
 	_Reporter = ReporterBase
-	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, 
-			  reporter: AbstractEvent = None, env: Dict[str, AbstractMachine] = None, 
-			  events: Dict[str, AbstractEvent] = None,
-			  device: str = None, **kwargs):
-		if reporter is None:
-			reporter = self._Reporter()
-		if env is None:
-			env = {}
-		if events is None:
-			events = {}
+	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer = None, *, reporter: AbstractEvent = None,
+				 env: Dict[str, AbstractMachine] = None, events: Dict[str, AbstractEvent] = None, **kwargs):
+		if reporter is None: reporter = self._Reporter()
+		if env is None: env = {}
+		if events is None: events = {}
 		super().__init__(**kwargs)
+		self._name = None
 		self._model = model
-		self._dataset = None
 		self._optimizer = optimizer
 		self._reporter = reporter
-		self._device = device
 		self._env = env
 		env.update(events)
 		self._events = events
-		self.extend(env.values())
 
 
 	@property
 	def name(self) -> str:
-		src = 'unknown' if self._dataset is None else self._dataset.name
-		return f'{self._model.name}_{src}'
+		if self._name is None:
+			raise ValueError('name not set, prepare(src) must be called to create a name')
+		return self._name
 
 
-	def environment(self) -> Dict[str, Any]:
-		'''prepare the dataset for training'''
-		return self._env.copy()
-	
 	def train(self):
 		self._model.train()
 
 	def eval(self):
 		self._model.eval()
 
+	def to(self, device: str = None):
+		raise NotImplementedError
+
 
 	@property
 	def settings(self) -> Dict[str, Any]:
-		assert 'model' not in self._env and 'optimizer' not in self._env, f'env cannot contain "model" or "optimizer": {self._env}'
-		return {'model': self._model.settings(), 'optimizer': self._optimizer.settings(), 
+		assert 'model' not in self._env and 'optimizer' not in self._env, \
+			f'env cannot contain "model" or "optimizer": {self._env}'
+		return {'model': self._model.settings(),
+				'optimizer': self._optimizer.settings(),
 		  **{k: v.settings() for k, v in self._env.items()}}
 
 
@@ -73,8 +68,70 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 	def gadgetry(self) -> Iterator[AbstractGadget]:
 		yield self._model
 		yield self._optimizer
-		yield from super().gadgetry()
+		yield self._reporter
+		yield from self._env.values()
 
+
+	_System = System
+	def prepare(self, src: AbstractDataset, *extra: AbstractGadget) -> Structured:
+		# TODO: set name if its not already set
+		system = self._System(src, *extra, env=self.gadgetry())
+		system.stage()
+		return system
+
+
+	def announce(self, src: AbstractDataset): # TODO: should be called from the (first) reporter
+		print(self._my_config.root)
+		print(src)
+		print(self._model)
+		raise NotImplementedError('announce events/env components')
+
+
+	def batch(self, system: Structured, *, plan: AbstractPlanner = None):
+		if plan is None:
+			plan = self.plan(system)
+		return next(plan.generate_batch(system))
+
+	def loop(self, system: Structured):
+		plan = self.plan(system)
+		batch_cls = self._Batch or getattr(self._dataset, '_Batch', None) or Batch
+		for info in planner.generate(batch_size):
+			batch = batch_cls(info, planner=planner)
+			if system is not None:
+				batch.include(system)
+			yield batch
+
+
+	def fit_loop(self, src: AbstractDataset, **settings):
+
+		system = self.prepare(src)
+
+
+
+		for batch in self.loop(system):
+			terminate = self.learn(batch)
+			yield batch
+			if terminate: break
+
+
+
+		pass
+
+
+	def fit(self, src: AbstractDataset, **settings) -> Structured:
+		for _ in self.fit_loop(src): pass
+
+
+	# def _stage(self, scape: AbstractMechanics):
+	# 	super()._stage(scape)
+	# 	self._model.stage(scape)
+	# 	self._optimizer.stage(scape)
+	# 	for key, e in self._env.items():
+	# 		if isinstance(e, AbstractStaged):
+	# 			e.stage(scape)
+	# 	for key, e in self._events.items():
+	# 		if isinstance(e, AbstractStaged):
+	# 			e.stage(scape)
 
 	def _prepare(self, *, device: str = None):
 		"""
@@ -90,7 +147,6 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 		return self
 
 
-	_System = Structured
 	def setup(self, src: AbstractDataset, *, device: str = None):
 		self._dataset = src
 		if device is None:
@@ -102,9 +158,6 @@ class TrainerBase(Prepared, _DynamicTrainerBase):
 		self.prepare(device=device)
 		for e in self._events.values():
 			e.setup(self, src, device=device)
-		print(self._my_config.root)
-		print(src)
-		print(self._model)
 		return system
 
 

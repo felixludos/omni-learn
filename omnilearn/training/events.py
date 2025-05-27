@@ -163,6 +163,10 @@ class Pbar_Reporter(ReporterBase):
 			self._pbar.close()
 
 
+	def report_metrics(self, metrics: Dict[str, Any], iteration: int, *, key_fmt='train/{key}') -> None:
+		pass
+
+
 class WandB_Monitor(Event):
 	def __init__(self, *, freqs: Dict[str, int] = None, project_name: str = None, use_wandb: bool = None, wandb_dir: Union[str, Path] = None, max_imgs: int = 12, details: str = None, **kwargs):
 		super().__init__(**kwargs)
