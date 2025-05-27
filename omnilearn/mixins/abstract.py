@@ -1,6 +1,6 @@
 from .imports import *
 from omnibelt.staging import AbstractStaged
-from omnibelt import JSONABLE
+from omnibelt import JSONDATA
 
 
 
@@ -38,7 +38,7 @@ class AbstractCheckpointable:
 
 
 class AbstractSettings:
-	def settings(self) -> Dict[str, JSONABLE]:
+	def settings(self) -> Dict[str, JSONDATA]:
 		raise NotImplementedError
 
 

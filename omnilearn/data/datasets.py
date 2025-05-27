@@ -2,7 +2,6 @@ from .imports import *
 
 from ..core import Batch
 from ..training import DefaultPlanner
-from ..util import prime_factors, closest_factors
 
 from .abstract import AbstractDataset, AbstractFileDataset
 

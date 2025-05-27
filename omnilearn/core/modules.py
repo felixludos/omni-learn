@@ -1,7 +1,7 @@
 from .imports import *
 from .staging import AutoStaged
 from .containers import Structured
-from ..abstract import AbstractMachine
+from ..abstract import AbstractMachine, AbstractEvent, AbstractTrainer, AbstractDataset, AbstractBatch
 
 
 # class Machine(Prepared, Structured, AbstractMachine):
@@ -90,6 +90,19 @@ class System(Machine, AbstractSystem):
 		for key, e in self._events.items():
 			if isinstance(e, AbstractStaged):
 				e.stage(scape)
+
+
+
+
+class Event(AbstractEvent):
+	def setup(self, trainer: AbstractTrainer, src: AbstractDataset, *, device: Optional[str] = None) -> Self:
+		return self
+
+	def step(self, batch: AbstractBatch) -> None:
+		pass
+
+	def end(self, last_batch: AbstractBatch = None) -> None:
+		pass
 
 
 

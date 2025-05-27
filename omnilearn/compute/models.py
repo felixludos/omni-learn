@@ -1,10 +1,10 @@
 from .imports import *
 from ..abstract import AbstractModel
-from ..machines import Machine
+from ..core import Machine
 
 
 
-class Model(Machine, nn.Module, AbstractModel):
+class Model(Machine, AbstractModel, nn.Module):
 	pass
 
 

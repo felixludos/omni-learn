@@ -1,7 +1,6 @@
 from .imports import *
 from ..core import *
 from .. import spaces
-from ..util import human_size
 from .math import parameter_count
 
 from .models import Model

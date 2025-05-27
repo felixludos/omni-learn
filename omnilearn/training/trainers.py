@@ -1,6 +1,6 @@
 from .imports import *
-from ..core import Batch, ToolKit, Structured
-from ..abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractEvent, AbstractPlanner, AbstractReporter
+from ..core import Batch, ToolKit, Structured, System
+from ..abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractEvent, AbstractPlanner
 from omniply.apps.training import TrainerBase as _TrainerBase
 # from ..mixins import Prepared
 from .events import ReporterBase
@@ -61,7 +61,7 @@ class TrainerBase(AutoStaged, _TrainerBase):
 	
 
 	@property
-	def reporter(self) -> AbstractReporter:
+	def reporter(self):
 		return self._reporter
 
 

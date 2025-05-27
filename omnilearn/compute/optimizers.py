@@ -1,6 +1,5 @@
 from .imports import *
 from ..abstract import AbstractMachine, AbstractOptimizer, AbstractModel, AbstractBatch
-from ..machines import Machine
 from .models import Model
 
 

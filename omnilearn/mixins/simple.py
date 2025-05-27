@@ -1,9 +1,9 @@
 from .imports import *
-from .abstract import AbstractPrepared
+# from .abstract import AbstractPrepared
 
 
 
-class Prepared(AbstractPrepared):
+class Prepared:
 	_is_prepared: bool = False
 
 

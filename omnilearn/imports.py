@@ -7,6 +7,7 @@ from datetime import datetime
 
 from omnibelt import unspecified_argument, pformat, where_am_i
 from omnibelt.staging import AbstractStaged, AbstractSetup, AbstractScape, AutoStaged
+import omnifig as fig
 from omniply import AbstractGadget, AbstractGaggle, AbstractGame
 from omniply.gears import AbstractMechanics
 # from omniply import Scope, Selection#, ToolKit, Context, tool
@@ -27,4 +28,5 @@ from torch import nn
 from torch.nn import functional as F
 from torch import optim as O
 
-
+from omnibelt import JSONDATA
+from omnibelt import fixed_width_format_value, fixed_width_format_positive, human_size

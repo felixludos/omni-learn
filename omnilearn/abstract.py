@@ -63,7 +63,7 @@ class AbstractDataset(AbstractSource, AbstractMachine):
 
 
 
-class AbstractBatch(AbstractDataset, AbstractIndustry, AbstractGame):
+class AbstractBatch(AbstractDataset, AbstractGame): # AbstractIndustry
 	def new(self, size: int = None) -> 'AbstractBatch':
 		raise NotImplementedError
 
@@ -74,12 +74,12 @@ class AbstractBatch(AbstractDataset, AbstractIndustry, AbstractGame):
 
 
 
-class AbstractEngine(AbstractSettings, AbstractIndustry):
+class AbstractEngine(AbstractSettings): # AbstractIndustry
 	def loop(self) -> Iterator[AbstractGame]:
 		raise NotImplementedError
 
 
-	def run(self) -> JSONABLE:
+	def run(self) -> JSONDATA:
 		for _ in self.loop(): pass
 
 

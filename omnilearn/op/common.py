@@ -1,6 +1,5 @@
 from .imports import *
-from ..core import Mechanism as _Mechanism
-from ..machines import Machine as _Machine, Event as _Event
+from ..core import Mechanism as _Mechanism, Machine as _Machine, Event as _Event
 
 
 

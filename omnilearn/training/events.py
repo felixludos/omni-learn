@@ -1,10 +1,8 @@
 from .imports import *
-from ..core import ToolKit
-from ..abstract import (AbstractTrainer, AbstractReporter, AbstractPlanner, AbstractBatch, AbstractDataset,
-						AbstractEvaluatableDataset)
+from ..core import ToolKit, Event
+from ..abstract import (AbstractTrainer, AbstractPlanner, AbstractBatch, AbstractDataset, AbstractEvent)
 
-from ..machines import Event
-from ..util import fixed_width_format_value, fixed_width_format_positive, DynamicMeter, IntervalMeter, Meter
+from ..util import DynamicMeter, IntervalMeter, Meter
 
 
 
@@ -54,7 +52,7 @@ class Checkpointer(Event):
 
 
 
-class ReporterBase(AbstractReporter):
+class ReporterBase(AbstractEvent):
 	def setup(self, trainer, planner, batch_size):
 		return self
 	
