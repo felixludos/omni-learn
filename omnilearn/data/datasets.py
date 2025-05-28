@@ -1,7 +1,7 @@
 from .imports import *
 
 from ..core import Batch
-from ..training import DefaultPlanner
+from .selection import DefaultSelector
 
 from .abstract import AbstractDataset, AbstractFileDataset
 
@@ -9,7 +9,7 @@ from .abstract import AbstractDataset, AbstractFileDataset
 
 class DatasetBase(AbstractDataset):
 	_Batch = Batch
-	_Planner = DefaultPlanner
+	_Planner = DefaultSelector
 
 
 	def __iter__(self) -> Iterator[Batch]:

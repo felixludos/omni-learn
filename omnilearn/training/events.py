@@ -1,6 +1,6 @@
 from .imports import *
 from ..core import ToolKit, Event
-from ..abstract import (AbstractTrainer, AbstractPlanner, AbstractBatch, AbstractDataset, AbstractEvent)
+from ..abstract import (AbstractTrainer, AbstractSelector, AbstractBatch, AbstractDataset, AbstractEvent)
 
 from ..util import DynamicMeter, IntervalMeter, Meter
 
@@ -85,7 +85,7 @@ class Pbar_Reporter(ReporterBase):
 
 
 	_max_alpha = 0.01
-	def setup(self, trainer: AbstractTrainer, planner: AbstractPlanner, batch_size: int) -> Self:
+	def setup(self, trainer: AbstractTrainer, planner: AbstractSelector, batch_size: int) -> Self:
 		total_iterations = planner.expected_iterations(batch_size)
 
 		self._meters = {key: DynamicMeter(alpha=self._meter_ema_alpha, target_halflife=self._meter_ema_halflife) for key in self._print_metrics}

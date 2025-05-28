@@ -1,6 +1,7 @@
 from .imports import *
 from .staging import AutoStaged
 from .containers import Structured
+from ..mixins import AbstractCheckpointable, AbstractNamed
 from ..abstract import AbstractMachine, AbstractEvent, AbstractTrainer, AbstractDataset, AbstractBatch
 
 
@@ -49,7 +50,7 @@ class Machine(AutoStaged, Structured, AbstractMachine):
 
 
 
-class AbstractSystem(AbstractStaged):
+class AbstractSystem(AbstractNamed, AbstractStaged, AbstractCheckpointable):
 	@property
 	def source(self):
 		raise NotImplementedError
@@ -62,35 +63,62 @@ class AbstractSystem(AbstractStaged):
 
 
 
-class System(Machine, AbstractSystem):
-	def __init__(self, src: 'AbstractDataset', *other: AbstractGadget, env: Dict[str, AbstractGadget], **kwargs):
-		super().__init__(*other, *env.values(), **kwargs)
-		self._source = src
-		self._env = env
+# class SystemBase(Machine, AbstractSystem):
+# 	def __init__(self, src: 'AbstractDataset', *args, **kwargs):
+# 		super().__init__(*args, **kwargs)
+# 		self._source = src
+#
+# 	@property
+# 	def source(self):
+# 		return self._source
+#
+# 	def gadgetry(self) -> Iterator[AbstractGadget]:
+# 		yield from self._env.values()
+#
+# 	def iterate(self, batch_size: int = None, **kwargs):
+# 		return self._source.iterate(batch_size, **kwargs)
+#
+# 	def enumerate(self, batch_size: int = None, **kwargs):
+# 		pass
+#
+# 	def batch(self, batch_size: int = None, **kwargs):
+# 		return self._source.batch(batch_size, **kwargs)
+#
+# 	def _stage(self, scape: AbstractMechanics = None):
+# 		if scape is None:
+# 			# create scape based on content
+# 			scape = Mechanics(self.source, *self.gadgetry())
+# 		super()._stage(scape)
+# 		self.source.stage(scape)
+# 		for gadget in self.gadgetry():
+# 			if isinstance(gadget, AbstractStaged):
+# 				gadget.stage(scape)
+# 		return scape
 
 
-	@property
-	def source(self):
-		return self._source
 
-
-	def iterate(self, batch_size: int, **kwargs):
-		return self._source.iterate(batch_size, **kwargs)
-
-
-	def batch(self, batch_size: int, **kwargs):
-		return self._source.batch(batch_size, **kwargs)
-
-
-	def _stage(self, scape: AbstractMechanics):
-		super()._stage(scape)
-		for key, e in self._env.items():
-			if isinstance(e, AbstractStaged):
-				e.stage(scape)
-		for key, e in self._events.items():
-			if isinstance(e, AbstractStaged):
-				e.stage(scape)
-
+# class PlannedSystem(SystemBase):
+# 	def __init__(self, src: 'AbstractDataset', trainer: AbstractTrainer, **kwargs):
+# 		super().__init__(src, **kwargs)
+# 		self._trainer = trainer
+#
+# 	@property
+# 	def name(self):
+# 		return self._trainer.name_using(self.source)
+#
+# 	def gadgetry(self) -> Iterator[AbstractGadget]:
+# 		yield from self._trainer.gadgetry()
+#
+#
+#
+# class System(SystemBase):
+# 	def __init__(self, src: 'AbstractDataset', *other, env: Dict[str, AbstractGadget], **kwargs):
+# 		super().__init__(src, *other, *env.values(), **kwargs)
+# 		self._env = env
+# 		self._other = other
+#
+# 	def gadgetry(self) -> Iterator[AbstractGadget]:
+# 		yield from self._env.values()
 
 
 

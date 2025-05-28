@@ -13,7 +13,11 @@ class AbstractSource(AbstractNamed, AbstractSized):
 		raise NotImplementedError
 
 
-	def actualize(self, info: Dict[str, Any], planner: 'AbstractPlanner' = None) -> 'AbstractBatch':
+	def actualize(self, info: Dict[str, Any], planner: 'AbstractSelector' = None) -> 'AbstractBatch':
+		raise NotImplementedError
+
+
+	def enumerate(self, batch_size: int, **kwargs) -> Iterator[Tuple[int, 'AbstractBatch']]:
 		raise NotImplementedError
 
 
@@ -25,7 +29,7 @@ class AbstractSystem(AbstractPlanning, AbstractSource):
 
 
 
-class AbstractPlanner(AbstractPlanning, AbstractSource):
+class AbstractSelector(AbstractJsonable):#(AbstractPlanning, AbstractSource):
 	def draw(self, size: int) -> Dict[str, Any]:
 		'''create the info for a new batch'''
 		raise NotImplementedError
@@ -69,18 +73,18 @@ class AbstractBatch(AbstractDataset, AbstractGame): # AbstractIndustry
 
 
 	@property
-	def plan(self) -> Optional[AbstractPlanner]:
+	def plan(self) -> Optional[AbstractSelector]:
 		raise NotImplementedError
 
 
 
-class AbstractEngine(AbstractSettings): # AbstractIndustry
-	def loop(self) -> Iterator[AbstractGame]:
-		raise NotImplementedError
-
-
-	def run(self) -> JSONDATA:
-		for _ in self.loop(): pass
+# class AbstractEngine(AbstractSettings): # AbstractIndustry
+# 	def loop(self) -> Iterator[AbstractGame]:
+# 		raise NotImplementedError
+#
+#
+# 	def run(self) -> JSONDATA:
+# 		for _ in self.loop(): pass
 
 
 
@@ -107,16 +111,85 @@ class AbstractOptimizer(AbstractNamed, AbstractEvent):
 
 
 
-class AbstractTrainer(AbstractNamed, AbstractEngine):
-	@property
-	def model(self) -> AbstractModel:
-		raise NotImplementedError
-
-
+class AbstractTrainer(AbstractNamed, AbstractCheckpointable, AbstractBatchable, AbstractJsonable):
 	@property
 	def dataset(self) -> AbstractDataset:
 		raise NotImplementedError
+	@property
+	def model(self) -> AbstractModel:
+		raise NotImplementedError
+	@property
+	def optimizer(self) -> AbstractOptimizer:
+		raise NotImplementedError
 
+	def train(self):
+		raise NotImplementedError
+	def eval(self):
+		raise NotImplementedError
+	def to(self, device: str = None):
+		raise NotImplementedError
+
+	def gadgetry(self) -> Iterator[AbstractGadget]:
+		raise NotImplementedError
+
+	def prepare(self) -> Self:
+		raise NotImplementedError
+
+	def remember(self, **info: JSONDATA) -> Self:
+		raise NotImplementedError
+
+	def describe(self) -> str:
+		raise NotImplementedError
+
+	def learn(self, batch: AbstractBatch) -> bool:
+		raise NotImplementedError
+
+	def _terminate_fit(self, batch: AbstractBatch) -> bool:
+		raise NotImplementedError
+
+	def status(self) -> JSONDATA:
+		raise NotImplementedError
+
+	def summary(self) -> str:
+		raise NotImplementedError
+
+
+class AbstractPlanner:
+	def to_batch(self, info: Dict[str, Any]) -> 'AbstractBatch':
+		raise NotImplementedError
+
+	@property
+	def batch_size(self) -> int:
+		'''default batch size for the planner'''
+		raise NotImplementedError
+
+	@property
+	def max_steps(self) -> Optional[int]:
+		'''maximum number of steps to take in a plan'''
+		raise NotImplementedError
+
+	@property
+	def max_epochs(self) -> Optional[int]:
+		'''maximum number of epochs to take in a plan'''
+		raise NotImplementedError
+
+	@property
+	def total_steps(self) -> Optional[int]:
+		raise NotImplementedError
+
+	@property
+	def steps_remaining(self) -> Optional[int]:
+		raise NotImplementedError
+
+	@property
+	def past_steps(self) -> Optional[int]:
+		raise NotImplementedError
+
+	def __iter__(self):
+		raise NotImplementedError
+
+	def __next__(self):
+		raise NotImplementedError
 
 
 # class AbstractReporter(AbstractGadget):

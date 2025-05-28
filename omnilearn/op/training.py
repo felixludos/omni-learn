@@ -1,13 +1,13 @@
 from .imports import *
 from .common import Machine, Event
 
-from ..training import CheckpointableTrainer, Pbar_Reporter, Checkpointer as _Checkpointer, DefaultPlanner
+from ..training import CheckpointableTrainer, Pbar_Reporter, Checkpointer as _Checkpointer, TrainerBase
 from ..training import WandB_Monitor as _WandB_Monitor, EvaluatorBase as _EvaluatorBase
 
 
 
-class Planner(Machine, DefaultPlanner):
-	pass
+# class Planner(Machine, DefaultSelector):
+# 	pass
 
 
 
@@ -35,17 +35,17 @@ class Checkpointer(Machine, _Checkpointer):
 
 
 
-class Trainer(Configurable, CheckpointableTrainer):
-	_Planner = Planner
-	_Reporter = Reporter
-	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, reporter: AbstractEvent = None,
-				 env: Dict[str, AbstractMachine] = None, events: Dict[str, AbstractEvent] = None,
-				 budget: Union[int, Dict[str, int]] = None, batch_size: int = None, **kwargs):
-		if isinstance(budget, int):
-			budget = {'max_iterations': budget}
-		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, events=events,
-						 batch_size=batch_size, **kwargs)
-		self._budget = budget
+# class Trainer(Configurable, TrainerBase):
+# 	# _Planner = Planner
+# 	_Reporter = Reporter
+# 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, reporter: AbstractEvent = None,
+# 				 env: Dict[str, AbstractMachine] = None, events: Dict[str, AbstractEvent] = None,
+# 				 budget: Union[int, Dict[str, int]] = None, batch_size: int = None, **kwargs):
+# 		if isinstance(budget, int):
+# 			budget = {'max_iterations': budget}
+# 		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, events=events,
+# 						 batch_size=batch_size, **kwargs)
+# 		self._budget = budget
 
 
 class Evaluator(Configurable, _EvaluatorBase):

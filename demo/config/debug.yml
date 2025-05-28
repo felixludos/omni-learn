@@ -9,7 +9,8 @@ _base: [demo]
 
 #budget: 5
 
-use-wandb: no
+wandb: no
+out-dir: no
 
 # hidden: [2]
 budget: 10
@@ -18,14 +19,17 @@ budget: 10
 #   _type: meaner
 
 dataset._type: bernies
+dataset._type: mnist
+
+max-steps: 1000
 
 #log.val_accuracy: yes
 
-events.evaluator:
-  _type: evaluator
-  eval_reporter: null
-  metrics:
-    accuracy: 10
+#events.evaluator:
+#  _type: evaluator
+#  eval_reporter: null
+#  metrics:
+#    accuracy: 10
 
 # model:
 #   app:

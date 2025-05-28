@@ -1,6 +1,6 @@
 from .imports import *
 from ..core import Batch, ToolKit, Structured
-from ..abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractEvent, AbstractPlanner, AbstractReporter
+from ..abstract import AbstractMachine, AbstractModel, AbstractDataset, AbstractOptimizer, AbstractEvent, AbstractSelector, AbstractReporter
 from omniply.apps.training import TrainerBase as _TrainerBase
 # from ..mixins import Prepared
 from .events import ReporterBase
@@ -108,7 +108,7 @@ class TrainerBase(AutoSetup, _TrainerBase):
 		return system
 
 
-	def _setup_fit(self, src: AbstractDataset, *, device: str = None, **settings: Any) -> AbstractPlanner:
+	def _setup_fit(self, src: AbstractDataset, *, device: str = None, **settings: Any) -> AbstractSelector:
 		return self._planner.setup(src, **settings)
 
 
@@ -117,7 +117,7 @@ class TrainerBase(AutoSetup, _TrainerBase):
 			e.end(batch)
 
 
-	def loop(self, batch_size: int = None, *, system: Structured = None, planner: AbstractPlanner = None):
+	def loop(self, batch_size: int = None, *, system: Structured = None, planner: AbstractSelector = None):
 		if batch_size is None:
 			assert self._batch_size is not None, 'batch_size must be provided if not set'
 			batch_size = self._batch_size

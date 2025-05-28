@@ -2,6 +2,7 @@ from .imports import *
 from omnilearn import *
 from omnilearn.op import *
 from omnilearn import autoreg
+from omnilearn import scripts
 from torchvision.datasets import MNIST as Torchvision_MNIST
 
 
@@ -125,7 +126,7 @@ class ImageClassification(Machine):
 
 
 
-@fig.script('train')
+# @fig.script('train')
 def train_mnist(cfg: fig.Configuration):
 
     record_step = cfg.pull('record-step', False)

@@ -17,10 +17,10 @@ class OptimizerBase(Machine, AbstractOptimizer):
 	@property
 	def objective_direction(self) -> int:
 		return 1 if self._maximize else -1
-	
 
-	def setup(self, model: AbstractModel) -> Self:
-		return self
+
+	# def setup(self, model: AbstractModel) -> Self:
+	# 	return self
 
 
 
@@ -43,9 +43,9 @@ class PytorchOptimizer(OptimizerBase, O.Optimizer):
 			self.add_param_group(param_group)
 
 
-	def setup(self, model: Model) -> Self:
-		self.add_parameters(model.parameters())
-		return super().setup(model)
+	# def setup(self, model: Model) -> Self:
+	# 	self.add_parameters(model.parameters())
+	# 	return super().setup(model)
 		
 
 	def step(self, batch: AbstractBatch) -> AbstractBatch:

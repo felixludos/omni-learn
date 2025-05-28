@@ -4,32 +4,32 @@ try:
 except ImportError:
 	wandb = None
 
+from .. import *
+from ..op import *
+from omnibelt import flatten
 
-@fig.script('train', description='Iterative training')
+
+@fig.script('train', description='Iterative optimization on a dataset using a trainer')
 def train(cfg: fig.Configuration):
 	"""
-	Evaluate a `strategy` on a specific `task` (using a specific `protocol`).
-
-	Optionally saves results to a directory with `out-dir` as the root.
-
-	:param task: The task to evaluate.
-	:type task: AbstractTask
-	:param strategy: The strategy to evaluate (ie. the model).
-	:type strategy: AbstractStrategy
-	:param protocol: The protocol to use for evaluation.
-	:type protocol: AbstractProtocol
-	:return:
+	readme todo
 	"""
 	medium = cfg.pull('medium', where_am_i())
 	pbar: bool = cfg.pull('pbar', medium != 'cluster')
 	pstdout: bool = cfg.pull('pstdout', not pbar)
+
+	record_step = cfg.pull('record-step', False)
+	if record_step:
+		Dataset._Batch = VizBatch
+		# Trainer._Batch = VizBatch
+		fig.component('mechanism')(VizMechanism)
 
 	use_wandb = cfg.pulls('use-wandb', 'wandb', default=wandb is not None)
 	if use_wandb and wandb is None:
 		raise ValueError('You need to install `wandb` to use `wandb`')
 
 	out_root = cfg.pull('out-dir', None)
-	if out_root is not None:
+	if out_root:
 		out_root = Path(out_root)
 		out_root.mkdir(exist_ok=True)
 
@@ -50,7 +50,7 @@ def train(cfg: fig.Configuration):
 	trainer: AbstractTrainer = cfg.pull('trainer')
 
 	if ckptpath is not None:
-		trainer.load_checkpoint(ckptpath)
+		trainer.load_checkpoint(path=ckptpath)
 
 	pre_targets = cfg.pull('pre', None)
 	if pre_targets is not None:
@@ -65,36 +65,32 @@ def train(cfg: fig.Configuration):
 	if out_targets is not None:
 		out_targets = flatten(out_targets)
 
-	# log_table = cfg.pull('log-table', 4)
-	# log_fails = cfg.pull('log-fails', 10)
-	# log_samples = cfg.pull('log-samples', (not use_wandb or log_table is not None) and out_root is not None)
-	# drop_keys = cfg.pull('drop-keys', [])
-
 	ckpt_freq = cfg.pulls('ckpt-freq', 'ckpt', default=None)
 	error_ckpt = cfg.pull('err-ckpt', True)
 
-	out_dir = trainer.prepare(out_root)
-
+	trainer.prepare() # internally stages with scape
+	out_dir = out_root.joinpath(trainer.name) if out_root else None
 	if out_dir is not None:
 		with out_dir.joinpath('config.yaml').open('w') as f:
 			f.write(str(cfg))
 
 	wandb_run = None
-	check_confirmation = None
 	if use_wandb:
 		wandb_dir = out_dir.absolute()
 		wandb_config = trainer.json()
 		project_name = cfg.pull('project-name', '{dataset.name}')
 		project_name = pformat(project_name, trainer=trainer, model=trainer.model, dataset=trainer.dataset,
 							   config=wandb_config)
-		wand_id = None
-		wandb_run = wandb.init(project=project_name, name=trainer.name, config=wandb_config, dir=wandb_dir, id=wand_id)
+		wandb_id = None
+		wandb_run = wandb.init(project=project_name, name=trainer.name, config=wandb_config, dir=wandb_dir, id=wandb_id)
 		wandb_addr = f'{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}'
-
+		trainer.remember(wandb={'id': wandb_run.id, 'entity': wandb_run.entity, 'project': wandb_run.project})
 	# sample_logger = None
 	# if log_samples:
 	# assert out_dir is not None, f'log-samples requires out-dir to be set'
 	# logger = out_dir.joinpath('log.jsonl').open('a')
+
+	limit = cfg.pull('limit', None)
 
 	desc = trainer.describe()
 	if desc is not None:
@@ -104,7 +100,7 @@ def train(cfg: fig.Configuration):
 		print(f'Saving results to {out_dir}')
 		print()
 
-	artifacts = trainer.pre_loop()
+	artifacts = trainer.pre_loop(pre_targets)
 	if artifacts is not None:
 		if 'stats' in artifacts:
 			print(f'Pre-loop stats:')
@@ -118,19 +114,15 @@ def train(cfg: fig.Configuration):
 				tbl = wandb.Table(dataframe=tbl)
 			wandb_run.log({f'study': tbl})
 
-	itr = trainer.remaining_iterations()
-	num_digits = len(str(len(itr))) + 1
-	if out_dir is not None and ckpt_freq is not None:
-		ckptpath = out_dir / f'ckpt-{0:0{num_digits}}'
-		trainer.checkpoint(ckptpath)
-		if artifacts is not None:
-			with ckptpath.joinpath('artifacts.json').open('w') as f:
-				json.dump(artifacts, f)
-
-	if pbar: itr = tqdm(itr, desc=f'[score]')
-	for i in itr:
+	itr = trainer.enumerate(limit)
+	past_iterations = trainer.past_steps
+	remaining_iterations = trainer.expected_steps
+	assert remaining_iterations is not None, 'Trainer must have expected_steps defined (set `max-steps` or `max-epochs` in the configuration)'
+	num_digits = len(str(remaining_iterations)) + 1
+	if pbar: itr = tqdm(itr, initial=past_iterations, total=past_iterations + remaining_iterations)
+	for i, batch in itr:
 		try:
-			sample = trainer.step(i)
+			terminate = trainer.learn(batch)
 		except:
 			if out_dir is not None and error_ckpt:
 				trainer.checkpoint(out_dir / f'error{i}')
@@ -147,8 +139,7 @@ def train(cfg: fig.Configuration):
 
 		# log to wandb
 		if wandb_run is not None:
-			if 'log' in sample:
-				wandb_run.log(flatten(sample['log']), step=i)
+			wandb_run.log(flatten(batch['log']), step=i)
 
 		# validation step
 
@@ -157,8 +148,8 @@ def train(cfg: fig.Configuration):
 			trainer.checkpoint(out_dir / f'ckpt-{i+1:0{num_digits}}')
 
 		# early stopping
-		if sample.get('terminate', False):
-			if pbar: itr.close()
+		if terminate:
+			if pbar: source.close()
 			break
 
 	summary = trainer.summary()
@@ -170,9 +161,9 @@ def train(cfg: fig.Configuration):
 	# 	logger.close()
 
 	if out_dir is not None:
-		trainer.checkpoint(out_dir)
+		trainer.checkpoint(out_dir.joinpath('final'))
 
-	output = trainer.post_loop()
+	output = trainer.post_loop(out_targets)
 
 	if wandb_run is not None:
 		# extract out from (full) output

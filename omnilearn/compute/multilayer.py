@@ -46,9 +46,10 @@ class MLP(Model, nn.Sequential):
 
 	@property
 	def name(self) -> str:
-		desc = f'{len(self._hidden)}-{self._nonlin}' if self._hidden is not None else f'-{self._nonlin}'
-		return f'MLP{desc}' if not self._is_prepared \
-			else f'MLP{desc}-{human_size(parameter_count(self))}'
+		# desc = f'{len(self._hidden)}-{self._nonlin}' if self._hidden is not None else f'-{self._nonlin}'
+		# return f'MLP{desc}' if not self._is_prepared \
+		# 	else f'MLP{desc}-{human_size(parameter_count(self))}'
+		return 'mlp'
 
 	@staticmethod
 	def _build(din: Union[int, spaces.AbstractSpace], dout: Union[int, spaces.AbstractSpace],
