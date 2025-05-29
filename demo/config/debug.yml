@@ -5,7 +5,7 @@ _base: [demo]
 
 # unit: i
 
-# record-step: yes
+record-step: yes
 
 #budget: 5
 

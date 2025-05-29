@@ -129,6 +129,12 @@ def train(cfg: fig.Configuration):
 				trainer.checkpoint(out_dir / f'error{i}')
 			raise
 
+		if record_step:
+			if pbar: itr.close()
+			print()
+			print(batch.report(**cfg.pull('report-settings', {})))
+			break
+
 		# # (internal) log progress
 		# if sample_logger is not None:
 		# 	if drop_keys:
@@ -150,7 +156,7 @@ def train(cfg: fig.Configuration):
 
 		# early stopping
 		if terminate:
-			if pbar: source.close()
+			if pbar: itr.close()
 			break
 
 	summary = trainer.summary()
