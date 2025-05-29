@@ -21,8 +21,8 @@ class DatasetBase(AbstractDataset, AbstractCountableData):
 		return self.size
 
 
-	def load(self, *, device: Optional[str] = None) -> Self:
-		return self
+	def setup(self, *, device: Optional[str] = None):
+		pass
 
 
 	def suggest_batch_size(self, *, prefer_power_of_two: bool = True,

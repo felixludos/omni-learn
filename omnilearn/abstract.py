@@ -147,7 +147,7 @@ class AbstractTrainer(AbstractNamed, AbstractCheckpointable, AbstractBatchable, 
 	def _terminate_fit(self, batch: AbstractBatch) -> bool:
 		raise NotImplementedError
 
-	def status(self) -> JSONDATA:
+	def status(self) -> JSONOBJ:
 		raise NotImplementedError
 
 	def summary(self) -> str:

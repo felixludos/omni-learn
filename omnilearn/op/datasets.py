@@ -6,10 +6,9 @@ from ..data import FileDatasetBase, DefaultSelector
 
 
 class Dataset(Machine, FileDatasetBase):
-	def setup(self):
-		self.load()
+	def setup(self, *, device: Optional[str] = None):
 		self.selector = DefaultSelector(self, )
-		return self
+		return super().setup(device=device)
 
 	def json(self):
 		raise NotImplementedError('include selector hyperparameters')

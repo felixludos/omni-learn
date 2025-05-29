@@ -48,7 +48,7 @@ class MNIST(Dataset):
         return my_root / 'data'
 
     
-    def load(self, *, device: str = None) -> Self:
+    def setup(self, *, device: str = None):
         if self._dataset is None:
             self._dataset = Torchvision_MNIST(self.dataroot, train=self._split != 'test', download=self._download)
             self._image_data = self._dataset.data
@@ -63,7 +63,7 @@ class MNIST(Dataset):
             if device is not None:
                 self._image_data = self._image_data.to(device)
                 self._label_data = self._label_data.to(device)
-        return super().load(device=device)
+        return super().setup(device=device)
 
 
     @tool('image')

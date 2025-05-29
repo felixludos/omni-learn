@@ -7,6 +7,7 @@ from omniply.apps.gaps import Mechanics
 from ..mixins import AbstractCheckpointable, AbstractJsonable
 
 
+
 @fig.component('default-trainer')
 class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 	def __init__(self, dataset: AbstractDataset, model: AbstractModel, optimizer: AbstractOptimizer = None, *,
@@ -57,7 +58,7 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 		raise NotImplementedError
 
 
-	def json(self) -> JSONDATA:
+	def json(self) -> JSONOBJ:
 		data = {
 			'dataset': self._dataset.json(),
 			'model': self._model.json(),
@@ -70,6 +71,9 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 			for key, agent in self._env.items()},
 		}
 		return data
+
+	def status(self) -> JSONOBJ:
+		pass
 
 	@property
 	def dataset(self) -> AbstractDataset:
@@ -116,7 +120,7 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 
 	def describe(self) -> str: # TODO: should be called from the (first) reporter
 		rows = [
-			('Trainer', self.name),
+			('Trainer', self),
 			('Dataset', self.dataset),
 			('Model', self.model),
 			('Optimizer', self.optimizer),
@@ -126,11 +130,15 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 
 		return tabulate(rows)# + '\n'
 
-	def pre_loop(self, targets: Iterable[str] = None) -> Optional[JSONDATA]:
+	def summary(self) -> Optional[str]:
 		pass
 
-	def post_loop(self, targets: Iterable[str] = None) -> Optional[JSONDATA]:
+	def pre_loop(self, targets: Iterable[str] = None) -> Optional[JSONOBJ]:
 		pass
+
+	def post_loop(self, targets: Iterable[str] = None) -> Optional[JSONOBJ]:
+		pass
+
 
 	def enumerate(self, num: Optional[int] = None, *, batch_size: Optional[int] = None,
 				  gadgets: Iterable[AbstractGadget] = None) -> Iterator[Tuple[int, AbstractBatch]]:
@@ -217,156 +225,6 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 	def _terminate_fit(self, batch: AbstractBatch) -> bool:
 		'''is the training done?'''
 		return False
-
-
-
-	# def setup(self, src: AbstractDataset, *, device: str = None):
-	# 	self._dataset = src
-	# 	if device is None:
-	# 		device = self._device
-	# 	src = src.prepare(device=device)
-	# 	system = self._System(src, *self.gadgetry())
-	# 	system.mechanize() # sync for gears and spaces
-	# 	mech = system.mechanics()
-	# 	self.prepare(device=device)
-	# 	for e in self._events.values():
-	# 		e.setup(self, src, device=device)
-	# 	return system
-
-
-	# def _setup_fit(self, src: AbstractDataset, *, device: str = None, **settings: Any) -> AbstractPlanner:
-	# 	return self._planner.setup(src, **settings)
-
-
-	# def _end_fit(self, batch: Batch) -> None:
-	# 	for e in self._events.values():
-	# 		e.end(batch)
-
-	#
-	# def loop(self, batch_size: int = None, *, system: Structured = None, planner: AbstractPlanner = None):
-	# 	if batch_size is None:
-	# 		assert self._batch_size is not None, 'batch_size must be provided if not set'
-	# 		batch_size = self._batch_size
-	# 	if planner is None:
-	# 		assert self._dataset is not None, 'planner must be provided if dataset is not set'
-	# 		planner = self._planner.setup(self._dataset)
-	#
-	# 	batch_cls = self._Batch or getattr(self._dataset, '_Batch', None) or Batch
-	# 	for info in planner.generate(batch_size):
-	# 		batch = batch_cls(info, planner=planner)
-	# 		if system is not None:
-	# 			batch.include(system)
-	# 		yield batch
-	#
-
-	# def fit(self, src: AbstractDataset) -> Self:
-	# 	'''train the model'''
-	# 	for batch in self.fit_loop(src): pass
-	# 	return self
-	#
-	# def fit_loop(self, src: AbstractDataset, *, batch_size: int = None, **settings):
-	# 	if batch_size is None:
-	# 		batch_size = src.suggest_batch_size() if self._batch_size is None else self._batch_size
-	#
-	# 	system = self.setup(src)
-	# 	planner = self._setup_fit(src, **settings)
-	# 	self.reporter.setup(self, planner, batch_size)
-	#
-	# 	batch = None
-	# 	for batch in self.loop(batch_size, system=system, planner=planner):
-	# 		# Note: this runs the optimization step before yielding the batch
-	# 		terminate = self.learn(batch)
-	# 		yield batch
-	# 		if terminate: break
-	#
-	# 	self._end_fit(batch)
-	# 	self.reporter.end(batch)
-	#
-	#
-	# def learn(self, batch: Batch) -> bool:
-	# 	self._optimizer.step(batch)
-	#
-	# 	for e in self._events.values():
-	# 		e.step(batch)
-	#
-	# 	reporter = self.reporter
-	# 	if reporter is not None:
-	# 		reporter.step(batch)
-	#
-	# 	return self._terminate_fit(batch)
-
-
-
-	# def fit_loop(self, src: AbstractDataset, **settings):
-	#
-	# 	system = self.prepare(src)
-	#
-	#
-	#
-	# 	for batch in self.loop(system):
-	# 		terminate = self.learn(batch)
-	# 		yield batch
-	# 		if terminate: break
-	#
-	#
-	#
-	# 	pass
-	#
-	#
-	# def fit(self, src: AbstractDataset, **settings) -> Structured:
-	# 	for _ in self.fit_loop(src): pass
-
-
-	# def _stage(self, scape: AbstractMechanics):
-	# 	super()._stage(scape)
-	# 	self._model.stage(scape)
-	# 	self._optimizer.stage(scape)
-	# 	for key, e in self._env.items():
-	# 		if isinstance(e, AbstractStaged):
-	# 			e.stage(scape)
-	# 	for key, e in self._events.items():
-	# 		if isinstance(e, AbstractStaged):
-	# 			e.stage(scape)
-
-	# def _prepare(self, *, device: str = None):
-	# 	"""
-	# 	Only run once, only uses dataset implicitly - eg through gears. Generally this is not the top level
-	#
-	# 	use setup() instead
-	# 	"""
-	# 	self._model.prepare(device=device)
-	# 	self._optimizer.setup(self._model)
-	# 	self._optimizer.prepare(device=device)
-	# 	for e in self._env.values():
-	# 		e.prepare(device=device)
-	# 	return self
-
-
-class CheckpointableTrainer(TrainerBase):
-	def __init__(self, checkpoint_freq: int = None, **kwargs):
-		super().__init__(**kwargs)
-		self._my_now = datetime.now().strftime('%Y%m%d_%H%M%S')
-
-
-	@property
-	def name(self) -> str:
-		return f'{super().name}_{self._my_now}'
-
-
-	def checkpoint(self, path: Path) -> None:
-		path.mkdir()
-
-		path.joinpath('config.yaml').write_text(str(self._my_config.root))
-
-		self.model.checkpoint(path / 'model')
-		self.optimizer.checkpoint(path / 'optimizer')
-		if self._dataset is not None:
-			self._dataset.checkpoint(path / 'dataset')
-		for ident, machine in self._env.items():
-			machine.checkpoint(path / ident)
-
-		return path
-
 
 
 

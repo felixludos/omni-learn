@@ -121,6 +121,7 @@ def train(cfg: fig.Configuration):
 	assert remaining_iterations is not None, 'Trainer must have expected_steps defined (set `max-steps` or `max-epochs` in the configuration)'
 	num_digits = len(str(remaining_iterations)) + 1
 	if pbar: itr = tqdm(itr, initial=past_iterations, total=past_iterations + remaining_iterations)
+	i = 0
 	for i, batch in itr:
 		try:
 			terminate = trainer.learn(batch)
@@ -167,14 +168,14 @@ def train(cfg: fig.Configuration):
 	# if logger is not None:
 	# 	logger.close()
 
-	if out_dir is not None:
-		trainer.checkpoint(out_dir.joinpath('final'))
+	if out_dir is not None and (ckpt_freq is None or i % ckpt_freq != 0):
+		trainer.checkpoint(out_dir / f'ckpt-{i+1:0{num_digits}}')
 
 	output = trainer.post_loop(out_targets)
 
 	if wandb_run is not None:
 		# extract out from (full) output
-		wandb.summary.update(flatten(out))
+		wandb.summary.update(flatten(output))
 		wandb_run.finish()
 
 	return output

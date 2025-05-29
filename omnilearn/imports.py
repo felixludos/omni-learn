@@ -29,5 +29,5 @@ from torch import nn
 from torch.nn import functional as F
 from torch import optim as O
 
-from omnibelt import JSONDATA
+from omnibelt import JSONDATA, JSONOBJ
 from omnibelt import fixed_width_format_value, fixed_width_format_positive, human_size
