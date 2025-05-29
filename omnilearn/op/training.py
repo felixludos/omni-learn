@@ -1,7 +1,7 @@
 from .imports import *
 from .common import Machine, Event
 
-from ..training import CheckpointableTrainer, Pbar_Reporter, Checkpointer as _Checkpointer, TrainerBase
+from ..training import Pbar_Reporter, Checkpointer as _Checkpointer, TrainerBase
 from ..training import WandB_Monitor as _WandB_Monitor, EvaluatorBase as _EvaluatorBase
 
 

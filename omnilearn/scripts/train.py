@@ -24,6 +24,7 @@ def train(cfg: fig.Configuration):
 		Dataset._Batch = VizBatch
 		# Trainer._Batch = VizBatch
 		fig.component('mechanism')(VizMechanism)
+		report_settings = cfg.pull('report-settings', {})
 
 	use_wandb = cfg.pulls('use-wandb', 'wandb', default=wandb is not None)
 	if use_wandb and wandb is None:
@@ -120,7 +121,7 @@ def train(cfg: fig.Configuration):
 	remaining_iterations = trainer.expected_steps
 	assert remaining_iterations is not None, 'Trainer must have expected_steps defined (set `max-steps` or `max-epochs` in the configuration)'
 	num_digits = len(str(remaining_iterations)) + 1
-	if pbar: itr = tqdm(itr, initial=past_iterations, total=past_iterations + remaining_iterations)
+	if pbar and not record_step: itr = tqdm(itr, initial=past_iterations, total=past_iterations + remaining_iterations)
 	i = 0
 	for i, batch in itr:
 		try:
@@ -132,8 +133,7 @@ def train(cfg: fig.Configuration):
 
 		if record_step:
 			if pbar: itr.close()
-			print()
-			print(batch.report(**cfg.pull('report-settings', {})))
+			print(batch.report(**report_settings))
 			break
 
 		# # (internal) log progress

@@ -118,6 +118,7 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 		self.optimizer.add_parameters(self.model.parameters())
 		return self
 
+
 	def describe(self) -> str: # TODO: should be called from the (first) reporter
 		rows = [
 			('Trainer', self),
@@ -130,13 +131,13 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 
 		return tabulate(rows)# + '\n'
 
-	def summary(self) -> Optional[str]:
-		pass
-
 	def pre_loop(self, targets: Iterable[str] = None) -> Optional[JSONOBJ]:
 		pass
 
 	def post_loop(self, targets: Iterable[str] = None) -> Optional[JSONOBJ]:
+		pass
+
+	def summary(self) -> Optional[str]:
 		pass
 
 
