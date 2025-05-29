@@ -51,6 +51,12 @@ class MLP(Model, nn.Sequential):
 		# 	else f'MLP{desc}-{human_size(parameter_count(self))}'
 		return 'mlp'
 
+	def __str__(self):
+		return super(AbstractGadget, self).__str__()
+
+	def __repr__(self):
+		return super(AbstractGadget, self).__repr__()
+
 	@staticmethod
 	def _build(din: Union[int, spaces.AbstractSpace], dout: Union[int, spaces.AbstractSpace],
 			   hidden: Optional[Iterable[int]] = None, initializer=None,
@@ -85,7 +91,7 @@ class MLP(Model, nn.Sequential):
 
 		return layers
 
-	def _prepare(self, *, device: Optional[str] = None, 
+	def setup(self, *, device: Optional[str] = None,
 			  input_space: Optional[spaces.AbstractSpace] = None,
 			  output_space: Optional[spaces.AbstractSpace] = None):
 		input_space = input_space or self.input_space
@@ -99,7 +105,6 @@ class MLP(Model, nn.Sequential):
 
 		if device is not None:
 			self.to(device)
-		return super()._prepare(device=device)
 
 	def settings(self):
 		out = super().settings()

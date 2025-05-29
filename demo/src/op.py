@@ -67,17 +67,17 @@ class MNIST(Dataset):
 
 
     @tool('image')
-    def get_images(self, index: np.ndarray) -> torch.Tensor:
+    def get_images(self, indices: np.ndarray) -> torch.Tensor:
         '''returns int8 tensor of shape (N, 28, 28)'''
-        return self._image_data[torch.from_numpy(index)]
+        return self._image_data[torch.from_numpy(indices)]
     @get_images.space
     def image_space(self) -> spaces.Pixels:
         return spaces.Pixels(1, 28, 28, as_bytes=True)
     
 
     @tool('label')
-    def get_labels(self, index: np.ndarray) -> torch.Tensor:
-        return self._label_data[torch.from_numpy(index)]
+    def get_labels(self, indices: np.ndarray) -> torch.Tensor:
+        return self._label_data[torch.from_numpy(indices)]
     @get_labels.space
     def label_space(self) -> spaces.Categorical:
         return spaces.Categorical(10)

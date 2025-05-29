@@ -93,7 +93,7 @@ class AbstractModel(AbstractNamed, AbstractMachine):
 
 
 
-class AbstractOptimizer(AbstractNamed, AbstractEvent):
+class AbstractOptimizer(AbstractNamed):
 	def step(self, batch: AbstractBatch) -> None:
 		raise NotImplementedError
 

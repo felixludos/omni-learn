@@ -6,6 +6,7 @@ except ImportError:
 
 from .. import *
 from ..op import *
+from ..abstract import AbstractTrainer
 from omnibelt import flatten
 
 

@@ -1,7 +1,7 @@
 from .imports import *
 from ..spaces.abstract import AbstractSpace
 from ..abstract import AbstractTrainer, AbstractBatch
-from ..mixins import AbstractBatchable
+from ..mixins import AbstractBatchable, AbstractCountableData
 from omniply.apps import DictGadget
 
 
@@ -40,7 +40,7 @@ class NoNewBatches(Exception):
 	pass
 
 
-class Batch(Context, AbstractBatch):
+class Batch(Context, AbstractBatch, AbstractCountableData):
 	_BatchInfo = BatchInfo
 	def __init__(self, source: AbstractBatchable, info: Dict[str, Any] = None, *,
 				 allow_draw: bool = True, **kwargs):

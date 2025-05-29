@@ -95,6 +95,8 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 		scape = Mechanics(self.dataset, *self.gadgetry())
 		self.stage(scape)
 		self.dataset.stage(scape)
+		self.model.stage(scape)
+		self.optimizer.stage(scape)
 		if self._batch_size is None:
 			self._batch_size = self.dataset.suggested_batch_size
 		for gadget in self.gadgetry():
@@ -109,16 +111,20 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 			self._name = pformat(self._name_format, trainer=self, dataset=self.dataset, model=self.model,
 								 optimizer=self.optimizer, now=self._timestamp, unique=urandom(16).hex())
 
+		self.optimizer.add_parameters(self.model.parameters())
 		return self
 
 	def describe(self) -> str: # TODO: should be called from the (first) reporter
-		lines = [
-			f'Trainer: {self.name}',
-			f'Dataset: {self.dataset}',
-			f'Model: {self.model}',
-			f'Optimizer: {self.optimizer}',
+		rows = [
+			('Trainer', self.name),
+			('Dataset', self.dataset),
+			('Model', self.model),
+			('Optimizer', self.optimizer),
 		]
-		return '\n'.join(lines) + '\n'
+		for name, machine in self._env.items():
+			rows.append((f'{name}', machine))
+
+		return tabulate(rows)# + '\n'
 
 	def pre_loop(self, targets: Iterable[str] = None) -> Optional[JSONDATA]:
 		pass
@@ -128,9 +134,9 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 
 	def enumerate(self, num: Optional[int] = None, *, batch_size: Optional[int] = None,
 				  gadgets: Iterable[AbstractGadget] = None) -> Iterator[Tuple[int, AbstractBatch]]:
-		for batch in self.batches(num, batch_size=batch_size, gadgets=gadgets):
+		for batch in self.iterate(num, batch_size=batch_size, gadgets=gadgets):
 			yield self._past_iterations, batch
-	def batches(self, num: Optional[int] = None, *, batch_size: Optional[int] = None, force: bool = False,
+	def iterate(self, num: Optional[int] = None, *, batch_size: Optional[int] = None, force: bool = False,
 				gadgets: Iterable[AbstractGadget] = None) -> Iterator[AbstractBatch]:
 		remaining = self.steps_remaining
 		if remaining is None:
@@ -195,7 +201,7 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 		return self._past_batches
 
 	def __iter__(self) -> Iterator[AbstractBatch]:
-		return self.batches()
+		return self.iterate()
 	def __next__(self) -> AbstractBatch:
 		return self.batch()
 

@@ -1,13 +1,14 @@
 from .imports import *
 
 from ..core import Batch
+from ..mixins import AbstractCountableData
 from .selection import DefaultSelector
 
 from .abstract import AbstractDataset, AbstractFileDataset
 
 
 
-class DatasetBase(AbstractDataset):
+class DatasetBase(AbstractDataset, AbstractCountableData):
 	_Batch = Batch
 	_Planner = DefaultSelector
 
@@ -39,8 +40,8 @@ class DatasetBase(AbstractDataset):
 	def iterate(self, batch_size: Optional[int] = None, *gadgets: AbstractGadget,
 				show_pbar: bool = True, count_samples: bool = True, pbar_desc=None,
 				max_epochs: int = 1, hard_budget: bool = True, drop_last: bool = False,
-				shuffle: bool = None, seed: Optional[int] = None,
-				**settings: Any) -> Iterator[Batch]:
+				shuffle: bool = None, seed: Optional[int] = None, **settings: Any) -> Iterator[Batch]:
+		raise NotImplementedError('needs to be updated!')
 		if batch_size is None:
 			batch_size = self.suggest_batch_size()
 		if shuffle is None:
