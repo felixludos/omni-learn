@@ -2,7 +2,6 @@ from .imports import *
 from ..core import Batch, ToolKit, Structured
 from ..abstract import (AbstractMachine, AbstractTrainer, AbstractModel, AbstractDataset, AbstractOptimizer,
 						AbstractEvent, AbstractPlanner, AbstractBatch)
-# from omniply.apps.training import TrainerBase as _TrainerBase
 from omniply.apps.gaps import Mechanics
 from ..mixins import AbstractCheckpointable, AbstractJsonable
 

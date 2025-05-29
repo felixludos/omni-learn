@@ -19,10 +19,6 @@ class OptimizerBase(Machine, AbstractOptimizer):
 		return 1 if self._maximize else -1
 
 
-	# def setup(self, model: AbstractModel) -> Self:
-	# 	return self
-
-
 
 class PytorchOptimizer(OptimizerBase, O.Optimizer):
 	def __init__(self, params=None, **kwargs):
@@ -42,11 +38,6 @@ class PytorchOptimizer(OptimizerBase, O.Optimizer):
 		for param_group in param_groups:
 			self.add_param_group(param_group)
 
-
-	# def setup(self, model: Model) -> Self:
-	# 	self.add_parameters(model.parameters())
-	# 	return super().setup(model)
-		
 
 	def step(self, batch: AbstractBatch) -> AbstractBatch:
 		objective = batch[self.objective]

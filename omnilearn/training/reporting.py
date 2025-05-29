@@ -1,13 +1,8 @@
-from .imports import *
-from .common import Machine, Event
+
+
 
 from ..training import Pbar_Reporter, Checkpointer as _Checkpointer, TrainerBase
 from ..training import WandB_Monitor as _WandB_Monitor, EvaluatorBase as _EvaluatorBase
-
-
-
-# class Planner(Machine, DefaultSelector):
-# 	pass
 
 
 
@@ -35,20 +30,8 @@ class Checkpointer(Machine, _Checkpointer):
 
 
 
-# class Trainer(Configurable, TrainerBase):
-# 	# _Planner = Planner
-# 	_Reporter = Reporter
-# 	def __init__(self, model: AbstractModel, optimizer: AbstractOptimizer, *, reporter: AbstractEvent = None,
-# 				 env: Dict[str, AbstractMachine] = None, events: Dict[str, AbstractEvent] = None,
-# 				 budget: Union[int, Dict[str, int]] = None, batch_size: int = None, **kwargs):
-# 		if isinstance(budget, int):
-# 			budget = {'max_iterations': budget}
-# 		super().__init__(model=model, optimizer=optimizer, reporter=reporter, env=env, events=events,
-# 						 batch_size=batch_size, **kwargs)
-# 		self._budget = budget
-
-
 class Evaluator(Configurable, _EvaluatorBase):
 	def __init__(self, metrics: Iterable[str] = None, *, freq: int = None, eval_reporter = None, skip_0 = True, eval_src = None, show_pbar: bool = True, single_batch: bool = True, batch_size: int = None, eval_batch_size: int = None, prefix: str = 'val', **kwargs):
 		super().__init__(metrics=metrics, freq=freq, eval_reporter=eval_reporter, skip_0=skip_0, eval_src=eval_src, show_pbar=show_pbar, single_batch=single_batch, batch_size=batch_size, eval_batch_size=eval_batch_size, prefix=prefix, **kwargs)
+
 
