@@ -1,2 +1,2 @@
 from .datasets import DatasetBase, FileDatasetBase
-from .selection import DefaultSelector
+from .selection import InfiniteSelector

@@ -29,16 +29,19 @@ class AbstractSystem(AbstractPlanning, AbstractSource):
 
 
 
-class AbstractSelector(AbstractJsonable):#(AbstractPlanning, AbstractSource):
-	def draw(self, size: int) -> Dict[str, Any]:
-		'''create the info for a new batch'''
+class AbstractSelector(AbstractJsonable):
+	def draw(self, n: int, /) -> np.ndarray:
+		'''draw a subset of the dataset'''
 		raise NotImplementedError
 
 
-	def generate(self, step_size: int) -> Iterator[Dict[str, Any]]:
-		'''generate batch infos with given step size'''
+	def status(self) -> JSONOBJ:
 		raise NotImplementedError
 
+
+	def reset(self, size: int = None) -> Self:
+		'''reset the selector state, optionally to a specific size'''
+		raise NotImplementedError
 
 
 class AbstractMachine(AbstractCheckpointable, AbstractSettings, AbstractStaged, AbstractGadget):

@@ -60,9 +60,9 @@ class Batch(Context, AbstractBatch, AbstractCountableData):
 		self._info.data.update(new_info)
 		return self
 
-	def new(self, size: int = None) -> 'Batch':
+	def new(self, size: int = None, *extra_gadgets: AbstractGadget) -> 'Batch':
 		if self._allow_draw:
-			return self.source.batch(size, self.gadgetry())
+			return self._source.batch(size, *extra_gadgets, gadgets=self.gadgetry())
 		raise NoNewBatches(f'creating new batches using the current batch is currently not allowed')
 
 	def gadgetry(self) -> Iterator[AbstractGadget]:

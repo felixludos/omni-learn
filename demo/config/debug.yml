@@ -7,21 +7,17 @@ _base: [demo]
 
 record-step: yes
 
-#budget: 5
-
 wandb: no
 out-dir: no
 
 # hidden: [2]
-budget: 10
+max-steps: 10
 
 # env.meaner:
 #   _type: meaner
 
 dataset._type: bernies
 dataset._type: mnist
-
-max-steps: 1000
 
 #log.val_accuracy: yes
 

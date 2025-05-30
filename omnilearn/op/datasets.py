@@ -1,14 +1,20 @@
 from .imports import *
 from .common import Machine
 
-from ..data import FileDatasetBase, DefaultSelector
+from ..data import FileDatasetBase, InfiniteSelector
 
 
 
 class Dataset(Machine, FileDatasetBase):
+	_Selector = InfiniteSelector
+	def __init__(self, *, selector: AbstractSelector = None, **kwargs):
+		if selector is None:
+			selector = self._Selector()
+		super().__init__(**kwargs)
+		self._selector = selector
+
 	def setup(self, *, device: Optional[str] = None):
-		self.selector = DefaultSelector(self, )
-		return super().setup(device=device)
+		self._selector.reset(self.size)
 
 	def json(self):
 		raise NotImplementedError('include selector hyperparameters')
@@ -18,8 +24,7 @@ class Dataset(Machine, FileDatasetBase):
 
 	@tool('indices')
 	def select_indices(self, size: int) -> np.ndarray:
-		info = self.selector.draw(size)
-		inds = info['index']
+		inds = self._selector.draw(size)
 		return inds
 
 

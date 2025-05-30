@@ -20,20 +20,24 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 		self._name = None
 		self._name_format = name
 		self._timestamp = datetime.now()
+
 		self._dataset = dataset
 		self._model = model
 		self._optimizer = optimizer
-		self._batch_size = batch_size
-		self._seed = seed
+
 		self._env = env
 		self._extra_info = {}
+
+		self._batch_size = batch_size
+		self._seed = seed
+
 		self._max_steps = max_steps
 		self._max_samples = max_samples
 		self._max_epochs = max_epochs
+
 		self._past_batches = None
 		self._past_iterations = None
 		self._past_failures = None
-		self._plan = None
 
 	@property
 	def name(self) -> Optional[str]:
@@ -72,16 +76,18 @@ class TrainerBase(fig.Configurable, AutoStaged, AbstractTrainer):
 		return data
 
 	def status(self) -> JSONOBJ:
-		pass
+		return {
+			'dataset': self.dataset.status(),
+			'model': self.model.status(),
+			'optim': self.optimizer.status(),
+		}
 
 	@property
 	def dataset(self) -> AbstractDataset:
 		return self._dataset
-
 	@property
 	def model(self) -> AbstractModel:
 		return self._model
-
 	@property
 	def optimizer(self) -> AbstractOptimizer:
 		return self._optimizer

@@ -2,27 +2,20 @@ from .imports import *
 
 from ..core import Batch
 from ..mixins import AbstractCountableData
-from .selection import DefaultSelector
+from .selection import InfiniteSelector
 
-from .abstract import AbstractDataset, AbstractFileDataset
+from .abstract import AbstractDataset, AbstractFileDataset, AbstractSelector
 
 
 
 class DatasetBase(AbstractDataset, AbstractCountableData):
 	_Batch = Batch
-	_Planner = DefaultSelector
-
-
 	def __iter__(self) -> Iterator[Batch]:
 		return self.iterate()
 
 
 	def __len__(self) -> int:
 		return self.size
-
-
-	def setup(self, *, device: Optional[str] = None):
-		pass
 
 
 	def suggest_batch_size(self, *, prefer_power_of_two: bool = True,

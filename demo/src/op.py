@@ -10,7 +10,7 @@ from torchvision.datasets import MNIST as Torchvision_MNIST
 @fig.component('mnist')
 class MNIST(Dataset):
     _val_split = 10000
-    def __init__(self, split: str = 'train', download: bool = True, **kwargs):
+    def __init__(self, split: str = 'train', *, download: bool = True, **kwargs):
         super().__init__(**kwargs)
         if self._val_split is None:
             assert split in ('train', 'test'), f'Invalid split: {split}'
@@ -44,7 +44,7 @@ class MNIST(Dataset):
     
 
     @property
-    def dataroot(self) -> str:
+    def dataroot(self) -> Path:
         return my_root / 'data'
 
     
@@ -123,56 +123,6 @@ class ImageClassification(Machine):
 
     def settings(self) -> Dict[str, Any]:
         return {'observation': self.observation_space.json(), 'label': self.label_space.json()}
-
-
-
-# @fig.script('train')
-def train_mnist(cfg: fig.Configuration):
-
-    record_step = cfg.pull('record-step', False)
-    if record_step:
-        Dataset._Batch = VizBatch
-        # Trainer._Batch = VizBatch
-        fig.component('mechanism')(VizMechanism)
-
-    dataset: Dataset = cfg.pull('dataset')
-
-    cfg.push('trainer._type', 'trainer', overwrite=False, silent=True)
-    cfg.push('planner._type', 'planner', overwrite=False, silent=True)
-    cfg.push('reporter._type', 'reporter', overwrite=False, silent=True)
-    trainer: Trainer = cfg.pull('trainer')
-
-    self = trainer
-
-    reporter = self.reporter
-
-    system = self.prepare(src)
-
-    plan = self.plan(system)
-    reporter.begin(self, plan)
-
-    batch_cls = self._Batch or getattr(src, '_Batch', None) or Batch
-    for info in plan.generate(batch_size):
-        batch = batch_cls(info, plan=plan)
-        if system is not None:
-            batch.include(system)
-
-        terminate = self.learn(batch)
-        if terminate: break
-
-    reporter.end(batch)
-
-
-
-
-    if record_step:
-        for batch in trainer.fit_loop(dataset): break
-        print()
-        print(batch.report(**cfg.pull('report-settings', {})))
-    else:
-        trainer.fit(dataset)
-    
-    return trainer
 
 
 
