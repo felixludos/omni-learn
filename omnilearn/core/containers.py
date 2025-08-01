@@ -11,7 +11,7 @@ class Context(omniply_Context):
 
 
 
-class ToolKit(omniply_ToolKit):
+class ToolKit(omniply_Geologist, omniply_ToolKit):
 	_space_of_default = object()
 	def space_of(self, gizmo: str, default: Any = _space_of_default) -> AbstractSpace:
 		try:
@@ -23,7 +23,7 @@ class ToolKit(omniply_ToolKit):
 
 
 
-class Structured(omniply_Structured):
+class Structured(omniply_Geologist, omniply_Structured):
 	pass
 
 

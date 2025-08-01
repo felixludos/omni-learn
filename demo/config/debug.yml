@@ -16,7 +16,7 @@ max-steps: 10
 # env.meaner:
 #   _type: meaner
 
-dataset._type: bernies
+#dataset._type: bernies
 dataset._type: mnist
 
 #log.val_accuracy: yes

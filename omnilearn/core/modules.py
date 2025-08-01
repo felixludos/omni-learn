@@ -1,3 +1,6 @@
+from typing import Mapping
+
+from omniply.gems.abstract import AbstractGeode
 from .imports import *
 from .staging import AutoStaged
 from .containers import Structured
@@ -43,6 +46,11 @@ class Machine(AutoStaged, Structured, AbstractMachine):
 			assert path is None, f'must provide path or data (not both)'
 		self._load_checkpoint_data(data, unsafe=unsafe)
 		return path
+
+
+	def _stage(self, scape: AbstractScape):
+		self._stage_geodes(scape)
+		return super()._stage(scape)
 
 
 	def settings(self) -> Dict[str, Any]:

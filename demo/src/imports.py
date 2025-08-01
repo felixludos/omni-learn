@@ -9,7 +9,7 @@ from collections import Counter
 import json
 import h5py as hf
 from tabulate import tabulate
-from tqdm import tqdm 
+from tqdm import tqdm
 # from omniply import Scope, Selection
 from omniply import AbstractGadget
 # from omniply.apps.gaps import tool, ToolKit, Context#, Scope, Selection

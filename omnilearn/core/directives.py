@@ -3,6 +3,16 @@ from .spaced import SpacedToolDecorator, SpacedToolCraft, ShortcutToolCraft, Spa
 
 
 
+class hparam(omniply_gem):
+	pass
+
+
+
+class submodule(omniply_geode):
+	pass
+
+
+
 class gear(omniply_gear):
 	pass
 
