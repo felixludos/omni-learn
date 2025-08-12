@@ -23,7 +23,7 @@ class ToolKit(omniply_Geologist, omniply_ToolKit):
 
 
 
-class Structured(omniply_Geologist, omniply_Structured):
+class Structured(omniply_Structured):
 	pass
 
 

@@ -11,16 +11,16 @@ class Model(Machine, _Model):
 
 
 class MLP(Model, _MLP):
-	def __init__(self, hidden: Optional[Iterable[int]] = None, *,
-				 nonlin: str = 'elu', output_nonlin: Optional[str] = None,
-				 norm: Optional[str] = None, dropout: Optional[float] = None,
-				 output_norm: Optional[str] = None, output_dropout: Optional[float] = None,
-				 input_dim: Optional[int] = None, output_dim: Optional[int] = None,
-				 **kwargs):
-		super().__init__(hidden=hidden, nonlin=nonlin, output_nonlin=output_nonlin,
-				   norm=norm, dropout=dropout, output_norm=output_norm, output_dropout=output_dropout,
-						 input_dim=input_dim, output_dim=output_dim,
-						 **kwargs)
+	pass
+	# def __init__(self, hidden: Optional[Iterable[int]] = None, *,
+	# 			 nonlin: str = 'elu', output_nonlin: Optional[str] = None,
+	# 			 norm: Optional[str] = None, dropout: Optional[float] = None,
+	# 			 output_norm: Optional[str] = None, output_dropout: Optional[float] = None,
+	# 			 din: Optional[int] = None, dout: Optional[int] = None,
+	# 			 **kwargs):
+	# 	super().__init__(hidden=hidden, nonlin=nonlin, output_nonlin=output_nonlin,
+	# 			   norm=norm, dropout=dropout, output_norm=output_norm, output_dropout=output_dropout,
+	# 					 din=din, dout=dout, **kwargs)
 
 
 class Linear(Model, _Linear):

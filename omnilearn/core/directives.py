@@ -1,5 +1,5 @@
 from .imports import *
-from .spaced import SpacedToolDecorator, SpacedToolCraft, ShortcutToolCraft, SpaceSkill, SpaceCraft, Indicator
+from .spaced import SpacedToolDecorator, SpacedToolCraft, ShortcutToolCraft, SpaceGem, StaticSpace, Indicator
 
 
 
@@ -18,9 +18,8 @@ class gear(omniply_gear):
 
 
 
-class space(SpaceCraft, omniply_gear):
-	class _GearSkill(SpaceSkill, gear._GearSkill):
-		pass
+class space(SpaceGem):
+	pass
 
 
 
