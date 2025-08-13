@@ -53,8 +53,8 @@ class Machine(AutoStaged, Structured, AbstractMachine):
 		return super()._stage(scape)
 
 
-	def settings(self) -> Dict[str, Any]:
-		return {}
+	# def settings(self) -> Dict[str, Any]:
+	# 	return {}
 
 
 

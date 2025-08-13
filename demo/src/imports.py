@@ -1,4 +1,4 @@
-from typing import Union, List, Dict, Any, Tuple, Optional, Type, Iterable, Iterator, Self
+from typing import Union, List, Dict, Any, Tuple, Optional, Type, Iterable, Iterator, Self, Literal
 import sys, os, shutil
 from pathlib import Path
 import subprocess

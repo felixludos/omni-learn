@@ -48,8 +48,9 @@ class AbstractCheckpointable:
 
 
 class AbstractSettings:
-	def settings(self) -> Dict[str, JSONDATA]:
-		raise NotImplementedError
+	pass
+	# def settings(self) -> Dict[str, JSONDATA]:
+	# 	raise NotImplementedError
 
 
 

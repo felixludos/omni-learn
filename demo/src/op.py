@@ -11,7 +11,7 @@ from torchvision.datasets import MNIST as Torchvision_MNIST
 class MNIST(Dataset):
 	_val_split = 10000
 
-	split = hparam('train') # ['train', 'test', 'val']
+	split: Literal['train', 'test', 'val'] = hparam('train') # ['train', 'test', 'val']
 	download = hparam(True)
 	@hparam()
 	def dataroot(self) -> Path:
@@ -102,9 +102,6 @@ class ImageClassification(Machine):
 	@indicator('accuracy')
 	def get_accuracy(self, correct: torch.Tensor) -> torch.Tensor:
 		return correct.float().mean()
-
-	def settings(self) -> Dict[str, Any]:
-		return {'observation': self.observation_space.json(), 'label': self.label_space.json()}
 
 
 
