@@ -1,12 +1,7 @@
 from .imports import *
-from ..core.viz import VizBatch as _VizBatch, VizContext as _VizContext, VizMechanism as _VizMechanism
-from .common import Batch, Context, Mechanism
+from omniply.visual import TraceRecorder as _TraceRecorder
 
-class VizBatch(_VizBatch, Batch):
-    pass
 
-class VizContext(_VizContext, Context):
-    pass
+class TraceRecorder(_TraceRecorder, fig.Configurable):
+	pass
 
-class VizMechanism(_VizMechanism, Mechanism):
-    pass

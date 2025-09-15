@@ -1,7 +1,8 @@
 import omnifig as fig
 
-from .op import Mechanism
+from .op import Mechanism, TraceRecorder
 fig.component('mechanism')(Mechanism)
+fig.component('trace-recorder')(TraceRecorder)
 
 
 # trainer

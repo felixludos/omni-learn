@@ -20,11 +20,10 @@ def train(cfg: fig.Configuration):
 	pstdout: bool = cfg.pull('pstdout', not pbar)
 
 	record_step = cfg.pull('record-step', False)
+	recorder = None
 	if record_step:
-		Dataset._Batch = VizBatch
-		# Trainer._Batch = VizBatch
-		fig.component('mechanism')(VizMechanism)
-		report_settings = cfg.pull('report-settings', {})
+		cfg.push('recorder._type', 'trace-recorder', overwrite=False, silent=True)
+		recorder = cfg.pull('recorder')
 
 	use_wandb = cfg.pulls('use-wandb', 'wandb', default=wandb is not None)
 	if use_wandb and wandb is None:
@@ -124,6 +123,8 @@ def train(cfg: fig.Configuration):
 	if pbar and not record_step: itr = tqdm(itr, initial=past_iterations, total=past_iterations + remaining_iterations)
 	i = 0
 	for i, batch in itr:
+		if record_step:
+			batch.record(recorder)
 		try:
 			terminate = trainer.learn(batch)
 		except:
@@ -133,7 +134,7 @@ def train(cfg: fig.Configuration):
 
 		if record_step:
 			if pbar: itr.close()
-			print(batch.report(**report_settings))
+			print(batch.report())
 			break
 
 		# # (internal) log progress

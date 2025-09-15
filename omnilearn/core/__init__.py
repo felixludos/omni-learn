@@ -3,5 +3,5 @@
 from .directives import space, gear, tool, indicator, hparam, submodule
 from .containers import Context, ToolKit, Mechanism, Batch, Structured
 from .modules import Machine, Event
-from .viz import VizContext, VizMechanism, VizBatch
+# from .viz import VizContext, VizMechanism, VizBatch
 
