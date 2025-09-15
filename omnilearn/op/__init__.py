@@ -1,6 +1,5 @@
 from .common import Machine, Mechanism, Event
 # from .viz import VizBatch, VizContext, VizMechanism
-from .viz import TraceRecorder
 from .datasets import Dataset
 # from .datasets import MNIST
 from ..training import TrainerBase

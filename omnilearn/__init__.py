@@ -1,7 +1,8 @@
 __version__ = '0.9.0'
 
 from .core import *
-from . import spaces
+# from .op import *
 from . import op
+from . import spaces
 
 
