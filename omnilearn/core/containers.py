@@ -2,11 +2,12 @@ from .imports import *
 from ..spaces.abstract import AbstractSpace
 from ..abstract import AbstractTrainer, AbstractBatch
 from ..mixins import AbstractBatchable, AbstractCountableData
+from .staging import StagedGaggle
 from omniply.apps import DictGadget
 
 
 
-class Context(omniply_Context):
+class Context(StagedGaggle, omniply_Context):
 	pass
 
 

@@ -1,6 +1,7 @@
 from .imports import *
 from omniply.gears.mechanics import MechanizedBase, AutoMechanized, MechanizedGame, AbstractMechanics, Mechanics
-from omnibelt.staging import AutoStaged as _AutoStaged, Staged as _Staged, AbstractScape
+from omniply import AbstractGame, AbstractGaggle
+from omnibelt.staging import AutoStaged as _AutoStaged, Staged as _Staged, AbstractScape, AbstractStaged
 
 
 
@@ -27,6 +28,13 @@ class TopLevelStaged(Staged, AutoMechanized):
 		if not self.is_staged and scape is None:
 			scape = self._auto_mechanics()
 		return super().stage(scape)
+
+
+class StagedGaggle(TopLevelStaged, AbstractGaggle):
+	def _stage(self, scape: AbstractScape):
+		for gadget in self.vendors():
+			if isinstance(gadget, AbstractStaged):
+				gadget.stage(scape)
 
 
 

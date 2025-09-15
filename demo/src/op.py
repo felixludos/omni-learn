@@ -12,7 +12,7 @@ class MNIST(Dataset):
 	_val_split = 10000
 
 	split: Literal['train', 'test', 'val'] = hparam('train') # ['train', 'test', 'val']
-	download = hparam(True)
+	download: bool = hparam(True)
 	@hparam()
 	def dataroot(self) -> Path:
 		return my_root / 'data'
